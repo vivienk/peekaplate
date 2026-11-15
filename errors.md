@@ -2690,3 +2690,15 @@ but the owner-menu suite could not load its existing retention-helper import.
 Promoted the unchanged helper and unit tests with the original integration
 suite; no scheduler, cron or retention settings are activated. The source
 contracts and migration remain the previously merged #161 implementation.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T09:23:48.080Z","exitCode":1}
+```
+
+## 2026-11-15 — owner wiring release context
+
+The context validator rejected an appended backend summary at 1,024 characters.
+Removed a redundant configuration-preservation clause rather than changing the
+1,000-character limit. Context refresh/check verifies the bounded summary; no
+runtime behavior, migration or hosted resource changed during this failure.

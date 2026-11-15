@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 uses the shared verifier; hosted release acceptance remains separately recorded. The read-only owner workspace contract lists only the verified actor and current owner/editor restaurant memberships.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 uses the shared verifier; hosted release acceptance remains separately recorded. The read-only owner workspace contract lists only the verified actor and current owner/editor restaurant memberships. owner-analysis.v1 strictly carries dish/goal requests and bounded synthetic review/abstention responses without menu effects.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -55,7 +55,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-menu.ts",
         "packages/contracts/src/owner-menu.test.ts",
         "packages/contracts/src/owner-workspace.ts",
-        "packages/contracts/src/owner-workspace.test.ts"
+        "packages/contracts/src/owner-workspace.test.ts",
+        "packages/contracts/src/owner-analysis.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -63,7 +64,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "f10a8489c334d20df018b282c05d04a45ddb1c0ff17c9f429ca23615fb83cc43"
+      "sourceFingerprint": "af0040d641127b76b7026d21cf8e798ee8df2c6e4c6408c2355a9d4bd7c47153"
     },
     {
       "id": "tokens",
@@ -207,12 +208,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d50cc35ae1cddf81f5dde196c8b072ffee3fc1923c934f0d0a0029552e49c692"
+      "sourceFingerprint": "0b2af6a1e7e361a39ed089c47744c8dcbb3ece67e650d71bf1742f529bc56523"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite owner shell, fields and synthetic preview demos; setup rules require supplied persisted facts, and preview AI cannot apply changes. Auth143/146 use pinned Supabase SDK/public config, confirmed users and isolated purpose-bound recovery; previews force provider Auth off. Live Auth now discovers actor-scoped owner/editor restaurants, opens the merged shell and supplies actor-bound SDK tokens to the report reader. No access is an empty state; identity changes and denial clear old state. Reports validate venue/privacy/status; live workspace never falls back to saved samples. Editable email sources preserve provider placeholders. Persisted setup, menu intake/edit/publish UI and hosted full-journey acceptance remain separate.",
+      "summary": "React/Vite owner shell, fields and synthetic preview demos; setup rules require supplied persisted facts, and preview AI cannot apply changes. Auth143/146 use pinned Supabase SDK/public config, confirmed users and isolated purpose-bound recovery; previews force provider Auth off. Live Auth now discovers actor-scoped owner/editor restaurants, opens the merged shell and supplies actor-bound SDK tokens to the report reader. No access is an empty state; identity changes and denial clear old state. Reports validate venue/privacy/status; live workspace never falls back to saved samples. Editable email sources preserve provider placeholders. Persisted setup, menu intake/edit/publish UI and hosted full-journey acceptance remain separate. The merged menu client and source/draft/photo/review controls are connected to actor-bound workspace access. Opt-in owner AI uses separate evidence-period labels and typed denial cleanup; model activation remains off.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -280,7 +281,32 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/workspace-api.test.tsx",
         "frontend/console/src/owner/workspace.css",
         "docs/owner-session-workspace.md",
-        "tests/e2e/owner-workspace.spec.ts"
+        "tests/e2e/owner-workspace.spec.ts",
+        "frontend/console/src/onboarding/OnboardingLayout.tsx",
+        "frontend/console/src/onboarding/onboarding.css",
+        "frontend/console/src/onboarding/ChooseMenuSource.tsx",
+        "frontend/console/src/onboarding/AddMenuLink.tsx",
+        "frontend/console/src/onboarding/UploadMenu.tsx",
+        "frontend/console/src/onboarding/menu-source.ts",
+        "frontend/console/src/onboarding/menu-source.test.tsx",
+        "frontend/console/src/onboarding/MenuProcessing.tsx",
+        "frontend/console/src/onboarding/FileButton.tsx",
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/api.test.ts",
+        "frontend/console/src/owner-menu/jobs.ts",
+        "frontend/console/src/owner-menu/jobs.test.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "frontend/console/src/owner-menu/dishForm.test.ts",
+        "frontend/console/src/owner-menu/fixtures.test-helpers.ts",
+        "frontend/console/src/owner-menu/evidence.ts",
+        "frontend/console/src/owner-menu/evidence.test.ts",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/owner-menu/DishEditor.test.tsx",
+        "frontend/console/src/owner-menu/dishEditor.css",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
+        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.test.tsx",
+        "frontend/console/src/owner/api-origin.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -290,12 +316,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a150011ed47765a1d627027f2c3b1bd4a4e4bb5add6d92f4f03022d34b26b604"
+      "sourceFingerprint": "1f5845bae4caaeb138e12b4272b5cebde13d41931d7407d050b1d384b7b9f5d8"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs and restaurant authority before commands, review/upload/publication and read-only owner reporting; public diner reads verify publication and signed content. Observation Queue consumers archive/deduplicate under existing bindings. GET /staff/venues lists only the verified actor’s current owner/editor restaurant IDs and names through restricted RLS, with exact console-origin CORS and no automatic grants. The report query uses start-inclusive/end-exclusive observations and checkpoints, covered by actual PostgreSQL boundary regressions. This narrow release retains main bindings/migrations, existing synthetic report allowlist and paused-Queue policy; unrelated develop order/POS, insight, comparison and cleanup features are excluded. Hosted release evidence is recorded separately.",
+      "summary": "Hono Worker verifies staff JWTs and restaurant authority before commands, review/upload/publication and read-only owner reporting; public diner reads verify publication and signed content. Observation Queue consumers archive/deduplicate under existing bindings. GET /staff/venues lists only the verified actor’s current owner/editor restaurant IDs and names through restricted RLS, with exact console-origin CORS and no automatic grants. The report query uses start-inclusive/end-exclusive observations and checkpoints, covered by actual PostgreSQL boundary regressions. This narrow release retains main bindings/migrations, existing synthetic report allowlist and paused-Queue policy; unrelated develop order/POS, insight, comparison and cleanup features are excluded. Hosted release evidence is recorded separately. An opt-in synthetic-only owner analysis route rechecks current owner/report authority and fails closed without server provider/project/rate-limiter configuration.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -418,7 +444,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-report.data12.test.ts",
         "backend/src/owner-menu-retention.ts",
         "backend/src/owner-menu-retention.test.ts",
-        "docs/fe064-staging-setup.md"
+        "docs/fe064-staging-setup.md",
+        "backend/src/owner-ai/responses.ts",
+        "backend/src/owner-ai/responses.test.ts",
+        "backend/src/owner-ai/routes.ts",
+        "backend/src/owner-ai/routes.test.ts",
+        "backend/src/owner-ai/selection-reason.offline.test.ts",
+        "backend/scripts/owner-ai-local-fixture.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -431,7 +463,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "9e58fc6e9c9a5b8ac7b6c5ee900fafc0cbc9b788f39cf7f992895736872e1f76"
+      "sourceFingerprint": "d3525d977b51e7c45a7ee2edad9faba916b8787d1eeb6c2f7cd0a91ae0c69fbc"
     },
     {
       "id": "database",
@@ -749,14 +781,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-10",
       "modules": [
-        "diner"
-      ],
-      "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
-      "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
         "backend",
         "delivery"
       ],
@@ -887,6 +911,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261113010000_menu_verification_lifecycle.sql"
       ],
       "next": "Complete pinned release checks/reviews and final approval; inspect/apply hosted migration and resolve confirmed tester identities. Keep all Queues paused until the controlled request budget and window are agreed; #184 counter alone does not enforce provider requests."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console",
+        "backend",
+        "contracts"
+      ],
+      "summary": "Narrow staging release of merged owner menu client156, workspace190 and opt-in AI164/187, including required onboarding/dish screen dependencies. Main database, extraction, diner, Queue and DNS configuration preserved.",
+      "sources": [
+        "docs/owner-onboarding-wiring.md",
+        "docs/owner-ai-responses.md"
+      ],
+      "next": "Verify exact main API/console deployment and synthetic/denial behavior. Keep paid AI activation, unknown freshness, restaurant-details persistence and final publish UI separate."
     }
   ]
 }
