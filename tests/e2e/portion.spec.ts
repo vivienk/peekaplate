@@ -116,6 +116,22 @@ async function openPortion(page: Page, keepPortal = false) {
   }
 }
 
+test('closing a portion preview preserves the Saved return label and destination', async ({
+  page,
+}) => {
+  await openMenu(page);
+  await page.getByRole('button', { name: 'Save Charred Leeks', exact: true }).click();
+  await page.getByRole('button', { name: /^Saved dishes/ }).click();
+  await page.locator('.pp-saved__open').click();
+  await expect(page.getByRole('button', { name: 'Back to Saved', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+  await expect(page.locator('.pp-portion__css')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Back to Saved', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to Saved', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Saved Dishes', exact: true })).toBeVisible();
+});
+
 test('menu → dish-specific 2.5D → detail → another dish, with focus and browser navigation', async ({
   page,
 }) => {

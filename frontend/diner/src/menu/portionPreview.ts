@@ -84,6 +84,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
+  let returnBackLabel: string | null = null;
   let disposed = false;
   let closing = false;
   let scroll = 0;
@@ -153,6 +154,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   photoObserver.observe(stage, { childList: true });
   const show = async (retrying = false) => {
     if ((active && !retrying) || disposed) return;
+    if (!active) returnBackLabel = back.getAttribute('aria-label');
     stop();
     active = true;
     closing = false;
@@ -292,7 +294,8 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     controls.hidden = true;
     instructions.hidden = true;
     title.textContent = 'Dish details';
-    back.setAttribute('aria-label', 'Back to menu');
+    if (returnBackLabel === null) back.removeAttribute('aria-label');
+    else back.setAttribute('aria-label', returnBackLabel);
     status.hidden = true;
     open.focus({ preventScroll: true });
     window.scrollTo(0, scroll);
