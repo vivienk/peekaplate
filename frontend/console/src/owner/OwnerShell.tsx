@@ -29,6 +29,7 @@ export interface OwnerShellProps {
   available?: ReadonlySet<OwnerPage>;
   /** Pages listed in the sidebar at all. Defaults to all pages. */
   visible?: ReadonlySet<OwnerPage>;
+  lockedHint?: string;
   topbar: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
@@ -41,6 +42,7 @@ export function OwnerShell({
   onNavigate,
   available,
   visible,
+  lockedHint = 'These pages open after you publish your menu.',
   topbar,
   aside,
   children,
@@ -96,7 +98,7 @@ export function OwnerShell({
           </ul>
           {anyLocked && (
             <p className="owner-nav-hint" id={LOCKED_HINT_ID}>
-              These pages open after you publish your menu.
+              {lockedHint}
             </p>
           )}
         </nav>

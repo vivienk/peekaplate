@@ -4,6 +4,7 @@
 /* Shared component classes (Button) so the demo reuses the design-system button. */
 @import "@peekaplate/ui/components.css";
 
+@import "./dish-presentation.css";
 :root {
   --bg: var(--pp-role-surface);
   --panel: var(--pp-color-orange-100);
