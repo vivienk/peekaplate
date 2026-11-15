@@ -147,7 +147,7 @@ export function renderCompareResult(
   container.innerHTML = `
     <div class="pp-compare">
       <header class="pp-detail__topbar pp-compare__topbar">
-        ${navButtonMarkup('close', 'pp-detail__back pp-compare__close', 'Close compare')}
+        ${navButtonMarkup('back', 'pp-detail__back pp-compare__close', 'Close compare')}
         <h1 class="pp-detail__title" tabindex="-1">Compare</h1>
         <span class="pp-picker__spacer" aria-hidden="true"></span>
       </header>

@@ -171,6 +171,9 @@ p {
   background: transparent;
   color: #fafafa;
   font-size: 14px;
+  /* Figma Inter Medium 500, 14/24 (Azoz QA report 03, M3). */
+  font-weight: 500;
+  line-height: 24px;
   cursor: pointer;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
 }
@@ -310,7 +313,8 @@ main:has(> .pp-compare) {
 
 .pp-card__category {
   font-size: 12px;
-  letter-spacing: 0.1em;
+  line-height: 16px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
   color: #a8a59e;
   margin: 0;
@@ -327,6 +331,7 @@ main:has(> .pp-compare) {
 .pp-card__price {
   font-size: 16px;
   font-weight: 600;
+  line-height: 24px;
   color: #f89537;
   margin: 0;
 }
@@ -491,45 +496,67 @@ main:has(> .pp-compare) {
   outline-offset: 2px;
 }
 
-/* Figma "Search bar_Home page" (Azoz review #15, Rania Nov 15): a dark 42px pill with the search
-   icon and the close × inside it, placeholder Search here at 12/16, and an orange ring set off by
-   a small gap when focused. The × keeps a 32px target inside the field. */
+/* Figma "Search bar_Home page" (905:9153; Azoz QA report 03, S1/S3). A 44px frame with radius 12
+   and 6px/8px insets around a 28px pill field; 16px search icon 12px from the field's left edge and
+   6px before the placeholder "Search here" (12/16, #A8A59E). State=Default: dark #2D3038 field
+   inside an orange frame border. State=Active (focused): light #FAFAFA field, no orange border. The
+   close is the component's own 20px circle with a 12px cross, not the 42px Close Button; its
+   button keeps a 28px target. Typed text stays 16px so phones do not zoom on focus. */
+.pp-search-panel .pp-search-bar {
+  box-sizing: border-box;
+  height: 44px;
+  padding: 8px 6px;
+  border: 1px solid var(--pp-role-primary);
+  border-radius: 12px;
+}
+
+.pp-search-panel .pp-search-bar:hover {
+  border-color: var(--pp-color-orange-400, var(--pp-role-primary));
+}
+
+.pp-search-panel .pp-search-bar:focus-within {
+  border-color: transparent;
+}
+
 .pp-search-panel .pp-search-input {
   box-sizing: border-box;
-  height: 42px;
-  padding: 0 44px 0 34px;
-  border: 1px solid var(--pp-role-outline);
-  background: var(--pp-role-surface-container);
+  height: 28px;
+  padding: 0 34px 0 34px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pp-color-neutral-700);
   color: var(--pp-role-on-surface);
   font-size: 16px;
-  line-height: 24px;
+  line-height: 20px;
 }
 
 .pp-search-panel .pp-search-input::placeholder {
-  color: var(--pp-role-on-surface-variant);
+  color: #a8a59e;
   font-size: 12px;
   line-height: 16px;
 }
 
-.pp-search-panel .pp-search-input:hover {
-  border-color: var(--pp-role-input-border-hover);
+.pp-search-panel .pp-search-input:focus {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+  background: var(--pp-color-neutral-50);
+  color: var(--pp-color-neutral-800);
 }
 
-.pp-search-panel .pp-search-input:focus {
-  border-color: var(--pp-role-outline);
-  box-shadow:
-    0 0 0 3px var(--pp-role-surface),
-    0 0 0 4px var(--pp-role-primary);
+.pp-search-panel .pp-search-input:focus-visible {
+  outline: 2px solid var(--pp-role-input-border-focus);
+  outline-offset: 2px;
 }
 
 .pp-search-panel__icon {
   position: absolute;
   top: 50%;
-  left: 13px;
+  left: 19px;
   width: 16px;
   height: 16px;
   transform: translateY(-50%);
-  background: var(--pp-role-on-surface-variant);
+  background: #a8a59e;
   mask: url("./assets/icons/ui/search.svg") center / contain no-repeat;
   pointer-events: none;
 }
@@ -537,19 +564,26 @@ main:has(> .pp-compare) {
 .pp-search-panel .pp-search-close {
   position: absolute;
   top: 50%;
-  right: 5px;
+  right: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   transform: translateY(-50%);
+  border: 0;
   background: transparent;
-  color: var(--pp-role-on-surface-variant);
+  color: var(--pp-color-neutral-50);
 }
 
-.pp-search-panel .pp-search-close:hover {
-  color: var(--pp-role-on-surface);
+.pp-search-panel .pp-search-close svg {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--pp-color-neutral-700);
 }
 
 .pp-search-staff {
@@ -732,6 +766,7 @@ main:has(> .pp-compare) {
 .pp-detail__price {
   font-size: 24px;
   font-weight: 700;
+  line-height: 32px;
   color: #f89537;
   margin: 0;
 }
@@ -862,6 +897,49 @@ main:has(> .pp-compare) {
   display: flex;
   gap: 12px;
   margin-top: 0;
+}
+
+/* Figma View Portion / Compare: 40px tall (Azoz QA report 03, D6). */
+.pp-detail__actions .pp-btn {
+  min-height: 40px;
+  padding: 0 20px;
+}
+
+/* Dish details top bar (DishDetail_Default; Azoz QA report 03, D2/D3): the title sits left-aligned
+   next to the back button at 18/28 Semi Bold, and Save is a 16px heart icon with "Save" at 18/28.
+   The heart keeps its text character for assistive tech and state; the icon is drawn over it. */
+.pp-detail > .pp-detail__topbar {
+  grid-template-columns: auto 1fr auto;
+}
+
+.pp-detail > .pp-detail__topbar .pp-detail__title {
+  line-height: 28px;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.pp-detail__save.pp-save-heart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.pp-detail__save .pp-save-heart__icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  background-color: #fafafa;
+  mask: url("./assets/icons/ui/heart-outline.svg") center / contain no-repeat;
+}
+
+.pp-detail__save[aria-pressed="true"] .pp-save-heart__icon {
+  background-color: var(--pp-role-primary);
+  mask-image: url("./assets/icons/ui/heart.svg");
 }
 
 .pp-btn {
@@ -1249,8 +1327,8 @@ main:has(> .pp-compare) {
   display: flex;
 }
 
-/* Figma Nav Button (Azoz review #2, Rania Nov 15): 42px round back/close button. Default sits a
-   step above the page with an outline ring so it no longer blends into the background. */
+/* Figma round back/close buttons (Azoz QA report 03, Finding 3): 42px, Back = Nav Button
+   (447:7954), Close = Close Button (683:6577), sharing the component's state variants. */
 .pp-nav-btn {
   display: inline-flex;
   align-items: center;
@@ -1258,12 +1336,23 @@ main:has(> .pp-compare) {
   box-sizing: border-box;
   width: 42px;
   height: 42px;
+  min-width: 42px;
+  min-height: 42px;
   padding: 0;
-  border: 1px solid var(--pp-role-outline);
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--pp-role-nav-bg);
   color: var(--pp-role-nav-icon);
   cursor: pointer;
+}
+
+.pp-nav-btn--back {
+  background: rgba(255, 248, 237, 0.05);
+  border-color: rgba(255, 248, 237, 0.1);
+}
+
+.pp-nav-btn--close {
+  background: var(--pp-color-neutral-700);
+  border-color: var(--pp-role-outline);
 }
 
 .pp-nav-btn svg {
