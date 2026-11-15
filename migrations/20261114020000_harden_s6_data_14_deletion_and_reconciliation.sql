@@ -641,9 +641,11 @@ BEGIN
         WHERE tenant_id = p_tenant_id AND id = p_request_id;
       END IF;
 
-      UPDATE app_private.order_import_orphan_cleanups
+      UPDATE app_private.order_import_orphan_cleanups AS cleanup
       SET status = 'cleaned', cleaned_at = now(), last_attempt_at = now(), last_error = NULL
-      WHERE tenant_id = p_tenant_id AND status <> 'cleaned';
+      WHERE tenant_id = p_tenant_id AND status <> 'cleaned'
+        AND NOT EXISTS (SELECT 1 FROM app_private.order_outcome_import_batches AS batch
+          WHERE batch.tenant_id=p_tenant_id AND batch.created_at > p_completed_at AND batch.storage_key=cleanup.storage_key);
 
       v_outcome := 'reconciled';
     ELSE

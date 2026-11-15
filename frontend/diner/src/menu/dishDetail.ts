@@ -1,4 +1,5 @@
 import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
+import { ingredientIcon } from './icons';
 import { formatPrice } from './price';
 import type { CompleteDish } from './types';
 
@@ -39,13 +40,15 @@ function dietaryChips(dish: CompleteDish): string {
 
 function ingredientTiles(dish: CompleteDish): string {
   return dish.ingredients
-    .map(
-      (ingredient) => `
+    .map((ingredient) => {
+      const icon = ingredientIcon(ingredient.name);
+      return `
         <div class="pp-ingredient" role="group" aria-label="${escapeHtml(ingredient.name)}">
+          ${icon ? `<img class="pp-ingredient__icon" src="${escapeHtml(icon)}" alt="" aria-hidden="true" width="36" height="36" />` : ''}
           <p class="pp-ingredient__name">${escapeHtml(ingredient.name)}</p>
         </div>
-      `,
-    )
+      `;
+    })
     .join('');
 }
 
@@ -133,6 +136,11 @@ export function renderDishDetail(
   `;
 
   const backButton = container.querySelector<HTMLButtonElement>('.pp-detail__back');
+  // A failed decoration never replaces or hides its ingredient label.
+  container.querySelectorAll<HTMLImageElement>('img.pp-ingredient__icon').forEach((icon) => {
+    icon.addEventListener('error', () => icon.remove());
+    if (icon.complete && icon.naturalWidth === 0) icon.remove();
+  });
   backButton?.addEventListener('click', onBack);
   container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 

@@ -103,6 +103,32 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
     return !error && confirmed(data.user) ? { id: data.user.id, email: data.user.email! } : null;
   }
 
+  async function accessTokenFor(actorId: string): Promise<string | null> {
+    try {
+      const { data, error } = await client.auth.getSession();
+      const session = data.session;
+      if (error || !session || session.user.id !== actorId) return null;
+      const version = sessionVersion;
+      const checked = await client.auth.getUser(session.access_token);
+      return !checked.error &&
+        confirmed(checked.data.user) &&
+        checked.data.user.id === actorId &&
+        sessionVersion === version
+        ? session.access_token
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function onSessionChange(callback: () => void) {
+    const { data } = client.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED')
+        callback();
+    });
+    return () => data.subscription.unsubscribe();
+  }
+
   async function signOut(): Promise<boolean> {
     clearRecovery();
     try {
@@ -298,7 +324,16 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
     }
   }
 
-  return { service, signedInOwner, signOut, onSignedOut, confirmEmail, openRecovery };
+  return {
+    service,
+    signedInOwner,
+    accessTokenFor,
+    onSessionChange,
+    signOut,
+    onSignedOut,
+    confirmEmail,
+    openRecovery,
+  };
 }
 
 export type OwnerAuthRuntime = ReturnType<typeof connectOwnerAuth>;

@@ -2867,3 +2867,37 @@ describe('Multi-tenant owner report isolation', () => {
     expect(await revokedResponse.json()).toEqual({ error: 'forbidden' });
   });
 });
+
+it('discovers only current owner/editor restaurants through real workerd and signed staff JWTs', async () => {
+  const workspaceActor = crypto.randomUUID();
+  const workspaceViewer = crypto.randomUUID();
+  const ownedVenue = crypto.randomUUID();
+  const secretVenue = crypto.randomUUID();
+  await admin.query(
+    `INSERT INTO app_private.venues(id,name) VALUES($1,'Synthetic bridge restaurant'),($2,'Unrelated private restaurant')`,
+    [ownedVenue, secretVenue],
+  );
+  await admin.query(
+    `INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES($1,$2,'owner'),($1,$3,'viewer')`,
+    [ownedVenue, workspaceActor, workspaceViewer],
+  );
+  const url = `http://127.0.0.1:${worker.port}/staff/venues`;
+  expect((await fetch(url)).status).toBe(401);
+  const headers = { Authorization: `Bearer ${await token({ sub: workspaceActor })}` };
+  const response = await fetch(url, { headers });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    actorId: workspaceActor,
+    venues: [{ venueId: ownedVenue, name: 'Synthetic bridge restaurant', permission: 'owner' }],
+  });
+  const viewerResponse = await fetch(url, {
+    headers: { Authorization: `Bearer ${await token({ sub: workspaceViewer })}` },
+  });
+  expect(await viewerResponse.json()).toEqual({ actorId: workspaceViewer, venues: [] });
+  expect((await fetch(`${url}?venueId=${secretVenue}`, { headers })).status).toBe(400);
+  await admin.query('DELETE FROM app_private.staff_membership WHERE actor_id=$1', [workspaceActor]);
+  expect(await (await fetch(url, { headers })).json()).toEqual({
+    actorId: workspaceActor,
+    venues: [],
+  });
+});

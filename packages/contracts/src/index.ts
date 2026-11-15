@@ -1,5 +1,6 @@
 export * from './owner-actions';
 export * from './owner-ai';
+export * from './owner-workspace';
 
 import { z } from 'zod';
 import { ApprovedDishFactsSchema, PublicMenuAllergenCodeSchema } from './owner-menu';
@@ -1442,6 +1443,7 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
 
+export * from './ingredient-artwork';
 export {
   type IngredientAssessment,
   IngredientAssessmentSchema,
