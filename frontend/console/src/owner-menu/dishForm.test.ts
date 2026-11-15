@@ -3,6 +3,7 @@ import {
   allergenOutcome,
   approvalIssues,
   approveCommand,
+  approveSavedReviewCommand,
   dishFromManualDraft,
   dishFromReviewItem,
   emptyManualDish,
@@ -139,6 +140,17 @@ describe('manual dishes', () => {
 });
 
 describe('approval', () => {
+  it('blocks an unsaved edit rather than approving the stored price', () => {
+    const item = firstItem();
+    const form = dishFromReviewItem(EXTRACTION_ID, item);
+    expect(approveSavedReviewCommand(item, form, 2, crypto.randomUUID())).toMatchObject({
+      expectedDraftVersion: 2,
+    });
+    form.priceAmount = '9.50';
+    expect(() => approveSavedReviewCommand(item, form, 2, crypto.randomUUID())).toThrow(
+      'Save your changes',
+    );
+  });
   it('requires name, category, price and currency, and blocks rejected dishes', () => {
     const form = dishFromReviewItem(EXTRACTION_ID, firstItem());
     expect(approvalIssues(form)).toEqual(['price']);

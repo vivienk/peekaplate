@@ -207,6 +207,17 @@ export function allergenOutcome(form: DishForm): { label: string; staffWarning: 
 }
 
 // The approve body. Extracted dishes also bind the review session and its current version.
+export function approveSavedReviewCommand(
+  item: ReviewCandidateItemResponse,
+  form: DishForm,
+  draftVersion: number,
+  commandId: string,
+): ApproveDishDraftRequest {
+  if (reviewCorrection(item, form))
+    throw new Error('Save your changes and reload the draft before approval');
+  return approveCommand(form, draftVersion, commandId);
+}
+
 export function approveCommand(
   form: DishForm,
   draftVersion: number,

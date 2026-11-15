@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createOwnerMenuClient, OwnerMenuApiError, sha256Hex } from './api';
 import { JOB, reviewSession, VENUE } from './fixtures.test-helpers';
 
@@ -19,7 +19,7 @@ function fakeFetch(responses: Array<{ status: number; body: unknown } | Error>) 
 function client(responses: Array<{ status: number; body: unknown } | Error>) {
   const fake = fakeFetch(responses);
   const api = createOwnerMenuClient({
-    baseUrl: 'https://api.example.test/',
+    baseUrl: 'https://peekaplate-api-staging.vxkong.workers.dev/',
     getToken: () => 'staff-token',
     fetch: fake.fetchImpl,
   });
@@ -46,6 +46,45 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('owner menu client', () => {
+  it('rejects an untrusted origin before reading credentials', () => {
+    const getToken = vi.fn(() => 'private');
+    for (const baseUrl of [
+      'https://evil.test',
+      'https://peekaplate-api-staging.vxkong.workers.dev/path',
+      'https://user@peekaplate-api-staging.vxkong.workers.dev',
+      'https://peekaplate-api-staging.vxkong.workers.dev/?x=1',
+    ]) {
+      expect(() => createOwnerMenuClient({ baseUrl, getToken })).toThrow();
+    }
+    expect(getToken).not.toHaveBeenCalled();
+  });
+
+  it('does not send after logout or cancellation during token refresh', async () => {
+    const send = vi.fn();
+    const controller = new AbortController();
+    const api = createOwnerMenuClient({
+      baseUrl: 'http://127.0.0.1:8787',
+      getToken: async () => {
+        controller.abort();
+        return 'token';
+      },
+      signal: controller.signal,
+      fetch: send,
+    });
+    await expect(api.listJobs(VENUE, 'g1')).rejects.toMatchObject({ code: 'aborted' });
+    const signedOut = createOwnerMenuClient({
+      baseUrl: 'http://127.0.0.1:8787',
+      getToken: () => null,
+      fetch: send,
+    });
+    await expect(signedOut.listJobs(VENUE, 'g1')).rejects.toMatchObject({ status: 401 });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('rejects incomplete job data instead of rendering invented processing state', async () => {
+    const { api } = client([{ status: 200, body: { jobs: [{ id: JOB }] } }]);
+    await expect(api.listJobs(VENUE, 'g1')).rejects.toMatchObject({ code: 'invalid_response' });
+  });
   it('declares an upload group with the bearer token and no cookies', async () => {
     const { api, calls } = client([{ status: 202, body: { group: { id: 'g1', jobs: [job()] } } }]);
     const hash = await sha256Hex(new Blob(['%PDF-1.7 fixture']));
@@ -54,9 +93,12 @@ describe('owner menu client', () => {
       files: [{ sourceType: 'pdf', sourceHash: hash }],
     });
     expect(group.jobs[0]?.id).toBe(JOB);
-    expect(calls[0]?.url).toBe(`https://api.example.test/venues/${VENUE}/menus/upload-groups`);
+    expect(calls[0]?.url).toBe(
+      `https://peekaplate-api-staging.vxkong.workers.dev/venues/${VENUE}/menus/upload-groups`,
+    );
     expect(calls[0]?.init.method).toBe('POST');
     expect(calls[0]?.init.credentials).toBe('omit');
+    expect(calls[0]?.init.redirect).toBe('error');
     expect(header(calls[0], 'Authorization')).toBe('Bearer staff-token');
     expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
       idempotencyKey: 'key_0123456789abcdef',
@@ -95,7 +137,7 @@ describe('owner menu client', () => {
     const file = new Blob(['photo-bytes'], { type: 'image/jpeg' });
     await api.uploadGroupFile(VENUE, 'g1', 2, file, 'upload_key_0123456789');
     expect(calls[0]?.url).toBe(
-      `https://api.example.test/venues/${VENUE}/menus/upload-groups/g1/files/2`,
+      `https://peekaplate-api-staging.vxkong.workers.dev/venues/${VENUE}/menus/upload-groups/g1/files/2`,
     );
     expect(calls[0]?.init.method).toBe('PUT');
     expect(header(calls[0], 'Content-Type')).toBe('image/jpeg');
@@ -139,7 +181,9 @@ describe('owner menu client', () => {
     ]);
     const jobs = await api.listJobs(VENUE, 'g 1');
     expect(jobs[0]?.status).toBe('complete');
-    expect(calls[0]?.url).toBe(`https://api.example.test/venues/${VENUE}/menus/jobs?groupId=g%201`);
+    expect(calls[0]?.url).toBe(
+      `https://peekaplate-api-staging.vxkong.workers.dev/venues/${VENUE}/menus/jobs?groupId=g%201`,
+    );
     const opened = await api.openReviewSession(VENUE, JOB, crypto.randomUUID());
     expect(opened.items.map((entry) => entry.effective.name)).toEqual(
       session.items.map((entry) => entry.effective.name),
@@ -191,6 +235,27 @@ describe('owner menu client', () => {
     ).rejects.toMatchObject({ code: 'unsupported_media_type' });
     expect(calls).toHaveLength(0);
   });
+
+  it('preserves a previously rejected photo when identical bytes are uploaded again', async () => {
+    const photo = {
+      id: crypto.randomUUID(),
+      draftId: JOB,
+      contentType: 'image/png',
+      sizeBytes: 1,
+      sha256: 'a'.repeat(64),
+      verificationStatus: 'rejected',
+      storageKey: 'synthetic/private.png',
+    };
+    const { api } = client([{ status: 201, body: { photo } }]);
+    await expect(
+      api.uploadDraftPhoto(
+        VENUE,
+        JOB,
+        new Blob(['x'], { type: 'image/png' }),
+        'photo_key_0123456789',
+      ),
+    ).resolves.toEqual(photo);
+  });
 });
 
 describe('timeouts', () => {
@@ -203,7 +268,7 @@ describe('timeouts', () => {
         );
       })) as unknown as typeof fetch;
     const api = createOwnerMenuClient({
-      baseUrl: 'https://api.example.test',
+      baseUrl: 'https://peekaplate-api-staging.vxkong.workers.dev',
       getToken: () => 'staff-token',
       fetch: hanging,
       timeoutMs: 20,

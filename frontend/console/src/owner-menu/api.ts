@@ -7,9 +7,12 @@ import {
   type ApproveDishDraftRequest,
   ApproveDishDraftRequestSchema,
   CreateMenuUploadGroupSchema,
+  DishRevisionSchema,
   type ExtractionReviewSessionResponse,
   ExtractionReviewSessionResponseSchema,
   MenuUrlIntakeSchema,
+  OwnerDishFieldsSchema,
+  PhotoVerificationStatusSchema,
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
@@ -17,6 +20,7 @@ import {
   type SaveOwnerDishDraft,
   SaveOwnerDishDraftSchema,
 } from '@peekaplate/contracts';
+import { readWorkspaceApiBase } from '../owner/workspace-api';
 
 export type SourceType = 'pdf' | 'photo';
 
@@ -62,7 +66,15 @@ export type DishDraft = {
   manual_fields?: unknown;
 };
 
-export type DraftPhoto = { id: string; draft_id: string; content_type: string; size_bytes: number };
+export type DraftPhoto = {
+  id: string;
+  draftId: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+  verificationStatus: 'not_verified' | 'verified' | 'rejected';
+  storageKey: string;
+};
 
 export class OwnerMenuApiError extends Error {
   constructor(
@@ -94,7 +106,8 @@ export type OwnerMenuClientOptions = {
   // The staging/local API origin, e.g. https://peekaplate-api-staging.vxkong.workers.dev
   baseUrl: string;
   // The signed-in staff session's access token (S4-FE-04); called per request so a refresh applies.
-  getToken: () => string | Promise<string>;
+  getToken: () => string | null | Promise<string | null>;
+  signal?: AbortSignal;
   fetch?: typeof fetch;
   // A request with no answer by then fails as "timeout", so a screen never waits forever.
   timeoutMs?: number;
@@ -135,18 +148,74 @@ function withId<T>(value: unknown): T {
     throw new Error('id');
   return value as T;
 }
-function listWithIds<T>(value: unknown): T[] {
+function list<T>(value: unknown, parse: (item: unknown) => T): T[] {
   if (!Array.isArray(value)) throw new Error('list');
-  return value.map((item) => withId<T>(item));
+  return value.map(parse);
 }
+const count = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0;
+const nullableText = (value: unknown) => value === null || typeof value === 'string';
+const job = (value: unknown): MenuJob => {
+  const row = withId<MenuJob>(value);
+  if (
+    !['url', 'pdf', 'photo', 'text'].includes(row.source_type) ||
+    !['queued', 'running', 'complete', 'incomplete', 'failed', 'cancelled'].includes(row.status) ||
+    !count(row.attempt_count) ||
+    !count(row.max_attempts) ||
+    !count(row.draft_count) ||
+    !nullableText(row.error_code) ||
+    typeof row.created_at !== 'string' ||
+    !nullableText(row.started_at) ||
+    !nullableText(row.finished_at)
+  )
+    throw new Error('job');
+  return row;
+};
+const draft = (value: unknown): DishDraft => {
+  const row = withId<DishDraft>(value);
+  if (
+    typeof row.draft_id !== 'string' ||
+    !nullableText(row.job_id) ||
+    !['pending', 'accepted', 'rejected', 'edited', 'superseded'].includes(row.review_status) ||
+    ![
+      row.name,
+      row.category,
+      row.description,
+      row.price_amount,
+      row.price_currency,
+      row.source_text,
+    ].every(nullableText) ||
+    !(row.ingredients === null || Array.isArray(row.ingredients)) ||
+    !Array.isArray(row.review_warnings) ||
+    !row.review_warnings.every((x) => typeof x === 'string') ||
+    !count(row.draft_version)
+  )
+    throw new Error('draft');
+  if (row.origin === 'manual') OwnerDishFieldsSchema.parse(row.manual_fields);
+  return row;
+};
+const parsePhoto = (value: unknown): DraftPhoto => {
+  const row = withId<DraftPhoto>(value);
+  if (
+    typeof row.draftId !== 'string' ||
+    !['image/jpeg', 'image/png'].includes(row.contentType) ||
+    !count(row.sizeBytes) ||
+    row.sizeBytes > MAX_FILE_BYTES ||
+    !/^[a-f0-9]{64}$/.test(row.sha256) ||
+    !PhotoVerificationStatusSchema.safeParse(row.verificationStatus).success ||
+    typeof row.storageKey !== 'string'
+  )
+    throw new Error('photo');
+  return row;
+};
 const group = (body: unknown): UploadGroup => {
   const value = withId<UploadGroup>(field(body, 'group'));
-  listWithIds<MenuJob>(value.jobs);
+  list(value.jobs, job);
   return value;
 };
 
 export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
-  const base = options.baseUrl.replace(/\/+$/, '');
+  const base = readWorkspaceApiBase(options.baseUrl);
+  if (!base) throw new OwnerMenuApiError(0, 'invalid_api_origin');
   const send = options.fetch ?? ((input, init) => fetch(input, init));
 
   const venuePath = (venueId: string, path: string) =>
@@ -158,6 +227,8 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
     parse: (body: unknown) => T,
   ): Promise<T> {
     const token = await options.getToken();
+    if (options.signal?.aborted) throw new OwnerMenuApiError(0, 'aborted');
+    if (!token) throw new OwnerMenuApiError(401, 'unauthorized');
     const limit = init.upload
       ? (options.uploadTimeoutMs ?? 120_000)
       : (options.timeoutMs ?? 30_000);
@@ -178,10 +249,16 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           // The API never needs cookies; the bearer token is the only credential.
           credentials: 'omit',
           cache: 'no-store',
-          signal: controller.signal,
+          redirect: 'error',
+          signal: options.signal
+            ? AbortSignal.any([controller.signal, options.signal])
+            : controller.signal,
         });
       } catch {
-        throw new OwnerMenuApiError(0, timedOut ? 'timeout' : 'network');
+        throw new OwnerMenuApiError(
+          0,
+          timedOut ? 'timeout' : options.signal?.aborted ? 'aborted' : 'network',
+        );
       }
       try {
         body = await response.json();
@@ -192,6 +269,7 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
     } finally {
       clearTimeout(timer);
     }
+    if (options.signal?.aborted) throw new OwnerMenuApiError(0, 'aborted');
     if (!response.ok) {
       const code =
         typeof body === 'object' &&
@@ -264,7 +342,7 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
       return request(
         `${venuePath(venueId, '/menus/jobs')}?groupId=${encodeURIComponent(groupId)}`,
         { method: 'GET' },
-        (body) => listWithIds<MenuJob>(field(body, 'jobs')),
+        (body) => list(field(body, 'jobs'), job),
       );
     },
 
@@ -280,7 +358,11 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
       return request(
         venuePath(venueId, `/menus/jobs/${encodeURIComponent(jobId)}/cancel`),
         json('POST', { commandId }),
-        (body) => withId<MenuJob>(field(body, 'job')),
+        (body) => {
+          const row = job(field(body, 'job'));
+          if (row.id !== jobId) throw new Error('job scope');
+          return row;
+        },
       );
     },
 
@@ -288,7 +370,11 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
       return request(
         venuePath(venueId, `/menus/jobs/${encodeURIComponent(jobId)}/retry`),
         json('POST', { commandId }),
-        (body) => withId<MenuJob>(field(body, 'job')),
+        (body) => {
+          const row = job(field(body, 'job'));
+          if (row.id !== jobId) throw new Error('job scope');
+          return row;
+        },
       );
     },
 
@@ -327,7 +413,7 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
     async listDrafts(venueId: string, filter: { jobId?: string } = {}): Promise<DishDraft[]> {
       const query = filter.jobId ? `?jobId=${encodeURIComponent(filter.jobId)}` : '';
       return request(`${venuePath(venueId, '/drafts')}${query}`, { method: 'GET' }, (body) =>
-        listWithIds<DishDraft>(field(body, 'drafts')),
+        list(field(body, 'drafts'), draft),
       );
     },
 
@@ -335,7 +421,11 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
       return request(
         venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}`),
         { method: 'GET' },
-        (body) => withId<DishDraft>(field(body, 'draft')),
+        (body) => {
+          const row = draft(field(body, 'draft'));
+          if (row.id !== draftId) throw new Error('draft scope');
+          return row;
+        },
       );
     },
 
@@ -349,7 +439,11 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
       return request(
         venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}`),
         json('PUT', payload),
-        (body) => withId<DishDraft>(field(body, 'draft')),
+        (body) => {
+          const row = draft(field(body, 'draft'));
+          if (row.id !== draftId) throw new Error('draft scope');
+          return row;
+        },
       );
     },
 
@@ -371,11 +465,15 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           body: photo,
           headers: { 'Content-Type': photo.type, 'Idempotency-Key': idempotencyKey },
         },
-        (body) => withId<DraftPhoto>(field(body, 'photo')),
+        (body) => {
+          const row = parsePhoto(field(body, 'photo'));
+          if (row.draftId !== draftId) throw new Error('photo scope');
+          return row;
+        },
       );
     },
 
-    // Owner verification. Creates an approved revision; it never publishes the menu.
+    // Creates an approved revision; separate from the verification badge and menu publication.
     async approveDraft(
       venueId: string,
       draftId: string,
@@ -385,7 +483,12 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
       return request(
         venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/approve`),
         json('POST', payload),
-        (body) => body,
+        (body) => {
+          const row = draft(field(body, 'draft'));
+          const revision = DishRevisionSchema.parse(field(body, 'publishedRevision'));
+          if (row.id !== draftId) throw new Error('approval');
+          return { draft: row, publishedRevision: revision };
+        },
       );
     },
   };

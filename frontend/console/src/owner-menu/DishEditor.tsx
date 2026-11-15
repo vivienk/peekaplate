@@ -48,7 +48,7 @@ const ISSUE_TEXT: Record<ApprovalIssue, { field: string; text: string }> = {
   currency: { field: 'dish-currency', text: 'Enter a three-letter currency, for example USD.' },
   rejected: {
     field: 'dish-name',
-    text: 'This dish was rejected in review and cannot be verified.',
+    text: 'This dish was rejected in review and cannot be approved.',
   },
 };
 
@@ -57,7 +57,7 @@ export type DishEditorProps = {
   onChange: (next: DishForm) => void;
   // Saves the draft as it is; fields may still be incomplete.
   onSave: () => void;
-  // Owner verification (approval). Shown only when the parent can approve this dish.
+  // Revision approval (separate from the verification badge). Shown only when the parent can approve this dish.
   onVerify?: () => void;
   onCancel: () => void;
   busy?: boolean;
@@ -120,7 +120,7 @@ export function DishEditor({
       {issues.length > 0 && (
         <div id={summaryId} tabIndex={-1} role="alert" className="pp-dish-editor__summary">
           <strong>
-            Fix {issues.length} thing{issues.length > 1 ? 's' : ''} before verifying
+            Fix {issues.length} thing{issues.length > 1 ? 's' : ''} before approval
           </strong>
           <ul>
             {issues.map((issue) => (
@@ -203,7 +203,7 @@ export function DishEditor({
             <legend>Ingredients</legend>
             {extracted ? (
               <p className="pp-field__hint">
-                Read from the menu, so they stay a draft until you verify the dish.
+                Read from the menu, so they stay a draft until you approve the dish.
               </p>
             ) : (
               <StatusChoice
@@ -335,14 +335,14 @@ export function DishEditor({
         </Button>
         {onVerify && (
           <Button type="submit" disabled={busy}>
-            Verify dish
+            Approve dish
           </Button>
         )}
         <Button variant="text" onClick={onCancel} disabled={busy}>
           Cancel
         </Button>
       </div>
-      <p className="pp-field__hint">Verifying a dish does not publish your menu.</p>
+      <p className="pp-field__hint">Approving a dish does not publish your menu.</p>
     </form>
   );
 }

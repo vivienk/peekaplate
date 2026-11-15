@@ -87,6 +87,23 @@ test('incomplete placeholder is non-interactive and accessible', async ({ page }
   ).toEqual([]);
 });
 
+test('ingredient tiles render Figma art and keep labels when images fail', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('http://127.0.0.1:5173/?scenario=demo');
+  await page.locator('.pp-card__open').first().click();
+  const tile = page.locator('.pp-ingredient').filter({ hasText: 'Avocado' });
+  const icon = tile.locator('img');
+  await expect(icon).toBeVisible();
+  await expect
+    .poll(() => icon.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
+  await page.screenshot({ path: 'test-results/diner-ingredient-tiles.png', fullPage: true });
+  await icon.dispatchEvent('error');
+  await expect(tile.locator('img')).toHaveCount(0);
+  await expect(tile.locator('.pp-ingredient__name')).toHaveText('Avocado');
+  await expect(page.locator('.pp-allergy-note')).toBeVisible();
+});
+
 test('dish detail with allergen section is accessible', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://127.0.0.1:5173/?scenario=edge-cases');

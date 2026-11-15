@@ -21,7 +21,7 @@ import {
 import { DishEditor } from './DishEditor';
 import {
   allergenOutcome,
-  approveCommand,
+  approveSavedReviewCommand,
   type DishForm,
   dishFromReviewItem,
   reviewCorrection,
@@ -197,22 +197,27 @@ function Harness() {
       });
     });
 
-  // Owner verification of one scanned dish. Creates an approved revision; it never publishes.
+  // Revision approval of one scanned dish. Creates an approved revision; it never publishes.
   const verifyEdit = () =>
-    run('Verify dish', async () => {
+    run('Approve dish', async () => {
       if (!session || !editing) return;
+      const item = session.data.items.find((i) => i.candidate.candidate_id === editing.candidateId);
+      if (!item) return;
       const draft = (drafts[session.jobId] ?? []).find(
         (d) => d.candidate_id === editing.candidateId,
       );
       if (!draft) throw new Error('No draft found for this dish; reload the drafts first');
-      if (!window.confirm('Verify this dish on the staging restaurant? This does not publish.'))
-        return;
-      await client.approveDraft(
-        venueId.trim(),
-        draft.id,
-        approveCommand(editing.form, draft.draft_version ?? 1, newCommandId()),
+      const currentDraft = await client.getDraft(venueId.trim(), draft.id);
+      const command = approveSavedReviewCommand(
+        item,
+        editing.form,
+        currentDraft.draft_version ?? 1,
+        newCommandId(),
       );
-      note(`Dish ${editing.form.name} verified (approved revision, not published)`);
+      if (!window.confirm('Approve this dish on the staging restaurant? This does not publish.'))
+        return;
+      await client.approveDraft(venueId.trim(), draft.id, command);
+      note(`Dish ${editing.form.name} approved (revision only, not published)`);
     });
 
   const newSelection = () => {
@@ -426,7 +431,7 @@ function Harness() {
               setEditing(null);
               setSession({ jobId: 'synthetic-sample', data: syntheticSession() });
               note(
-                'Loaded the synthetic sample (shared OCR fixture, no API call); Save/Verify will fail',
+                'Loaded the synthetic sample (shared OCR fixture, no API call); Save/Approve will fail',
               );
             }}
           >

@@ -193,7 +193,8 @@ def _parse_page(text: str, page_num: int, errors: list[str]) -> list[V4Dish]:
 
 
 def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | None = None,
-                      attempts: list[dict] | None = None, provider: str = "default") -> tuple[list[V4Dish], list[str]]:
+                      attempts: list[dict] | None = None, provider: str = "default",
+                      budget_gate: Any | None = None) -> tuple[list[V4Dish], list[str]]:
     """Run direct multimodal extraction per page.
 
     Returns dishes (page numbers forced to the page that was sent) and page-level errors
@@ -224,6 +225,8 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
                           "truncated": False, "failure_class": "provider_error"}
                 attempts.append(record)
             try:
+                if budget_gate is not None:
+                    await budget_gate.areserve(provider)
                 if timeout is not None and timeout > 0:
                     try:
                         response = await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)

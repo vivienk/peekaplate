@@ -53,7 +53,7 @@ export function OwnerShell({
       <a className="owner-skip" href="#owner-content">
         Skip to content
       </a>
-      <div className="owner-sidebar">
+      <aside className="owner-sidebar" aria-label="Restaurant navigation">
         <div className="owner-brand">
           <div className="owner-brand__row">
             <img src={ICONS.logo} alt="" width={28} height={28} />
@@ -100,7 +100,7 @@ export function OwnerShell({
             </p>
           )}
         </nav>
-      </div>
+      </aside>
       <div className="owner-main">
         <header className="owner-topbar">{topbar}</header>
         <main id="owner-content" className="owner-content" tabIndex={-1}>
