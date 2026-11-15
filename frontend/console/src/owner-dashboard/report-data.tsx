@@ -66,8 +66,7 @@ const fmt = (iso: string) =>
 // The saved copy, checked against the same schema as a live response.
 const SAVED_REPORT = OwnerDishReportSchema.parse(UNEEZA_REPORT);
 
-// Owner sign-in is S4-FE-04 (Ehab). Until it exists there is no access token, so a live page shows
-// the signed-out state rather than any data.
+// Standalone demos have no identity. The real workspace passes its actor-bound SDK getter.
 export async function getOwnerAccessToken(): Promise<string | null> {
   return null;
 }
@@ -82,14 +81,17 @@ export type ReportSource =
     };
 
 // Live when both API settings are present; static previews have neither.
-export function reportSourceFromEnv(env: {
-  VITE_PUBLIC_API_URL?: string;
-  VITE_OWNER_REPORT_VENUE_ID?: string;
-}): ReportSource {
+export function reportSourceFromEnv(
+  env: {
+    VITE_PUBLIC_API_URL?: string;
+    VITE_OWNER_REPORT_VENUE_ID?: string;
+  },
+  getAccessToken = getOwnerAccessToken,
+): ReportSource {
   const apiBase = env.VITE_PUBLIC_API_URL;
   const venueId = env.VITE_OWNER_REPORT_VENUE_ID;
   if (!apiBase || !venueId) return { mode: 'saved' };
-  return { mode: 'live', apiBase, venueId, getAccessToken: getOwnerAccessToken };
+  return { mode: 'live', apiBase, venueId, getAccessToken };
 }
 
 // Loads the report for one restaurant. Changing restaurant clears the old report at once, and an
@@ -190,10 +192,23 @@ export function ReportData({
     VITE_PUBLIC_API_URL: import.meta.env.VITE_PUBLIC_API_URL,
     VITE_OWNER_REPORT_VENUE_ID: import.meta.env.VITE_OWNER_REPORT_VENUE_ID,
   }),
+  onAccessFailure,
+  onReport,
 }: {
   source?: ReportSource;
+  onAccessFailure?: (kind: 'signed_out' | 'denied') => void;
+  /** The report on screen, or null while none is (loading, failed or denied). */
+  onReport?: (report: OwnerDishReport | null) => void;
 }) {
   const { state, retry } = useOwnerReport(source);
+  useEffect(() => {
+    if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure?.(state.kind);
+  }, [state.kind, onAccessFailure]);
+  const report = state.kind === 'ready' ? state.report : null;
+  useEffect(() => {
+    onReport?.(report);
+  }, [report, onReport]);
+  useEffect(() => () => onReport?.(null), [onReport]);
   return <ReportView state={state} saved={source.mode === 'saved'} onRetry={retry} />;
 }
 

@@ -480,6 +480,7 @@ describe('design tokens', () => {
       '--pp-role-input-bg-disabled': 'var(--pp-color-neutral-200)',
       '--pp-role-input-border-disabled': 'var(--pp-color-neutral-300)',
       '--pp-role-input-text-disabled': 'var(--pp-color-neutral-400)',
+      '--pp-role-card-border': 'color-mix(in srgb, var(--pp-color-white) 80%, transparent)',
     });
   });
 

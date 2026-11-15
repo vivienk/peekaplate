@@ -3,8 +3,10 @@
 This is the backend handoff for [FE-06, S06–S09](https://app.clickup.com/t/90141746115/86bcthzjc).
 Ehab owns its screen integration; Nifemi/Harshita retain their assigned UI work.
 Jeffin's #105 Add/Edit reference and #125/#139 shell do not establish live persistence.
-Auth #143 → #146 remains a separate, unmerged connection. A signed-in user still
-needs an owner/editor membership for the requested restaurant.
+Auth #143 → #146 is merged. The [session bridge](owner-session-workspace.md)
+discovers the signed-in user's owner/editor restaurants; #156 must use its
+actor-bound token getter when the menu client is connected. Every later request
+still requires current restaurant membership.
 
 ## Storage and authority
 
@@ -256,3 +258,24 @@ auth #143/#146 dashboard integration, new provider accuracy tests and production
 acceptance remain separate. This run reused retained genuine extraction output;
 it did not launch another OCR/model job. Keep normal delivery paused outside a
 controlled synthetic test window.
+
+## Owner client integration (November 15)
+
+The FE-06.2 client reuses the authenticated workspace's exact local/staging API
+origin allowlist, refuses redirects, retrieves a fresh nullable staff token for
+each request, and accepts a caller AbortSignal. An actor/venue change must abort
+and discard the previous workspace. Job/draft/photo/approval responses validate
+the fields consumed by the screens; private-photo responses use the server's
+camelCase names. Errors remain typed and command identities remain caller-owned
+for identical retries.
+
+The local harness blocks approval of unsaved extracted corrections and reads the
+current draft version before approval. Its approval creates an approved revision;
+it neither records the separate verification badge nor publishes a menu. The
+harness remains excluded from normal and preview builds. Real owner screen
+composition, persisted restaurant setup and multi-source resume are a separate
+wiring change; this client alone does not complete the DES-02 journey.
+
+The [owner onboarding wiring](owner-onboarding-wiring.md) connects the available
+screens to these existing APIs. Restaurant-settings persistence and final
+review/publication stay outside that slice; rollout evidence is separate.

@@ -58,6 +58,87 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
     await adminClient?.end().catch(() => {});
   });
 
+  it('runs the read-only verifier against real job/draft rows and identity-first authorization', async () => {
+    const { verifyIngestionE2E } = await import(
+      new URL('../../../scripts/verify-ingestion-e2e.mjs', import.meta.url).href
+    );
+    const viewer = crypto.randomUUID();
+    await adminClient.query(
+      "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES($1,$2,'viewer')",
+      [venueId, viewer],
+    );
+    const jobId = crypto.randomUUID();
+    const sourceHash = 'a'.repeat(64);
+    await createIngestionJob(runtimeClient, {
+      id: jobId,
+      tenantId: venueId,
+      sourceType: 'pdf',
+      sourceHash,
+      idempotencyKey: `verifier-${jobId}`,
+    });
+    const claim = await claimIngestionJob(runtimeClient, {
+      tenantId: venueId,
+      jobId,
+      workerId: 'verifier-test',
+    });
+    expect(claim).not.toBeNull();
+    await persistExtractedDrafts(runtimeClient, {
+      tenantId: venueId,
+      jobId,
+      claimToken: claim!.claimToken,
+      resultStorageKey: `reports/${venueId}/${jobId}/attempts/${claim!.claimToken}/extraction.json`,
+      drafts: [
+        {
+          draft_id: 'synthetic-verifier-soup',
+          draft_index: 0,
+          name: 'Synthetic verifier soup',
+          description: null,
+          category: null,
+          price_amount: null,
+          price_currency: null,
+          ingredients: null,
+          image_id: null,
+          source_id: 'synthetic-verifier-source',
+          source_text: 'Synthetic verifier soup',
+          code_point_spans: [],
+          utf16_spans: [],
+          review_warnings: [],
+          status: 'needs_review',
+        },
+      ],
+    });
+    const app = createApp({
+      verify: async (authorization) => (authorization === 'Bearer viewer-test' ? viewer : actorId),
+      execute: vi.fn(),
+    });
+    const request = (url: string, init: RequestInit) => {
+      const parsed = new URL(url);
+      return app.request(parsed.pathname + parsed.search, init, {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: runtimeUrl!,
+      });
+    };
+    const options = {
+      jobId,
+      venueId,
+      token: 'owner-test',
+      viewerToken: 'viewer-test',
+      crossTenantVenueId: otherVenueId,
+      requirePr161: true,
+      request,
+      progress: () => {},
+    };
+    const result = await verifyIngestionE2E(options);
+    expect(result.checks.filter((check: { passed: boolean }) => !check.passed)).toEqual([]);
+    expect(result.passed).toBe(true);
+    expect(result.providerCallsConsumed).toBeNull();
+    await adminClient.query(
+      "UPDATE app_private.menu_ingestion_jobs SET status='failed' WHERE id=$1",
+      [jobId],
+    );
+    expect((await verifyIngestionE2E(options)).passed).toBe(false);
+  });
+
   it('uploads authorized source bytes through HTTP before queue dispatch', async () => {
     const stored = new Map<string, unknown>();
     const send = vi.fn(async () => {
