@@ -6,13 +6,21 @@
 import {
   type ApproveDishDraftRequest,
   ApproveDishDraftRequestSchema,
+  type ApproveMenuRevision,
+  ApproveMenuRevisionSchema,
   CreateMenuUploadGroupSchema,
   DishRevisionSchema,
   type ExtractionReviewSessionResponse,
   ExtractionReviewSessionResponseSchema,
+  MenuApprovalSchema,
+  MenuPublicationSchema,
   MenuUrlIntakeSchema,
   OwnerDishFieldsSchema,
   PhotoVerificationStatusSchema,
+  PreparedMenuPreviewSchema,
+  PreparedMenusSchema,
+  type PublishMenu,
+  PublishMenuSchema,
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
@@ -299,6 +307,60 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   });
 
   return {
+    async listPreparedMenus(venueId: string) {
+      return request(
+        venuePath(venueId, '/prepared-menus'),
+        { method: 'GET' },
+        (body) => PreparedMenusSchema.parse(body).menus,
+      );
+    },
+    async previewPreparedMenu(venueId: string, menuId: string, revisionId: string) {
+      return request(
+        venuePath(
+          venueId,
+          `/prepared-menus/${encodeURIComponent(menuId)}/${encodeURIComponent(revisionId)}`,
+        ),
+        { method: 'GET' },
+        (body) => PreparedMenuPreviewSchema.parse(body),
+      );
+    },
+    async approveMenu(venueId: string, menuId: string, input: ApproveMenuRevision) {
+      return request(
+        venuePath(venueId, `/menus/${encodeURIComponent(menuId)}/approvals`),
+        json('POST', ApproveMenuRevisionSchema.parse(input)),
+        (body) => MenuApprovalSchema.parse(body),
+      );
+    },
+    async publishMenu(venueId: string, menuId: string, input: PublishMenu) {
+      return request(
+        venuePath(venueId, `/menus/${encodeURIComponent(menuId)}/publications`),
+        json('POST', PublishMenuSchema.parse(input)),
+        (body) => MenuPublicationSchema.parse(body),
+      );
+    },
+    async dinerLink(venueId: string, menuId: string): Promise<string> {
+      return request(
+        venuePath(venueId, `/menus/${encodeURIComponent(menuId)}/diner-link`),
+        { method: 'GET' },
+        (body) => {
+          const value = field(body, 'url');
+          const path = field(body, 'path');
+          if (typeof value !== 'string' || typeof path !== 'string') throw new Error('link');
+          const url = new URL(value);
+          if (
+            url.origin !== 'https://routing-staging.peekaplate-diner-staging.pages.dev' ||
+            url.pathname !== path ||
+            !/^\/diner\/[a-z0-9][a-z0-9_-]{0,63}$/.test(path) ||
+            url.search ||
+            url.hash ||
+            url.username ||
+            url.password
+          )
+            throw new Error('link');
+          return url.href;
+        },
+      );
+    },
     // Existing private-photo endpoint; retrieve bytes with the same actor-bound request boundary.
     async readDraftPhoto(venueId: string, draftId: string, photoId: string): Promise<Blob> {
       return request(
