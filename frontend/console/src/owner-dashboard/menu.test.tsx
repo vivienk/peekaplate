@@ -129,6 +129,8 @@ describe('Screen 9 (Add dish) form', () => {
       ing: ['Avocado'],
       aiUsed: true,
       aiReviewed: false,
+      upload: 'data:image/png;base64,iVBORw0KGgo=',
+      rights: true,
     });
     expect(html).toMatch(/aria-disabled="true"[^>]*>Continue to review/);
   });

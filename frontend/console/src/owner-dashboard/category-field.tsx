@@ -8,7 +8,8 @@ import chevron from './assets/icons/angle-small-down.svg';
 import plus from './assets/icons/plus-small.svg';
 import { Btn } from './ui';
 
-const ADD = 'add';
+const ADD = Symbol('add-category');
+type CategoryKey = string | typeof ADD;
 
 export function CategoryField({
   id,
@@ -28,11 +29,12 @@ export function CategoryField({
 }) {
   const uid = useId();
   const listId = `${uid}-list`;
-  const optionId = (key: string) => `${uid}-opt-${key === ADD ? 'add' : categories.indexOf(key)}`;
+  const optionId = (key: CategoryKey) =>
+    `${uid}-opt-${key === ADD ? 'add' : categories.indexOf(key)}`;
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   // The highlighted row (Option hover style): none until the pointer or the arrow keys pick one.
-  const [active, setActive] = useState<string | null>(null);
+  const [active, setActive] = useState<CategoryKey | null>(null);
   const [name, setName] = useState('');
   const fieldRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -51,7 +53,7 @@ export function CategoryField({
     setCreating(false);
     setActive(fromKeyboard ? (categories.includes(value) ? value : ADD) : null);
   };
-  const choose = (key: string) => {
+  const choose = (key: CategoryKey) => {
     if (key === ADD) {
       setCreating(true);
       return;

@@ -76,6 +76,31 @@ test('Add category: the new category joins the list for the owner to select', as
   await expect(page.getByRole('option', { name: 'Salads', exact: true })).toHaveCount(1);
 });
 
+for (const keyboard of [false, true]) {
+  test(`a category named add is selectable by ${keyboard ? 'keyboard' : 'pointer'}`, async ({
+    page,
+  }) => {
+    const field = await openAddDish(page);
+    await field.click();
+    await page.getByRole('option', { name: 'Add category', exact: true }).click();
+    await page.getByLabel('New category name').fill('add');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    const ids = await page
+      .getByRole('option')
+      .evaluateAll((options) => options.map((option) => option.id));
+    expect(new Set(ids).size).toBe(ids.length);
+    if (keyboard) {
+      await field.focus();
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+    }
+    else await page.getByRole('option', { name: 'add', exact: true }).click();
+    await expect(field).toHaveText('add');
+    await expect(field).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByLabel('New category name')).toHaveCount(0);
+  });
+}
+
 test('keyboard: open, move, select and cancel as the handoff describes', async ({ page }) => {
   const field = await openAddDish(page);
   await field.focus();
