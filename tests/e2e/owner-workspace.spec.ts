@@ -410,6 +410,25 @@ async function addCategory(page: Page, category: string) {
   }
 }
 
+test('long restaurant names fit the dashboard and onboarding account menu', async ({
+  context,
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = await fixture(context);
+  state.venues = [
+    { ...venue, name: 'RES-02 SYNTHETIC VERIFICATION 2026-11-01 A - not a restaurant' },
+  ];
+  await signIn(page, undefined, false);
+  await expect(page.locator('.owner-progress')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  await page.locator('summary[aria-label="Owner account"]').click();
+  await expect(page.getByLabel('Restaurant', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
 test('menu typography and locked-page copy keep the authored live boundary', async ({
   context,
   page,

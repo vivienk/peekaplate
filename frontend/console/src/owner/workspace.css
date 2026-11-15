@@ -23,6 +23,12 @@
 .owner-workspace-picker {
   display: grid;
   gap: var(--pp-space-4);
+  min-width: 0;
+  max-width: 100%;
+}
+.owner-workspace-picker select {
+  min-width: 0;
+  max-width: 100%;
 }
 .owner-workspace-state select,
 .owner-workspace-toolbar select {

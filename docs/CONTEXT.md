@@ -323,7 +323,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "12537e06733a5c2bedfa37624d7e17ae3e0b14780d9190bf331018001627729c"
+      "sourceFingerprint": "27ffa2fb3793e803cb751d9e1357c6b5eb5491c95936112b01d987dd84db8545"
     },
     {
       "id": "backend",
@@ -929,7 +929,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "Restore authored dashboard, onboarding and Screen 9 composition while preserving the existing authenticated menu controller. Reproduced missing dashboard/form frames before correction; explicit unavailable setup facts avoid fake progress.",
+      "summary": "Restore authored dashboard, onboarding and Screen 9 composition while preserving the existing authenticated menu controller. Reproduced missing dashboard/form frames before correction; explicit unavailable setup facts avoid fake progress. Hosted mobile readback exposed an intrinsic-width restaurant selector; constrain the shared picker/select and verify long names in dashboard and onboarding account menu.",
       "files": [
         "frontend/console/src/owner/FirstDashboard.tsx",
         "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
