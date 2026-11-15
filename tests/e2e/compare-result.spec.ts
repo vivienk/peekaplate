@@ -147,6 +147,8 @@ test('Replace then replace again keeps the comparison_id and fires replace each 
   await expect(page.locator('.pp-picker__kept-name')).toHaveText('Avocado Toast');
   const confirm = page.locator('.pp-picker__confirm');
   await expect(confirm).toHaveText('Replace Dish');
+  // The Replace picker says what it does in its title too (Rania, Nov 15).
+  await expect(page.getByRole('heading', { level: 1, name: 'Replace Dish' })).toBeVisible();
   await expect(confirm).toBeDisabled();
   await expect(page.locator('.pp-picker__option .pp-card__name-text')).toHaveText([
     'Classic Eggs Benedict',

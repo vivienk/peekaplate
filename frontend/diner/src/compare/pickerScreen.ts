@@ -3,7 +3,9 @@
 // after searching. Options come from pickerOptions(), so search reuses the shared menu rules and
 // incomplete or already-shown dishes are never offered. Opening, searching, selecting and closing
 // make no request, fire no event and never store, log or put the query in the URL.
+
 import { completeDishes } from '../menu/adapter';
+import { navButtonMarkup } from '../menu/navButton';
 import { formatPrice } from '../menu/price';
 import { SEARCH_STAFF_LINE, searchEmptyMarkup } from '../menu/searchView';
 import type { CompleteDish, Menu } from '../menu/types';
@@ -60,6 +62,8 @@ export type ComparePickerOptions = {
   onConfirm?: (pickedDishId: string) => void;
   // "Compare" when starting a comparison, "Replace Dish" when replacing one side (DIN-02.4).
   confirmLabel?: string;
+  // Screen title: "Compare Dish", or "Replace Dish" after Replace (Rania, Nov 15; Azoz review #14).
+  title?: string;
 };
 
 function escapeHtml(value: string): string {
@@ -121,8 +125,8 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
   container.innerHTML = `
     <div class="pp-picker">
       <header class="pp-detail__topbar pp-picker__topbar">
-        <button class="pp-detail__back pp-picker__close" type="button" aria-label="Close compare">×</button>
-        <h1 class="pp-detail__title" tabindex="-1">Compare Dish</h1>
+        ${navButtonMarkup('close', 'pp-detail__back pp-picker__close', 'Close compare')}
+        <h1 class="pp-detail__title" tabindex="-1">${escapeHtml(options.title ?? 'Compare Dish')}</h1>
         <span class="pp-picker__spacer" aria-hidden="true"></span>
       </header>
 

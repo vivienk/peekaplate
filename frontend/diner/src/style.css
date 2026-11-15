@@ -171,6 +171,9 @@ p {
   background: transparent;
   color: #fafafa;
   font-size: 14px;
+  /* Figma Inter Medium 500, 14/24 (Azoz QA report 03, M3). */
+  font-weight: 500;
+  line-height: 24px;
   cursor: pointer;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
 }
@@ -310,7 +313,8 @@ main:has(> .pp-compare) {
 
 .pp-card__category {
   font-size: 12px;
-  letter-spacing: 0.1em;
+  line-height: 16px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
   color: #a8a59e;
   margin: 0;
@@ -327,6 +331,7 @@ main:has(> .pp-compare) {
 .pp-card__price {
   font-size: 16px;
   font-weight: 600;
+  line-height: 24px;
   color: #f89537;
   margin: 0;
 }
@@ -489,6 +494,100 @@ main:has(> .pp-compare) {
 .pp-search-empty__clear:focus-visible {
   outline: 2px solid #f89537;
   outline-offset: 2px;
+}
+
+/* Figma "Search bar_Home page" (905:9153; Azoz QA report 03, S1/S3). A 44px frame with radius 12
+   and 6px/8px insets around a 28px pill field; 16px search icon 12px from the field's left edge and
+   6px before the placeholder "Search here" (12/16, #A8A59E). State=Default: dark #2D3038 field
+   inside an orange frame border. State=Active (focused): light #FAFAFA field, no orange border. The
+   close is the component's own 20px circle with a 12px cross, not the 42px Close Button; its
+   button keeps a 28px target. Typed text stays 16px so phones do not zoom on focus. */
+.pp-search-panel .pp-search-bar {
+  box-sizing: border-box;
+  height: 44px;
+  padding: 8px 6px;
+  border: 1px solid var(--pp-role-primary);
+  border-radius: 12px;
+}
+
+.pp-search-panel .pp-search-bar:hover {
+  border-color: var(--pp-color-orange-400, var(--pp-role-primary));
+}
+
+.pp-search-panel .pp-search-bar:focus-within {
+  border-color: transparent;
+}
+
+.pp-search-panel .pp-search-input {
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 34px 0 34px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pp-color-neutral-700);
+  color: var(--pp-role-on-surface);
+  font-size: 16px;
+  line-height: 20px;
+}
+
+.pp-search-panel .pp-search-input::placeholder {
+  color: #a8a59e;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pp-search-panel .pp-search-input:focus {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+  background: var(--pp-color-neutral-50);
+  color: var(--pp-color-neutral-800);
+}
+
+.pp-search-panel .pp-search-input:focus::placeholder {
+  color: var(--pp-color-neutral-600);
+}
+
+.pp-search-panel .pp-search-input:focus-visible {
+  outline: 2px solid var(--pp-role-input-border-focus);
+  outline-offset: 2px;
+}
+
+.pp-search-panel__icon {
+  position: absolute;
+  top: 50%;
+  left: 19px;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  background: #a8a59e;
+  mask: url("./assets/icons/ui/search.svg") center / contain no-repeat;
+  pointer-events: none;
+}
+
+.pp-search-panel .pp-search-close {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--pp-color-neutral-50);
+}
+
+.pp-search-panel .pp-search-close svg {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--pp-color-neutral-700);
 }
 
 .pp-search-staff {
@@ -671,6 +770,7 @@ main:has(> .pp-compare) {
 .pp-detail__price {
   font-size: 24px;
   font-weight: 700;
+  line-height: 32px;
   color: #f89537;
   margin: 0;
 }
@@ -803,6 +903,49 @@ main:has(> .pp-compare) {
   margin-top: 0;
 }
 
+/* Figma View Portion / Compare: 40px tall (Azoz QA report 03, D6). */
+.pp-detail__actions .pp-btn {
+  min-height: 40px;
+  padding: 0 20px;
+}
+
+/* Dish details top bar (DishDetail_Default; Azoz QA report 03, D2/D3): the title sits left-aligned
+   next to the back button at 18/28 Semi Bold, and Save is a 16px heart icon with "Save" at 18/28.
+   The heart keeps its text character for assistive tech and state; the icon is drawn over it. */
+.pp-detail > .pp-detail__topbar {
+  grid-template-columns: auto 1fr auto;
+}
+
+.pp-detail > .pp-detail__topbar .pp-detail__title {
+  line-height: 28px;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.pp-detail__save.pp-save-heart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.pp-detail__save .pp-save-heart__icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  background-color: #fafafa;
+  mask: url("./assets/icons/ui/heart-outline.svg") center / contain no-repeat;
+}
+
+.pp-detail__save[aria-pressed="true"] .pp-save-heart__icon {
+  background-color: var(--pp-role-primary);
+  mask-image: url("./assets/icons/ui/heart.svg");
+}
+
 .pp-btn {
   flex: 1;
   padding: 12px 20px;
@@ -916,12 +1059,6 @@ main:has(> .pp-compare) {
 .pp-picker button,
 .pp-picker input {
   font-family: inherit;
-}
-
-.pp-picker__close {
-  width: 40px;
-  height: 40px;
-  padding: 0;
 }
 
 .pp-picker__close:focus-visible,
@@ -1194,6 +1331,62 @@ main:has(> .pp-compare) {
   display: flex;
 }
 
+/* Figma round back/close buttons (Azoz QA report 03, Finding 3): 42px, Back = Nav Button
+   (447:7954), Close = Close Button (683:6577), sharing the component's state variants. */
+.pp-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--pp-role-nav-icon);
+  cursor: pointer;
+}
+
+.pp-nav-btn--back {
+  background: rgba(255, 248, 237, 0.05);
+  border-color: rgba(255, 248, 237, 0.1);
+}
+
+.pp-nav-btn--close {
+  background: var(--pp-color-neutral-700);
+  border-color: var(--pp-role-outline);
+}
+
+.pp-nav-btn svg {
+  display: block;
+}
+
+.pp-nav-btn:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--pp-role-nav-hover-bg);
+  color: var(--pp-role-nav-hover-icon);
+}
+
+.pp-nav-btn:focus-visible {
+  outline: 2px solid var(--pp-role-input-border-focus);
+  outline-offset: 2px;
+}
+
+.pp-nav-btn:active:not(:disabled) {
+  border-color: transparent;
+  background: var(--pp-role-nav-pressed-bg);
+  color: var(--pp-role-nav-icon);
+}
+
+.pp-nav-btn:disabled {
+  border-color: transparent;
+  background: var(--pp-role-nav-disabled-bg);
+  color: var(--pp-role-nav-icon-disabled);
+  cursor: not-allowed;
+}
+
 /* Hover and pressed states (Azoz review #17) from the design-system button and input roles. */
 .pp-picker__option:hover:not(.pp-picker__option--selected) {
   outline: 1px solid var(--pp-role-outline-solid);
@@ -1214,22 +1407,10 @@ main:has(> .pp-compare) {
   transform: scale(0.98);
 }
 
-.pp-picker__close:hover,
-.pp-compare__close:hover {
-  background: var(--pp-role-button-outline-pressed-bg);
-}
-
-.pp-picker__close:active,
-.pp-compare__close:active {
-  transform: scale(0.95);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .pp-picker__option:active,
   .pp-picker .pp-btn--primary:active,
-  .pp-compare .pp-btn--primary:active,
-  .pp-picker__close:active,
-  .pp-compare__close:active {
+  .pp-compare .pp-btn--primary:active {
     transform: none;
   }
 }

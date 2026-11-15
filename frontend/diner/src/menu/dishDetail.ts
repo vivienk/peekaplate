@@ -1,5 +1,6 @@
 import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
 import { ingredientIcon } from './icons';
+import { navButtonMarkup } from './navButton';
 import { formatPrice } from './price';
 import type { CompleteDish } from './types';
 
@@ -75,7 +76,7 @@ export function renderDishDetail(
   container.innerHTML = `
     <div class="pp-detail">
       <header class="pp-detail__topbar">
-        <button class="pp-detail__back" type="button" aria-label="${fromCompare ? 'Back to compare' : 'Back to menu'}">←</button>
+        ${navButtonMarkup('back', 'pp-detail__back', fromCompare ? 'Back to compare' : 'Back to menu')}
         <h1 class="pp-detail__title" tabindex="-1">Dish details</h1>
         ${saveHeartMarkup(dish, 'pp-detail__save')}
       </header>

@@ -788,6 +788,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       keptDish,
       exclude: replaceExclusions(comparison),
       confirmLabel: 'Replace Dish',
+      title: 'Replace Dish',
       onClose: () => showResult(comparison, undefined, back),
       onConfirm: (pickedDishId) => {
         const next = replaceSide(menu, comparison, side, pickedDishId);
