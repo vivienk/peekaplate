@@ -2,9 +2,9 @@
 
 ## Overview
 
-PeekaPlate enforces a hard, durable, run-scoped cap of **2 outbound provider requests per authorized ingestion run** (`MAX_PROVIDER_CALLS_PER_RUN = 2`) at the actual outbound HTTP boundary across all LLM and OCR providers.
+The configured hosted ingestion path enforces a durable cap of **2 outbound provider attempts per tenant/job** (`MAX_PROVIDER_CALLS_PER_RUN = 2`) across its LLM and OCR calls. A reservation is charged before transport, so a timeout or uncertain delivery can consume allowance without a successful response. A redelivery of the same job does not reset it; a new job has a separate budget.
 
-This cap protects controlled staging E2E runs (FE-06.4) and production-equivalent extraction paths against unbounded spend from provider cascades, retries, multi-page fan-out, concurrency, or Cloudflare Queue redeliveries.
+Standalone Python helpers remain optionally gated. The hosted service requires the gate explicitly; this change is not a general account-wide spending limit. Both the Worker and matching container image must be deployed before hosted enforcement can be accepted.
 
 ## Architecture
 
@@ -31,7 +31,25 @@ This cap protects controlled staging E2E runs (FE-06.4) and production-equivalen
    - In `run_pipeline.py`, `ProviderBudgetError` aborts immediately without cascading to subsequent providers or falling back to OCR.
    - `model_providers.py` sets `max_retries=0` on `ChatOpenAI` clients so the OpenAI SDK cannot perform hidden uncounted retries.
 
-## Non-Billable Staging Verification Plan
+## Independent local verification
+
+- The real local workerd/SQLite regression sends 12 concurrent reservations and
+  requires exactly two grants. It checks granted/denied replay, cross-job scope
+  rejection, process-restart persistence and rollback after an injected SQL error.
+  It passed in 2.98s. The isolated temporary harness has no container configuration,
+  bucket, Queue or provider transport. It deliberately bypasses the outer HTTP
+  authentication boundary, which has separate host unit coverage.
+- Run that test explicitly with TEST_WORKERD=1 and
+  `pnpm exec vitest run backend/src/extraction-budget.workerd.test.ts`.
+  Ordinary unit checks skip this optional runtime test.
+- `uv run --project processing --extra service --frozen python -X utf8 -m unittest discover -s processing/tests -q`
+  passed all 576 offline Python tests in 72.731s. The service extra supplies FastAPI;
+  UTF-8 mode avoids Windows' legacy encoding for Unicode fixture files. These tests
+  mock paid provider transports and do not establish actual extraction accuracy.
+- Hosted deployment, mixed-version rollout and provider acceptance are NOT RUN
+  in this review. Keep the existing approved request allowance and Queue controls.
+
+## Staging verification plan
 
 Before unpausing staging queues or submitting a synthetic menu:
 
