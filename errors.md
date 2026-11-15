@@ -3880,3 +3880,7 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T08:57:00.409Z","exitCode":1}
 ```
+
+```json
+{"id": "ERR-20261115-OWNER-AI-SHELL", "status": "resolved", "area": "owner-ai-shell", "cause": "Generic analysis failures retained private report output after authorization denial; panel wording implied an exact displayed snapshot despite an independent server read. Mobile grid intrinsic width also widened the report workspace.", "prevention": "Propagate typed access denials, cancel stale actor/report work, label both evidence periods explicitly and constrain report grid tracks.", "sources": ["frontend/console/src/owner/OwnerWorkspace.tsx", "frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "Two browser reproducers failed before fixes. Access denial, separate periods, pending sign-out/account change and mobile accessibility/overflow now pass; full verification follows."}
+```

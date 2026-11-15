@@ -13,6 +13,18 @@ or refresh access. Provider credentials remain server-only. Origin validation
 is a dependency-free shared helper, keeping unrelated report contracts out of
 the synthetic demo dependency path.
 
+The signed-in owner shell mounts the panel beside Dish performance only when
+`VITE_OWNER_AI_ENABLED=true`. Owners choose a dish and review focus; editors do
+not receive the panel. Session, restaurant, dish, focus or displayed-report changes
+cancel pending work. A 401 returns to sign-in; a 403 removes private report output
+and refreshes restaurant access. The menu workspace remains available separately.
+
+The displayed report and analysis are independent server reads. The panel labels
+both periods and the synthetic analysis source rather than claiming the analysis
+uses the exact table snapshot. The response's evidence period and snapshot ID are
+server-generated; the browser sends only `{dishId, goal}`. The mobile report table
+scrolls inside its card without widening the whole workspace.
+
 `POST /api/v1/venues/:venueId/ai/analysis` accepts only a dish ID and one review goal
 (menu, engagement or CRM). The normal Worker verifies the signed owner session and
 uses the existing owner report reader, which checks current owner membership and

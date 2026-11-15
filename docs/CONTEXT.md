@@ -236,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console includes design foundations, Auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and merged menu/draft/photo wiring. The opt-in synthetic analysis client restricts API destinations, cancellation and response scope, with typed denials for the later owner-shell panel. Save, verification, approval and publication remain separate. Restaurant setup persistence and final publish UI are unconnected; no sample restaurant or invented progress replaces saved data. Hosted AI activation and model-quality acceptance are not established.",
+      "summary": "Owner console includes design foundations, Auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and merged menu/draft/photo wiring. The opt-in synthetic analysis client restricts API destinations, cancellation and response scope, with typed denials for the later owner-shell panel. Save, verification, approval and publication remain separate. Restaurant setup persistence and final publish UI are unconnected; no sample restaurant or invented progress replaces saved data. Hosted AI activation and model-quality acceptance are not established. Opt-in owner analysis mounts beside the signed-in report with typed access cleanup and separate displayed-report/analysis periods; mobile report cards contain table overflow. No model activation is implied.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -341,7 +341,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/ai-preview/analysis-client.test.tsx",
         "playwright.owner-ai.config.ts",
         "tests/owner-ai-browser/connection.spec.ts",
-        "frontend/console/src/owner/api-origin.ts"
+        "frontend/console/src/owner/api-origin.ts",
+        "playwright.workspace.config.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -351,7 +352,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "795332c0dd6a762eb61b14d97873ff879e5f6ae5c3980ffff3023166b783ea55"
+      "sourceFingerprint": "ed87032decd187d29859fc1837a8829596c44e49642b14eb7cbc9be1647260ce"
     },
     {
       "id": "backend",
@@ -538,7 +539,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "b65ff365478302755b44ec3a4c111f55ca6ffe0c6f63146444ce23c113840122"
+      "sourceFingerprint": "08679cc0f2665b05c272f7d921ef309212d771d7160f575feed3b30039f7a7cf"
     },
     {
       "id": "database",
@@ -682,7 +683,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "365808f8e3ef7877e952f5c66c8fce2b7a25e51709fbcd4f812c9e6528f8c91e"
+      "sourceFingerprint": "fda2d9d1a36ed450bf9498df6c7fd51960806d03c23d1ce744566ee74bd6ce40"
     },
     {
       "id": "agents",
@@ -898,25 +899,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-14",
       "modules": [
-        "measurement",
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "summary": "PR166 adds agreement-gated order imports and separate owner-request/operator/checker deletion. Re-review fixed overwritten SQL FOUND, later-import destruction during restore, cross-operator receipt mismatch and Windows/TypeScript CLI loading. Historical reconciliation deletes through a trusted completedAt cutoff and preserves later batch CSV keys. A request stays bound to its first executor. Disposable database and CLI regressions cover these failures; hosted activation and agreement approval remain separate.",
-      "sources": [
-        "docs/pilot-order-outcome-agreement.md",
-        "packages/contracts/src/order-outcome.ts",
-        "migrations/20261113120000_pilot_order_agreement_and_deletion.sql",
-        "migrations/20261114020000_harden_s6_data_14_deletion_and_reconciliation.sql",
-        "backend/src/order-ingestion/service.ts",
-        "backend/src/index.ts"
-      ],
-      "next": "Finish final CI and independent review before merge. Provision restricted operator/checker bindings and run a synthetic hosted deletion/restore drill before any real pilot uploads; obtain product/agreement sign-off."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
         "processing"
       ],
       "summary": "PR169 prepares offline QA-02 reference freezing and integrity evidence. Original-byte hashes, page coverage and declared source-family splits are checked; source/reference review declarations are not authenticated approvals. The three-entry fictional development source is reviewed as a development case, with two blank-page exclusions. Independent reference sign-off remains pending; registered holdouts are zero and model evaluation is NOT RUN.",
@@ -1040,6 +1022,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-ai-responses.md"
       ],
       "next": "Merge analysis before shell panel; preserve unknown-freshness abstention and hosted activation gates."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "The signed-in owner shell includes the opt-in AI panel with typed access cleanup and distinct displayed-report/analysis evidence periods, preserving merged menu workspace wiring.",
+      "files": [],
+      "next": "Retarget after #164; test pending sign-out, mobile, flag-off and hosted configuration gates before activation."
     }
   ]
 }
