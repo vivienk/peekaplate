@@ -9,7 +9,7 @@ for (const { supported, landscape } of [
 ]) {
   test(`original actions and landscape portal, orientation API ${supported ? 'supported' : 'unavailable'} ${landscape ? 'landscape' : 'portrait'}`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize(
       landscape ? { width: 844, height: 390 } : { width: 390, height: 844 },
     );
@@ -91,7 +91,7 @@ for (const { supported, landscape } of [
       /pp-ar__back/,
     );
     await page.screenshot({
-      path: `/private/tmp/portion-fullscreen-${supported}-${landscape}.png`,
+      path: testInfo.outputPath(`portion-fullscreen-${supported}-${landscape}.png`),
     });
     await expect(portal.locator('.pp-ar__scale-status')).toContainText(/approximate/i);
     await portal.getByRole('button', { name: 'Original photo', exact: true }).click();
@@ -106,7 +106,9 @@ for (const { supported, landscape } of [
     await expect(portal.locator('.pp-ar__original')).toBeHidden();
     await portal.getByText('Adjust view', { exact: true }).click();
     await expect(portal.getByRole('slider', { name: 'Tilt dish' })).toHaveAttribute('max', '3');
-    await page.screenshot({ path: `/private/tmp/portion-landscape-${supported}-${landscape}.png` });
+    await page.screenshot({
+      path: testInfo.outputPath(`portion-landscape-${supported}-${landscape}.png`),
+    });
     await portal.getByRole('button', { name: 'Back to preview', exact: true }).click();
     if (supported)
       await expect

@@ -13,6 +13,7 @@ This section supersedes the older merge/conflict and observer/withdrawal blocker
 - PASS: 64 focused portion/model/cutout/demo Python tests in the existing Linux service image with `--network none`, plus 12 proxy/bundle/generator script tests.
 - Full Python discovery in that image ran 655 tests in 55.408s: 651 passed; four spatial harness cases could not start because the image lacks Node. All 17 spatial tests, including those four, then passed using the host toolchain in 19.584s. This is split-environment evidence, not a passing full Linux run.
 - Two read-only review lanes checked UI lifecycle and private-service/contract boundaries. The original pinned security diff produced no supported security finding; reconciliation received separate delta review.
+- CI run `43757839050` passed unit, full Python/package, build and database checks, but exposed three landscape screenshot writes to the macOS-only `/private/tmp` path. Both landscape captures and the opt-in upload capture now use Playwright's per-test output directory. The three affected landscape cases pass locally in 13.1s; no application behavior or assertions changed. The PR description now contains the required contract labels. Full CI rerun remains required before merge.
 - NOT RUN: paid Tripo calls, real cutout-model execution, physical-phone camera/orientation/scale acceptance, hosted publication or deployment. Generated/local assets stay review-only and publication-ineligible.
 
 ## Historical size and interaction correction

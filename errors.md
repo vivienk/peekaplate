@@ -4433,3 +4433,7 @@ The empty focused search kept its dark-surface placeholder colour on a light sur
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T20:22:18.664Z","exitCode":1}
 ```
+
+## PR162 portable browser artifacts — November 15, 2026
+
+CI run `43757839050` passed application/Python/build/database checks but three landscape cases failed with ENOENT writing screenshots under `/private/tmp`. The local machine already had that directory, masking the portability issue. Landscape and opt-in upload captures now use `testInfo.outputPath` so each test gets a runner-owned artifact directory. The three affected cases pass in 13.1s without changing their assertions or application code. PR documentation also failed because the required contract labels were missing; the description was corrected without weakening its check.

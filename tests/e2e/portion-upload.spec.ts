@@ -7,7 +7,9 @@ for (const variant of [
   { name: 'Brioche French Toast', query: '?scenario=edge-cases', legacy: false },
   { name: 'Avocado Toast', query: '?scenario=portion-demo', legacy: true },
 ]) {
-  test(`uploaded opaque photo works for ${variant.name} ${variant.query}`, async ({ page }) => {
+  test(`uploaded opaque photo works for ${variant.name} ${variant.query}`, async ({
+    page,
+  }, testInfo) => {
     test.skip(
       !process.env.PEEKAPLATE_LIVE_CUTOUT,
       'Start the local cutout service and explicitly enable this integration check.',
@@ -78,7 +80,7 @@ for (const variant of [
     const rotation = page.getByRole('slider', { name: 'Tilt dish' });
     await rotation.fill('3');
     await expect(rotation).toHaveValue('3');
-    await page.screenshot({ path: '/private/tmp/automatic-cutout-camera-test.png' });
+    await page.screenshot({ path: testInfo.outputPath('automatic-cutout-camera-test.png') });
     await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
     await page.getByText('Preview controls', { exact: true }).click();
     await expect(page.getByLabel('Preview image (local review only)')).toHaveCount(0);
