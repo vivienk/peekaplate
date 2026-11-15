@@ -491,6 +491,67 @@ main:has(> .pp-compare) {
   outline-offset: 2px;
 }
 
+/* Figma "Search bar_Home page" (Azoz review #15, Rania Nov 15): a dark 42px pill with the search
+   icon and the close × inside it, placeholder Search here at 12/16, and an orange ring set off by
+   a small gap when focused. The × keeps a 32px target inside the field. */
+.pp-search-panel .pp-search-input {
+  box-sizing: border-box;
+  height: 42px;
+  padding: 0 44px 0 34px;
+  border: 1px solid var(--pp-role-outline);
+  background: var(--pp-role-surface-container);
+  color: var(--pp-role-on-surface);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.pp-search-panel .pp-search-input::placeholder {
+  color: var(--pp-role-on-surface-variant);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pp-search-panel .pp-search-input:hover {
+  border-color: var(--pp-role-input-border-hover);
+}
+
+.pp-search-panel .pp-search-input:focus {
+  border-color: var(--pp-role-outline);
+  box-shadow:
+    0 0 0 3px var(--pp-role-surface),
+    0 0 0 4px var(--pp-role-primary);
+}
+
+.pp-search-panel__icon {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  background: var(--pp-role-on-surface-variant);
+  mask: url("./assets/icons/ui/search.svg") center / contain no-repeat;
+  pointer-events: none;
+}
+
+.pp-search-panel .pp-search-close {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  transform: translateY(-50%);
+  background: transparent;
+  color: var(--pp-role-on-surface-variant);
+}
+
+.pp-search-panel .pp-search-close:hover {
+  color: var(--pp-role-on-surface);
+}
+
 .pp-search-staff {
   margin: 8px 0 0;
   color: #fafafa;
@@ -918,12 +979,6 @@ main:has(> .pp-compare) {
   font-family: inherit;
 }
 
-.pp-picker__close {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-}
-
 .pp-picker__close:focus-visible,
 .pp-picker__confirm:focus-visible,
 .pp-picker__choose:focus-visible {
@@ -1194,6 +1249,51 @@ main:has(> .pp-compare) {
   display: flex;
 }
 
+/* Figma Nav Button (Azoz review #2, Rania Nov 15): 42px round back/close button. Default sits a
+   step above the page with an outline ring so it no longer blends into the background. */
+.pp-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--pp-role-outline);
+  border-radius: 999px;
+  background: var(--pp-role-nav-bg);
+  color: var(--pp-role-nav-icon);
+  cursor: pointer;
+}
+
+.pp-nav-btn svg {
+  display: block;
+}
+
+.pp-nav-btn:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--pp-role-nav-hover-bg);
+  color: var(--pp-role-nav-hover-icon);
+}
+
+.pp-nav-btn:focus-visible {
+  outline: 2px solid var(--pp-role-input-border-focus);
+  outline-offset: 2px;
+}
+
+.pp-nav-btn:active:not(:disabled) {
+  border-color: transparent;
+  background: var(--pp-role-nav-pressed-bg);
+  color: var(--pp-role-nav-icon);
+}
+
+.pp-nav-btn:disabled {
+  border-color: transparent;
+  background: var(--pp-role-nav-disabled-bg);
+  color: var(--pp-role-nav-icon-disabled);
+  cursor: not-allowed;
+}
+
 /* Hover and pressed states (Azoz review #17) from the design-system button and input roles. */
 .pp-picker__option:hover:not(.pp-picker__option--selected) {
   outline: 1px solid var(--pp-role-outline-solid);
@@ -1214,22 +1314,10 @@ main:has(> .pp-compare) {
   transform: scale(0.98);
 }
 
-.pp-picker__close:hover,
-.pp-compare__close:hover {
-  background: var(--pp-role-button-outline-pressed-bg);
-}
-
-.pp-picker__close:active,
-.pp-compare__close:active {
-  transform: scale(0.95);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .pp-picker__option:active,
   .pp-picker .pp-btn--primary:active,
-  .pp-compare .pp-btn--primary:active,
-  .pp-picker__close:active,
-  .pp-compare__close:active {
+  .pp-compare .pp-btn--primary:active {
     transform: none;
   }
 }
