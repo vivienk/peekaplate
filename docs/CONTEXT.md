@@ -231,7 +231,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "86572a06895d815f93cf6efb4de38e77780669e45f7422e7ae057df3e0b5f749"
+      "sourceFingerprint": "46949161d1bc8c315ad3bb68c574c855acc1708589950be08ec68c79d91f7377"
     },
     {
       "id": "console",
@@ -349,7 +349,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/dish-presentation.css",
         "frontend/console/src/owner/OwnerPublish.tsx",
         "frontend/console/src/owner/owner-publish.css",
-        "docs/owner-publish-handoff.md"
+        "docs/owner-publish-handoff.md",
+        "frontend/console/src/owner-dashboard/data.ts",
+        "frontend/console/src/owner-dashboard/attention.test.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -359,7 +361,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9919cfe7ee74a2f22a6a4a53b66773c70cd9eec4d94fd0c034ae421bfaa42b03"
+      "sourceFingerprint": "1435a19a632e44503c6c95af77a1367ae67f9206d3ba96a068efe735ad5e831e"
     },
     {
       "id": "backend",
@@ -915,21 +917,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-14",
-      "modules": [
-        "backend"
-      ],
-      "summary": "PR188 adds a required hosted tenant/job provider-attempt gate backed by transactional DO SQLite. Queue redeliveries share the two-attempt counter; Python vision/OCR/model retries reserve before transport and fail closed. Real local workerd concurrency, replay/scope, process-restart and SQL rollback checks pass; 576 offline Python tests pass. Hosted Worker+image rollout and provider acceptance remain NOT RUN.",
-      "files": [
-        "backend/src/extraction-host.ts",
-        "backend/src/extraction-budget.workerd.test.ts",
-        "backend/tests/provider-budget-worker.ts",
-        "processing/src/peekaplate_processing/provider_budget.py",
-        "docs/provider-call-budget.md"
-      ],
-      "next": "Deploy matching Worker and container image before any controlled provider test; keep the existing allowance and Queue controls. This is not an account-wide spending limit."
-    },
-    {
       "date": "2026-11-15",
       "modules": [
         "console"
@@ -1040,6 +1027,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/qa02-strict-scorer-spec.md"
       ],
       "next": "Review source-only answers and scoring with Sai/Uneeza before new predictions; Vivien thresholds and call/retry authorization stay separate. PR169 merged at0946d21 with unchanged reference/helper bytes, removing its code-landing dependency. Reuse FE-06.4's job verifier and existing backend acceptance in the operator-coordinated156/171/172 run; do not claim routed-UI or release acceptance."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR189 ranks the synthetic preview most-attention answer by first opens divided by seen visits, with a ten-visit floor. The illustrative answer does not use live owner reports.",
+      "files": [
+        "frontend/console/src/owner-dashboard/data.ts",
+        "frontend/console/src/owner-dashboard/attention.test.ts"
+      ],
+      "next": "Retain the synthetic label; connect real owner AI only through validated server report semantics."
     },
     {
       "date": "2026-11-15",
