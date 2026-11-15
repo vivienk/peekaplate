@@ -47,7 +47,17 @@ const SAVE_FAILED = {
   body: 'Please try again.',
 };
 
-export function RestaurantDetails({
+export function RestaurantDetails(props: RestaurantDetailsProps) {
+  // Reset on an actual saved baseline change, not an equivalent object from a parent render.
+  const baseline = JSON.stringify([
+    props.mode,
+    ...Object.keys(EMPTY_DETAILS).map((field) => props.saved?.[field as DetailsField] ?? ''),
+    props.savedPhotoUrl ?? null,
+  ]);
+  return <RestaurantDetailsForm key={baseline} {...props} />;
+}
+
+function RestaurantDetailsForm({
   mode,
   saved,
   savedPhotoUrl,

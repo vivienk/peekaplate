@@ -116,6 +116,13 @@ function Demo() {
   const [processAnswer, setProcessAnswer] = useState('failed');
   const [processState, setProcessState] = useState<MenuProcessingState>('processing');
   const [processSources, setProcessSources] = useState<MenuSourceItem[]>(SAMPLE_SOURCES);
+  const requestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (requestTimer.current !== null) clearTimeout(requestTimer.current);
+    },
+    [],
+  );
 
   // S08 follows the extraction on its own: processing, then the result picked in the demo bar.
   useEffect(() => {
@@ -137,6 +144,8 @@ function Demo() {
   };
 
   const restart = () => {
+    if (requestTimer.current !== null) clearTimeout(requestTimer.current);
+    requestTimer.current = null;
     setDone(null);
     setFailed(false);
     setSaving(false);
@@ -155,7 +164,8 @@ function Demo() {
     setRequests((n) => n + 1);
     setImporting(true);
     setLinkFailure(undefined);
-    setTimeout(() => {
+    requestTimer.current = setTimeout(() => {
+      requestTimer.current = null;
       setImporting(false);
       if (linkAnswer === 'accepted') startProcessing([{ name: url, kind: 'link' }]);
       else setLinkFailure(linkAnswer as MenuLinkFailure);
@@ -166,7 +176,8 @@ function Demo() {
     setRequests((n) => n + 1);
     setSaving(true);
     setFailed(false);
-    setTimeout(() => {
+    requestTimer.current = setTimeout(() => {
+      requestTimer.current = null;
       setSaving(false);
       if (answer === 'failed') setFailed(true);
       else if (mode === 'onboarding') setScreen('s06');

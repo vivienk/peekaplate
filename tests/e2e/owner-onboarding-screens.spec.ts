@@ -7,6 +7,94 @@ const demo = 'http://127.0.0.1:5174/owner-onboarding.html';
 
 const save = (page: Page) => page.getByRole('button', { name: 'Save' });
 
+async function mountDetailsCaller(page: Page) {
+  await page.route('**/src/onboarding/demo.tsx*', async (route) => {
+    const response = await route.fetch();
+    const source = await response.text();
+    const react = source.match(/from ["']([^"']*\/react\.js[^"']*)["']/)?.[1];
+    const dom = source.match(/from ["']([^"']*\/react-dom_client\.js[^"']*)["']/)?.[1];
+    expect(react).toBeDefined();
+    expect(dom).toBeDefined();
+    await route.fulfill({
+      response,
+      body: `
+      import React from ${JSON.stringify(react)};
+      import ReactDOM from ${JSON.stringify(dom)};
+      import { RestaurantDetails } from '/src/onboarding/RestaurantDetails.tsx';
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      window.updateSaved = (saved, savedPhotoUrl) => root.render(React.createElement(RestaurantDetails, {
+        mode: 'dashboard', saved, savedPhotoUrl, onSave() {}, onLeave() {}
+      }));
+      window.updateSaved({ name: 'Synthetic A', city: 'San Francisco', street: 'Test street', line2: '', phone: '5552345678', email: '' });
+    `,
+    });
+  });
+  await page.goto(demo);
+  await expect(page.getByLabel('Restaurant name')).toHaveValue('Synthetic A');
+}
+
+test('S05 resets changed saved baselines but preserves edits across equivalent props', async ({
+  page,
+}) => {
+  await mountDetailsCaller(page);
+  await page.getByLabel('City').fill('Unsaved city');
+  const baseline = {
+    name: 'Synthetic A',
+    city: 'San Francisco',
+    street: 'Test street',
+    line2: '',
+    phone: '5552345678',
+    email: '',
+  };
+  const update = (saved: typeof baseline) =>
+    page.evaluate(
+      (saved) =>
+        (window as unknown as { updateSaved(saved: typeof baseline): void }).updateSaved(saved),
+      saved,
+    );
+  await update(baseline);
+  await expect(page.getByLabel('City')).toHaveValue('Unsaved city');
+  await update({ ...baseline, name: 'Synthetic B' });
+  await expect(page.getByLabel('Restaurant name')).toHaveValue('Synthetic B');
+  await expect(page.getByLabel('City')).toHaveValue('San Francisco');
+  await expect(save(page)).toHaveAttribute('aria-disabled', 'true');
+});
+
+test('S05 clears the chosen photo after its saved baseline changes', async ({ page }) => {
+  await mountDetailsCaller(page);
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles({
+      name: 'logo.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+  await expect(save(page)).not.toHaveAttribute('aria-disabled');
+  await page.evaluate(() =>
+    (
+      window as unknown as { updateSaved(saved: Record<string, string>, photo: string): void }
+    ).updateSaved(
+      {
+        name: 'Synthetic A',
+        city: 'San Francisco',
+        street: 'Test street',
+        line2: '',
+        phone: '5552345678',
+        email: '',
+      },
+      '/brand/peekaplate-logo.svg',
+    ),
+  );
+  await expect(save(page)).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('img', { name: 'Restaurant photo' })).toHaveAttribute(
+    'src',
+    '/brand/peekaplate-logo.svg',
+  );
+});
+
 async function fillRequired(page: Page) {
   await page.getByLabel('Restaurant name').fill('Ember & Stone');
   await page.getByLabel('City').fill('San Francisco');
@@ -193,6 +281,18 @@ async function openS07Link(page: Page, answer = 'accepted') {
 }
 
 const importMenu = (page: Page) => page.getByRole('button', { name: 'Import menu' });
+
+test('S07 leaving an in-flight import cannot navigate back into processing', async ({ page }) => {
+  await openS07Link(page);
+  await page.getByLabel('Menu URL').fill('https://example.test/menu');
+  await page.clock.install();
+  await importMenu(page).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.clock.runFor(1000);
+  await expect(
+    page.getByRole('heading', { name: 'Choose how to add your menu', exact: true }),
+  ).toBeVisible();
+});
 
 test('S07 link: Import menu waits for a valid address, then shows Loading and opens S08', async ({
   page,
