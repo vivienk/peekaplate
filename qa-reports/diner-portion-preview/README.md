@@ -1,3 +1,20 @@
+# November 15 size and interaction correction
+
+Latest source reviewed: `11a20aa` (delta from `50c3b99`). This section supersedes older interaction evidence below.
+
+- Camera preview contains the complete image, preserves preferred pixel width/relative placement on resize, and temporarily constrains oversized images instead of clipping. Size remains approximate.
+- 2.5D tilt is limited to ±3°. Drag retains the grab point; background taps place the image. Optional local models stay centered in manual mode, with active bounds used for placement.
+- Landscape is requested on opening when supported. Portrait has a fresh-gesture retry only where orientation lock exists; otherwise it gives a manual sideways-rotation prompt. Browser/OS restrictions cannot be overridden by a web page.
+- PASS: `pnpm exec vitest run frontend/diner/src/menu/portion.test.ts frontend/diner/src/menu/portionMotion.test.ts frontend/diner/src/menu/portionOrientation.test.ts frontend/diner/src/menu/portionScale.test.ts frontend/diner/src/menu/portionPlacement.test.ts frontend/diner/src/menu/portionUpload.test.ts` —30 tests.
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --grep 'camera portal|portal closes|table session|opens the camera portal|actual PR145|original actions' --workers=2` —16 tests, including all six photos, drag, original comparison, model switch/failure, cleanup and portrait/landscape. Camera and orientation are simulated.
+- PASS: `pnpm verify lint typecheck context:check docs:check`; workspace build passed before the final interaction correction; final preview diner build passed with `PEEKAPLATE_PREVIEW_DEMOS=true pnpm --filter @peekaplate/diner build`.
+- RED-to-GREEN: original camera code fails the bounded Tilt control regression; corrected code passes. Landscape test port and touch emulation, and six phone viewport setups were corrected.
+- Broader suite was67/76 before test-setup corrections. Two remaining unrelated checks (observer count and withdrawal event count) reproduce with original50c3b99 application files restored. This is not a claim of full-suite or merge readiness.
+- Independent read-only architecture/correctness review found no remaining blocker in the correction. Portrait and landscape screenshots were visually inspected.
+- NOT RUN: physical phone camera/orientation, real AR tracking/scale, real restaurant publication. PR remains draft; no merge or production deployment.
+
+---
+
 # Figma screens with PR25 viewer — November 12, 2026
 
 Local development evidence on Node24.16.0 / pnpm11.25.0. The latest user direction

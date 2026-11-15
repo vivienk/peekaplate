@@ -2875,3 +2875,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T08:55:19.271Z","exitCode":1}
 ```
+
+- 2026-11-15 final correction:30 focused unit tests and16 focused camera/landscape browser tests pass. A temporary baseline trace folder was outside the normal ignored test-results path and triggered formatting; moved the artifacts to /private/tmp, then lint/typecheck/context/docs passed. Preview diner build passed.
