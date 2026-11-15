@@ -619,6 +619,7 @@ test('a delayed review session cannot reopen an editor after shell navigation', 
   await expect.poll(() => state.reviewStarted).toBe(true);
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   state.releaseReview();
+  await expect(page.locator('.owner-menu-workspace')).toHaveAttribute('aria-busy', 'false');
   await expect(page.getByRole('heading', { name: 'Your menu draft', exact: true })).toBeVisible();
   await expect(page.getByLabel('Category', { exact: true })).toHaveCount(0);
 });
