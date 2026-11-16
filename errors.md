@@ -3912,3 +3912,35 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"id": "ERR-20261115-OWNER-PICKER-WIDTH", "status": "resolved", "area": "owner-console-responsive", "cause": "A long server-returned restaurant name gave the selector a 440px intrinsic width and widened a 390px hosted viewport.", "prevention": "Constrain the shared picker and select minimum/maximum inline width, including the onboarding account disclosure.", "sources": ["frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "The real hosted overflow was reproduced locally at 448px; the long-name dashboard/account-menu browser case now passes at390px. Final hosted retest follows release."}
 ```
+
+
+## 2026-11-15 — OCR screen integration checks
+
+The new job-state regression failed before the fix: an empty status list was
+classified as failed, and mixed terminal failures without drafts could be shown
+as an empty result. The workspace also treated older dishes as proof that a new
+import succeeded. `owner-menu/jobs.test.ts` and the OCR cases in
+`tests/e2e/owner-workspace.spec.ts` cover these paths; processing now uses the
+selected import's stored state and reads drafts after job status.
+
+Initial dependency setup found Node24.14 below the pinned engine and an incomplete
+offline store. Using the existing Node24.16 toolchain and a frozen install resolved
+setup. Browser startup needed permission for localhost/Chromium. An interrupted
+run left its own server running; that process was stopped before rerunning.
+The inherited workspace suite still assumed pre-PR206 dashboard entry and omitted
+its new review checkboxes; tests now follow the authored S05 exit and confirmations.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-16T00:07:58.811Z","exitCode":1}
+```
+
+
+The full check initially failed because authentication fixtures could not bind
+localhost under restricted execution (EPERM), also preventing local-session
+setup. Rerunning with localhost access passed `TMPDIR=/private/tmp pnpm check`:
+1,892 unit tests (five existing skips), 107 script checks, lint, types, context
+and docs. `pnpm verify build` also passed; backend build was dry-run only.
+New OCR browser fixtures initially omitted required draft_version; supplying the
+real response shape resolved their invalid-response errors. Existing browser
+navigation now explicitly exits S05 and the PR206 review screen before shell use.

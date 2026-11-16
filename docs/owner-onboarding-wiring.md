@@ -109,3 +109,35 @@ uses the author's scoped 28px heading and describes unavailable connections
 without changing the demo. Browser-dropped files with no MIME use the existing
 extension policy to declare PDF/JPEG/PNG while retaining the original bytes;
 server signature/hash verification remains authoritative.
+
+## PR206 OCR screen integration
+
+This follow-up is stacked on `feat/s8-menu-review` at
+`7884ed1dddb9680383eb898532e844259c1790e8`; PR206 is still open and itself
+stacks on PR163. Retarget after those dependencies merge. Existing integration
+points are reused, not replaced:
+
+| Screen | Client / backend boundary |
+| --- | --- |
+| S06 source picker | `OwnerMenuWorkspace.nextSource` selects URL, upload or manual entry. |
+| S07 URL | `submitMenuUrl` calls `POST /venues/:venueId/menus/url`; the server materializes a validated direct PDF/image URL. |
+| S07 upload | `createUploadGroup` and `uploadGroupFile` send SHA-256 manifests and original bytes to `menus/upload-groups` and its file route. |
+| S08 processing | `listJobs` reads persisted states; `listDrafts` runs afterward so a terminal status is not paired with a draft read started earlier. The existing `menuProcessingState` controls empty/failure screens and review navigation for the selected import only. |
+| S08/S10 review | `draftToReviewDish` displays saved candidates. Complete/partial imports open review; older drafts cannot turn an empty or failed import into success. |
+| S09 correction | `openReviewSession` loads validated stored evidence; `reviewCandidate` sends versioned, idempotent corrections. No browser extraction/provider call is added. |
+| Retry/cancel | Existing job commands remain server-authorized. Exhausted attempts have no retry button; an explicit successful retry opens processing. No automatic retry or new job is used to evade limits. |
+
+The backend route module is `backend/src/owner-menu-routes.ts`. Existing
+`backend/src/ingestion/orchestrator.ts` coordinates durable jobs, private reports
+and draft persistence; `backend/src/extraction-host.ts` hosts extraction and
+atomic provider reservations; Python `provider_budget.py` fails closed before
+outbound provider calls. All remain unchanged. UI states do not enable Queue
+delivery or establish hosted provider availability. Historical staging readbacks
+above require fresh verification before rollout; this change deploys nothing,
+changes no secrets/budgets, and sends no paid provider request.
+
+PR206's remaining boundaries still apply: S05 details are memory-only; extracted
+photo attachment and serving-size persistence lack the needed connection;
+review confirmations are not a persisted verification decision. Complete
+verification is local UI state, not approval or publication. A real hosted
+end-to-end acceptance run remains separate from synthetic browser coverage.

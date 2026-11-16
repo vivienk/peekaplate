@@ -30,7 +30,7 @@ import {
   reviewCorrection,
 } from '../owner-menu/dishForm';
 import { evidenceExcerpts } from '../owner-menu/evidence';
-import { errorMessage } from '../owner-menu/jobs';
+import { errorMessage, menuProcessingState } from '../owner-menu/jobs';
 import { Button } from '../ui';
 import { FirstDashboardContent } from './FirstDashboard';
 import { draftToReviewDish, REVIEWED_STATUSES } from './review/fromDishDraft';
@@ -172,10 +172,10 @@ export function OwnerMenuWorkspace({
   const load = useCallback(
     async (active: Active) => {
       const generation = ++readGeneration.current;
-      const [nextJobs, nextDrafts] = await Promise.all([
-        active.client.listJobs(venueId),
-        active.client.listDrafts(venueId),
-      ]);
+      // Read drafts after status: a terminal job must not be paired with an older draft read.
+      const nextJobs = await active.client.listJobs(venueId);
+      if (!current(active) || generation !== readGeneration.current) return;
+      const nextDrafts = await active.client.listDrafts(venueId);
       if (!current(active) || generation !== readGeneration.current) return;
       setJobs(nextJobs);
       setDrafts(nextDrafts);
@@ -300,33 +300,25 @@ export function OwnerMenuWorkspace({
     }, 5000);
     return () => window.clearInterval(timer);
   }, [view, load, current, failure]);
+  const selectedJobs = jobs.filter((job) => processingIds.includes(job.id));
+  const processing = menuProcessingState(selectedJobs);
+  const selectedJobsLoaded =
+    processingIds.length > 0 && selectedJobs.length === processingIds.length;
   useEffect(() => {
-    const selected = jobs.filter((job) => processingIds.includes(job.id));
-    if (
-      view === 'processing' &&
-      selected.length &&
-      selected.every((job) => !['queued', 'running'].includes(job.status))
-    ) {
-      if (drafts.length > 0) {
-        // S8: once reading finishes, the owner reviews the dishes found before verifying them. A source
-        // that failed or was only partly read is named, and can be retried from Menu.
-        const unread = selected.filter((job) =>
-          ['failed', 'incomplete'].includes(job.status),
-        ).length;
-        setView('review');
-        setNotice(
-          unread > 0
-            ? `${unread} ${unread === 1 ? 'source' : 'sources'} could not be read fully. Review the dishes found, add any missing dish, or retry the source from Menu.`
-            : 'We read your menu. Review each dish before you verify it.',
-        );
-      } else {
-        setView('list');
-        setNotice(
-          'Processing status updated. Review the saved dishes and any failed sources below.',
-        );
-      }
+    if (view !== 'processing' || !selectedJobsLoaded) return;
+    if (processing.phase === 'ready' || processing.phase === 'partial') {
+      // Only this import can trigger success; older saved dishes are not extraction evidence.
+      setView('review');
+      setNotice(
+        processing.phase === 'partial'
+          ? 'Some sources could not be read fully. Review the dishes found, add any missing dish, or retry the source from Menu.'
+          : 'We read your menu. Review each dish before you verify it.',
+      );
+    } else if (processing.phase === 'cancelled') {
+      setView('list');
+      setNotice('Processing cancelled. Previously saved dishes remain available.');
     }
-  }, [view, jobs, drafts, processingIds, setView]);
+  }, [view, selectedJobsLoaded, processing.phase, setView]);
   const editManual = (draft?: DishDraft) => {
     const form = draft ? dishFromManualDraft(draft) : emptyManualDish();
     setEditing({
@@ -662,13 +654,22 @@ export function OwnerMenuWorkspace({
     ) : view === 'processing' ? (
       <>
         <MenuProcessing
-          state="processing"
+          state={
+            selectedJobsLoaded && processing.phase === 'failed'
+              ? 'failed'
+              : selectedJobsLoaded && processing.phase === 'empty'
+                ? 'no-dishes'
+                : 'processing'
+          }
+          failureReason={errorMessage(processing.errorCodes[0] ?? 'extraction_failed')}
           step={
-            jobs
-              .filter((job) => processingIds.includes(job.id))
-              .some((job) => job.status === 'running')
-              ? 'Processing the uploaded source'
-              : 'Queued for processing'
+            processing.phase === 'uploading'
+              ? 'Waiting for the remaining source files'
+              : jobs
+                    .filter((job) => processingIds.includes(job.id))
+                    .some((job) => job.status === 'running')
+                ? 'Processing the uploaded source'
+                : 'Queued for processing'
           }
           onCancel={() =>
             void run(async (active) => {
@@ -826,17 +827,22 @@ export function OwnerMenuWorkspace({
                       View processing
                     </Button>
                   )}
-                  {['failed', 'incomplete'].includes(job.status) && (
+                  {menuProcessingState([job]).retryable.includes(job.id) && (
                     <Button
                       disabled={busy}
                       onClick={() =>
                         void run(async (active) => {
+                          const generation = viewGeneration.current;
                           await active.client.retryJob(
                             venueId,
                             job.id,
                             command('retry', [job.id, job.attempt_count]),
                           );
                           await load(active);
+                          if (current(active) && generation === viewGeneration.current) {
+                            setProcessingIds([job.id]);
+                            setView('processing');
+                          }
                         })
                       }
                     >
