@@ -5,6 +5,7 @@
 // when a valid comparison is displayed.
 import { completeDishes } from '../menu/adapter';
 import { allergenIcon, dietaryIcon } from '../menu/icons';
+import { navButtonMarkup } from '../menu/navButton';
 import { formatPrice } from '../menu/price';
 import type { CompleteDish, Menu } from '../menu/types';
 import type { CompareSide, Comparison } from './comparison';
@@ -146,7 +147,7 @@ export function renderCompareResult(
   container.innerHTML = `
     <div class="pp-compare">
       <header class="pp-detail__topbar pp-compare__topbar">
-        <button class="pp-detail__back pp-compare__close" type="button" aria-label="Close compare">×</button>
+        ${navButtonMarkup('back', 'pp-detail__back pp-compare__close', 'Close compare')}
         <h1 class="pp-detail__title" tabindex="-1">Compare</h1>
         <span class="pp-picker__spacer" aria-hidden="true"></span>
       </header>
