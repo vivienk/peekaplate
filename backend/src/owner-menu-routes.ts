@@ -120,7 +120,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
           type,
           (key, bytes) => bucket.put(key, bytes),
           async (key) => {
-            const object = await bucket.get(key);
+              const object = await bucket.get?.(key);
             return object ? object.arrayBuffer() : null;
           },
         ),

@@ -4549,3 +4549,10 @@ The full affected browser run passed 57 cases and failed an outdated exact motio
 Sai's count-only correction case reproduced on a disposable real database: the effective count changed but the draft remained version 1 and verified (expected version 2/not_verified). Reused PR213's draft-before-review locks and same-transaction invalidation; added count-only correction/retry/stale-verification coverage. Profile source inspection confirmed two projections writing the same event stream. Reused PR213's canonical fields/status/photo-ID contract, routes and unchanged migration; removed the undeployed PR215-only migration. Added actual HTTP upload/save/export integration through the shared profile and exact byte checks. No cloud database or deployment was changed.
 
 The full reconciled database suite passed 14 SQL files and 158 integration tests plus Worker smoke. Independent correctness review found a same-photo recovery defect inherited from the canonical upload path: receipt/hash deduplication skipped storage repair. The added HTTP regression removed the synthetic stored object and reproduced failed export after reupload. Upload retries now verify or repair only the exact authorized hash-bound bytes, preserving photo IDs and profile history; the same-key and new-key recovery paths are covered.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T22:36:28.170Z","exitCode":2}
+```
+
+Final typecheck caught the optional storage-reader interface in the retry repair route. The route now treats an unavailable reader as an unverified object and restores the authenticated exact bytes through the existing writer; it does not claim a verified object without reading it.
