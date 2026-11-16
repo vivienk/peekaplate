@@ -237,6 +237,3 @@ export function OwnerPublish({
     />
   );
 }
-
-// The prepared menu in the phone before publishing, in the diner's menu look: category tabs, then
-// each dish with its photo, price and food information. Dishes not ready to display say so.
