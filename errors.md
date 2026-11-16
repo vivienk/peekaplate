@@ -3944,3 +3944,10 @@ and docs. `pnpm verify build` also passed; backend build was dry-run only.
 New OCR browser fixtures initially omitted required draft_version; supplying the
 real response shape resolved their invalid-response errors. Existing browser
 navigation now explicitly exits S05 and the PR206 review screen before shell use.
+
+
+Independent review corrected the retry interpretation before release: max_attempts
+is an automatic-attempt window, not a permanent manual-retry cap. Existing
+changeMenuJob extends that window on explicit retry; the independent tenant/job
+provider allowance does not reset. Manual retry visibility is preserved, with
+browser coverage for exhausted automatic attempts reusing the same job.

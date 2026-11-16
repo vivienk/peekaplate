@@ -125,7 +125,7 @@ points are reused, not replaced:
 | S08 processing | `listJobs` reads persisted states; `listDrafts` runs afterward so a terminal status is not paired with a draft read started earlier. The existing `menuProcessingState` controls empty/failure screens and review navigation for the selected import only. |
 | S08/S10 review | `draftToReviewDish` displays saved candidates. Complete/partial imports open review; older drafts cannot turn an empty or failed import into success. |
 | S09 correction | `openReviewSession` loads validated stored evidence; `reviewCandidate` sends versioned, idempotent corrections. No browser extraction/provider call is added. |
-| Retry/cancel | Existing job commands remain server-authorized. Exhausted attempts have no retry button; an explicit successful retry opens processing. No automatic retry or new job is used to evade limits. |
+| Retry/cancel | Existing job commands remain server-authorized. An explicit successful retry opens processing on the same job. The server may extend its automatic-attempt window; the independent tenant/job provider allowance is not reset. No automatic client retry or replacement job is added. |
 
 The backend route module is `backend/src/owner-menu-routes.ts`. Existing
 `backend/src/ingestion/orchestrator.ts` coordinates durable jobs, private reports

@@ -236,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "S10 verification is local UI only, never approval/publication. Selected-import status drives OCR empty/failure/partial/review screens; draft reads follow status, retries obey attempt limits. Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected.",
+      "summary": "S10 verification is local UI only, never approval/publication. Selected-import status drives OCR empty/failure/partial/review screens; draft reads follow status, explicit retries reuse the same job. Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -366,7 +366,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "2ca1a81852c6617013e728c3dd0c5ef35eb95641c4ae902ebd3c90e7b0de6032"
+      "sourceFingerprint": "4d94fee3612e0639599ff30810d947f0c45099ab6a8985834cd156bd6c9128d9"
     },
     {
       "id": "backend",
@@ -1039,7 +1039,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "Stacked on PR206: reused owner-menu client and job-state helper for selected-import processing outcomes, sequential status/draft reads and bounded explicit retries. Added synthetic OCR intake-to-review/correction coverage; no backend or hosted controls changed.",
+      "summary": "Stacked on PR206: reused owner-menu client and job-state helper for selected-import processing outcomes, sequential status/draft reads and same-job explicit retries. Added synthetic OCR intake-to-review/correction coverage; no backend or hosted controls changed.",
       "files": [
         "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
         "frontend/console/src/owner-menu/jobs.ts",

@@ -257,6 +257,13 @@ async function fixture(context: BrowserContext) {
         for (const job of group.jobs) job.status = 'cancelled';
         return route.fulfill({ json: { group: { id: groupId, jobs: group.jobs } }, headers });
       }
+      if (/^menus\/jobs\/[^/]+\/retry$/.test(path)) {
+        const job = state.jobs[id]!.find((value) => value.id === path.split('/')[2])!;
+        job.status = 'queued';
+        job.max_attempts = Math.max(job.max_attempts, job.attempt_count + 3);
+        job.error_code = null;
+        return route.fulfill({ json: { job }, headers });
+      }
       if (/^menus\/jobs\/[^/]+\/review-session$/.test(path)) {
         state.reviewStarted = true;
         if (state.delayReview)
@@ -1430,10 +1437,20 @@ for (const outcome of ['complete', 'failed', 'incomplete'] as const) {
       page.getByRole('button', { name: 'Try another source', exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'View saved dishes', exact: true }).click();
-    await expect(page.getByText('Older dish', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit Older dish', exact: true })).toBeVisible();
     await page.getByText('Saved sources (1)', { exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Retry source', exact: true })).toHaveCount(0);
     expect(state.apiCalls.some(({ path }) => /retry|approve|publish/.test(path))).toBe(false);
+    if (outcome === 'complete') {
+      await expect(page.getByRole('button', { name: 'Retry source', exact: true })).toHaveCount(0);
+    } else {
+      const jobId = job.id;
+      await page.getByRole('button', { name: 'Retry source', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Processing your menu' })).toBeVisible();
+      expect(state.jobs[venue.venueId]).toHaveLength(1);
+      expect(job.id).toBe(jobId);
+      expect(job.max_attempts).toBe(6);
+      expect(state.apiCalls.filter(({ path }) => path.endsWith('/retry'))).toHaveLength(1);
+    }
   });
 }
 

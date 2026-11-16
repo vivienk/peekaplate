@@ -827,7 +827,7 @@ export function OwnerMenuWorkspace({
                       View processing
                     </Button>
                   )}
-                  {menuProcessingState([job]).retryable.includes(job.id) && (
+                  {['failed', 'incomplete'].includes(job.status) && (
                     <Button
                       disabled={busy}
                       onClick={() =>
