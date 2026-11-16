@@ -38,6 +38,7 @@ import { renderDishDetail } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
+import { UI_ICONS } from './icons';
 import { mountLiveArtwork } from './liveArtwork';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
@@ -52,6 +53,7 @@ import type { CompleteDish, Menu, MenuLoadResult } from './types';
 
 const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
   'demo',
+  'portion-demo',
   'edge-cases',
   'withdrawal',
   'layout-20',
@@ -231,7 +233,7 @@ function renderMenu(
           <span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>
         </div>
         <button class="pp-search" type="button" aria-label="Search menu" aria-expanded="false" aria-controls="pp-search-panel">
-          <span aria-hidden="true">⌕</span>
+          <img class="pp-search__icon" src="${UI_ICONS.search}" alt="" aria-hidden="true" width="18" height="18" />
         </button>
       </header>
       ${toastAreaMarkup()}
@@ -615,7 +617,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     }
     switchScreen('detail');
     const fromSaved = from === 'saved_screen';
-    renderDishDetail(
+    const stopPortion = renderDishDetail(
       container,
       dish,
       compareBack ?? (fromSaved ? () => showSaved() : () => showMenu()),
@@ -638,6 +640,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       bindDetailSave(container, { saveState: state, menu, send: track }),
     );
     leaveScreen = () => {
+      stopPortion();
       stopArtwork();
       stopSave();
     };

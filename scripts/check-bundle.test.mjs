@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { checkInitialBundle } from './check-bundle.mjs';
+import { checkInitialBundle, checkPortionBundle } from './check-bundle.mjs';
 
 const chunk = (fileName, isEntry = false) => ({
   type: 'chunk',
@@ -38,4 +38,45 @@ test('rejects unaccounted initial imports instead of silently undercounting Java
   const entry = chunk('index.js', true);
   entry.imports = ['https://cdn.example/viewer.js'];
   assert.throws(() => checkInitialBundle({ 'index.js': entry }), /Missing initial JS chunk/);
+});
+
+test('T1 counts renderer imports plus manifest and asset allowance', () => {
+  const renderer = chunk('portion.js');
+  renderer.modules['/src/menu/portionRenderer.ts'] = {};
+  renderer.imports = ['shared.js'];
+  const shared = chunk('shared.js');
+  const bundle = { 'portion.js': renderer, 'shared.js': shared };
+  const result = checkPortionBundle(bundle);
+  assert.ok(result.total > 200_000);
+  assert.throws(() => checkPortionBundle(bundle, 200_000), /exceeds/);
+  assert.throws(() => checkPortionBundle({ 'portion.js': renderer }), /Missing portion/);
+  assert.equal(checkPortionBundle({}), null);
+});
+
+test('T1 includes both emitted preview font weights', () => {
+  const renderer = chunk('portion.js');
+  renderer.modules['/src/menu/portionRenderer.ts'] = {};
+  const bundle = { 'portion.js': renderer };
+  const baseline = checkPortionBundle(bundle).total;
+  bundle['font.woff2'] = {
+    type: 'asset',
+    fileName: 'assets/inter-latin-400-normal-abc.woff2',
+    source: new Uint8Array(24_000),
+  };
+  assert.equal(checkPortionBundle(bundle).total, baseline + 24_000);
+  assert.throws(() => checkPortionBundle(bundle, baseline + 23_999), /exceeds/);
+});
+
+test('T1 counts all three preview-scoped font assets with current filenames', () => {
+  const renderer = chunk('portion.js');
+  renderer.modules['/src/menu/portionRenderer.ts'] = {};
+  const bundle = { 'portion.js': renderer };
+  const baseline = checkPortionBundle(bundle).total;
+  for (const weight of [400, 600, 700]) {
+    const name = `assets/inter-latin-${weight}-abc123.woff2`;
+    bundle[name] = { type: 'asset', fileName: name, source: new Uint8Array(24_000) };
+  }
+  assert.equal(checkPortionBundle(bundle).fontBytes, 72_000);
+  assert.equal(checkPortionBundle(bundle).total, baseline + 72_000);
+  assert.throws(() => checkPortionBundle(bundle, baseline + 71_999), /exceeds/);
 });

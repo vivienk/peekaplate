@@ -1,6 +1,7 @@
 import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
 import { ingredientIcon } from './icons';
 import { navButtonMarkup } from './navButton';
+import { bindPortionPreview } from './portionPreview';
 import { formatPrice } from './price';
 import type { CompleteDish } from './types';
 
@@ -63,7 +64,7 @@ export function renderDishDetail(
   // Detail opened from a Compare result (DIN-02.4): Back returns to that result, and the Compare
   // button is hidden because the diner is already comparing.
   fromCompare = false,
-): void {
+): () => void {
   const image = dish.images?.detail ?? dish.images?.card;
   const imageMarkup = image
     ? `<img class="pp-detail__image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt)}" width="${image.width}" height="${image.height}" />`
@@ -87,6 +88,7 @@ export function renderDishDetail(
         ${imageMarkup}
       </div>
 
+      <p class="pp-portion__status pp-notice" role="status" hidden></p>
       <section class="pp-detail__section">
         <div class="pp-detail__text">
           <p class="pp-detail__category">${escapeHtml(dish.categoryName)}</p>
@@ -133,10 +135,10 @@ export function renderDishDetail(
         </div>
 
         <div class="pp-detail__actions">
-          <button class="pp-btn pp-btn--primary" type="button" disabled>View Portion</button>
+          <button class="pp-btn pp-btn--primary pp-detail__portion" type="button">View Portion</button>
           ${fromCompare ? '' : `<button class="pp-btn pp-btn--outlined pp-detail__compare" type="button"${onCompare ? '' : ' disabled'}>Compare <span aria-hidden="true">→</span></button>`}
         </div>
-        <p class="pp-notice">${onCompare || fromCompare ? 'View Portion is' : 'View Portion and Compare are'} not available yet.</p>
+        ${onCompare || fromCompare ? '' : '<p class="pp-notice">Compare is not available yet.</p>'}
       </section>
     </div>
   `;
@@ -176,4 +178,5 @@ export function renderDishDetail(
       handleFailure();
     }
   }
+  return bindPortionPreview(container, dish);
 }

@@ -4,8 +4,11 @@
 // values in ./types; ingredient icons by ingredient name, because the bundle has no icon field.
 
 import generatedCatalogue from '../assets/icons/generated-ingredients/catalogue.json';
+import back from '../assets/icons/ui/back-navigation.svg';
+import close from '../assets/icons/ui/close.svg';
 import heart from '../assets/icons/ui/heart.svg';
 import search from '../assets/icons/ui/search.svg';
+import unsaveHeart from '../assets/icons/ui/unsave-heart.svg';
 import { ALLERGENS, DIETARY_VALUES, LEGACY_ALLERGEN_CODES } from './types';
 
 type UrlModules = Record<string, string>;
@@ -49,7 +52,7 @@ const allergenIcons = byKey(glob.allergens);
 const dietaryIcons = byKey(glob.dietary);
 const ingredientIcons = byKey(glob.ingredients);
 
-export const UI_ICONS = { heart, search } as const;
+export const UI_ICONS = { heart, search, back, unsaveHeart, close } as const;
 
 // Accepts the label screens show ("Nuts"), the code ("nuts") or a legacy code ("tree nut").
 export function allergenIcon(value: string): string | null {

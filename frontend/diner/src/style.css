@@ -1682,3 +1682,512 @@ main:has(> .pp-compare) {
 .pp-compare__header > .pp-compare__divider {
   grid-row: 1 / span 3;
 }
+
+/* Figma preview shell. PR25 image bytes and movement remain independent of layout. */
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  src: url("./menu/preview-assets/inter-latin-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  src: url("./menu/preview-assets/inter-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  src: url("./menu/preview-assets/inter-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.pp-detail--preview {
+  position: relative;
+  min-height: 100svh;
+  padding: max(12px, env(safe-area-inset-top)) 16px 32px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: "PeekaPlate Preview Inter", "Inter", sans-serif;
+}
+.pp-detail--preview .pp-detail__save,
+.pp-detail--preview .pp-detail__section,
+.pp-detail--preview > .pp-notice:not(.pp-portion__status) {
+  display: none;
+}
+.pp-detail--preview .pp-detail__topbar {
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 54px;
+  box-sizing: border-box;
+}
+.pp-detail--preview .pp-detail__title {
+  text-align: left;
+  line-height: 28px;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.pp-detail--preview .pp-detail__back {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  font-size: 0;
+  background: url("./menu/preview-assets/back.svg") center no-repeat;
+}
+.pp-detail--preview .pp-detail__image-wrap {
+  position: relative;
+  width: 250px;
+  max-width: 100%;
+  height: 250px;
+  padding: 0;
+  margin: max(48px, calc(50svh - 233px)) auto 0;
+  touch-action: pan-y;
+  isolation: isolate;
+}
+.pp-detail--preview .pp-detail__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.pp-portion__css {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pp-portion__css img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 9px #2223);
+}
+.pp-portion--ready > .pp-detail__image,
+.pp-portion--original .pp-portion__css {
+  visibility: hidden;
+}
+.pp-portion--original > .pp-detail__image {
+  visibility: visible;
+}
+.pp-detail--preview .pp-detail__image-wrap:focus-visible,
+.pp-portion__controls :focus-visible {
+  outline: 2px solid #fff8ed;
+  outline-offset: 4px;
+}
+.pp-detail--preview .pp-portion__status {
+  margin: 36px 0 0;
+  font-size: 18px;
+  line-height: 28px;
+  text-align: center;
+  white-space: pre-line;
+  color: #b5b6ba;
+}
+.pp-portion__status strong,
+.pp-portion__status span {
+  display: block;
+}
+.pp-portion__status strong {
+  color: #fafafa;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.pp-detail[data-portion-state="ready"] .pp-portion__status {
+  margin-top: 60px;
+  color: #fafafa;
+  font-weight: 600;
+}
+.pp-detail[data-portion-state="ready"] .pp-portion__status::before {
+  content: "";
+  display: block;
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 8px;
+  background: url("./menu/preview-assets/hand-touch.svg") center no-repeat;
+}
+.pp-detail[data-portion-state="loading"] .pp-portion__status {
+  margin-top: 60px;
+  color: #fff8ed;
+  font-weight: 700;
+}
+.pp-detail[data-portion-state="loading"] .pp-detail__image {
+  filter: blur(20.5px);
+  opacity: 0.61;
+  mix-blend-mode: lighten;
+}
+.pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 32px);
+  top: calc(50% - 32px);
+  width: 64px;
+  height: 64px;
+  background: url("./menu/preview-assets/loading.svg") center no-repeat;
+  animation: pp-portion-spin 1s linear infinite;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image-wrap {
+  height: 150px;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image {
+  display: none;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image-wrap::after {
+  content: "";
+  width: 150px;
+  height: 150px;
+  background: url("./menu/preview-assets/image-not-found.svg") center no-repeat;
+}
+.pp-detail[data-portion-state="failed"] .pp-portion__status {
+  margin-top: 32px;
+}
+.pp-portion__retry {
+  display: block;
+  width: calc(100% - 40px);
+  height: 40px;
+  margin: 48px 20px 0;
+  border: 0;
+  border-radius: 999px;
+  background: #f89537;
+  color: #421708;
+  font:
+    14px "PeekaPlate Preview Inter",
+    sans-serif;
+  cursor: pointer;
+}
+.pp-portion__controls {
+  margin-top: max(80px, calc(50svh - 190px));
+  font-size: 14px;
+  color: #fafafa;
+}
+.pp-portion__controls summary {
+  cursor: pointer;
+  text-align: center;
+  padding: 12px;
+}
+.pp-portion__controls button,
+.pp-portion__visual {
+  padding: 10px;
+  margin: 8px 4px;
+  font: inherit;
+  color: #fafafa;
+  background: #2a2d36;
+  border: 1px solid #b5b6ba;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pp-portion__visual {
+  display: block;
+  width: calc(100% - 8px);
+}
+.pp-portion__retry[hidden],
+.pp-portion__controls[hidden],
+.pp-portion__instructions[hidden] {
+  display: none;
+}
+@keyframes pp-portion-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
+    animation: none;
+  }
+  .pp-portion__css,
+  .pp-portion__css img {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* Local-only 3D review panel; the 2.5D card stays mounted underneath. */
+.pp-local3d {
+  border-top: 1px solid #71737a;
+  margin-top: 16px;
+  padding-top: 8px;
+}
+.pp-local3d p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pp-local3d__viewer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+.pp-local3d__viewer[hidden],
+.pp-local3d button[hidden] {
+  display: none;
+}
+.pp-detail__image-wrap[data-model3d="true"] .pp-portion__css {
+  visibility: hidden;
+}
+
+/* Local AR portal: camera pixels remain on the device and never enter generation requests. */
+.pp-ar {
+  position: fixed;
+  inset: 0;
+  width: min(100vw, 390px);
+  height: min(100dvh, 844px);
+  max-width: 100vw;
+  max-height: 100dvh;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: #171a21;
+  color: #fff;
+  overflow: hidden;
+  font-family: Inter, sans-serif;
+}
+.pp-ar:fullscreen,
+.pp-ar:xr-overlay {
+  width: 100vw;
+  height: 100dvh;
+  margin: 0;
+  background: transparent;
+}
+.pp-ar::backdrop {
+  background: #171a21;
+}
+.pp-ar__camera,
+.pp-ar__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.pp-ar__camera {
+  object-fit: cover;
+}
+.pp-ar__canvas {
+  touch-action: none;
+}
+.pp-ar__canvas canvas {
+  display: block;
+}
+.pp-ar__header,
+.pp-ar__panel {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  padding: 16px max(16px, env(safe-area-inset-right));
+  background: rgb(23 26 33 / 88%);
+}
+.pp-ar__header {
+  top: 0;
+  padding-top: max(16px, env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pp-ar__header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.pp-ar__panel {
+  bottom: 0;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.pp-ar__panel p {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.pp-ar__message {
+  font-weight: 600;
+}
+.pp-ar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.pp-ar button {
+  min-height: 44px;
+  padding: 8px 12px;
+  color: #fff;
+  background: #363b48;
+  border: 1px solid #9a9eaa;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.pp-ar button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.pp-ar button[hidden] {
+  display: none;
+}
+.pp-ar label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.pp-ar input {
+  flex: 1;
+  min-height: 32px;
+  min-width: 0;
+  accent-color: #fff;
+}
+
+/* Keep the original detail action pair together; local upload is outside the row. */
+.pp-detail__actions + label {
+  display: block;
+  margin-top: 16px;
+  font-size: 13px;
+}
+.pp-detail__actions + label input {
+  display: block;
+  max-width: 100%;
+  margin-top: 8px;
+}
+.pp-ar__rotate-hint {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .pp-ar__rotate-hint {
+    display: block;
+    position: absolute;
+    z-index: 2;
+    top: calc(76px + env(safe-area-inset-top));
+    left: 16px;
+    right: 16px;
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: #fff;
+    background: rgb(23 26 33 / 88%);
+    text-align: center;
+    pointer-events: none;
+    font-size: 14px;
+  }
+}
+/* The dish uses the whole camera viewport; adjustments are collapsed by default. */
+.pp-ar {
+  width: 100vw;
+  height: 100dvh;
+}
+.pp-ar__header {
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px
+    max(16px, env(safe-area-inset-left));
+  background: transparent;
+  pointer-events: none;
+}
+.pp-ar .pp-ar__back {
+  pointer-events: auto;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 999px;
+  background: url("./menu/preview-assets/back.svg") center no-repeat;
+  border: 1px solid rgba(255, 248, 237, 0.1);
+}
+.pp-ar__scale-status {
+  position: absolute;
+  z-index: 2;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(16px, env(safe-area-inset-left));
+  right: 130px;
+  margin: 0;
+  font-size: 12px;
+  text-shadow: 0 1px 4px #000;
+  pointer-events: none;
+}
+.pp-ar__settings {
+  position: absolute;
+  z-index: 3;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  right: max(12px, env(safe-area-inset-right));
+  max-width: calc(100vw - 32px);
+}
+.pp-ar__settings > summary {
+  margin-left: auto;
+  width: fit-content;
+  padding: 12px;
+  border-radius: 999px;
+  background: rgb(23 26 33 / 78%);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pp-ar__settings .pp-ar__panel {
+  position: static;
+  width: 320px;
+  max-width: 100%;
+  max-height: calc(100dvh - 140px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 12px;
+}
+.pp-detail__actions ~ label {
+  display: block;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.pp-detail__actions ~ label input {
+  display: block;
+  max-width: 100%;
+  margin-top: 6px;
+}
+
+.pp-ar__original {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #151515;
+  z-index: 2;
+}
+.pp-ar__original[hidden] {
+  display: none;
+}
+.pp-ar__header {
+  z-index: 4;
+}
+.pp-ar__header [data-action="original"] {
+  margin-left: auto;
+  pointer-events: auto;
+}
+.pp-ar--original .pp-ar__settings,
+.pp-ar--original .pp-ar__scale-status,
+.pp-ar--original .pp-ar__rotate-hint {
+  visibility: hidden;
+}
+
+.pp-ar__canvas {
+  touch-action: none;
+  cursor: grab;
+}
+.pp-ar__canvas:active {
+  cursor: grabbing;
+}
+
+.pp-ar__header [data-action="landscape"] {
+  display: none;
+  pointer-events: auto;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .pp-ar__header [data-action="landscape"] {
+    display: block;
+    margin-left: auto;
+  }
+  .pp-ar__header [data-action="original"] {
+    margin-left: 8px;
+  }
+}
+
+.pp-search__icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
