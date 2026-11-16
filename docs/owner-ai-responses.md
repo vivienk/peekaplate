@@ -19,18 +19,24 @@ not receive the panel. Session, restaurant, dish, focus or displayed-report chan
 cancel pending work. A 401 returns to sign-in; a 403 removes private report output
 and refreshes restaurant access. The menu workspace remains available separately.
 
-The displayed report and analysis are independent server reads. The panel labels
-both periods and the synthetic analysis source rather than claiming the analysis
-uses the exact table snapshot. The response's evidence period and snapshot ID are
-server-generated; the browser sends only `{dishId, goal}`. The mobile report table
-scrolls inside its card without widening the whole workspace.
+The Worker issues an `X-Owner-Report-Ref` response header on a successful owner
+report GET when analysis and its reference signing secret are configured. It
+binds the report's exact UTC end timestamp and content digest to the authenticated
+owner, venue and synthetic source for up to 60 seconds. The frontend handoff is
+to pass this same header on POST for the report currently on screen. The JSON
+request body remains `{dishId, goal}`. The header is for this exchange only.
 
 `POST /api/v1/venues/:venueId/ai/analysis` accepts only a dish ID and one review goal
 (menu, engagement or CRM). The normal Worker verifies the signed owner session and
 uses the existing owner report reader, which checks current owner membership and
-reads in a tenant-scoped read-only transaction. The browser cannot provide metrics,
-a prompt, a model, a policy or OpenAI credentials. Cross-origin requests outside the
-console allowlist are denied, even when they carry an otherwise valid token.
+reads the pinned window in a tenant-scoped read-only transaction. The Worker
+recomputes the content digest before model evaluation and checks freshness against
+the current request clock. A missing, expired, mismatched or changed reference
+returns `409 report_reference_unavailable`; refresh the report before requesting
+analysis again. Sending the reference does not grant owner access. The browser
+cannot provide metrics, a prompt, a model, a policy or OpenAI credentials.
+The existing console origin allowlist applies to both routes. GET exposes the
+reference header and POST permits it in preflight for allowed origins.
 
 The route is off unless `OWNER_AI_RESPONSES_ENABLED=true`, `APP_ENV` is local or
 staging, and the server-approved synthetic venue matches. Production is rejected.
@@ -75,6 +81,7 @@ session; it does not log in to Supabase or read a restaurant database. The local
 backend binds only to 127.0.0.1:8792. A development-only same-origin proxy obtains
 the ephemeral session. The OpenAI key never goes to the browser. Normal builds
 force the local preview switch off and do not contain the proxy/session setup.
+Only this standalone fictional preview runs without a Worker report reference.
 
 At most ten outbound provider attempts are permitted during one local server run.
 Restarting resets that development guard. Each click may consume existing API
@@ -86,10 +93,15 @@ changed by the launcher. Existing OpenAI budget alerts remain soft thresholds.
 
 The backend code is wired into createApp but not deployed. Hosting requires the
 restricted key in a Worker secret named `OWNER_AI_OPENAI_API_KEY` and a server-only
-`OWNER_AI_OPENAI_PROJECT_ID`. Staging additionally requires `OWNER_AI_RATE_LIMITER`
-(a Cloudflare rate limiter binding); missing configuration fails closed. These
-bindings were not provisioned by this change. Provider rate limiting is not a
-monthly spending cap. Choose and verify an operational budget before activation.
+`OWNER_AI_OPENAI_PROJECT_ID`. Store a separate high-entropy printable key of at
+least 48 characters in the Worker secret `OWNER_AI_REPORT_REFERENCE_SECRET`.
+Staging additionally requires `OWNER_AI_RATE_LIMITER` (a Cloudflare rate limiter
+binding). Missing analysis configuration keeps ordinary report reads available
+and leaves analysis disabled. These bindings were not provisioned by this change.
+Before enabling hosted analysis, use a matching console that carries the GET
+reference to the POST. Verify the handoff with the mock provider first.
+Provider rate limiting is not a monthly spending cap. Choose and verify an
+operational budget before activation.
 
 The reusable `OwnerAnalysisPanel` takes the authenticated caller's venue/dish and
 `createOwnerAnalysisClient`, whose `getAccessToken` must read the current owner

@@ -1,3 +1,4 @@
+import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { Hono } from 'hono';
 import { expect, it, vi } from 'vitest';
 import { createOwnerAnalysisClient } from '../frontend/console/src/owner-dashboard/ai-preview/analysis-client';
@@ -6,6 +7,10 @@ import {
   LOCAL_AI_VENUE,
   localOwnerAiReport,
 } from './scripts/owner-ai-local-fixture';
+import {
+  mintOwnerReportReference,
+  OWNER_REPORT_REFERENCE_HEADER,
+} from './src/owner-ai/report-reference';
 import { registerOwnerAnalysisRoutes } from './src/owner-ai/routes';
 
 const baseUrl = 'http://127.0.0.1:8787';
@@ -15,12 +20,14 @@ const input = { dishId: LOCAL_AI_DISH, goal: 'menu' };
 function setup() {
   const now = new Date('2026-11-12T12:00:00Z');
   const report = localOwnerAiReport(now);
+  const secret = 'fixture-secret-for-handoff-tests-not-used-in-production';
   const env = {
     APP_ENV: 'local',
     SYNTHETIC_REPORT_VENUE_ID: LOCAL_AI_VENUE,
     OWNER_AI_RESPONSES_ENABLED: 'true',
     OWNER_AI_OPENAI_API_KEY: 'synthetic',
     OWNER_AI_OPENAI_PROJECT_ID: 'proj_synthetic',
+    OWNER_AI_REPORT_REFERENCE_SECRET: secret,
   };
   const app = new Hono();
   app.onError(() => new Response('forbidden', { status: 403 }));
@@ -50,7 +57,23 @@ function setup() {
     allowedOrigins: ['http://127.0.0.1:5174'],
     syntheticVenues: [LOCAL_AI_VENUE],
   });
-  const request = vi.fn(async (url, init) => app.fetch(new Request(url, init), env));
+  const request = vi.fn(async (url, init) => {
+    // The workspace will attach the displayed report's GET header. Keep this client fixture
+    // independent of the workspace; the HTTP integration tests cover header issuance itself.
+    const headers = new Headers(init.headers);
+    const actorId =
+      headers.get('Authorization') === 'Bearer first-token' ? 'first-owner' : 'current-owner';
+    headers.set(
+      OWNER_REPORT_REFERENCE_HEADER,
+      await mintOwnerReportReference(
+        OwnerDishReportSchema.parse(report),
+        { actorId, venueId: LOCAL_AI_VENUE },
+        secret,
+        new Date(report.report_metadata.date_window.end_time),
+      ),
+    );
+    return app.fetch(new Request(url, { ...init, headers }), env);
+  });
   const client = createOwnerAnalysisClient({
     baseUrl,
     venueId: LOCAL_AI_VENUE,
@@ -71,8 +94,8 @@ function setup() {
 
 it('binds AI results to the current token, venue, dish and server-read report window', async () => {
   const s = setup();
-  const start = '2026-11-11T11:00:00.219Z';
-  const end = '2026-11-12T11:00:00.219Z';
+  const start = '2026-11-11T11:59:35.219Z';
+  const end = '2026-11-12T11:59:35.219Z';
   Object.assign(s.report.report_metadata.date_window, { start_time: start, end_time: end });
   s.verify.mockResolvedValueOnce('first-owner');
   s.getAccessToken.mockResolvedValueOnce('first-token');
@@ -100,7 +123,7 @@ it('binds AI results to the current token, venue, dish and server-read report wi
 
 it('does not dispatch a second request after sign-out', async () => {
   const s = setup();
-  s.getAccessToken.mockResolvedValueOnce('first-token').mockResolvedValue(null);
+  s.getAccessToken.mockResolvedValueOnce('current-token').mockResolvedValue(null);
 
   expect(await s.review()).toMatchObject({ status: 'review' });
   await expect(s.review()).rejects.toThrow('Sign in to request a recommendation.');

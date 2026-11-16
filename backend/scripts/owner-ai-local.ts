@@ -43,6 +43,8 @@ app.get('/session', (c) => {
   return c.json({ token, venueId: LOCAL_AI_VENUE, dishId: LOCAL_AI_DISH, mocked });
 });
 registerOwnerAnalysisRoutes(app, {
+  // This standalone loopback harness displays its own in-memory fictional report.
+  syntheticLoopbackPreview: true,
   verify: async (authorization) => {
     if (authorization !== `Bearer ${token}`) throw new Error('Invalid local session');
     return 'synthetic-local-owner';
