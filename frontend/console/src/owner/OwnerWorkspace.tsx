@@ -325,6 +325,20 @@ function reportPeriod(window: { start_time: string; end_time: string }): string 
   return PERIOD_FORMAT.formatRange(start, end);
 }
 const percent = (value: number | null) => `${((value ?? 0) * 100).toFixed(1)}%`;
+// The analysis reads its own server snapshot. Its suggestion is shown only when that snapshot
+// covers exactly the report period on screen (compared as instants, so "…07:00:00Z" and
+// "…07:00:00.000Z" match); otherwise it would read as advice about numbers the owner isn't seeing.
+export function samePeriod(
+  report: { start_time: string; end_time: string },
+  analysis: { start: string; end: string },
+): boolean {
+  const at = (value: string) => Date.parse(value);
+  return (
+    Number.isFinite(at(report.start_time)) &&
+    at(report.start_time) === at(analysis.start) &&
+    at(report.end_time) === at(analysis.end)
+  );
+}
 
 type Reply =
   | { kind: 'loading'; scope: string }
@@ -440,38 +454,57 @@ function LiveAiPanel({
             The report could not be reviewed. Check your session or try again later.
           </p>
         )}
-        {shown?.kind === 'result' && (
-          <div className="owner-ai__answer">
-            {shown.result.status === 'review' && shown.result.metric !== null ? (
-              <>
-                <h3>Suggested review: {shown.dishName}</h3>
-                <p>{OWNER_ANALYSIS_ACTIONS[shown.result.metric]}</p>
-                <p className="owner-muted">
-                  {shown.result.metric.replaceAll('_', ' ')}: {percent(shown.result.value)}
-                </p>
-              </>
-            ) : (
-              <>
-                <h3>No recommendation for {shown.dishName}</h3>
-                <p>
-                  {shown.result.reason === 'unsupported_goal'
-                    ? 'This report has no customer-retention or CRM evidence.'
-                    : 'There is not enough verified evidence to suggest a next step.'}
-                </p>
-              </>
-            )}
-            <p className="owner-muted">
-              Analysis evidence period:{' '}
-              {reportPeriod({
-                start_time: shown.result.timeWindow.start,
-                end_time: shown.result.timeWindow.end,
-              })}
-            </p>
-            <p className="owner-muted">Synthetic analysis from a separate server-read snapshot.</p>
-            <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
-            <p className="owner-muted">No menu changes or customer messages are sent.</p>
-          </div>
-        )}
+        {shown?.kind === 'result' &&
+          !samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
+            <div className="owner-ai__answer" data-ai-period="mismatch">
+              <h3>Different report period</h3>
+              <p>
+                This analysis covers{' '}
+                {reportPeriod({
+                  start_time: shown.result.timeWindow.start,
+                  end_time: shown.result.timeWindow.end,
+                })}
+                , not the report on screen ({reportPeriod(report.report_metadata.date_window)}), so
+                no suggestion is shown. Refresh the report, then ask again.
+              </p>
+              <p className="owner-muted">No menu changes or customer messages are sent.</p>
+            </div>
+          )}
+        {shown?.kind === 'result' &&
+          samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
+            <div className="owner-ai__answer">
+              {shown.result.status === 'review' && shown.result.metric !== null ? (
+                <>
+                  <h3>Suggested review: {shown.dishName}</h3>
+                  <p>{OWNER_ANALYSIS_ACTIONS[shown.result.metric]}</p>
+                  <p className="owner-muted">
+                    {shown.result.metric.replaceAll('_', ' ')}: {percent(shown.result.value)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3>No recommendation for {shown.dishName}</h3>
+                  <p>
+                    {shown.result.reason === 'unsupported_goal'
+                      ? 'This report has no customer-retention or CRM evidence.'
+                      : 'There is not enough verified evidence to suggest a next step.'}
+                  </p>
+                </>
+              )}
+              <p className="owner-muted">
+                Analysis evidence period:{' '}
+                {reportPeriod({
+                  start_time: shown.result.timeWindow.start,
+                  end_time: shown.result.timeWindow.end,
+                })}
+              </p>
+              <p className="owner-muted">
+                Synthetic analysis from a separate server-read snapshot.
+              </p>
+              <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
+              <p className="owner-muted">No menu changes or customer messages are sent.</p>
+            </div>
+          )}
       </div>
       <form className="owner-ai__composer owner-ai__composer--pickers" onSubmit={ask}>
         <label className="owner-visually-hidden" htmlFor={`${ids}-dish`}>

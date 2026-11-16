@@ -100,6 +100,8 @@ async function fixture(context: BrowserContext) {
     analysisStatus: 200,
     delayAnalysis: false,
     releaseAnalysis: () => {},
+    // The analysis snapshot period; by default the same as the report on screen (UNEEZA_REPORT).
+    analysisWindow: { start: '2026-10-19T07:00:00Z', end: '2026-10-20T07:00:00Z' },
   };
   await context.route('https://auth-fixture.supabase.co/auth/v1/**', async (route) => {
     const request = route.request();
@@ -170,7 +172,7 @@ async function fixture(context: BrowserContext) {
           goal: body.goal,
           source: 'synthetic',
           reportSnapshot: 'a'.repeat(64),
-          timeWindow: { start: '2026-11-11T12:00:00Z', end: '2026-11-12T12:00:00Z' },
+          timeWindow: state.analysisWindow,
           status: 'review',
           metric: 'open_rate',
           value: 0.5,
@@ -1642,6 +1644,37 @@ test('the AI panel shows the report period and an honest error when the review f
   await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
 });
 
+test('an analysis for a different period than the report on screen shows no suggestion', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  // Deliberately different UTC start and end from the report on screen (Oct 19 07:00 – Oct 20 07:00).
+  state.analysisWindow = { start: '2026-11-11T12:00:00Z', end: '2026-11-12T12:00:00Z' };
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
+  await expect(panel.getByText(/Nov 11\s*–\s*12, 2026/)).toBeVisible();
+  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+  await expect(panel.getByText(/open rate/i)).toHaveCount(0);
+  await expect(panel.getByText('Review the approved dish card', { exact: false })).toHaveCount(0);
+
+  // Only the start differs: still no suggestion.
+  state.analysisWindow = { start: '2026-10-19T06:00:00Z', end: '2026-10-20T07:00:00Z' };
+  await panel.getByLabel('Review focus').selectOption('engagement');
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+
+  // The same instants written differently (".000Z") count as the same period.
+  state.analysisWindow = { start: '2026-10-19T07:00:00.000Z', end: '2026-10-20T07:00:00.000Z' };
+  await panel.getByLabel('Review focus').selectOption('menu');
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toBeVisible();
+});
+
 test('analysis denial clears the private report and refreshes restaurant access', async ({
   context,
   page,
@@ -1670,7 +1703,9 @@ test('the panel distinguishes its server-read analysis period from the displayed
   await panel.getByRole('button', { name: 'Review report' }).click();
   await expect(panel.getByRole('heading', { name: /Suggested review/ })).toBeVisible();
   await expect(panel.getByText(/Displayed report period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
-  await expect(panel.getByText(/Analysis evidence period:.*Nov 11\s*–\s*12, 2026/)).toBeVisible();
+  // A suggestion is shown only when the analysis covers the period on screen (see the next test
+  // for a different period).
+  await expect(panel.getByText(/Analysis evidence period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
   await expect(
     panel.getByText('Synthetic analysis from a separate server-read snapshot.'),
   ).toBeVisible();
