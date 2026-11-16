@@ -1,10 +1,10 @@
 # Published diner branding, portion and ingredient mapping
 
-Screen 5 saves a private versioned restaurant profile. JPEG/PNG uploads are decoded in the browser and normalized to PNG at at most 1024 by 512 pixels, preserving the whole image and aspect ratio. The server bounds and validates the PNG, stores content-addressed bytes in `INGESTION_REPORTS_BUCKET`, and commits a tenant-scoped profile event, projection, command receipt and outbox together. A retry returns the same receipt; stale versions conflict. Saving a profile does not publish it.
+Screen 5 saves a private versioned restaurant profile. JPEG/PNG uploads are decoded in the browser and normalized to PNG at at most 1024 by 512 pixels, preserving the whole image and aspect ratio. The shared photo endpoint bounds JPEG/PNG uploads and stores hash-bound private bytes in `INGESTION_REPORTS_BUCKET`. Saving the selected photo ID commits a tenant-scoped profile event, projection, command receipt and outbox together. A retry returns the same receipt; stale versions conflict. Saving a profile does not publish it.
 
 ## Owner to public bundle
 
-Apply migration `20261116010000_restaurant_profile.sql` before using the new Screen 5 API. Owner/editor membership is checked on every read, write and logo download. Contact/address fields stay private. The diner never reads this authenticated API.
+Apply migration `20261116020000_owner_flow_profile.sql` before using the new Screen 5 API. Owner/editor membership is checked on every read, write and logo download. Contact/address fields stay private. The diner never reads this authenticated API.
 
 The existing operator-controlled producer can use the saved profile:
 
@@ -14,7 +14,7 @@ pnpm produce:bundle --request work/request.json --t0-root work/t0 \
   --out work/menu-bundles
 ```
 
-Supply the existing database credential and `PEEKAPLATE_OWNER_TOKEN` through the operator environment, never a command argument or a `VITE_*` variable. The API origin must be a bare HTTPS origin. The producer fetches the private saved profile and exact logo bytes with redirects disabled, checks size and SHA-256, and writes the logo beneath `work/menu-bundles/assets/restaurant-logos/{venue}/{hash}.png`. Host that assets subtree at the request's `asset_base_url`, alongside the existing T0 assets. Only the name and public image descriptor enter the immutable bundle. Private API URLs, tokens and contact data do not. A profile changed during download fails safely if its logo is no longer current.
+Supply the existing database credential and `PEEKAPLATE_OWNER_TOKEN` through the operator environment, never a command argument or a `VITE_*` variable. The API origin must be a bare HTTPS origin. The producer fetches the private saved profile and exact logo bytes with redirects disabled, checks size and SHA-256, and writes the logo beneath `work/menu-bundles/assets/restaurant-logos/{venue}/{hash}.{png|jpg}`. Host that assets subtree at the request's `asset_base_url`, alongside the existing T0 assets. Only the name and public image descriptor enter the immutable bundle. Private API URLs, tokens and contact data do not. The fetched profile version pins an immutable private photo ID; a later profile edit does not change those bytes. Missing or changed stored bytes fail export.
 
 Without `--owner-profile-api`, the historical restaurant-confirmed request remains supported; it does not establish Screen 5 provenance. Upload/hosting, review-subject admission, approval and publication remain explicit operator/owner steps. A later profile edit requires a new reviewed bundle and publication. Logo descriptors contribute to the asset approval hash.
 
@@ -127,3 +127,28 @@ count/calibration, a different serving, or unavailable tracked AR must never be
 presented as actual-size placement. The existing local upload/calibration tools
 remain review-only; restaurant measurements and physical-device acceptance are
 still required before claiming the Noka result is true to scale.
+
+## Reconciliation with PR #213
+
+PR #215 reuses the profile contract, persistence, private-photo routes and unchanged
+`20261116020000_owner_flow_profile.sql` migration from #213 at `499b45bb`.
+The shared endpoint is `/venues/:venueId/profile`, with `{fields,status}` and
+`fields.photoId`; photos use `/profile/photos/:photoId`. The operator exporter
+reads this same model and emits only the public name and exact hash-verified
+photo bytes with their dimensions. Profile status and contact/address fields stay
+private. Saving details does not grant restaurant verification or publish a menu.
+
+The unshipped #215-only migration `20261116010000` and its duplicate projection
+and `/restaurant-profile` routes were removed before deployment. Neither draft
+profile migration was applied to hosted environments in this work. Apply the
+canonical migration once; when combining #213, retain its identical profile
+schema/routes instead of introducing a second writer. The shared migration also
+contains #213's draft-removal columns; this change does not enable that UI.
+
+Extracted corrections reuse #213's draft-before-review lock order. A successful
+correction advances the linked pending draft version and clears verification in
+the same transaction; command retries do not advance it twice. Verification
+receipts for old content or a replaced verification decision return a conflict.
+Serving count remains a number of people (`servingCount` / `serving_count`),
+separate from #213's free-text serving description. Approval/publication remains
+an independent explicit action. No merge or deployment is part of this fix.

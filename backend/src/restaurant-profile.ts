@@ -2,176 +2,234 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   type RestaurantProfile,
   RestaurantProfileSchema,
+  RestaurantSetupSchema,
   type SaveRestaurantProfile,
-  SaveRestaurantProfileSchema,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { CommandError } from './dish-command';
 import { IngestionError } from './ingestion/repository';
-import type { ArtworkStorage } from './ingredient-artwork';
 import { withOwnerMenuTransaction } from './owner-menu';
 
-export const restaurantLogoKey = (venue: string, sha: string) =>
-  `restaurant-logos/${venue}/${sha}.png`;
-// Browser decodes and bounds uploaded JPEG/PNG before this PNG-only storage boundary.
-export function parseRestaurantLogo(base64: string) {
-  const bytes = Buffer.from(base64, 'base64');
-  if (
-    bytes.toString('base64') !== base64 ||
-    bytes.length < 45 ||
-    bytes.length > 1_000_000 ||
-    !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
-    bytes.toString('ascii', 12, 16) !== 'IHDR' ||
-    bytes.readUInt32BE(8) !== 13
-  )
-    throw new IngestionError('invalid_logo', 400);
-  const width = bytes.readUInt32BE(16),
-    height = bytes.readUInt32BE(20);
-  if (!width || !height || width > 2048 || height > 2048)
-    throw new IngestionError('invalid_logo', 400);
-  let offset = 8,
-    hasData = false,
-    ended = false;
-  while (offset + 12 <= bytes.length) {
-    const length = bytes.readUInt32BE(offset);
-    if (length > bytes.length - offset - 12) break;
-    const chunk = bytes.toString('ascii', offset + 4, offset + 8);
-    if (chunk === 'IDAT') hasData = true;
-    offset += length + 12;
-    if (chunk === 'IEND') {
-      ended = length === 0 && offset === bytes.length;
-      break;
-    }
-  }
-  if (!hasData || !ended) throw new IngestionError('invalid_logo', 400);
-  return {
-    bytes,
-    logo: {
-      width,
-      height,
-      sizeBytes: bytes.length,
-      sha256: createHash('sha256').update(bytes).digest('hex'),
-    },
-  };
-}
-
-export async function readRestaurantProfile(
-  client: Client,
-  venue: string,
-): Promise<RestaurantProfile | null> {
-  const row = (
-    await client.query(
-      'SELECT version,details,logo FROM app_private.restaurant_profile_current WHERE tenant_id=$1',
+export async function readRestaurantProfile(client: Client, actor: string, venue: string) {
+  return withOwnerMenuTransaction(client, actor, venue, async () => {
+    const result = await client.query(
+      'SELECT version,fields,status FROM app_private.restaurant_profile WHERE tenant_id=$1',
       [venue],
-    )
-  ).rows[0];
-  return row ? RestaurantProfileSchema.parse(row) : null;
+    );
+    return result.rows[0] ? RestaurantProfileSchema.parse(result.rows[0]) : null;
+  });
 }
 
-export function replayRestaurantProfile(
-  events: readonly {
-    tenant_id: string;
-    stream_id: string;
-    version: number;
-    event_type: string;
-    schema_version: number;
-    payload: unknown;
-  }[],
-) {
-  let state: RestaurantProfile | null = null;
-  for (const event of events) {
-    const next = RestaurantProfileSchema.parse(event.payload);
-    if (
-      event.tenant_id !== events[0]?.tenant_id ||
-      event.stream_id !== events[0]?.stream_id ||
-      event.event_type !== 'restaurant.profile.saved' ||
-      event.schema_version !== 1 ||
-      event.version !== (state?.version ?? 0) + 1 ||
-      next.version !== event.version
-    )
-      throw new Error('Invalid restaurant profile stream');
-    state = next;
-  }
-  return state;
+export async function readRestaurantSetup(client: Client, actor: string, venue: string) {
+  return withOwnerMenuTransaction(client, actor, venue, async () => {
+    const result = await client.query(
+      `SELECT v.id AS "venueId",COALESCE(p.fields->>'name',v.name) AS "restaurantName",
+         COALESCE(p.status,'missing') AS "detailsStatus",
+         EXISTS(SELECT 1 FROM app_private.dish_drafts d WHERE d.tenant_id=v.id AND d.removed_at IS NULL AND d.review_status NOT IN ('rejected','superseded')) AS "menuAdded",
+         NOT EXISTS(SELECT 1 FROM app_private.dish_drafts d WHERE d.tenant_id=v.id AND d.removed_at IS NULL AND d.review_status NOT IN ('rejected','superseded') AND d.verification_status <> 'verified')
+           AND EXISTS(SELECT 1 FROM app_private.dish_drafts d WHERE d.tenant_id=v.id AND d.removed_at IS NULL AND d.review_status NOT IN ('rejected','superseded')) AS "menuVerified",
+         EXISTS(SELECT 1 FROM app_private.menu_publication_current m WHERE m.tenant_id=v.id AND m.status='published') AS published
+       FROM app_private.venues v LEFT JOIN app_private.restaurant_profile p ON p.tenant_id=v.id WHERE v.id=$1`,
+      [venue],
+    );
+    if (!result.rows[0]) throw new IngestionError('not_found', 404);
+    return RestaurantSetupSchema.parse(result.rows[0]);
+  });
 }
 
 export async function saveRestaurantProfile(
   client: Client,
   actor: string,
   venue: string,
-  raw: SaveRestaurantProfile,
-  storage: ArtworkStorage,
+  input: SaveRestaurantProfile,
 ): Promise<RestaurantProfile> {
-  const input = SaveRestaurantProfileSchema.parse(raw);
-  const uploaded = input.logoPngBase64 ? parseRestaurantLogo(input.logoPngBase64) : null;
-  const { logoPngBase64: _bytes, ...command } = input;
-  const metadata = {
-    type: 'restaurant.profile.save',
-    ...command,
-    logo: uploaded?.logo ?? (input.logoPngBase64 === null ? null : 'preserve'),
-  };
-  const hash = createHash('sha256').update(JSON.stringify(metadata)).digest('hex');
   return withOwnerMenuTransaction(client, actor, venue, async () => {
+    const payload = { commandType: 'restaurant.profile.save.v1', ...input };
+    const hash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
       `command:${venue}:${actor}:${input.commandId}`,
     ]);
-    const receipt = (
-      await client.query(
-        'SELECT request_hash,result FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
-        [venue, actor, input.commandId],
-      )
-    ).rows[0];
-    if (receipt) {
-      if (receipt.request_hash !== hash) throw new CommandError('command_conflict', 409);
-      return RestaurantProfileSchema.parse(receipt.result);
+    const receipt = await client.query(
+      'SELECT request_hash,result FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
+      [venue, actor, input.commandId],
+    );
+    if (receipt.rows[0]) {
+      if (receipt.rows[0].request_hash !== hash) throw new CommandError('command_conflict', 409);
+      return RestaurantProfileSchema.parse(receipt.rows[0].result);
     }
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
       `restaurant-profile:${venue}`,
     ]);
-    const previous = await readRestaurantProfile(client, venue);
-    if ((previous?.version ?? 0) !== input.expectedVersion)
+    const current = await client.query(
+      'SELECT version FROM app_private.restaurant_profile WHERE tenant_id=$1 FOR UPDATE',
+      [venue],
+    );
+    if ((current.rows[0]?.version ?? 0) !== input.expectedVersion)
       throw new CommandError('version_conflict', 409);
-    if (uploaded) {
-      // Immutable content-addressed bytes; a failed DB commit can leave only a private orphan.
-      await storage.put(
-        restaurantLogoKey(venue, uploaded.logo.sha256),
-        Uint8Array.from(uploaded.bytes).buffer,
-        { sha256: uploaded.logo.sha256 },
+    if (input.fields.photoId) {
+      const photo = await client.query(
+        'SELECT id FROM app_private.restaurant_profile_photo WHERE tenant_id=$1 AND id=$2',
+        [venue, input.fields.photoId],
       );
+      if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
     }
-    const state: RestaurantProfile = {
-      version: input.expectedVersion + 1,
-      details: input.details,
-      logo: uploaded?.logo ?? (input.logoPngBase64 === null ? null : (previous?.logo ?? null)),
-    };
+    const version = input.expectedVersion + 1;
+    const saved = await client.query(
+      `INSERT INTO app_private.restaurant_profile(tenant_id,version,fields) VALUES($1,$2,$3::jsonb)
+       ON CONFLICT(tenant_id) DO UPDATE SET version=$2,fields=$3::jsonb,updated_at=now() RETURNING version,fields,status`,
+      [venue, version, JSON.stringify(input.fields)],
+    );
+    const result = RestaurantProfileSchema.parse(saved.rows[0]);
     const event = randomUUID();
     await client.query(
       `INSERT INTO app_private.es_event(id,tenant_id,stream_type,stream_id,version,schema_version,event_type,payload,metadata)
       VALUES($1,$2,'restaurant_profile',$2,$3,1,'restaurant.profile.saved',$4::jsonb,$5::jsonb)`,
-      [event, venue, state.version, JSON.stringify(state), JSON.stringify({ actorId: actor })],
-    );
-    await client.query(
-      `INSERT INTO app_private.restaurant_profile_current(tenant_id,version,details,logo) VALUES($1,$2,$3::jsonb,$4::jsonb)
-      ON CONFLICT(tenant_id) DO UPDATE SET version=$2,details=$3::jsonb,logo=$4::jsonb`,
-      [venue, state.version, JSON.stringify(state.details), JSON.stringify(state.logo)],
+      [event, venue, version, JSON.stringify(result), JSON.stringify({ actorId: actor })],
     );
     await client.query(
       `INSERT INTO app_private.es_command(id,tenant_id,actor_id,command_type,idempotency_key,payload,request_hash,result)
-      VALUES($1,$2,$3,'restaurant.profile.save',$4,$5::jsonb,$6,$7::jsonb)`,
+      VALUES($1,$2,$3,'restaurant.profile.save.v1',$4,$5::jsonb,$6,$7::jsonb)`,
       [
         randomUUID(),
         venue,
         actor,
         input.commandId,
-        JSON.stringify(metadata),
+        JSON.stringify(payload),
         hash,
-        JSON.stringify(state),
+        JSON.stringify(result),
       ],
     );
     await client.query(
       `INSERT INTO app_private.outbox(id,tenant_id,event_id,topic,payload) VALUES($1,$2,$3,'restaurant.profile.saved',$4::jsonb)`,
-      [randomUUID(), venue, event, JSON.stringify({ version: state.version })],
+      [randomUUID(), venue, event, JSON.stringify({ version })],
     );
-    return state;
+    return result;
+  });
+}
+
+export function replayRestaurantProfile(
+  events: readonly {
+    version: number;
+    schema_version: number;
+    event_type: string;
+    payload: unknown;
+  }[],
+): RestaurantProfile | null {
+  let profile: RestaurantProfile | null = null;
+  for (const [index, event] of events.entries()) {
+    const parsed = RestaurantProfileSchema.safeParse(event.payload);
+    if (
+      event.version !== index + 1 ||
+      event.schema_version !== 1 ||
+      event.event_type !== 'restaurant.profile.saved' ||
+      !parsed.success ||
+      parsed.data.version !== event.version
+    )
+      throw new Error('invalid_restaurant_profile_stream');
+    profile = parsed.data;
+  }
+  return profile;
+}
+
+export async function storeRestaurantPhoto(
+  client: Client,
+  actor: string,
+  venue: string,
+  upload: { bytes: Uint8Array; sourceHash: string; idempotencyKey: string },
+  contentType: string,
+  put: (key: string, bytes: ArrayBuffer) => Promise<unknown>,
+) {
+  const bytes = upload.bytes;
+  const png = bytes.length > 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((n, i) => bytes[i] === n);
+  const jpeg = bytes.length > 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  if (!(contentType === 'image/png' && png) && !(contentType === 'image/jpeg' && jpeg))
+    throw new IngestionError('invalid_photo', 400);
+  if (
+    bytes.length > 12_000_000 ||
+    createHash('sha256').update(bytes).digest('hex') !== upload.sourceHash
+  )
+    throw new IngestionError('upload_scope_mismatch', 409);
+  return withOwnerMenuTransaction(client, actor, venue, async () => {
+    const hash = createHash('sha256')
+      .update(
+        JSON.stringify({
+          commandType: 'restaurant.photo.upload.v1',
+          sourceHash: upload.sourceHash,
+          contentType,
+          size: bytes.length,
+        }),
+      )
+      .digest('hex');
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+      `command:${venue}:${actor}:${upload.idempotencyKey}`,
+    ]);
+    const receipt = await client.query(
+      'SELECT request_hash,result FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
+      [venue, actor, upload.idempotencyKey],
+    );
+    if (receipt.rows[0]) {
+      if (receipt.rows[0].request_hash !== hash) throw new CommandError('command_conflict', 409);
+      return receipt.rows[0].result as { id: string };
+    }
+    const existing = await client.query(
+      'SELECT id FROM app_private.restaurant_profile_photo WHERE tenant_id=$1 AND source_hash=$2',
+      [venue, upload.sourceHash],
+    );
+    const remember = async (id: string) => {
+      const result = { id };
+      await client.query(
+        `INSERT INTO app_private.es_command(id,tenant_id,actor_id,command_type,idempotency_key,payload,request_hash,result)
+        VALUES($1,$2,$3,'restaurant.photo.upload.v1',$4,$5::jsonb,$6,$7::jsonb)`,
+        [
+          randomUUID(),
+          venue,
+          actor,
+          upload.idempotencyKey,
+          JSON.stringify({ sourceHash: upload.sourceHash }),
+          hash,
+          JSON.stringify(result),
+        ],
+      );
+      return result;
+    };
+    if (existing.rows[0]) return remember(existing.rows[0].id);
+    const key = `restaurant-profile/${venue}/${upload.sourceHash}`;
+    await put(
+      key,
+      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    );
+    const stored = await client.query(
+      `INSERT INTO app_private.restaurant_profile_photo(tenant_id,id,source_hash,storage_key,content_type,size_bytes)
+      VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(tenant_id,source_hash) DO NOTHING RETURNING id`,
+      [venue, randomUUID(), upload.sourceHash, key, contentType, bytes.length],
+    );
+    const row =
+      stored.rows[0] ??
+      (
+        await client.query(
+          'SELECT id FROM app_private.restaurant_profile_photo WHERE tenant_id=$1 AND source_hash=$2',
+          [venue, upload.sourceHash],
+        )
+      ).rows[0];
+    if (!row) throw new IngestionError('photo_not_found', 404);
+    return remember(row.id);
+  });
+}
+
+export async function restaurantPhoto(client: Client, actor: string, venue: string, photo: string) {
+  return withOwnerMenuTransaction(client, actor, venue, async () => {
+    const row = (
+      await client.query(
+        'SELECT storage_key,content_type,size_bytes,source_hash FROM app_private.restaurant_profile_photo WHERE tenant_id=$1 AND id=$2',
+        [venue, photo],
+      )
+    ).rows[0];
+    if (!row) throw new IngestionError('not_found', 404);
+    return row as {
+      storage_key: string;
+      content_type: string;
+      size_bytes: number;
+      source_hash: string;
+    };
   });
 }

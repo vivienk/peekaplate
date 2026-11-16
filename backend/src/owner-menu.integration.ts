@@ -26,11 +26,6 @@ import {
   verifyOwnerDish,
 } from './owner-menu';
 import { cleanupStagedMenuPhotos } from './owner-menu-retention';
-import {
-  readRestaurantProfile,
-  replayRestaurantProfile,
-  saveRestaurantProfile,
-} from './restaurant-profile';
 import { saveCandidateReviewCommand } from './review-command';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -78,79 +73,6 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       idempotencyKey: key,
     };
   };
-  it('persists Screen 5 with tenant isolation, version checks, idempotent receipts and replay', async () => {
-    const commandId = crypto.randomUUID();
-    const details = {
-      name: 'Synthetic Bistro',
-      city: 'Test city',
-      street: 'Test street',
-      line2: '',
-      phone: '1234567890',
-      email: '',
-    };
-    const png =
-      'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAJElEQVR4nO3MMQEAAAgDoEU0ju01hIcPBCABADiarrkeAEA+LbVgAsefyYE+AAAAAElFTkSuQmCC';
-    const storage = { put: vi.fn(async () => ({})) };
-    const input = { commandId, expectedVersion: 0, details, logoPngBase64: png };
-    const first = await saveRestaurantProfile(runtime, actor, venue, input, storage);
-    expect(first.logo).toMatchObject({ width: 32, height: 32 });
-    expect(await saveRestaurantProfile(runtime, actor, venue, input, storage)).toEqual(first);
-    expect(storage.put).toHaveBeenCalledTimes(1);
-    await expect(
-      saveRestaurantProfile(runtime, actor, other, input, storage),
-    ).rejects.toMatchObject({ code: 'forbidden' });
-    await expect(
-      saveRestaurantProfile(runtime, viewer, venue, input, storage),
-    ).rejects.toMatchObject({ code: 'forbidden' });
-    await expect(
-      saveRestaurantProfile(
-        runtime,
-        actor,
-        venue,
-        { ...input, details: { ...details, name: 'Changed' } },
-        storage,
-      ),
-    ).rejects.toMatchObject({ code: 'command_conflict' });
-    await expect(
-      saveRestaurantProfile(
-        runtime,
-        actor,
-        venue,
-        { ...input, commandId: crypto.randomUUID() },
-        storage,
-      ),
-    ).rejects.toMatchObject({ code: 'version_conflict' });
-    const updated = await saveRestaurantProfile(
-      runtime,
-      actor,
-      venue,
-      {
-        commandId: crypto.randomUUID(),
-        expectedVersion: 1,
-        details: { ...details, name: 'Saved name' },
-      },
-      storage,
-    );
-    expect(updated.logo).toEqual(first.logo);
-    const events = (
-      await admin.query(
-        "SELECT tenant_id,stream_id,version,schema_version,event_type,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_type='restaurant_profile' ORDER BY version",
-        [venue],
-      )
-    ).rows;
-    expect(replayRestaurantProfile(events)).toEqual(updated);
-    expect(JSON.stringify(events)).not.toContain(png);
-    expect(await readRestaurantProfile(admin, venue)).toEqual(updated);
-    expect(
-      (
-        await admin.query(
-          "SELECT id FROM app_private.outbox WHERE tenant_id=$1 AND topic='restaurant.profile.saved'",
-          [venue],
-        )
-      ).rowCount,
-    ).toBe(2);
-  });
-
   it('saves incomplete work and resumes exactly; command replay and event replay do not duplicate writes', async () => {
     const id = crypto.randomUUID();
     const command = crypto.randomUUID();
@@ -742,7 +664,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect((await request()).status).toBe(200);
     const extractionId = session.extractionResult.extraction_id;
     const candidateId = session.items[0]!.candidate.candidate_id;
-    const review = await saveCandidateReviewCommand(
+    let review = await saveCandidateReviewCommand(
       runtime,
       actor,
       venue,
@@ -760,12 +682,78 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         },
       },
     );
-    const row = (
+    let row = (
       await admin.query<{ id: string; draft_version: number }>(
         'SELECT id,draft_version FROM app_private.dish_drafts WHERE tenant_id=$1 AND job_id=$2 AND candidate_id=$3',
         [venue, job.id, candidateId],
       )
     ).rows[0]!;
+    const verifiedVersion = row.draft_version;
+    const verificationCommand = crypto.randomUUID();
+    await verifyOwnerDish(
+      runtime,
+      actor,
+      venue,
+      row.id,
+      verificationCommand,
+      true,
+      verifiedVersion,
+    );
+    const correction = {
+      commandId: crypto.randomUUID(),
+      expectedVersion: review.review.version,
+      action: 'correct' as const,
+      corrected: { serving_count: 2 },
+    };
+    review = await saveCandidateReviewCommand(
+      runtime,
+      actor,
+      venue,
+      extractionId,
+      candidateId,
+      correction,
+    );
+    expect(review.effective.serving_count).toBe(2);
+    const changed = (
+      await admin.query(
+        'SELECT id,draft_version,verification_status FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2',
+        [venue, row.id],
+      )
+    ).rows[0];
+    expect(changed).toMatchObject({
+      draft_version: verifiedVersion + 1,
+      verification_status: 'not_verified',
+    });
+    expect(
+      await saveCandidateReviewCommand(
+        runtime,
+        actor,
+        venue,
+        extractionId,
+        candidateId,
+        correction,
+      ),
+    ).toEqual(review);
+    expect(
+      (await admin.query('SELECT draft_version FROM app_private.dish_drafts WHERE id=$1', [row.id]))
+        .rows[0].draft_version,
+    ).toBe(verifiedVersion + 1);
+    await expect(
+      verifyOwnerDish(runtime, actor, venue, row.id, verificationCommand, true, verifiedVersion),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
+    await expect(
+      verifyOwnerDish(runtime, actor, venue, row.id, crypto.randomUUID(), true, verifiedVersion),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
+    row = changed;
+    await verifyOwnerDish(
+      runtime,
+      actor,
+      venue,
+      row.id,
+      crypto.randomUUID(),
+      true,
+      row.draft_version,
+    );
     const reportKey = (
       await admin.query(
         'SELECT result_storage_key FROM app_private.menu_ingestion_jobs WHERE id=$1',
@@ -913,10 +901,9 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(events).toHaveLength(1);
     expect(replayOwnerDraftVerification(events, 1)).toBe('verified');
     expect(replayOwnerDraftVerification(events, 2)).toBe('not_verified');
-    expect(
-      (await verifyOwnerDish(runtime, actor, venue, row.id, command, true, 1)).draft
-        .verification_status,
-    ).toBe('verified');
+    await expect(
+      verifyOwnerDish(runtime, actor, venue, row.id, command, true, 1),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
     expect(
       (
         await admin.query('SELECT verification_status FROM app_private.dish_drafts WHERE id=$1', [

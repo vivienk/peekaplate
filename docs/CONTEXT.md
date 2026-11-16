@@ -81,7 +81,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "79fa08d7c47d651f7ac55fb5304bdb4d5df76bd79e091141f43b8b1b540a9ac0"
+      "sourceFingerprint": "b76e6dac7c881ac8abfe40f550dd9809e5734be4e232306a78eb3a3be4977375"
     },
     {
       "id": "tokens",
@@ -271,7 +271,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "24150b4a896216c3e5242b7686a9145615bb790e9c7b88e05f8bc36a8b120ea0"
+      "sourceFingerprint": "a112cc9352941a16dcbdce7c7f6790042c86006cd189136c0d45646c0260708d"
     },
     {
       "id": "console",
@@ -415,7 +415,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "ecd16c4b64f5fd2ed6de3ffc22bb10e5d9cfc136aacc037df949c80c8104d18a"
+      "sourceFingerprint": "953608dcd3213e8307c78c71c0ce7e07ea2879a7bcd7ae2f0edaee0efc0ec87b"
     },
     {
       "id": "backend",
@@ -599,7 +599,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/restaurant-profile.test.ts",
         "backend/src/bundle-producer/restaurant.ts",
         "backend/src/bundle-producer/restaurant.test.ts",
-        "migrations/20261116010000_restaurant_profile.sql",
+        "migrations/20261116020000_owner_flow_profile.sql",
         "docs/diner-published-mapping.md"
       ],
       "adrs": [
@@ -613,7 +613,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "ccb22969c789e51c8b8762074038770b6a617f52d1d50060317e2253d340a0ae"
+      "sourceFingerprint": "6a5ff7eb09eb6aa65096b228bf8779fe372c9f05a43972ef89cdc549a11f5c5e"
     },
     {
       "id": "database",
@@ -1127,7 +1127,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "diner"
       ],
-      "summary": "Screen 9 serving count persists through manual/OCR review and approved dish snapshots to published diner details. Measured AR requires matching serving-bound plate calibration; counts never scale lengths and 2.5D remains approximate.",
+      "summary": "Screen 9 count reaches published measured AR with matching calibration; 2.5D stays approximate. Extracted corrections invalidate verification atomically. PR215 reuses PR213 canonical profile fields/status/photo IDs and migration; the public exporter reads that model.",
       "files": [
         "docs/diner-published-mapping.md",
         "packages/contracts/src/owner-menu.ts",
@@ -1135,7 +1135,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/produce.ts",
         "frontend/diner/src/menu/portionSize.ts"
       ],
-      "next": "Run contract, persistence, producer and browser checks; keep PR draft. Real Noka measurements and physical-device validation remain required."
+      "next": "Run regression and integration checks; keep PR draft with no merge/deploy. Reuse the identical PR213 migration once; Noka measurements and device acceptance remain pending."
     }
   ]
 }

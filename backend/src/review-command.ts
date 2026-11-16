@@ -604,6 +604,17 @@ export async function saveCandidateReviewCommand(
       throw new ReviewCommandError('not_found', 404);
     }
 
+    // Match approval's draft-before-review lock order; removed work cannot be edited by a stale tab.
+    const linkedDrafts = sessionResult.rows[0].job_id
+      ? (
+          await client.query<{ id: string; removed_at: string | null; review_status: string }>(
+            `SELECT id,removed_at,review_status FROM app_private.dish_drafts WHERE tenant_id=$1 AND job_id=$2 AND COALESCE(candidate_id,draft_id)=$3 ORDER BY id FOR UPDATE`,
+            [venueId, sessionResult.rows[0].job_id, candidateId],
+          )
+        ).rows
+      : [];
+    if (linkedDrafts.some((draft) => draft.removed_at))
+      throw new ReviewCommandError('version_conflict', 409);
     if (extractionResult.schema_version === 1 && input.corrected) {
       if (input.corrected.subcategory !== undefined || input.corrected.price_text !== undefined) {
         throw new ReviewCommandError('invalid_candidate', 400);
@@ -759,6 +770,13 @@ export async function saveCandidateReviewCommand(
           actorId,
           reviewedAt,
         ],
+      );
+    }
+
+    for (const draft of linkedDrafts.filter((draft) => draft.review_status === 'pending')) {
+      await client.query(
+        `UPDATE app_private.dish_drafts SET draft_version=draft_version+1,verification_status='not_verified',updated_at=now() WHERE tenant_id=$1 AND id=$2`,
+        [venueId, draft.id],
       );
     }
 

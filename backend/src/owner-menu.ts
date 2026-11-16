@@ -504,7 +504,6 @@ export async function verifyOwnerDish(
     );
     if (receipt.rows[0] && receipt.rows[0].request_hash !== hash)
       throw new CommandError('command_conflict', 409);
-    if (receipt.rows[0]) return receipt.rows[0].result;
 
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
       `owner-draft:${venueId}:${draftId}`,
@@ -517,6 +516,13 @@ export async function verifyOwnerDish(
     if (!draft) throw new IngestionError('draft_not_found', 404);
     if (draft.review_status !== 'pending') throw new IngestionError('draft_not_editable', 409);
     if (draft.draft_version !== expectedVersion) throw new CommandError('version_conflict', 409);
+
+    // A historical receipt cannot verify newer content or undo a later verification decision.
+    if (receipt.rows[0]) {
+      if (draft.verification_status !== receipt.rows[0].result.draft.verification_status)
+        throw new CommandError('version_conflict', 409);
+      return receipt.rows[0].result;
+    }
 
     const targetStatus = verified ? 'verified' : 'not_verified';
     const updatedDraftRes = await client.query<DishDraftRow>(

@@ -44,8 +44,10 @@ import {
 
 import {
   readRestaurantProfile,
-  restaurantLogoKey,
+  readRestaurantSetup,
+  restaurantPhoto,
   saveRestaurantProfile,
+  storeRestaurantPhoto,
 } from './restaurant-profile';
 
 type Services = {
@@ -76,46 +78,70 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     }
   };
 
-  app.get('/venues/:venueId/restaurant-profile', async (c) => {
+  app.get('/venues/:venueId/profile', async (c) => {
     const { actor, venue } = await identity(c);
-    const profile = await services.database(c.env, (client) =>
-      withOwnerMenuTransaction(client, actor, venue, () => readRestaurantProfile(client, venue)),
-    );
-    return c.json({ profile });
+    return c.json({
+      profile: await services.database(c.env, (client) =>
+        readRestaurantProfile(client, actor, venue),
+      ),
+    });
   });
-  app.put('/venues/:venueId/restaurant-profile', async (c) => {
+  app.get('/venues/:venueId/setup', async (c) => {
+    const { actor, venue } = await identity(c);
+    return c.json(
+      await services.database(c.env, (client) => readRestaurantSetup(client, actor, venue)),
+    );
+  });
+  app.put('/venues/:venueId/profile', async (c) => {
     const { actor, venue } = await identity(c);
     const input = SaveRestaurantProfileSchema.safeParse(await json(c));
     if (!input.success) return c.json({ error: 'invalid_request' }, 400);
-    const storage = c.env.INGESTION_REPORTS_BUCKET;
-    if (!storage) throw new AuthUnavailableError();
-    const profile = await services.database(c.env, (client) =>
-      saveRestaurantProfile(client, actor, venue, input.data, storage),
-    );
-    return c.json({ profile });
+    return c.json({
+      profile: await services.database(c.env, (client) =>
+        saveRestaurantProfile(client, actor, venue, input.data),
+      ),
+    });
   });
-  app.get('/venues/:venueId/restaurant-profile/logo/:sha', async (c) => {
+  app.post('/venues/:venueId/profile/photos', async (c) => {
     const { actor, venue } = await identity(c);
-    const profile = await services.database(c.env, (client) =>
-      withOwnerMenuTransaction(client, actor, venue, () => readRestaurantProfile(client, venue)),
+    const bucket = c.env.INGESTION_REPORTS_BUCKET;
+    if (!bucket) throw new AuthUnavailableError();
+    const type = c.req.header('Content-Type')?.split(';')[0]?.trim() ?? '';
+    if (!['image/jpeg', 'image/png'].includes(type))
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    const upload = await readMenuUpload(c.req.raw);
+    return c.json(
+      await services.database(c.env, (client) =>
+        storeRestaurantPhoto(client, actor, venue, upload, type, (key, bytes) =>
+          bucket.put(key, bytes),
+        ),
+      ),
+      201,
     );
-    if (!profile?.logo || profile.logo.sha256 !== c.req.param('sha'))
-      return c.json({ error: 'not_found' }, 404);
-    const storage = c.env.INGESTION_REPORTS_BUCKET;
-    const object = await storage?.get?.(restaurantLogoKey(venue, profile.logo.sha256));
-    if (!object || object.size !== profile.logo.sizeBytes) throw new AuthUnavailableError();
+  });
+  app.get('/venues/:venueId/profile/photos/:photoId', async (c) => {
+    const { actor, venue } = await identity(c);
+    const photoId = c.req.param('photoId');
+    if (!DraftPhotoScopeSchema.shape.photoId.safeParse(photoId).success)
+      return c.json({ error: 'invalid_request' }, 400);
+    const photo = await services.database(c.env, (client) =>
+      restaurantPhoto(client, actor, venue, photoId),
+    );
+    const object = await c.env.INGESTION_REPORTS_BUCKET?.get?.(photo.storage_key);
+    if (!object) throw new AuthUnavailableError();
     const bytes = await object.arrayBuffer();
     if (
-      bytes.byteLength !== profile.logo.sizeBytes ||
-      createHash('sha256').update(new Uint8Array(bytes)).digest('hex') !== profile.logo.sha256
+      bytes.byteLength !== photo.size_bytes ||
+      createHash('sha256').update(new Uint8Array(bytes)).digest('hex') !== photo.source_hash
     )
       throw new AuthUnavailableError();
-    c.header('Content-Type', 'image/png');
-    c.header('Cache-Control', 'private, no-store');
+    c.header('Content-Type', photo.content_type);
+    c.header('Content-Length', String(photo.size_bytes));
+    c.header('X-Content-SHA256', photo.source_hash);
     c.header('X-Content-Type-Options', 'nosniff');
+    c.header('Cache-Control', 'private, no-store');
     return c.body(bytes);
   });
-
   app.put('/venues/:venueId/drafts/:draftId', async (c) => {
     const { actor, venue } = await identity(c);
     const scope = DraftScopeSchema.safeParse(c.req.param());

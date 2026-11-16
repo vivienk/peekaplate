@@ -23,7 +23,8 @@ import {
   PreparedMenusSchema,
   type PublishMenu,
   PublishMenuSchema,
-  RestaurantProfileSchema,
+  RestaurantProfileResponseSchema,
+  RestaurantSetupSchema,
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
@@ -315,25 +316,58 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   });
 
   return {
-    async readRestaurantProfile(venueId: string) {
-      return request(venuePath(venueId, '/restaurant-profile'), { method: 'GET' }, (body) =>
-        RestaurantProfileSchema.nullable().parse(field(body, 'profile')),
+    async readProfile(venueId: string) {
+      return request(
+        venuePath(venueId, '/profile'),
+        { method: 'GET' },
+        (body) => RestaurantProfileResponseSchema.parse(body).profile,
       );
     },
-    async saveRestaurantProfile(venueId: string, input: SaveRestaurantProfile) {
+    async saveProfile(venueId: string, input: SaveRestaurantProfile) {
       return request(
-        venuePath(venueId, '/restaurant-profile'),
+        venuePath(venueId, '/profile'),
         json('PUT', SaveRestaurantProfileSchema.parse(input)),
-        (body) => RestaurantProfileSchema.parse(field(body, 'profile')),
+        (body) => RestaurantProfileResponseSchema.parse(body).profile,
       );
     },
-    async restaurantLogo(venueId: string, sha: string): Promise<Blob> {
+    async readSetup(venueId: string) {
+      return request(venuePath(venueId, '/setup'), { method: 'GET' }, (body) => {
+        const setup = RestaurantSetupSchema.parse(body);
+        if (setup.venueId !== venueId) throw new Error('setup scope');
+        return setup;
+      });
+    },
+    async uploadProfilePhoto(venueId: string, file: Blob, idempotencyKey: string) {
+      if (
+        !IDEMPOTENCY_KEY.test(idempotencyKey) ||
+        !['image/jpeg', 'image/png'].includes(file.type) ||
+        !file.size ||
+        file.size > MAX_FILE_BYTES
+      )
+        throw new OwnerMenuApiError(0, 'invalid_request');
       return request(
-        venuePath(venueId, `/restaurant-profile/logo/${encodeURIComponent(sha)}`),
+        venuePath(venueId, '/profile/photos'),
+        {
+          method: 'POST',
+          upload: true,
+          body: file,
+          headers: { 'Content-Type': file.type, 'Idempotency-Key': idempotencyKey },
+        },
+        (body) => withId<{ id: string }>(body),
+      );
+    },
+    async readProfilePhoto(venueId: string, photoId: string) {
+      return request(
+        venuePath(venueId, `/profile/photos/${encodeURIComponent(photoId)}`),
         { method: 'GET', blob: true },
         (body) => {
-          if (!(body instanceof Blob) || body.type !== 'image/png' || body.size > 1_000_000)
-            throw new Error('Invalid logo');
+          if (
+            !(body instanceof Blob) ||
+            !['image/jpeg', 'image/png'].includes(body.type) ||
+            !body.size ||
+            body.size > MAX_FILE_BYTES
+          )
+            throw new Error('profile photo');
           return body;
         },
       );

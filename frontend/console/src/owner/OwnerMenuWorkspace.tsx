@@ -135,6 +135,7 @@ export function OwnerMenuWorkspace({
   const [afterManualSave, setAfterManualSave] = useState(false);
   // S5: saved profile is private; a new approved bundle is required to publish changes.
   const [profileVersion, setProfileVersion] = useState(0);
+  const [profilePhotoId, setProfilePhotoId] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [profileRead, setProfileRead] = useState(0);
   const [profileConflict, setProfileConflict] = useState(false);
@@ -666,18 +667,19 @@ export function OwnerMenuWorkspace({
     setProfileLoaded(false);
     let stopped = false;
     void active.client
-      .readRestaurantProfile(venueId)
+      .readProfile(venueId)
       .then(async (profile) => {
         if (stopped || !current(active)) return;
-        setDetails(profile?.details ?? null);
+        setDetails(profile?.fields ?? null);
         setProfileVersion(profile?.version ?? 0);
+        setProfilePhotoId(profile?.fields.photoId ?? null);
         setDetailsPhotoUrl((previous) => {
           if (previous) URL.revokeObjectURL(previous);
           return null;
         });
-        if (profile?.logo) {
+        if (profile?.fields.photoId) {
           try {
-            const blob = await active.client.restaurantLogo(venueId, profile.logo.sha256);
+            const blob = await active.client.readProfilePhoto(venueId, profile.fields.photoId);
             if (stopped || !current(active)) return;
             setDetailsPhotoUrl((previous) => {
               if (previous) URL.revokeObjectURL(previous);
@@ -731,9 +733,10 @@ export function OwnerMenuWorkspace({
             disabled={busy}
             onClick={() =>
               void run(async (active) => {
-                const latest = await active.client.readRestaurantProfile(venueId);
+                const latest = await active.client.readProfile(venueId);
                 if (!current(active)) return;
                 setProfileVersion(latest?.version ?? 0);
+                setProfilePhotoId(latest?.fields.photoId ?? null);
                 setProfileConflict(false);
                 setNotice(
                   'Latest saved version loaded. Your edits are still here; review them before saving over that version.',
@@ -755,21 +758,31 @@ export function OwnerMenuWorkspace({
               const editingSaved = details !== null;
               const logoPngBase64 = photo ? await prepareLogo(photo) : undefined;
               if (!current(active)) return;
+              let photoId = profilePhotoId;
+              if (logoPngBase64) {
+                const bytes = Uint8Array.from(atob(logoPngBase64), (value) => value.charCodeAt(0));
+                const upload = await active.client.uploadProfilePhoto(
+                  venueId,
+                  new Blob([bytes], { type: 'image/png' }),
+                  command('profile-photo', [logoPngBase64]),
+                );
+                if (!current(active)) return;
+                photoId = upload.id;
+              }
               const input = {
-                commandId: command('restaurant-profile', [profileVersion, next, logoPngBase64]),
+                commandId: command('restaurant-profile', [profileVersion, next, photoId]),
                 expectedVersion: profileVersion,
-                details: next,
-                ...(logoPngBase64 ? { logoPngBase64 } : {}),
+                fields: { ...next, photoId },
               };
-              const profile = await active.client
-                .saveRestaurantProfile(venueId, input)
-                .catch((reason) => {
-                  if (current(active) && reason instanceof OwnerMenuApiError && reason.isConflict)
-                    setProfileConflict(true);
-                  throw reason;
-                });
+              const profile = await active.client.saveProfile(venueId, input).catch((reason) => {
+                if (current(active) && reason instanceof OwnerMenuApiError && reason.isConflict)
+                  setProfileConflict(true);
+                throw reason;
+              });
               if (!current(active)) return;
-              setDetails(profile.details);
+              if (!profile) throw new OwnerMenuApiError(0, 'invalid_response');
+              setDetails(profile.fields);
+              setProfilePhotoId(profile.fields.photoId);
               setProfileVersion(profile.version);
               setProfileConflict(false);
               if (photo)

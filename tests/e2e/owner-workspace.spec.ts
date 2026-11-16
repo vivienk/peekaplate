@@ -203,31 +203,30 @@ async function fixture(context: BrowserContext) {
       const headers = { 'Access-Control-Allow-Origin': origin };
       if (state.menuStatus !== 200)
         return route.fulfill({ status: state.menuStatus, json: { error: 'forbidden' }, headers });
-      if (path === 'restaurant-profile') {
+      if (path === 'profile') {
         if (request.method() === 'PUT') {
           const input = request.postDataJSON();
           if (input.expectedVersion !== (state.profile?.version ?? 0))
             return route.fulfill({ status: 409, json: { error: 'version_conflict' }, headers });
-          const bytes = input.logoPngBase64 ? Buffer.from(input.logoPngBase64, 'base64') : null;
-          if (bytes) state.profilePng = bytes;
           state.profile = {
             version: input.expectedVersion + 1,
-            details: input.details,
-            logo: bytes
-              ? {
-                  width: bytes.readUInt32BE(16),
-                  height: bytes.readUInt32BE(20),
-                  sizeBytes: bytes.length,
-                  sha256: createHash('sha256').update(bytes).digest('hex'),
-                }
-              : (state.profile?.logo ?? null),
+            fields: input.fields,
+            status: 'submitted',
           };
         }
         return route.fulfill({ json: { profile: state.profile }, headers });
       }
-      if (path.startsWith('restaurant-profile/logo/') && state.logoStatus !== 200)
+      if (path === 'profile/photos' && request.method() === 'POST') {
+        state.profilePng = request.postDataBuffer();
+        return route.fulfill({
+          status: 201,
+          json: { id: '11111111-1111-4111-8111-111111111111' },
+          headers,
+        });
+      }
+      if (path.startsWith('profile/photos/') && state.logoStatus !== 200)
         return route.fulfill({ status: state.logoStatus, json: { error: 'unavailable' }, headers });
-      if (path.startsWith('restaurant-profile/logo/') && state.profilePng)
+      if (path.startsWith('profile/photos/') && state.profilePng)
         return route.fulfill({ contentType: 'image/png', body: state.profilePng, headers });
       if (path === 'menus/jobs') {
         state.jobsReads++;
@@ -1981,7 +1980,9 @@ test('Screen 5 saves a normalized uploaded logo and restores it after reload', a
   await page.locator('input[type=file]').setInputFiles('tests/fixtures/portion/foreground.png');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(() => state.profile?.version).toBe(1);
-  expect(state.profile?.logo).toMatchObject({ width: 64, height: 64 });
+  expect(state.profile?.fields.photoId).toBe('11111111-1111-4111-8111-111111111111');
+  expect(state.profilePng?.readUInt32BE(16)).toBe(64);
+  expect(state.profilePng?.readUInt32BE(20)).toBe(64);
   await page.reload();
   await page.getByRole('button', { name: 'Restaurant Setup', exact: true }).click();
   await page.getByRole('button', { name: /Restaurant details/i }).click();
@@ -2011,5 +2012,5 @@ test('Screen 5 saves a normalized uploaded logo and restores it after reload', a
   );
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(() => state.profile?.version).toBe(3);
-  expect(state.profile?.details.name).toBe('Unsaved corrected name');
+  expect(state.profile?.fields.name).toBe('Unsaved corrected name');
 });
