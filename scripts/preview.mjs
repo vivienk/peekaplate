@@ -34,12 +34,24 @@ const reserved = new Set([
   'package.json',
   'peekaplate-preview.json',
 ]);
-export const headers = `/*
+// Frames stay blocked except one pairing for the S13 owner menu preview: a console preview may
+// show a diner preview in its phone frame, and a diner preview may be shown only by a console
+// preview. Both are PeekaPlate preview projects built from reviewed PR commits; every other site
+// stays blocked in both directions.
+const FRAME_SRC = { console: 'https://*.peekaplate-diner-preview.pages.dev', diner: "'none'" };
+const FRAME_ANCESTORS = {
+  console: "'none'",
+  diner: 'https://*.peekaplate-console-preview.pages.dev',
+};
+export function headersFor(app) {
+  if (!(app in FRAME_SRC)) throw new Error('Unknown preview app');
+  return `/*
   X-Robots-Tag: noindex, nofollow
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-src ${FRAME_SRC[app]}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${FRAME_ANCESTORS[app]}
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
 `;
+}
 
 function validateCommit(sha) {
   if (!/^[a-f0-9]{40}$/.test(sha ?? '')) throw new Error('Invalid preview commit');
@@ -71,7 +83,7 @@ export async function sanitize(root, sha) {
     await walk(dir);
     const index = await lstat(resolve(dir, 'index.html'));
     if (!index.isFile()) throw new Error('Preview index missing');
-    await writeFile(resolve(dir, '_headers'), headers);
+    await writeFile(resolve(dir, '_headers'), headersFor(app));
     await writeFile(
       resolve(dir, 'peekaplate-preview.json'),
       `${JSON.stringify({ schemaVersion: 1, commit: sha })}\n`,

@@ -3948,6 +3948,28 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T00:22:49.352Z","exitCode":2}
+```
+
+### PR #206 review reconciliation — November 15, 2026
+
+- Reproduced stale corrected rows with two failing adapter regressions; reload now uses existing effective review-session values. Both regressions pass.
+- Empty-menu auto-redirect detached the Menu control in browser tests. Removed the inference; the authored dashboard and all 41 workspace cases pass.
+- Existing local verification success lacked server evidence. Reused versioned verification/photo approval; browser checks cover conflict, retry identity, persisted state, revoked access and no publication.
+- Reused transport extraction initially copied adjacent methods too broadly. Type checking caught duplicate methods/unrelated types; restricted the move to the two verification methods. Type checking now passes.
+- New browser regression selectors initially used a nonexistent class and omitted an explicit accessible button label. Corrected them against the rendered authored DOM; all three strengthened regressions pass.
+- Price regressions failed for contract-valid zero and invalid Infinity/exponent strings. The review rule now uses the shared decimal schema.
+
+Sources: `frontend/console/src/owner/OwnerMenuWorkspace.tsx`, `frontend/console/src/owner/review/fromDishDraft.test.ts`, `frontend/console/src/owner/review/reviewDishes.test.tsx`, `tests/e2e/owner-workspace.spec.ts`.
+
+- The first full check found the new review price-schema import pulled unrelated contract literals into synthetic previews. Added the existing-style `@peekaplate/contracts/owner-menu` export and used that narrow contract entry. All five preview-build checks pass unchanged; no analytics assertion was relaxed.
+
+- Independent review reproduced eager review hydration blocking an incomplete source retry, because queued/running sources reject review bootstrap. Hydrate only ready sources; isolate unavailable artifacts while preserving fatal auth handling. The retry/running/cancel/reload/503-and-manual-save browser regression failed before the fix and passed afterward (4.9s).
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-16T00:31:04.061Z","exitCode":1}
+```
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T17:43:19.710Z","exitCode":1}
 ```
 
@@ -4437,3 +4459,13 @@ The empty focused search kept its dark-surface placeholder colour on a light sur
 ## PR162 portable browser artifacts — November 15, 2026
 
 CI run `43757839050` passed application/Python/build/database checks but three landscape cases failed with ENOENT writing screenshots under `/private/tmp`. The local machine already had that directory, masking the portability issue. Landscape and opt-in upload captures now use `testInfo.outputPath` so each test gets a runner-owned artifact directory. The three affected cases pass in 13.1s without changing their assertions or application code. PR documentation also failed because the required contract labels were missing; the description was corrected without weakening its check.
+# ERR-20261115-DATA01-CORS — routing diner observation preflight
+
+Hosted preflight from the configured routing-staging diner returned 204 without
+Access-Control-Allow-Origin. Public-menu reads allowed that origin but observation
+writes used the older fixed list, preventing browser delivery before token checks.
+The regression in backend/src/index.test.ts failed with null instead of the exact
+origin, then passed after both paths reused the existing staging-only rule.
+Production/unconfigured/lookalike origins and missing-token denial are covered.
+Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
+

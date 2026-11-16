@@ -52,7 +52,7 @@ part of this narrowed slice.
 - Harshita's pending PR163 owns verification-only S10 integration.
   Required owner confirmations, optional verification badges, approval and
   publication must remain separate. Use the returned diner URL after an explicit
-  successful publish. The separately authorized [temporary S13 handoff](owner-publish-handoff.md)
+  successful publish. The [S13 handoff](owner-publish-handoff.md)
   publishes already prepared snapshots through the existing owner commands.
 - Pending AI, portion/2.5D and other team PRs remain separate. No unfinished
   screen is used as a live fallback.
@@ -110,3 +110,36 @@ uses the author's scoped 28px heading and describes unavailable connections
 without changing the demo. Browser-dropped files with no MIME use the existing
 extension policy to declare PDF/JPEG/PNG while retaining the original bytes;
 server signature/hash verification remains authoritative.
+
+## S8/S10 integration reconciliation (PR #206)
+
+Harshita's existing review table, status pills, edit/return flow and review
+checkboxes are reused. Completing verification calls the existing authenticated
+photo-approval and versioned draft-verification APIs, then confirms the saved
+versions before showing success. It does not accept a dish revision or publish a
+menu. Conflicts and revoked access cannot show the success dialog.
+
+Both the Menu table and review screen reload effective candidate corrections
+through the existing review-session API. They do not re-display the original
+extraction after a correction. Unknown allergens remain unknown. Review/license
+attestations are never inferred from an old draft; editing text or replacing a
+photo resets the relevant checkbox. A missing image needs no image attestation.
+Prices use the existing decimal contract, including zero, and preserve currency.
+
+An empty menu does not prove missing restaurant details. Existing restaurants
+stay in the authored dashboard. S5's local-only form cannot mark details submitted:
+there is no profile-save API in this slice. Extracted-photo editing and menu-level
+publication handoff remain separate gaps; imported dishes without photos remain
+unready instead of receiving invented photos or approval. Final publishing remains
+separate from verification. PR #205 must reuse this implementation once reconciled,
+including its transport helpers, rather than introduce another review controller.
+
+Local evidence: all 41 workspace browser cases passed in 39.3 seconds; the three
+strengthened correction/verification/attestation regressions passed in 7.0 seconds.
+After reconciling current develop, 46 workspace cases passed in 52.8 seconds,
+including the existing S13 publication/URL flow. Independent review found an
+unready extraction could block workspace reload: its regression failed before
+the fix and passed in 4.9 seconds afterward. Unready/failed review hydration now
+leaves other saved work usable with an explicit notice; 401/403 still clear access.
+These use the real browser/SDK with synthetic intercepted HTTP. Hosted acceptance
+requires the later reviewed staging release; this is not hosted evidence.

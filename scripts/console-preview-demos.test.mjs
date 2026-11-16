@@ -16,10 +16,15 @@ const DEMOS = [
   },
   { page: 'foundations.html', asset: /foundations/, label: /Synthetic demo/ },
   { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
+  { page: 'review-dishes.html', asset: /reviewDishes|menuReviewDemo/, label: /Synthetic demo/ },
   // S4-FE-04: the owner sign-in demo answers with a synthetic service, so it never reaches staging.
   { page: 'owner-sign-in.html', asset: /ownerSignIn/, label: /Synthetic demo/ },
   // FE-05/FE-06: the owner onboarding demo answers saves itself, so it never reaches staging.
   { page: 'owner-onboarding.html', asset: /ownerOnboarding/, label: /Synthetic demo/ },
+  // S13: the menu preview demo answers the publish request itself, so it never reaches staging. It
+  // has no demo bar (Jeffin, 16 Nov), so it is identified by its screen title instead of a
+  // "Synthetic demo" label; it stays preview-only, noindex and free of analytics like the others.
+  { page: 'owner-menu-preview.html', asset: /ownerMenuPreview/, label: /Preview your menu/ },
 ];
 // Normal builds carry the provider-backed sign-in pages instead; preview builds do not.
 const LIVE_AUTH = ['owner-auth.html', 'auth-confirm.html', 'auth-reset.html'];
@@ -79,6 +84,17 @@ test('a preview build adds the demo pages, labelled synthetic, noindex and witho
     if (demo.page === 'first-dashboard.html') assert.match(scripts, /Illustrative sample data/);
     assert.doesNotMatch(scripts, /posthog/i);
   }
+});
+
+test('a preview build adds the menu review demo, labelled synthetic, noindex and without analytics', async (t) => {
+  const dir = await build(t, true);
+  assert.ok((await readdir(dir)).includes('review-dishes.html'));
+  const html = await readFile(join(dir, 'review-dishes.html'), 'utf8');
+  assert.match(html, /<meta name="robots" content="noindex"/);
+  const scripts = (await pageScripts(dir, 'review-dishes.html')).join('\n');
+  assert.match(scripts, /Synthetic demo/);
+  assert.match(scripts, /Illustrative sample data/);
+  assert.doesNotMatch(scripts, /posthog/i);
 });
 
 test('only the preview workflow turns the demo flag on', async () => {

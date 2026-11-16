@@ -150,12 +150,15 @@ export function DishForm({
   orig,
   cancel,
   toReview,
+  requireReviewBox = false,
 }: {
   ed: Extract<EditState, { step: 'form' | 'review' }>;
   setEd: (e: EditState) => void;
   orig: MenuItem | null;
   cancel: () => void;
   toReview: () => void;
+  /** Onboarding (S9 -> S10): "I reviewed the AI-drafted text and ingredients" must always be ticked. */
+  requireReviewBox?: boolean;
 }) {
   const dr = ed.draft;
   const [errs, setErrs] = useState<Record<string, string>>({});
@@ -181,13 +184,19 @@ export function DishForm({
     // A photo is required (Jeffin, 14 Nov): an uploaded one or the dish's existing photo.
     if (!imgOf(d)) er['f-photo'] = 'Add a photo of the dish';
     if (d.upload && !d.rights) er['f-rights'] = 'Confirm you have the right to use this photo';
-    if (d.aiUsed && !d.aiReviewed)
+    if ((requireReviewBox || d.aiUsed) && !d.aiReviewed)
       er['f-ai'] = 'Confirm you reviewed the AI-drafted text and ingredients';
     return er;
   };
   const ready = Object.keys(check(dr)).length === 0;
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    // The review box is required first: Enter in a field cannot skip it.
+    if (requireReviewBox && !dr.aiReviewed) {
+      setErrs(check(dr));
+      document.getElementById('f-ai')?.focus();
+      return;
+    }
     const er = check(dr);
     setErrs(er);
     const first = Object.keys(er)[0];
@@ -521,6 +530,7 @@ export function DishForm({
             kind="primary"
             size="lg"
             type="submit"
+            disabled={requireReviewBox && !dr.aiReviewed}
             aria-disabled={!ready}
             className={ready ? undefined : 's09-off'}
           >
