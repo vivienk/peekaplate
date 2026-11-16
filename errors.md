@@ -4534,3 +4534,10 @@ Final `TMPDIR=/private/tmp VITEST_MAX_WORKERS=2 pnpm verify test:db` passed all 
 ## ERR-20261116-SERVING-AR
 
 Source inspection found the authored Screen 9 Serving Size input disabled and absent from saved/approved/public contracts. Added optional owner-confirmed count through both manual and extracted review paths. The first focused suite exposed a stale exact expected draft payload (new unknown count is null); updated it to retain the explicit unknown. Typecheck caught the explicit-undefined count under exact optional properties; the AR call boundary now declares that input. New producer/scale regressions bind measurements to the approved count, not a count-based multiplier. Existing events without the optional field retain their shape.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-16T17:49:53.815Z","exitCode":1}
+```
+
+The independent review found `publicBundleToWire` omitted `serving_count`, disabling measured AR on actual published deliveries. A new published-loader regression failed before the mapping fix and all 31 loader tests passed afterward. The first full check passed 1967 unit tests and 117 script tests but detected a stale diner context fingerprint; refreshed it after reviewing the serving-count handoff. Browser regressions passed saved/reloaded Screen 9 count, matching published calibration, cross-dish navigation, mismatched calibration rejection, and approximate fallback labels.
