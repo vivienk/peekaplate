@@ -92,7 +92,7 @@ export function parseLegalMarkdown(source: string): LegalDocument {
       continue;
     }
     // A paragraph runs until a blank line or the start of another block. Its lines keep their
-    // breaks, so "Email:" and "Mail:" stay on separate lines.
+    // breaks, so short labelled lines (like "Email:") stay on separate lines.
     const paragraph: string[] = [];
     while (i < lines.length) {
       const next = lines[i] ?? '';

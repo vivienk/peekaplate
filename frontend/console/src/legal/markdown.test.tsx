@@ -65,6 +65,14 @@ describe('LegalBody', () => {
 });
 
 describe('owner legal documents', () => {
+  it('has no unfilled placeholders and gives the contact email', () => {
+    for (const doc of Object.values(LEGAL_DOCUMENTS)) {
+      const text = JSON.stringify(doc);
+      expect(text).not.toMatch(/\[(contact email|mailing address)\]/);
+      expect(text).toContain('hello@peekaplate.io');
+    }
+  });
+
   it('loads both documents with their titles and sections', () => {
     expect(LEGAL_DOCUMENTS.terms.title).toBe('Terms of Service');
     expect(LEGAL_DOCUMENTS.privacy.title).toBe('Privacy Policy');

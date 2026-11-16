@@ -154,7 +154,6 @@ If we change something important, we will tell you at least 14 days before it ta
 ## Questions
 
 **Email:** hello@peekaplate.io
-**Mail:** PeekaPlate, [mailing address]
 
 If you are not happy with how we handled something, write to us and we will respond within 10 business days.
 
