@@ -98,6 +98,7 @@ export function OwnerMenuWorkspace({
   const [jobs, setJobs] = useState<MenuJob[]>([]);
   const [drafts, setDrafts] = useState<DishDraft[]>([]);
   const [reviews, setReviews] = useState<Record<string, ExtractionReviewSessionResponse>>({});
+  const [reviewUnavailable, setReviewUnavailable] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,6 +184,7 @@ export function OwnerMenuWorkspace({
         active.client.listDrafts(venueId),
       ]);
       const nextReviews: Record<string, ExtractionReviewSessionResponse> = {};
+      let unavailable = false;
       for (const jobId of new Set(
         nextDrafts
           .filter(
@@ -194,15 +196,30 @@ export function OwnerMenuWorkspace({
           .map((draft) => draft.job_id),
       )) {
         if (!jobId) continue;
-        nextReviews[jobId] = await active.client.openReviewSession(
-          venueId,
-          jobId,
-          command('review-session', jobId),
-        );
+        const job = nextJobs.find((item) => item.id === jobId);
+        if (job && !['complete', 'incomplete'].includes(job.status)) {
+          unavailable = true;
+          continue;
+        }
+        try {
+          nextReviews[jobId] = await active.client.openReviewSession(
+            venueId,
+            jobId,
+            command('review-session', jobId),
+          );
+        } catch (reason) {
+          if (
+            reason instanceof OwnerMenuApiError &&
+            (reason.status === 401 || reason.status === 403)
+          )
+            throw reason;
+          unavailable = true;
+        }
         if (!current(active) || generation !== readGeneration.current) return;
       }
       if (!current(active) || generation !== readGeneration.current) return;
       setReviews(nextReviews);
+      setReviewUnavailable(unavailable);
       setJobs(nextJobs);
       setDrafts(nextDrafts);
       setLoaded(true);
@@ -588,6 +605,12 @@ export function OwnerMenuWorkspace({
     const dish = draftToReviewDish(draft, session?.extractionResult.extraction_id, item);
     return reviewedIds.has(draft.id) ? { ...dish, reviewed: true } : dish;
   });
+  const reviewNotice = reviewUnavailable ? (
+    <p role="status">
+      Some extracted reviews could not be loaded. Other saved dishes remain available. Reload after
+      processing or recovery.
+    </p>
+  ) : null;
   const completeVerification = () =>
     void run(async (active) => {
       if (
@@ -674,6 +697,7 @@ export function OwnerMenuWorkspace({
       </>
     ) : view === 'review' ? (
       <>
+        {reviewNotice}
         {error && <p role="alert">{error}</p>}
         {notice && <p role="status">{notice}</p>}
         <ReviewDishes
@@ -1025,6 +1049,7 @@ export function OwnerMenuWorkspace({
     >
       {error && view !== 'edit' && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
+      {reviewNotice}
       {content}
     </section>
   );

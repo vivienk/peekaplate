@@ -89,6 +89,7 @@ async function fixture(context: BrowserContext) {
     releaseJobs: () => {},
     delayReview: false,
     reviewStarted: false,
+    reviewServiceStatus: 200,
     releaseReview: () => {},
     delayMembership: false,
     releaseMembership: () => {},
@@ -261,11 +262,25 @@ async function fixture(context: BrowserContext) {
       }
       if (/^menus\/jobs\/[^/]+\/review-session$/.test(path)) {
         state.reviewStarted = true;
+        const job = state.jobs[id]?.find((value) => value.id === path.split('/')[2]);
+        if (job && !['complete', 'incomplete'].includes(job.status))
+          return route.fulfill({ status: 409, json: { error: 'review_not_ready' }, headers });
+        if (state.reviewServiceStatus !== 200)
+          return route.fulfill({
+            status: state.reviewServiceStatus,
+            json: { error: 'artifact_unavailable' },
+            headers,
+          });
         if (state.delayReview)
           await new Promise<void>((resolve) => {
             state.releaseReview = resolve;
           });
         return route.fulfill({ json: state.review, headers });
+      }
+      if (/^menus\/jobs\/[^/]+\/(retry|cancel)$/.test(path)) {
+        const job = state.jobs[id]!.find((value) => value.id === path.split('/')[2])!;
+        job.status = path.endsWith('/retry') ? 'queued' : 'cancelled';
+        return route.fulfill({ json: { job }, headers });
       }
       if (/^extractions\/[^/]+\/candidates\/[^/]+\/review$/.test(path)) {
         const input = request.postDataJSON();
@@ -1827,4 +1842,73 @@ test('corrected extracted fields survive review return and a full reload', async
   await expect(page.locator('.mrow:not(.mhead)')).toContainText('7.25');
   expect(state.drafts[venue.venueId][0].name).not.toBe('Corrected fictional soup');
   expect(state.review.items[0].effective.name).toBe('Corrected fictional soup');
+});
+
+test('an unready or unavailable extraction does not hide other saved work', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const item = state.review.items[0]!;
+  const id = crypto.randomUUID();
+  state.jobs[venue.venueId] = [
+    {
+      id: JOB,
+      source_type: 'pdf',
+      status: 'incomplete',
+      attempt_count: 1,
+      max_attempts: 3,
+      error_code: null,
+      draft_count: 1,
+      created_at: '2026-11-15T00:00:00Z',
+      started_at: null,
+      finished_at: null,
+    },
+  ];
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: JOB,
+      candidate_id: item.candidate.candidate_id,
+      origin: 'extracted',
+      draft_version: 1,
+      name: item.effective.name,
+      category: null,
+      description: null,
+      price_amount: null,
+      price_currency: null,
+      ingredients: null,
+      source_text: 'Synthetic source',
+      review_warnings: [],
+      review_status: 'pending',
+    },
+  ];
+  await signIn(page);
+  await page.getByText('Saved sources (1)', { exact: true }).click();
+  await page.getByRole('button', { name: 'Retry source', exact: true }).click();
+  await expect(page.getByText('PDF source — queued; 1 dishes.')).toBeVisible();
+  state.jobs[venue.venueId]![0]!.status = 'running';
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByText('Saved sources (1)', { exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel source', exact: true }).click();
+  await expect(page.getByText('PDF source — cancelled; 1 dishes.')).toBeVisible();
+  state.jobs[venue.venueId]![0]!.status = 'complete';
+  state.reviewServiceStatus = 503;
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await expect(
+    page.getByText(
+      'Some extracted reviews could not be loaded. Other saved dishes remain available. Reload after processing or recovery.',
+    ),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  await page.getByLabel('Dish name', { exact: true }).fill('Independent manual soup');
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  expect(state.drafts[venue.venueId]).toHaveLength(2);
 });

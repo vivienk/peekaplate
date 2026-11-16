@@ -136,5 +136,10 @@ including its transport helpers, rather than introduce another review controller
 
 Local evidence: all 41 workspace browser cases passed in 39.3 seconds; the three
 strengthened correction/verification/attestation regressions passed in 7.0 seconds.
+After reconciling current develop, 46 workspace cases passed in 52.8 seconds,
+including the existing S13 publication/URL flow. Independent review found an
+unready extraction could block workspace reload: its regression failed before
+the fix and passed in 4.9 seconds afterward. Unready/failed review hydration now
+leaves other saved work usable with an explicit notice; 401/403 still clear access.
 These use the real browser/SDK with synthetic intercepted HTTP. Hosted acceptance
 requires the later reviewed staging release; this is not hosted evidence.

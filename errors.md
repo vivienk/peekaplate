@@ -3964,6 +3964,8 @@ Sources: `frontend/console/src/owner/OwnerMenuWorkspace.tsx`, `frontend/console/
 
 - The first full check found the new review price-schema import pulled unrelated contract literals into synthetic previews. Added the existing-style `@peekaplate/contracts/owner-menu` export and used that narrow contract entry. All five preview-build checks pass unchanged; no analytics assertion was relaxed.
 
+- Independent review reproduced eager review hydration blocking an incomplete source retry, because queued/running sources reject review bootstrap. Hydrate only ready sources; isolate unavailable artifacts while preserving fatal auth handling. The retry/running/cancel/reload/503-and-manual-save browser regression failed before the fix and passed afterward (4.9s).
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-16T00:31:04.061Z","exitCode":1}
