@@ -34,13 +34,18 @@ describe('dishStatus', () => {
   });
 
   it('names the field, in red, when only the price is missing', () => {
-    for (const priceAmount of [null, '', '  ', 'Free', '0']) {
+    for (const priceAmount of [null, '', '  ', 'Free', 'Infinity', '1e2', '1.234']) {
       expect(dishStatus(dish({ priceAmount }))).toEqual({
         ready: false,
         label: 'Price Missing',
         tone: 'error',
       });
     }
+  });
+
+  it('accepts the contract zero price and rejects an explicitly missing live currency', () => {
+    expect(dishStatus(dish({ priceAmount: '0', priceCurrency: 'USD' })).ready).toBe(true);
+    expect(dishStatus(dish({ priceCurrency: null })).ready).toBe(false);
   });
 
   it('names the field, in yellow, when only the category is missing', () => {

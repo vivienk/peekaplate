@@ -6,6 +6,8 @@
 // plus the dish id, so the real draft data can be passed in without conversion once the API is wired.
 // Unknown or only-proposed facts are never shown as recorded.
 
+import { OwnerDishFieldsSchema } from '@peekaplate/contracts/owner-menu';
+
 export type FactStatus = 'unknown' | 'proposed' | 'confirmed';
 
 export interface DishFacts {
@@ -68,7 +70,9 @@ function isBlank(value: string | null): boolean {
 }
 
 function priceValid(priceAmount: string | null): boolean {
-  return !isBlank(priceAmount) && Number(priceAmount) > 0;
+  return (
+    priceAmount !== null && OwnerDishFieldsSchema.shape.priceAmount.safeParse(priceAmount).success
+  );
 }
 
 /**
@@ -80,7 +84,13 @@ export function missingFields(dish: ReviewDish): MissingField[] {
   const missing: MissingField[] = [];
   if ((dish.name?.trim().length ?? 0) < MIN_NAME_LENGTH) missing.push('name');
   if (isBlank(dish.category)) missing.push('category');
-  if (!priceValid(dish.priceAmount)) missing.push('price');
+  if (
+    !priceValid(dish.priceAmount) ||
+    (dish.priceCurrency !== undefined &&
+      (dish.priceCurrency === null ||
+        !OwnerDishFieldsSchema.shape.priceCurrency.safeParse(dish.priceCurrency).success))
+  )
+    missing.push('price');
   if (dish.servingSize !== undefined && isBlank(dish.servingSize)) missing.push('servingSize');
   if (dish.ingredients.items.length === 0) missing.push('ingredients');
   if (isBlank(dish.photoId)) missing.push('photo');
@@ -122,8 +132,10 @@ export function dishStatus(dish: ReviewDish): DishStatus {
   };
 }
 
-export function formatPrice(priceAmount: string | null): string {
+export function formatPrice(priceAmount: string | null, currency?: string | null): string {
   if (!priceValid(priceAmount)) return NOT_FOUND;
+  if (currency === null || currency === '') return Number(priceAmount).toFixed(2);
+  if (currency && currency !== 'USD') return `${Number(priceAmount).toFixed(2)} ${currency}`;
   return `$${Number(priceAmount).toFixed(2)}`;
 }
 

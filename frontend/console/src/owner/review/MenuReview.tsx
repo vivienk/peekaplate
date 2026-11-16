@@ -18,6 +18,7 @@ import {
 } from './reviewDishes';
 
 export interface ReviewDishesProps {
+  verificationUnavailable?: string | undefined;
   restaurantName: string;
   state: ReviewState;
   /** Opens the empty S09 form. */
@@ -133,6 +134,7 @@ export function ReviewDishes({
   onCancel,
   onSaveAndExit,
   onCompleteVerification,
+  verificationUnavailable,
   completing = false,
   completeError = null,
   verified = false,
@@ -237,7 +239,7 @@ export function ReviewDishes({
                         <span className="review-dish__meta">{dishMeta(dish)}</span>
                       </th>
                       <td>{categoryLabel(dish)}</td>
-                      <td>{formatPrice(dish.priceAmount)}</td>
+                      <td>{formatPrice(dish.priceAmount, dish.priceCurrency)}</td>
                       <td>
                         <span className={`review-status review-status--${status.tone}`}>
                           {status.label}
@@ -289,7 +291,8 @@ export function ReviewDishes({
               <Button
                 variant="action"
                 className="owner-button"
-                disabled={completing}
+                disabled={completing || Boolean(verificationUnavailable)}
+                title={verificationUnavailable}
                 aria-busy={completing}
                 onClick={onCompleteVerification}
               >

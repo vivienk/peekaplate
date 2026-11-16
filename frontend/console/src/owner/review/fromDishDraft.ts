@@ -3,14 +3,18 @@
 // facts stay confirmed. Extracted drafts only have the proposed text the extraction found: their
 // ingredients are proposed (never confirmed), allergens are unknown and there is no photo, so the
 // row shows what is still missing until the owner corrects it in the dish form (S09).
-import { OwnerDishFieldsSchema } from '@peekaplate/contracts';
+import { OwnerDishFieldsSchema, type ReviewCandidateItemResponse } from '@peekaplate/contracts';
 import type { DishDraft } from '../../owner-menu/api';
+import { dishFromReviewItem } from '../../owner-menu/dishForm';
 import type { ReviewDish } from './reviewDishes';
 
 // Draft review statuses that mean the owner has already reviewed or corrected the dish.
-export const REVIEWED_STATUSES: readonly string[] = ['edited', 'approved', 'accepted'];
 
-export function draftToReviewDish(draft: DishDraft): ReviewDish {
+export function draftToReviewDish(
+  draft: DishDraft,
+  extractionId?: string,
+  item?: ReviewCandidateItemResponse,
+): ReviewDish {
   if (draft.origin === 'manual') {
     const parsed = OwnerDishFieldsSchema.safeParse(draft.manual_fields);
     if (parsed.success) {
@@ -29,6 +33,13 @@ export function draftToReviewDish(draft: DishDraft): ReviewDish {
       };
     }
   }
+  if (extractionId && item && item.candidate.candidate_id === draft.candidate_id) {
+    return {
+      id: draft.id,
+      ...dishFromReviewItem(extractionId, item),
+      reviewed: item.review.reviewStatus === 'corrected',
+    };
+  }
   const proposed = (draft.ingredients ?? []).filter(
     (item): item is string => typeof item === 'string' && item.trim() !== '',
   );
@@ -43,6 +54,6 @@ export function draftToReviewDish(draft: DishDraft): ReviewDish {
     allergens: { status: 'unknown', items: [] },
     photoId: null,
     // An extracted dish is Pending Review until the owner has reviewed it in S09.
-    reviewed: draft.origin === 'manual' || REVIEWED_STATUSES.includes(draft.review_status),
+    reviewed: false,
   };
 }

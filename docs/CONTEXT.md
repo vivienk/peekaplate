@@ -79,7 +79,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "f6e9b0c334cc251100d306a13f754f94b0370bdcb6f5f994d5563c3684b5c2f4"
+      "sourceFingerprint": "6e338356aa9d730d72f927aebc22053253f2a526f0b9daac2e729bd1d69b80c9"
     },
     {
       "id": "tokens",
@@ -236,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "S10 owner review only verifies dishes: Complete verification opens a Menu verified pop-up and never publishes. Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected.",
+      "summary": "Owner console reuses authored auth, dashboard, S5 source form, S6/S7 upload and S8/S9/S10 review screens. Review rows reload effective candidate corrections through the existing review-session API. S10 completes authenticated photo and draft verification with expected versions, stable commands and confirmed reload; it never publishes. No saved draft implies review/license attestations, and edited content/photo resets confirmation. Empty menus do not imply missing profiles, and local S5 details cannot claim submission. Unknown food facts, tenant/session isolation and failure handling are preserved. Profile persistence and extracted-photo editing remain gaps; final publication and hosted acceptance are separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -356,7 +356,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/controls.tsx",
         "frontend/console/src/owner-dashboard/menu-presentation.tsx",
         "frontend/console/src/owner-dashboard/menu-presentation.css",
-        "frontend/console/src/owner-dashboard/dish-presentation.css"
+        "frontend/console/src/owner-dashboard/dish-presentation.css",
+        "frontend/console/src/owner/review/fromDishDraft.ts",
+        "frontend/console/src/owner/review/fromDishDraft.test.ts",
+        "frontend/console/src/owner/review/MenuReviewStage.test.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -366,7 +369,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "134078e0ce4bfc98fd36a6ed1b7bc03b1abd7235976d2178b6a913c72054a2b1"
+      "sourceFingerprint": "40b5f5e180102de87ca30366a45787c0755c0c58295a87baae6b7e0d071edbdf"
     },
     {
       "id": "backend",
@@ -913,20 +916,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-14",
       "modules": [
-        "diner"
-      ],
-      "summary": "PR127 adds displayed Compare pairs, Start/Replace observations, linked detail openings and Save controls. Preserves PR126 publication-safe navigation. Three regressions fix withdrawn Replace/detail targets and Saved-origin route exits. Repository checks and 38 targeted browser cases pass.",
-      "files": [
-        "frontend/diner/src/compare/resultScreen.ts",
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/compare-result.spec.ts",
-        "tests/e2e/menu-triggers-live.spec.ts"
-      ],
-      "next": "Hosted tracking acceptance remains separate. Continue owner onboarding after Compare merges."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
         "console"
       ],
       "summary": "PR171 adds props-controlled owner onboarding S05 details, S06 source choice, S07 URL/files and S08 processing states. Actual saved baseline changes reset form/photo state, while equivalent props preserve edits; demo request callbacks cancel on navigation. Reconciled current develop and Compare changes. Real upload/persistence integration is not claimed.",
@@ -1047,6 +1036,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/menu-review.spec.ts"
       ],
       "next": "Wire Edit and Add dish to the S09 form (DishEditor, PR156) and add S8 on the same list. Publishing and the diner link belong to S13. Confirm serving-size contract field and wording for a single missing detail."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR206 preserves Harshita S8/S9/S10 presentation and fixes false verification success, stale extracted corrections, inferred profile state and prechecked attestations. Reuses existing verification APIs and effective review-session responses; no new backend or screen. 41 workspace browser cases PASS; three strengthened regressions PASS7.0s. Shared-schema price checks cover zero and invalid decimal values.",
+      "files": [
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner/review/fromDishDraft.ts",
+        "frontend/console/src/owner/review/reviewDishes.ts",
+        "frontend/console/src/owner-menu/api.ts",
+        "tests/e2e/owner-workspace.spec.ts",
+        "docs/owner-onboarding-wiring.md"
+      ],
+      "next": "Complete pinned review/CI, merge the authored slice before reconciling PR205. Profile persistence/extracted-photo editing and hosted acceptance remain unclaimed."
     }
   ]
 }

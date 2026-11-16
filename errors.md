@@ -3912,3 +3912,26 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"id": "ERR-20261115-OWNER-PICKER-WIDTH", "status": "resolved", "area": "owner-console-responsive", "cause": "A long server-returned restaurant name gave the selector a 440px intrinsic width and widened a 390px hosted viewport.", "prevention": "Constrain the shared picker and select minimum/maximum inline width, including the onboarding account disclosure.", "sources": ["frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "The real hosted overflow was reproduced locally at 448px; the long-name dashboard/account-menu browser case now passes at390px. Final hosted retest follows release."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T00:22:49.352Z","exitCode":2}
+```
+
+### PR #206 review reconciliation — November 15, 2026
+
+- Reproduced stale corrected rows with two failing adapter regressions; reload now uses existing effective review-session values. Both regressions pass.
+- Empty-menu auto-redirect detached the Menu control in browser tests. Removed the inference; the authored dashboard and all 41 workspace cases pass.
+- Existing local verification success lacked server evidence. Reused versioned verification/photo approval; browser checks cover conflict, retry identity, persisted state, revoked access and no publication.
+- Reused transport extraction initially copied adjacent methods too broadly. Type checking caught duplicate methods/unrelated types; restricted the move to the two verification methods. Type checking now passes.
+- New browser regression selectors initially used a nonexistent class and omitted an explicit accessible button label. Corrected them against the rendered authored DOM; all three strengthened regressions pass.
+- Price regressions failed for contract-valid zero and invalid Infinity/exponent strings. The review rule now uses the shared decimal schema.
+
+Sources: `frontend/console/src/owner/OwnerMenuWorkspace.tsx`, `frontend/console/src/owner/review/fromDishDraft.test.ts`, `frontend/console/src/owner/review/reviewDishes.test.tsx`, `tests/e2e/owner-workspace.spec.ts`.
+
+- The first full check found the new review price-schema import pulled unrelated contract literals into synthetic previews. Added the existing-style `@peekaplate/contracts/owner-menu` export and used that narrow contract entry. All five preview-build checks pass unchanged; no analytics assertion was relaxed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-16T00:31:04.061Z","exitCode":1}
+```
