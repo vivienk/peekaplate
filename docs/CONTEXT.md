@@ -410,12 +410,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f534a957cd68ccfb54de9987d59397272e11fcca7bd1c1bf46629f23dd895dc9"
+      "sourceFingerprint": "449c60ba7fff066a95a5d4a873b6fd9b522a4748c27e8584449b884c6b8a7ba5"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces have versioned private draft/photo/upload flows; owner-only staging prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are idempotent. AI trust/issuance remains gated. Artwork uses blob-locked repair before approval. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job including redelivery. Hosted rollout/acceptance stays separate.",
+      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces have versioned private draft/photo/upload flows; owner-only staging prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog; public reads and ingestion share exact configured staging-origin CORS. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are idempotent. AI trust/issuance remains gated. Artwork uses blob-locked repair before approval. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job including redelivery. Hosted rollout/acceptance stays separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -602,7 +602,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "8dc0717e132ac55b91f26b6daabac4a6127ca7e93ca1ca0b863424a52513ab0f"
+      "sourceFingerprint": "e8403b18c9356839fe5d371e1e359bcfc1524339fb1d264632ebc847186f2b56"
     },
     {
       "id": "database",
@@ -681,7 +681,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending. The DATA-01 runbook in observation-infrastructure.md records twelve planned dual-destination acceptance cases and separate capture, receipt, persistence and report checkpoints.",
+      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending. The DATA-01 runbook records twelve dual-destination cases and the partial November 16 staging evidence. Event-by-event transport and report reconciliation remain pending.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -746,7 +746,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "e039a6afaefa72b3eab892f2b510bce59b526c9c082e4467339f24b82e54c605"
+      "sourceFingerprint": "bf8a71295548cbf0c5244c138d334c079896e500440defa071b99fdfddba7bd1"
     },
     {
       "id": "agents",
@@ -1039,7 +1039,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.test.ts",
         "backend/src/owner-publication.workerd-harness.ts"
       ],
-      "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu. Coordinate the twelve DATA-01 acceptance cases through Jeffin's S6-REL-02 run after the deployed Compare and release prerequisites are confirmed."
+      "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu. Reconcile the partial DATA-01 staging evidence per case in shared REL-02 run REL02-DATA01-20261116-055223Z, then obtain independent review."
     },
     {
       "date": "2026-11-15",

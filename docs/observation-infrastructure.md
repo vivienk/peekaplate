@@ -22,6 +22,28 @@ operator may resume only a bounded, labelled synthetic run and pause it afterwar
 
 ## Typed facts and archive recovery — November 2
 
+### Routing-staging DATA-01 preflight
+
+The `/diner/:slug` site uses
+`https://routing-staging.peekaplate-diner-staging.pages.dev`. Its observation
+preflight must allow this exact origin only when the staging Worker's
+`DINER_PUBLIC_ORIGIN` selects it. Public-menu reads and observation writes use
+the same origin rule. Production, preview and lookalike origins gain no new access;
+bearer-token verification, traffic classification and rate limits remain required.
+
+Build the existing diner with `--mode staging`, `VITE_POSTHOG_ENABLED=true`,
+`VITE_POSTHOG_ENVIRONMENT=staging`, the existing public project ingestion token
+and host, and `VITE_POSTHOG_ALLOWED_ORIGIN` set to that exact routing origin.
+Preserve the `/diner/` base and existing routing-site preparation. Record the
+resulting Pages deployment and configuration alongside the exact main commit;
+the older routing build deliberately had PostHog disabled.
+
+Before enabling Queue delivery, pin the shared coordinator's Run ID, case pack,
+tenant/publication, allowed event count and recovery procedure. Capture provider
+readback separately from HTTP delivery. The twelve DATA-01 cases remain NOT RUN
+until their own evidence is recorded. Test-class browser facts stay excluded from
+owner reports; reserved synthetic cohort checks are a separately labelled path.
+
 The follow-up implementation writes an accepted index, the shared
 `observation_event` row and its matching detail row in one transaction. A failed
 detail write rolls everything back and keeps the Queue item retryable. Rejected
@@ -181,11 +203,12 @@ References: [accepted evidence boundary](adr/0003-intent-evidence.md), [integrat
 
 ## DATA-01 dual-destination acceptance preparation — November 10
 
-Status: **PREPARED; every case below is PLANNED / NOT RUN.** This is the shared
-DATA-01 run specification, not another acceptance ledger or permission to enable
-collection. Record actual results in the coordinator's existing shared run and
-link that run from [DATA-01](https://app.clickup.com/t/90141746115/86bcnfzu6).
-Do not replace the historical November 1/2 records above with these expectations.
+The cases below were prepared on November 10 with an initial status of
+**PLANNED / NOT RUN**. Use the coordinator's existing shared run as the acceptance
+ledger and link it from [DATA-01](https://app.clickup.com/t/90141746115/86bcnfzu6).
+The November 16 evidence summary below records the available run evidence and
+what is still needed for each case. The historical November 1/2 records above are
+separate from these cases.
 
 Zhiliang owns event/field mapping, ingestion/receipt checks and downstream
 reconciliation. Jeffin coordinates the integrated run; Uneeza independently checks
@@ -282,3 +305,45 @@ handles findings in their own slice. A reviewer records the source/run version,
 decision and evidence link before DATA-01 can move from In Review to accepted.
 Preparing this section, or passing existing intercepted tests, executes none of
 these hosted cases.
+
+### November 16 staging evidence
+
+Shared REL-02 Run ID: `REL02-DATA01-20261116-055223Z`. The exact UTC start and
+end, served versions, and case-by-case evidence mapping are pending confirmation
+in the shared run. See the [staging release approval][data01-staging-approval],
+[REL-02][data01-rel02], and the [DATA-12 evidence task][data01-data12].
+
+The staging operator reported PostHog enabled through #211 and #212 and
+verified 13 durable canonical browser facts. The PostHog export contains 30
+staging observations with distinct event IDs: 9 menu views, 13 dish views,
+4 dish-detail opens and 4 activity checkpoints. Its event timestamps span
+06:28:57.929–06:30:27.409 UTC. These timestamps describe only the exported
+events. The operator's actual run start and end remain pending. A separate,
+labelled synthetic report check used 90 events and covered the 9/10/11-session
+suppression boundaries. The Queue was re-paused after the run. Matching
+individual events, receipts, archive records and report outcomes remains
+pending.
+
+| Case | Evidence available for this run | Disposition |
+| --- | --- | --- |
+| D01-01 | Pre-consent and privacy-signal cases lack attributed observations. | Pending case evidence |
+| D01-02 | Fixture-mode silence lacks attributed network and outbox evidence. | Pending case evidence |
+| D01-03 | PostHog export confirms 30 stored staging observations across four event types. The operator reported 13 durable browser facts. The selected control and its event ID, receipt, archive and fact remain to be matched. | Partial evidence; pending reconciliation |
+| D01-04 | The isolated PostHog failure and canonical delivery need a matched case record. | Pending case evidence |
+| D01-05 | The canonical retry sequence and PostHog logical capture count need a matched case record. | Pending case evidence |
+| D01-06 | Offline, reload and recovery need a matched case record. | Pending case evidence |
+| D01-07 | Mixed and uncertain receipts need a matched batch and outbox record. | Pending case evidence |
+| D01-08 | Withdrawal and re-opt-in need a matched send, retry and persistence record. | Pending case evidence |
+| D01-09 | Publication and token checks are pending. | Pending token and publication evidence |
+| D01-10 | Save, Unsave and Undo need case evidence for each agreed storage mode. | Pending case evidence |
+| D01-11 | The 30 exported PostHog observations carry distinct event IDs. Identical retries and conflicting reuse need evidence joined by event ID across the receipt, archive, index and facts. | Pending reconciliation |
+| D01-12 | The separately labelled synthetic path covered the 9/10/11-session boundaries. Authorized owner, cross-tenant and revoked access, exact reporting window, and reconciliation to this run's canonical facts are pending. | Partial synthetic report evidence |
+
+Zhiliang owns DATA-01 reconciliation. Link the DATA-12 ledger under this
+Run ID and record independent dispositions for transmission and owner
+reporting when the reviewers are confirmed. The available aggregate evidence
+leaves DATA-01 acceptance in review.
+
+[data01-staging-approval]: https://github.com/vivienk/peekaplate/pull/212#issuecomment-6908571146
+[data01-rel02]: https://app.clickup.com/t/90141746115/86bd1am6x
+[data01-data12]: https://app.clickup.com/t/90141746115/86bcxgcu2

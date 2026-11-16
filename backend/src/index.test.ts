@@ -675,6 +675,52 @@ describe('observation.v2 HTTP boundary', () => {
     );
   });
 
+  it('allows the configured routing diner to post observations only in staging', async () => {
+    const app = createApp(baseServices);
+    const origin = 'https://routing-staging.peekaplate-diner-staging.pages.dev';
+    const allowed = { APP_ENV: 'staging', DINER_PUBLIC_ORIGIN: origin };
+    for (const [env, expected] of [
+      [allowed, origin],
+      [{ APP_ENV: 'production', DINER_PUBLIC_ORIGIN: origin }, null],
+      [{ APP_ENV: 'staging' }, null],
+    ] as const) {
+      const preflight = await app.request(
+        '/observations',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: origin,
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'Authorization,Content-Type',
+          },
+        },
+        env,
+      );
+      expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe(expected);
+      expect(preflight.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+      const unauthenticated = await app.request(
+        '/observations',
+        {
+          method: 'POST',
+          headers: { Origin: origin, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contract: 'observation.v2', events: [] }),
+        },
+        env,
+      );
+      expect(unauthenticated.status).toBe(401);
+      expect(unauthenticated.headers.get('Access-Control-Allow-Origin')).toBe(expected);
+    }
+    const lookalike = await app.request(
+      '/observations',
+      {
+        method: 'OPTIONS',
+        headers: { Origin: `${origin}.evil.example` },
+      },
+      allowed,
+    );
+    expect(lookalike.headers.get('Access-Control-Allow-Origin')).toBeNull();
+  });
+
   it('handles CORS allowlist and OPTIONS preflight aligned with PR #43', async () => {
     const app = createApp(baseServices);
 
