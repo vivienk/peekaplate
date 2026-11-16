@@ -610,6 +610,13 @@ async function preparedPublication(context: BrowserContext) {
       ),
     }),
   );
+  // After publishing, the S13 phone frames the returned diner page; answer it locally.
+  await context.route('https://routing-staging.peekaplate-diner-staging.pages.dev/**', (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: '<!doctype html><title>Diner</title><h1>Synthetic Bridge Cafe diner menu</h1>',
+    }),
+  );
   return state;
 }
 
@@ -625,21 +632,24 @@ for (const width of [1440, 390]) {
     await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
     await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Synthetic Garden Soup' })).toBeVisible();
-    await expect(page.getByText(/8.50 CAD/)).toBeVisible();
+    await expect(
+      page.getByText('Fictional soup used only for testing.', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText('CA$8.50')).toBeVisible();
     await page.getByText('Ingredients and allergens', { exact: true }).click();
     await expect(page.getByText('Allergen information not provided.')).toBeVisible();
     expect(state.approvals).toHaveLength(0);
     expect(state.publishes).toHaveLength(0);
-    await page.locator('.owner-publish__phone').evaluate((element) => {
+    await page.locator('.pp-menu-preview__screen').evaluate((element) => {
       element.scrollTop = 0;
     });
     await page.screenshot({
       path: testInfo.outputPath('s13-prepared-preview.png'),
       fullPage: true,
     });
-    expect((await new AxeBuilder({ page }).include('.owner-publish').analyze()).violations).toEqual(
-      [],
-    );
+    expect(
+      (await new AxeBuilder({ page }).include('.pp-menu-preview').analyze()).violations,
+    ).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -649,19 +659,26 @@ for (const width of [1440, 390]) {
       path: testInfo.outputPath('s13-publish-confirmation.png'),
       fullPage: true,
     });
-    await page.getByRole('button', { name: 'Confirm and publish', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Your menu is published' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /routing-staging/ })).toHaveAttribute(
-      'href',
+    await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
+    await expect(page.getByRole('heading', { name: 'Your menu is live' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Menu link' })).toHaveValue(
+      'https://routing-staging.peekaplate-diner-staging.pages.dev/diner/synthetic-bridge-cafe',
+    );
+    // The phone now shows the real diner page at the returned link.
+    await expect(page.locator('iframe.pp-menu-preview__frame')).toHaveAttribute(
+      'src',
       'https://routing-staging.peekaplate-diner-staging.pages.dev/diner/synthetic-bridge-cafe',
     );
     expect(state.approvals).toHaveLength(1);
     expect(state.publishes).toHaveLength(1);
     await page.screenshot({ path: testInfo.outputPath('s13-published-link.png'), fullPage: true });
-    await page.getByRole('button', { name: 'Back to Edit' }).click();
+    // Figma S13: after publishing, the only action is Go to dashboard.
+    await page.getByRole('button', { name: 'Go to dashboard' }).click();
+    await expect(page.getByRole('heading', { name: 'Your menu is live' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await page.getByRole('button', { name: 'Review and publish' }).click();
     await page.getByRole('button', { name: /Preview prepared menu 1/ }).click();
-    await expect(page.getByRole('heading', { name: 'Your menu is published' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your menu is live' })).toBeVisible();
     expect(state.publishes).toHaveLength(1);
   });
 }
@@ -677,15 +694,16 @@ test('prepared publication retries the same command and a failed link read never
   await page.getByRole('button', { name: 'Review and publish' }).click();
   await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
   await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
-  await page.getByRole('button', { name: 'Confirm and publish' }).click();
-  await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
+  await expect(page.getByRole('alert')).toContainText('We couldn’t publish your menu');
   state.linkFailure = true;
-  await page.getByRole('button', { name: 'Confirm and publish' }).click();
+  await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
   await expect(page.getByRole('button', { name: 'Get diner link' })).toBeVisible();
   expect(state.approvals[1]).toEqual(state.approvals[0]);
   state.linkFailure = false;
   await page.getByRole('button', { name: 'Get diner link' }).click();
-  await expect(page.getByRole('link', { name: /routing-staging/ })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Menu link' })).toHaveValue(/routing-staging/);
   expect(state.publishes).toHaveLength(1);
 });
 
@@ -700,7 +718,7 @@ test('prepared publication conflict requires a fresh preview and denied access c
   await page.getByRole('button', { name: 'Review and publish' }).click();
   await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
   await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
-  await page.getByRole('button', { name: 'Confirm and publish' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
   await expect(
     page.getByText(
       'The menu changed. Reload prepared menus and review it again before publishing.',
@@ -710,7 +728,7 @@ test('prepared publication conflict requires a fresh preview and denied access c
   state.denied = true;
   await page.getByRole('button', { name: 'Reload prepared menus' }).click();
   await expect(page.getByRole('heading', { name: 'Synthetic Garden Soup' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /routing-staging/ })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Menu link' })).toHaveCount(0);
 });
 
 test('desktop panels stay in place while the middle scrolls, with account actions tucked away', async ({

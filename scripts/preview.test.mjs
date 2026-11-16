@@ -33,6 +33,21 @@ test('static output gets a policy blocking APIs, analytics, forms and frames', a
   await sanitize(dir, head);
   assert.match(await readFile(join(dir, 'diner/_headers'), 'utf8'), /connect-src 'none'/);
 });
+test('only console previews may frame diner previews (S13 menu preview); all else stays blocked', async (t) => {
+  const dir = await fixture(t);
+  await sanitize(dir, head);
+  const diner = await readFile(join(dir, 'diner/_headers'), 'utf8');
+  const console = await readFile(join(dir, 'console/_headers'), 'utf8');
+  for (const policy of [diner, console]) {
+    assert.match(policy, /connect-src 'none'/);
+    assert.match(policy, /form-action 'none'/);
+    assert.doesNotMatch(policy, /frame-(src|ancestors) \*[;\s]/);
+  }
+  assert.match(diner, /frame-src 'none'/);
+  assert.match(diner, /frame-ancestors https:\/\/\*\.peekaplate-console-preview\.pages\.dev\n/);
+  assert.match(console, /frame-src https:\/\/\*\.peekaplate-diner-preview\.pages\.dev;/);
+  assert.match(console, /frame-ancestors 'none'\n/);
+});
 test('static output identifies the exact trusted PR commit', async (t) => {
   const dir = await fixture(t);
   await sanitize(dir, head);
