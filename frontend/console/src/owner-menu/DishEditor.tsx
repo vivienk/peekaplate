@@ -69,6 +69,17 @@ export type DishEditorProps = {
   error?: string | null;
   // OCR source text for an extracted dish.
   evidence?: readonly EvidenceExcerpt[];
+  // Button text; defaults keep the other screens unchanged. The S8 flow uses Back / Continue to review.
+  saveLabel?: string;
+  cancelLabel?: string;
+  // When onReviewConfirmedChange is given, the owner must tick "I have reviewed the AI-drafted text and
+  // ingredients" before the save button is enabled.
+  reviewConfirmed?: boolean;
+  onReviewConfirmedChange?: (confirmed: boolean) => void;
+  // When onLicenseConfirmedChange is given, the owner must also tick "I have the legal license to use
+  // this image" (shown below the image) before the save button is enabled.
+  licenseConfirmed?: boolean;
+  onLicenseConfirmedChange?: (confirmed: boolean) => void;
 };
 
 export function DishEditor({
@@ -82,6 +93,12 @@ export function DishEditor({
   busy = false,
   error = null,
   evidence = [],
+  saveLabel = 'Save draft',
+  cancelLabel = 'Cancel',
+  reviewConfirmed = false,
+  onReviewConfirmedChange,
+  licenseConfirmed = false,
+  onLicenseConfirmedChange,
 }: DishEditorProps) {
   const [addedCategories, setAddedCategories] = useState<string[]>([]);
   const [issues, setIssues] = useState<ApprovalIssue[]>([]);
@@ -90,6 +107,10 @@ export function DishEditor({
   const extracted = value.origin === 'extracted';
   const uncertain = new Set(value.source?.uncertainFields ?? []);
   const set = (patch: Partial<DishForm>) => onChange({ ...value, ...patch });
+  // The two required boxes (image license, AI-text review) must be ticked before the dish can be saved.
+  const blocked =
+    (Boolean(onReviewConfirmedChange) && !reviewConfirmed) ||
+    (Boolean(onLicenseConfirmedChange) && !licenseConfirmed);
   const issueFor = (field: ApprovalIssue) =>
     issues.includes(field) ? ISSUE_TEXT[field].text : undefined;
   const check = (field: string, message: string) => (uncertain.has(field) ? message : undefined);
@@ -108,7 +129,8 @@ export function DishEditor({
 
   const verify = (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    // Enter in a field submits the form, so the gate is checked here too, not only on the button.
+    if (busy || blocked) return;
     if (!onVerify) {
       onSave();
       return;
@@ -141,6 +163,17 @@ export function DishEditor({
                 <div className="s09-photo">
                   <span>No photo available</span>
                 </div>
+              )}
+              {onLicenseConfirmedChange && (
+                <label className="pp-dish-editor__review">
+                  <input
+                    type="checkbox"
+                    checked={licenseConfirmed}
+                    disabled={busy}
+                    onChange={(event) => onLicenseConfirmedChange(event.target.checked)}
+                  />{' '}
+                  I have the legal license to use this image
+                </label>
               )}
             </section>
             <section
@@ -384,12 +417,23 @@ export function DishEditor({
             Diners will see: {allergens.label}. {STAFF_ALLERGY_LINE}
           </p>
         </fieldset>
+        {onReviewConfirmedChange && (
+          <label className="pp-dish-editor__review">
+            <input
+              type="checkbox"
+              checked={reviewConfirmed}
+              disabled={busy}
+              onChange={(event) => onReviewConfirmedChange(event.target.checked)}
+            />{' '}
+            I have reviewed the AI-drafted text and ingredients
+          </label>
+        )}
         <div className="s09-btns">
           <Button kind="outlined" onClick={onCancel} disabled={busy}>
-            Cancel
+            {cancelLabel}
           </Button>
-          <Button kind="primary" onClick={onSave} disabled={busy}>
-            Save draft
+          <Button kind="primary" onClick={onSave} disabled={busy || blocked}>
+            {saveLabel}
           </Button>
           {onVerify && (
             <Button type="submit" disabled={busy}>

@@ -80,7 +80,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "8f2e1602b752c4fbbf775912da7e035141c4cf8743ca50792bac149b22f718e7"
+      "sourceFingerprint": "1d0d617910820048285c294efbc2e6d5661c140bdc6bd48dd87c25a93ed70e28"
     },
     {
       "id": "tokens",
@@ -272,7 +272,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and private menu/draft/photo persistence. Signed-in setup reuses merged FirstDashboard, source picker and authored Screen 9; live presentation imports no demo data. Unknown setup/food facts, evidence, cancellation and access cleanup remain explicit. Temporary S13 previews admitted snapshots, explicitly approves/publishes and reads the returned diner URL with stable retries. Automatic draft-to-bundle preparation remains operator-owned. Opt-in analysis retains typed denials and distinct evidence periods. Profile persistence and hosted AI activation remain unconnected.",
+      "summary": "Owner console reuses authored auth, dashboard, S5 source form, S6/S7 upload and S8/S9/S10 review screens. Review rows reload effective candidate corrections through the existing review-session API. S10 completes authenticated photo and draft verification with expected versions, stable commands and confirmed reload; it never publishes. No saved draft implies review/license attestations, and edited content/photo resets confirmation. Empty menus do not imply missing profiles, and local S5 details cannot claim submission. Unknown food facts, tenant/session isolation and failure handling are preserved. Profile persistence and extracted-photo editing remain gaps; final publication and hosted acceptance are separate. Existing S13 prepared-menu publication remains a separate step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -387,7 +387,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/owner-publish.css",
         "docs/owner-publish-handoff.md",
         "frontend/console/src/owner-dashboard/data.ts",
-        "frontend/console/src/owner-dashboard/attention.test.ts"
+        "frontend/console/src/owner-dashboard/attention.test.ts",
+        "frontend/console/review-dishes.html",
+        "frontend/console/src/owner/review/reviewDishes.ts",
+        "frontend/console/src/owner/review/reviewDishes.test.tsx",
+        "frontend/console/src/owner/review/MenuReview.tsx",
+        "frontend/console/src/owner/review/MenuReview.test.tsx",
+        "frontend/console/src/owner/review/fromMenuItem.ts",
+        "frontend/console/src/owner/review/fromMenuItem.test.tsx",
+        "frontend/console/src/owner/review/menuReviewDemo.tsx",
+        "frontend/console/src/owner/review/review.css",
+        "tests/e2e/menu-review.spec.ts",
+        "frontend/console/src/owner/review/fromDishDraft.ts",
+        "frontend/console/src/owner/review/fromDishDraft.test.ts",
+        "frontend/console/src/owner/review/MenuReviewStage.test.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -397,7 +410,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1435a19a632e44503c6c95af77a1367ae67f9206d3ba96a068efe735ad5e831e"
+      "sourceFingerprint": "f534a957cd68ccfb54de9987d59397272e11fcca7bd1c1bf46629f23dd895dc9"
     },
     {
       "id": "backend",
@@ -733,7 +746,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "5007f7fea9280f8fd0e10cea4c597544bebd61c6fa99a63da275d7f7b0db8979"
+      "sourceFingerprint": "e039a6afaefa72b3eab892f2b510bce59b526c9c082e4467339f24b82e54c605"
     },
     {
       "id": "agents",
@@ -968,23 +981,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "Connect merged owner controls through PR156 client to existing authenticated menu/draft APIs; no new backend or pending-team-PR merge.",
-      "files": [
-        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
-        "frontend/console/src/owner/OwnerWorkspace.tsx",
-        "frontend/console/src/owner-menu/api.ts",
-        "frontend/console/src/owner-menu/DishEditor.tsx",
-        "frontend/console/src/onboarding/ChooseMenuSource.tsx",
-        "tests/e2e/owner-workspace.spec.ts",
-        "docs/owner-onboarding-wiring.md"
-      ],
-      "next": "Verify narrow staging release; keep S05 persistence and PR163 final review/publication separate."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
-        "console"
-      ],
       "summary": "Reconcile opt-in synthetic owner analysis with merged menu wiring; client retains exact destinations, cancellation and typed access denial.",
       "files": [
         "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
@@ -1099,6 +1095,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/search.spec.ts"
       ],
       "next": "Review physical-device design separately; no hosted release follows from this merge."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR206 preserves Harshita S8/S9/S10 presentation and fixes false verification success, stale extracted corrections, inferred profile state and prechecked attestations. Reuses existing verification APIs and effective review-session responses; no new backend or screen. 41 workspace browser cases PASS; three strengthened regressions PASS7.0s. Shared-schema price checks cover zero and invalid decimal values.",
+      "files": [
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner/review/fromDishDraft.ts",
+        "frontend/console/src/owner/review/reviewDishes.ts",
+        "frontend/console/src/owner-menu/api.ts",
+        "tests/e2e/owner-workspace.spec.ts",
+        "docs/owner-onboarding-wiring.md"
+      ],
+      "next": "Complete pinned review/CI, merge the authored slice before reconciling PR205. Profile persistence/extracted-photo editing and hosted acceptance remain unclaimed."
     }
   ]
 }

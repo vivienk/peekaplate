@@ -18,3 +18,5 @@ __pycache__/
 .venv/
 .pytest_cache/
 .pnpm-store/
+.work/
+outputs/

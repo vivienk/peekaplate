@@ -43,6 +43,7 @@ export default defineConfig(({ command }) => ({
               ownerOnboarding: page('owner-onboarding.html'),
               firstDashboard: page('first-dashboard.html'),
               ownerDashboard: page('owner-dashboard.html'),
+              reviewDishes: page('review-dishes.html'),
             }
           : {
               ownerAuth: page('owner-auth.html'),

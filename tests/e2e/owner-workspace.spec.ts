@@ -76,6 +76,8 @@ async function fixture(context: BrowserContext) {
     photos: new Map<string, Buffer>(),
     receipts: new Map<string, unknown>(),
     conflictSave: false,
+    verificationStatus: 200,
+    verificationCommands: [] as string[],
     menuStatus: 200,
     review: { ...reviewSession(), venueId: venue.venueId },
     correctionIds: [] as string[],
@@ -87,6 +89,7 @@ async function fixture(context: BrowserContext) {
     releaseJobs: () => {},
     delayReview: false,
     reviewStarted: false,
+    reviewServiceStatus: 200,
     releaseReview: () => {},
     delayMembership: false,
     releaseMembership: () => {},
@@ -259,11 +262,25 @@ async function fixture(context: BrowserContext) {
       }
       if (/^menus\/jobs\/[^/]+\/review-session$/.test(path)) {
         state.reviewStarted = true;
+        const job = state.jobs[id]?.find((value) => value.id === path.split('/')[2]);
+        if (job && !['complete', 'incomplete'].includes(job.status))
+          return route.fulfill({ status: 409, json: { error: 'review_not_ready' }, headers });
+        if (state.reviewServiceStatus !== 200)
+          return route.fulfill({
+            status: state.reviewServiceStatus,
+            json: { error: 'artifact_unavailable' },
+            headers,
+          });
         if (state.delayReview)
           await new Promise<void>((resolve) => {
             state.releaseReview = resolve;
           });
         return route.fulfill({ json: state.review, headers });
+      }
+      if (/^menus\/jobs\/[^/]+\/(retry|cancel)$/.test(path)) {
+        const job = state.jobs[id]!.find((value) => value.id === path.split('/')[2])!;
+        job.status = path.endsWith('/retry') ? 'queued' : 'cancelled';
+        return route.fulfill({ json: { job }, headers });
       }
       if (/^extractions\/[^/]+\/candidates\/[^/]+\/review$/.test(path)) {
         const input = request.postDataJSON();
@@ -288,6 +305,38 @@ async function fixture(context: BrowserContext) {
       }
       if (path === 'drafts')
         return route.fulfill({ json: { drafts: state.drafts[id] ?? [] }, headers });
+      if (/^drafts\/[^/]+\/verify$/.test(path)) {
+        const input = request.postDataJSON();
+        state.verificationCommands.push(input.commandId);
+        const draft = state.drafts[id]?.find((draft) => draft.id === path.split('/')[1]);
+        if (state.verificationStatus !== 200)
+          return route.fulfill({
+            status: state.verificationStatus,
+            json: { error: 'version_conflict' },
+            headers,
+          });
+        if (!draft || draft.draft_version !== input.expectedVersion)
+          return route.fulfill({ status: 409, json: { error: 'version_conflict' }, headers });
+        draft.verification_status = 'verified';
+        return route.fulfill({ json: { draft }, headers });
+      }
+      if (/^drafts\/[^/]+\/photos\/[^/]+\/approve$/.test(path)) {
+        const photoId = path.split('/')[3]!;
+        return route.fulfill({
+          json: {
+            photo: {
+              id: photoId,
+              draftId: path.split('/')[1],
+              contentType: 'image/png',
+              sizeBytes: 4,
+              sha256: 'a'.repeat(64),
+              verificationStatus: 'verified',
+              storageKey: 'synthetic/approved.png',
+            },
+          },
+          headers,
+        });
+      }
       if (/^drafts\/[^/]+$/.test(path) && request.method() === 'PUT') {
         const draftId = path.split('/')[1]!;
         const input = request.postDataJSON();
@@ -385,6 +434,17 @@ async function fixture(context: BrowserContext) {
     }
   });
   return state;
+}
+
+async function acknowledgeDish(page: Page) {
+  const review = page.getByRole('checkbox', {
+    name: 'I have reviewed the AI-drafted text and ingredients',
+  });
+  if (await review.isVisible()) await review.check();
+  const license = page.getByRole('checkbox', {
+    name: 'I have the legal license to use this image',
+  });
+  if (await license.isVisible()) await license.check();
 }
 
 async function signIn(page: Page, email = 'owner@example.test', openMenu = true) {
@@ -868,6 +928,7 @@ for (const width of [1440, 390]) {
     await addCategory(page, 'Soup');
     await page.getByLabel('Price', { exact: true }).fill('9.50');
     await page.getByLabel('Currency', { exact: true }).fill('USD');
+    await acknowledgeDish(page);
     await page.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(
       page.getByText('Draft saved. This has not approved or published your menu.'),
@@ -962,6 +1023,7 @@ test('manual dish and original private photo survive save and reload', async ({
   await page
     .getByLabel('Dish photo', { exact: true })
     .setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: original });
+  await acknowledgeDish(page);
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(
     page.getByText('Draft saved. This has not approved or published your menu.'),
@@ -975,6 +1037,22 @@ test('manual dish and original private photo survive save and reload', async ({
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
   await expect(page.getByLabel('Price', { exact: true })).toHaveValue('9.50');
   await expect(page.getByRole('img', { name: 'Private draft dish' })).toBeVisible();
+  const license = page.getByRole('checkbox', {
+    name: 'I have the legal license to use this image',
+  });
+  const reviewed = page.getByRole('checkbox', {
+    name: 'I have reviewed the AI-drafted text and ingredients',
+  });
+  await expect(license).not.toBeChecked();
+  await expect(reviewed).not.toBeChecked();
+  await acknowledgeDish(page);
+  await page
+    .getByLabel('Dish photo', { exact: true })
+    .setInputFiles({ name: 'replacement.png', mimeType: 'image/png', buffer: original });
+  await expect(license).not.toBeChecked();
+  await reviewed.check();
+  await page.getByLabel('Dish name', { exact: true }).fill('Changed fictional soup');
+  await expect(reviewed).not.toBeChecked();
   expect(state.apiCalls.some((call) => /approve|publications/.test(call.path))).toBe(false);
 });
 
@@ -995,6 +1073,7 @@ test('URL and manual sources share saved work and queued status is not a fake su
   await page.getByRole('button', { name: 'Add dish', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Add dish', exact: true })).toBeVisible();
   await page.getByLabel('Dish name', { exact: true }).fill('Fictional side salad');
+  await acknowledgeDish(page);
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(
     page.getByText('Draft saved. This has not approved or published your menu.'),
@@ -1022,6 +1101,7 @@ test('a stale draft save leaves the current edit visible instead of reporting su
   await page.getByRole('button', { name: 'Add dish', exact: true }).click();
   await page.getByLabel('Dish name', { exact: true }).fill('Unsaved fictional soup');
   state.conflictSave = true;
+  await acknowledgeDish(page);
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Saved data changed');
   await expect(page.getByLabel('Dish name', { exact: true })).toHaveValue('Unsaved fictional soup');
@@ -1177,6 +1257,7 @@ test('identical corrections on separate extracted candidates get separate comman
   for (const item of candidates) {
     await page.getByRole('button', { name: `Edit ${item.effective.name}`, exact: true }).click();
     await addCategory(page, 'Sides');
+    await acknowledgeDish(page);
     await page.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(
       page.getByText('Draft saved. This has not approved or published your menu.'),
@@ -1212,8 +1293,9 @@ test('a delayed review session cannot reopen an editor after shell navigation', 
       review_status: 'pending',
     },
   ];
-  state.delayReview = true;
   await signIn(page);
+  state.reviewStarted = false;
+  state.delayReview = true;
   await page.getByRole('button', { name: `Edit ${item.effective.name}`, exact: true }).click();
   await expect.poll(() => state.reviewStarted).toBe(true);
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
@@ -1640,4 +1722,193 @@ test('the live owner AI panel stays usable on mobile with accessible controls', 
   }));
   expect(overflow.width, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.viewport);
   expect((await new AxeBuilder({ page }).include('.owner-ai').analyze()).violations).toEqual([]);
+});
+
+test('authored S10 verifies actual saved drafts without publication and preserves command identity after conflict', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const id = crypto.randomUUID();
+  const photoId = crypto.randomUUID();
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: null,
+      origin: 'manual',
+      draft_version: 1,
+      name: 'Fictional Lentil Soup',
+      category: 'Soup',
+      description: 'Slow cooked lentil soup with herbs.',
+      price_amount: '9.50',
+      price_currency: 'CAD',
+      ingredients: ['lentils'],
+      source_text: null,
+      review_warnings: [],
+      review_status: 'pending',
+      verification_status: 'not_verified',
+      manual_fields: {
+        name: 'Fictional Lentil Soup',
+        category: 'Soup',
+        description: 'Slow cooked lentil soup with herbs.',
+        priceAmount: '9.50',
+        priceCurrency: 'CAD',
+        ingredients: { status: 'confirmed', items: ['lentils'] },
+        allergens: { status: 'confirmed', items: [] },
+        photoId,
+      },
+    },
+  ];
+  state.verificationStatus = 409;
+  await signIn(page, undefined, false);
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Add your menu' })
+    .getByRole('button', { name: 'Edit: Add your menu', exact: true })
+    .click();
+  await expect(page.locator('.review-table')).toBeVisible();
+  await expect(page.getByRole('main')).toHaveCount(1);
+
+  await expect(page.getByText('9.50 CAD', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Saved data changed');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  state.verificationStatus = 200;
+  await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
+  expect(state.verificationCommands).toHaveLength(2);
+  expect(new Set(state.verificationCommands).size).toBe(1);
+  expect(state.drafts[venue.venueId]?.[0]?.verification_status).toBe('verified');
+  expect(state.apiCalls.some((call) => /\/photos\/[^/]+\/approve$/.test(call.path))).toBe(true);
+  expect(
+    state.apiCalls.some((call) =>
+      /publications|\/approvals$|\/drafts\/[^/]+\/approve$/.test(call.path),
+    ),
+  ).toBe(false);
+  await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'Edit: Add your menu', exact: true }).click();
+  state.venues = [];
+  state.menuStatus = 403;
+  await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Menu verified' })).toHaveCount(0);
+});
+
+test('corrected extracted fields survive review return and a full reload', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const item = state.review.items[0]!;
+  const id = crypto.randomUUID();
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: JOB,
+      candidate_id: item.candidate.candidate_id,
+      origin: 'extracted',
+      draft_version: 1,
+      name: item.effective.name,
+      category: null,
+      description: null,
+      price_amount: null,
+      price_currency: null,
+      ingredients: null,
+      source_text: 'Synthetic source',
+      review_warnings: [],
+      review_status: 'pending',
+    },
+  ];
+  await signIn(page, undefined, false);
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Add your menu' })
+    .getByRole('button', { name: 'Edit: Add your menu', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Review ' + item.effective.name, exact: true }).click();
+  await page.getByLabel('Dish name', { exact: true }).fill('Corrected fictional soup');
+  await addCategory(page, 'Soup');
+  await page.getByLabel('Price', { exact: true }).fill('7.25');
+  await page.getByLabel('Currency', { exact: true }).fill('CAD');
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+  await expect(page.locator('.review-table')).toContainText('Corrected fictional soup');
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await expect(page.locator('.mrow:not(.mhead)')).toContainText('Corrected fictional soup');
+  await expect(page.locator('.mrow:not(.mhead)')).toContainText('7.25');
+  expect(state.drafts[venue.venueId][0].name).not.toBe('Corrected fictional soup');
+  expect(state.review.items[0].effective.name).toBe('Corrected fictional soup');
+});
+
+test('an unready or unavailable extraction does not hide other saved work', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const item = state.review.items[0]!;
+  const id = crypto.randomUUID();
+  state.jobs[venue.venueId] = [
+    {
+      id: JOB,
+      source_type: 'pdf',
+      status: 'incomplete',
+      attempt_count: 1,
+      max_attempts: 3,
+      error_code: null,
+      draft_count: 1,
+      created_at: '2026-11-15T00:00:00Z',
+      started_at: null,
+      finished_at: null,
+    },
+  ];
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: JOB,
+      candidate_id: item.candidate.candidate_id,
+      origin: 'extracted',
+      draft_version: 1,
+      name: item.effective.name,
+      category: null,
+      description: null,
+      price_amount: null,
+      price_currency: null,
+      ingredients: null,
+      source_text: 'Synthetic source',
+      review_warnings: [],
+      review_status: 'pending',
+    },
+  ];
+  await signIn(page);
+  await page.getByText('Saved sources (1)', { exact: true }).click();
+  await page.getByRole('button', { name: 'Retry source', exact: true }).click();
+  await expect(page.getByText('PDF source — queued; 1 dishes.')).toBeVisible();
+  state.jobs[venue.venueId]![0]!.status = 'running';
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByText('Saved sources (1)', { exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel source', exact: true }).click();
+  await expect(page.getByText('PDF source — cancelled; 1 dishes.')).toBeVisible();
+  state.jobs[venue.venueId]![0]!.status = 'complete';
+  state.reviewServiceStatus = 503;
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await expect(
+    page.getByText(
+      'Some extracted reviews could not be loaded. Other saved dishes remain available. Reload after processing or recovery.',
+    ),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  await page.getByLabel('Dish name', { exact: true }).fill('Independent manual soup');
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  expect(state.drafts[venue.venueId]).toHaveLength(2);
 });
