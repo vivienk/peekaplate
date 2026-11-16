@@ -58,7 +58,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-workspace.test.ts",
         "packages/contracts/src/owner-analysis.ts",
         "packages/contracts/src/portion.ts",
-        "packages/contracts/src/ingredient-artwork.ts"
+        "packages/contracts/src/ingredient-artwork.ts",
+        "packages/contracts/package.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -66,7 +67,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c11fcbf1b60e8c6da7368aba3fa9eb10a59113bd9afcdecff61827a933e9e154"
+      "sourceFingerprint": "6295c5c2f8ba6bef188f49d9417dd46a0faf6379a9195d683af2560842e3700c"
     },
     {
       "id": "tokens",
@@ -104,7 +105,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Auth-free diner reads approved immutable menu bundles with exact-byte/revision verification and restaurant-link resolution. Authored Menu, Search, Detail, Save/Saved and Compare/Replace preserve navigation and accessibility. Consent gates independent PostHog/canonical dispatch. Optional portion layers are hash-bound and dish/revision-matched, loaded on demand with original-photo fallback and cleanup. Published synthetic demos use real HTTPS layer URLs and explicit provenance; no measured-size claim. Demo uploads/generation remain separate from normal builds. Hosted acceptance and physical-phone checks are recorded separately.",
+      "summary": "Auth-free diner reads exact-byte verified published menus using existing Menu/Search/Detail/Save/Compare screens. Published portion view exposes the original camera portal only after explicit action; original-photo fallback, lazy WebGL, teardown and uncalibrated-size copy remain. Existing approved ingredient-artwork client refreshes exact labels and restores Figma/text fallback on absence or revocation. Physical-phone/provider and hosted acceptance are recorded separately.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -207,7 +208,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionAR.ts",
         "frontend/diner/src/compare/pickerScreen.ts",
         "frontend/diner/src/compare/resultScreen.ts",
-        "docs/merged-diner-staging.md"
+        "docs/merged-diner-staging.md",
+        "playwright.portion-published.config.ts",
+        "tests/e2e/portion-published.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -216,12 +219,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "469a17d0850305e12bfb687e4fa59aa08c85fe32ef78f93ff4df7bda43b1de1b"
+      "sourceFingerprint": "66cdee1e1156f15268754c620fc687ba24023a78d2eacfc8de7b068e06077f91"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and private menu/draft/photo persistence. Signed-in setup reuses merged FirstDashboard, source picker and authored Screen 9; live presentation imports no demo data. Unknown setup/food facts, evidence, cancellation and access cleanup remain explicit. Temporary S13 previews admitted snapshots, explicitly approves/publishes and reads the returned diner URL with stable retries. Automatic draft-to-bundle preparation remains operator-owned. Opt-in analysis retains typed denials and distinct evidence periods. Profile persistence and hosted AI activation remain unconnected.",
+      "summary": "Owner auth/workspace preserves authored shell, setup and source selection. #206 supplies the single S08/S10 review controller, effective saved corrections, recovery-safe hydration and explicit attestations; verification uses existing draft/photo APIs without publication. Existing S05 details remain explicitly local-only. Demo and live performance share one authored frame/CSS with actual API metrics, suppression and unknown freshness. S13 alone is intentionally temporary. Profile persistence, extracted-photo verification, Overview/Actions/live AI and unsupported metrics remain incomplete.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -324,7 +327,28 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/dish-presentation.css",
         "frontend/console/src/owner/OwnerPublish.tsx",
         "frontend/console/src/owner/owner-publish.css",
-        "docs/owner-publish-handoff.md"
+        "docs/owner-publish-handoff.md",
+        "frontend/console/src/owner-dashboard/performance.css",
+        "frontend/console/src/owner-dashboard/performance-report.test.tsx",
+        "frontend/console/src/owner/review/MenuReview.test.tsx",
+        "frontend/console/src/owner/review/MenuReview.tsx",
+        "frontend/console/src/owner/review/review.css",
+        "frontend/console/src/owner/review/reviewDishes.test.tsx",
+        "frontend/console/src/owner/review/reviewDishes.ts",
+        "docs/screen-preservation-audit.md",
+        "frontend/console/src/owner/review/MenuReviewStage.test.tsx",
+        "frontend/console/src/owner/review/fromDishDraft.test.ts",
+        "frontend/console/src/owner/review/fromDishDraft.ts",
+        "frontend/console/src/owner/review/fromMenuItem.test.tsx",
+        "frontend/console/src/owner/review/fromMenuItem.ts",
+        "frontend/console/src/owner/review/menuReviewDemo.tsx",
+        "frontend/console/src/owner/review/reviewForm.test.tsx",
+        "frontend/console/src/owner/review/reviewForm.ts",
+        "frontend/console/src/onboarding/RestaurantDetails.tsx",
+        "frontend/console/src/onboarding/details.ts",
+        "frontend/console/src/onboarding/details.test.tsx",
+        "frontend/console/review-dishes.html",
+        "tests/e2e/menu-review.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -334,12 +358,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9bfd1d94c2a0c00a4bd48c38bcc0f72954ebac7e7ba23e0a3a3df96c419369cd"
+      "sourceFingerprint": "be377a4bec990bfa8bed6300c8036ab2616bcecaf0651a819a15c599aad82246"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker owns verified tenant commands, publication, observations, ingestion and owner reports. API/runtime contracts remain at ba70ce9 in this extraction-only release. The extraction host adds authenticated job-scoped budget reservations persisted atomically in its existing SQLite Durable Object. Matching Python calls reserve before provider transport; retries/redelivery share two attempts. The read-only FE-06.4 verifier binds job, source, report and draft identity and keeps upstream usage unknown. No API/Pages deployment, Supabase migration or Queue activation is included; paired extractor rollout and hosted acceptance remain separate.",
+      "summary": "Hono Worker owns verified tenant commands, publication, observations, ingestion and owner reports. Command paths share the existing transactional owner/editor membership check. Existing #165 ingredient-artwork review/read/revocation uses the private R2 prefix, hash-bound approved bytes, tenant projection and dry-run cleanup. Publication remains owner-only; artwork approval changes no food facts. Matching extraction budget host/container deployment and controlled provider acceptance remain separately coordinated.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -481,7 +505,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/verify-ingestion-e2e.mjs",
         "scripts/verify-ingestion-e2e.test.mjs",
         "scripts/verify-ingestion-e2e.regression.test.mjs",
-        "docs/staging-e2e-acceptance-2026-11-14.md"
+        "docs/staging-e2e-acceptance-2026-11-14.md",
+        "backend/src/command-error.ts",
+        "backend/src/staff-venue.test.ts",
+        "backend/src/ingredient-artwork.ts",
+        "backend/src/ingredient-artwork-routes.ts",
+        "backend/src/ingredient-artwork-retention.ts",
+        "backend/src/ingredient-artwork.test.ts",
+        "backend/src/ingredient-artwork-retention.test.ts",
+        "backend/src/ingredient-artwork.integration.ts",
+        "migrations/20261113020000_ingredient_artwork.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -494,7 +527,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "3fec2fa607632c9d2ae0d605a2760ccbe511b7a4463d3eaf82dcecfb230a0c0f"
+      "sourceFingerprint": "cffa8a40cb2e4ee090cf71f72b274e5cf3c50de1bf999d8a3c62a53d9bc8e8ed"
     },
     {
       "id": "database",
@@ -560,7 +593,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending.",
+      "summary": "Deploy a reviewed exact main commit to existing staging services. The single screen-preservation correction promotes the required original artwork modules and migration, shared authored console presentation and production portal entry. Extraction host/container, Queues, provider budgets, production and .io remain separate. Hosted verification must identify deployment versions and retained synthetic fixture; local tests are not hosted evidence.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -610,7 +643,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         ".github/workflows/deploy-extraction-staging.yml",
         "docs/staging-ingestion-release.md",
         "scripts/prepare-app-site.mjs",
-        "scripts/prepare-app-site.test.mjs"
+        "scripts/prepare-app-site.test.mjs",
+        "docs/screen-preservation-audit.md",
+        "playwright.portion-published.config.ts"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -621,7 +656,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "9eb41dc2864130a8c86878d6d243bd89748b7908a34b68ad22e941b5d3d84bf2"
+      "sourceFingerprint": "8aa57c03a02b87ffb1111b5a354ff571609e59a159b68bb747ea4d296554276a"
     },
     {
       "id": "agents",
@@ -688,7 +723,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. Hosted extraction requires a private loopback budget gate; the matching SQLite DO caps provider attempts at two per tenant/job across retries and redelivery. Standalone helpers remain optionally gated.",
+      "summary": "Vision-first extraction retains source-linked needs_review drafts and the existing job-scoped provider budget. The original #51 ingredient-review handoff and #165 opt-in illustration CLI are promoted together: exact source labels, bounded generation/cache, explicit image review and optional staff-API delivery. No live image generation occurs during diner browsing; no hosted automatic generation job is implied. Food confirmation and publication gates remain distinct.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -767,7 +802,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/product_validation.py",
         "processing/tests/test_product_validation.py",
         "processing/src/peekaplate_processing/provider_budget.py",
-        "processing/tests/test_provider_budget.py"
+        "processing/tests/test_provider_budget.py",
+        "processing/src/peekaplate_processing/ingredient_icons.py",
+        "processing/tests/test_ingredient_icons.py",
+        "processing/src/peekaplate_processing/ingredient_icon_generation.py",
+        "processing/tests/test_ingredient_icon_generation.py",
+        "processing/src/peekaplate_processing/ingredient_icon_export.py",
+        "processing/tests/test_ingredient_icon_export.py",
+        "processing/src/peekaplate_processing/ingredient_icon_delivery.py",
+        "processing/tests/test_ingredient_icon_delivery.py",
+        "processing/src/peekaplate_processing/ingredient_intelligence.py",
+        "processing/tests/test_ingredient_intelligence.py",
+        "docs/ingredient-icon-pipeline.md",
+        "docs/ingredient-intelligence.md",
+        "processing/tests/fixtures/ingredient-review.json",
+        "processing/tests/fixtures/ingredient-review-unicode.json"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -776,7 +825,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "278df97e6e1df069bb01ba12b7bc95685893ec5254aaf1d358c1856f74e43dad"
+      "sourceFingerprint": "a93fa942d5db4d2c981da184534df588d2e58a605057bcfe47b5017ddad68320"
     },
     {
       "id": "assets",
@@ -811,37 +860,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "backend",
-        "database",
-        "diner"
-      ],
-      "summary": "Automatic restaurant links allocate with owner publication; public resolution reuses existing publication/token/bundle verification. V1 events and receipts are unchanged; .io remains untouched.",
-      "sources": [
-        "backend/src/restaurant-link.ts",
-        "migrations/20261114010000_restaurant_menu_links.sql",
-        "docs/restaurant-urls.md"
-      ],
-      "next": "Complete pinned reviews, staging migration/deployment and genuine owner publish-to-diner verification. PR163 must display the returned URL; production DNS/hosting remains separate."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "console",
-        "backend",
-        "contracts"
-      ],
-      "summary": "Narrow main release candidate for merged Auth143/146, shell125/139, report reader128 and session/restaurant bridge179. Promote complete merged console sources while retaining live/demo build isolation. Backend promotes authenticated workspace discovery plus the merged half-open report-window correction; deployed main bindings, migrations, extraction and diner sources remain unchanged.",
-      "sources": [
-        "docs/owner-session-workspace.md",
-        "docs/owner-auth.md",
-        "backend/src/owner-workspace.ts",
-        "frontend/console/src/auth/live.tsx"
-      ],
-      "next": "Obtain final exact-commit approval, deploy staging API and console, and record hosted session/CORS evidence on the release PR. Keep menu setup/upload/publication UI integrations and production separate."
-    },
     {
       "date": "2026-11-14",
       "modules": [
@@ -960,6 +978,39 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/provider_budget.py"
       ],
       "next": "After green CI and final approval, hand the exact merge SHA to Teeyansh for extraction-only Worker/container rollout, authenticated non-billable budget probes, then the separately controlled two-attempt FE-06.4 run. Keep deployed API/Pages on ba70ce9."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "backend",
+        "console",
+        "diner",
+        "processing",
+        "delivery"
+      ],
+      "summary": "Single correction preserves authored S10/performance/portion screens, promotes existing #165 artwork plumbing and removes confirmed command authorization duplication. Original token packages and S13 boundary retained; no replacement backend or fixture report activation.",
+      "files": [
+        "docs/screen-preservation-audit.md",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner-dashboard/pages.tsx",
+        "frontend/diner/src/menu/portionPreview.ts",
+        "backend/src/staff-venue.ts"
+      ],
+      "next": "Complete combined checks and pinned reviews; then approve exact main release, apply original staging artwork migration and capture genuine hosted screens/artwork/viewer evidence. Never infer whole-product completion from this bounded correction."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console",
+        "contracts"
+      ],
+      "summary": "Prioritize Harshita #206 at 9a05e13; release reuses its controller, review components, client and editor unchanged, plus existing S05 dependencies. Supersedes the correction branch embedded review; keeps shared performance, existing S13, portal and artwork changes. No new backend endpoint or token definition.",
+      "files": [
+        "docs/screen-preservation-audit.md",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner/review/fromDishDraft.ts"
+      ],
+      "next": "Complete combined regression checks, pinned reviews and exact-commit approvals; then verify the staging release with genuine staff access and screenshots. Do not equate local-only profile state or unavailable extracted-photo verification with a completed flow."
     }
   ]
 }

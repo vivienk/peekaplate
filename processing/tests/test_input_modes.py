@@ -313,6 +313,20 @@ class InputModeTests(unittest.TestCase):
 
 
 class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
+    def test_direct_vision_early_return_writes_review_only_unknown_sidecar(self):
+        from peekaplate_processing.vision_extraction import V4Dish
+        with tempfile.TemporaryDirectory() as folder, \
+             patch('peekaplate_processing.run_pipeline.create_cascading_clients', return_value=[('synthetic', object())]), \
+             patch('peekaplate_processing.run_pipeline._vision_with_retry', return_value=([V4Dish(page_number=1, name='Soup', box=[10,10,100,100])], [])):
+            path=Path(folder)/'menu.pdf'
+            path.write_bytes(make_pdf([{'text':'Soup 8.50 Seasonal vegetables and herbs'}]))
+            report=run_pipeline(path,Path(folder)/'run',input_mode='vision_v4')
+            sidecar=json.loads((Path(folder)/'run/ingredient-review.json').read_text(encoding='utf-8'))
+            self.assertEqual(report.status,'complete',report.errors)
+            self.assertEqual(len(sidecar['assessments']),1)
+            self.assertEqual(sidecar['assessments'][0]['status'],'unknown')
+            self.assertFalse(sidecar['publishable'])
+
     def _image(self, folder):
         path=Path(folder)/"menu.png"
         photo(path,(200,120))

@@ -257,9 +257,6 @@ export function OwnerWorkspace({
                 Refresh access
               </Button>
               {signOut}
-              <small className="owner-workspace-design-note">
-                (Account placement awaiting design review)
-              </small>
             </OwnerAccountMenu>
           </div>
         }
@@ -271,6 +268,7 @@ export function OwnerWorkspace({
   return page === 'performance' && selected.permission === 'owner' ? (
     renderShell(
       <ReportData
+        presentation="performance"
         key={`${owner.id}:${selected.venueId}`}
         source={{ mode: 'live', apiBase, venueId: selected.venueId, getAccessToken }}
         onAccessFailure={accessFailure}

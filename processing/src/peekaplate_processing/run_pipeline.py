@@ -21,6 +21,7 @@ from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.extract_menus import extract_source
 from peekaplate_processing.schemas import DishDraft, DraftEvidence, SourceSpan, MenuExtractionResult, validate_box_evidence
 from peekaplate_processing.storage import save_json
+from peekaplate_processing.ingredient_intelligence import build_review_handoff
 from peekaplate_processing.workflow import INPUT_MODES, page_batches, request_failure, run_menu_graph
 from peekaplate_processing.sources import read_file, detect_kind
 from peekaplate_processing.timing import measure
@@ -375,11 +376,22 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         completed=True
         return report
     finally:
+        ingredient_review = {"status": "not_run"}
+        if completed and report is not None:
+            try:
+                handoff = build_review_handoff(report)
+            except (ExtractionError, ValueError):
+                ingredient_review = {"status": "unavailable", "reason": "unsupported_input"}
+                print("Ingredient review unavailable for this input; extraction retained.", file=sys.stderr, flush=True)
+            else:
+                save_json(handoff.model_dump(mode="json"), directory / "ingredient-review.json")
+                ingredient_review = {"status": "written", "file": "ingredient-review.json"}
         if vision_requested and report is not None and report.source is not None:
             save_json({"schema_version": 1, "source_id": report.source.source_id,
                        "attempts": vision_attempts}, directory / "vision-attempts.json")
         timings["total"]=round(time.perf_counter()-started, 6)
         summary={"schema_version":1, "status":report.status if completed else "failed", "input_mode":input_mode, "acquisition_mode":"images_without_ocr" if input_mode=="image" else "saved_pages" if pages_json is not None else "source", "timings_seconds":timings, "pages":[], "batches":[]}
+        summary["ingredient_review"] = ingredient_review
         if report is not None:
             summary["batches"]=report.configuration.get("llm_batches", [])
             summary["pages"]=[{"page_number":segment.page_number, "method":segment.method, "status":segment.status, "reused":pages_json is not None, "cache_hit":segment.metadata.get("cache_hit") if pages_json is None else None, "timings_seconds":segment.metadata.get("timings_seconds") if pages_json is None else None} for segment in report.segments]
@@ -394,6 +406,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--run-dir", required=True, type=Path)
+    parser.add_argument("--ingredient-icons", action="store_true", help="Write private text-fallback icon proposals after extraction; no generation or approval.")
+    parser.add_argument("--generate-ingredient-icons", action="store_true", help="Generate missing ingredient illustrations with Gemini after extraction; requires GEMINI_API_KEY.")
+    parser.add_argument("--icon-catalogue", type=Path, default=Path("work/ingredient-icons"))
+    parser.add_argument("--max-icon-requests", type=int, default=0, help="Maximum new image requests for this run, 0 to 20.")
+    parser.add_argument("--icon-rights-confirmed", action="store_true")
     parser.add_argument("--input-mode",choices=INPUT_MODES,default="ocr_image",help="Model input: ocr text, ocr_image (default), image (no OCR; private suggestions only), or vision_v4 (vision-model transcription with approximate boxes; falls back to ocr_image).")
     parser.add_argument("--pages-json", type=Path, help="Reuse a saved page report matching --input; no OCR calls.")
     parser.add_argument("--target-pages",type=int,nargs="+",help="Explicitly recover only 1 to 4 saved ready pages; no merging with old drafts or automatic retry.")
@@ -408,6 +425,14 @@ def main(argv=None):
     parser.add_argument("--require-budget-gate", action="store_true", help="Fail closed unless PEEK_BUDGET_URL and PEEK_BUDGET_TOKEN are configured.")
     args = parser.parse_args(argv)
     load_dotenv(override=False, interpolate=False)
+    if args.generate_ingredient_icons:
+        from .ingredient_icon_generation import GeminiImageProvider
+        try:
+            icon_provider = GeminiImageProvider(os.environ.get("GEMINI_API_KEY"))
+            if not args.icon_rights_confirmed or not 0 <= args.max_icon_requests <= 20:
+                raise ValueError("Confirm image rights and request budget")
+        except ValueError:
+            parser.exit(1, "Configure GEMINI_API_KEY, --icon-rights-confirmed and --max-icon-requests (0..20) before extraction.\n")
     recovery={} if args.target_pages is None and args.max_model_requests is None else {
         "target_pages":args.target_pages,"max_model_requests":args.max_model_requests}
     try:
@@ -415,6 +440,26 @@ def main(argv=None):
     except (ExtractionError, OSError) as error:
         parser.exit(1, f"Pipeline failed: {error if isinstance(error, ExtractionError) else 'Unable to write run files.'}\n")
     print(f"Saved {len(report.drafts)} drafts ({report.status}) to {args.run_dir / 'extraction.json'}.")
+    if args.ingredient_icons or args.generate_ingredient_icons:
+        from .ingredient_icons import export_icons
+        try:
+            export_icons(args.run_dir / "extraction.json", args.run_dir / "ingredient-icons.json")
+        except (ValueError, OSError, ExtractionError):
+            parser.exit(1, "Ingredient icons unavailable; original extraction retained.\n")
+    if args.generate_ingredient_icons:
+        from .ingredient_icons import IconStore
+        from .ingredient_icon_generation import generate_missing, export_preview
+        try:
+            store = IconStore(args.icon_catalogue)
+            generation = generate_missing(report, store=store, provider=icon_provider,
+                                          max_requests=args.max_icon_requests,
+                                          rights_confirmed=args.icon_rights_confirmed)
+            export_preview(store, generation, args.run_dir / "ingredient-artwork")
+        except (ValueError, OSError, ExtractionError):
+            parser.exit(1, "Ingredient artwork unavailable; original extraction retained.\n")
+        if any(job["state"] in {"failed", "budget_exhausted"} for job in generation["jobs"]):
+            print("Some illustrations are unavailable; inspect ingredient-artwork/generation-results.json.")
+            return 2
     if args.input_mode=="image":
         print("Image-only results are private unvalidated suggestions in review-suggestions.json; no OCR-grounded candidates were created.")
     for error in report.errors: print(error)

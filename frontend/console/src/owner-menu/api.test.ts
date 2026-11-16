@@ -46,6 +46,27 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('owner menu client', () => {
+  it('verifies a saved dish with caller command identity and rejects a mismatched response', async () => {
+    const command = { commandId: crypto.randomUUID(), expectedVersion: 1, verified: true };
+    const { api, calls } = client([{ status: 200, body: { draft: { id: JOB } } }]);
+    await expect(api.verifyDraft(VENUE, VENUE, command)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+    expect(calls[0]?.url).toContain(`/drafts/${VENUE}/verify`);
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual(command);
+  });
+
+  it('approves only the requested draft photo through the existing authenticated transport', async () => {
+    const { api, calls } = client([{ status: 200, body: { photo: { id: JOB } } }]);
+    const commandId = crypto.randomUUID();
+    await expect(api.approveDraftPhoto(VENUE, VENUE, JOB, { commandId })).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+    expect(calls[0]?.url).toContain(`/drafts/${VENUE}/photos/${JOB}/approve`);
+    expect(header(calls[0], 'Authorization')).toBe('Bearer staff-token');
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({ commandId });
+  });
+
   it('reads private image bytes with staff auth and rejects non-image responses', async () => {
     let type = 'image/png';
     const send = vi.fn<typeof fetch>(

@@ -2772,3 +2772,52 @@ runtime behavior, migration or hosted resource changed during this failure.
 ```json
 {"id":"ERR-20261115-NESTED-SHELL-EXPANSION","status":"resolved","area":"local-verification","cause":"A read-only process inspection embedded in a double-quoted nested PowerShell command expanded its pipeline variable in the outer shell.","prevention":"Use a literal single-quoted command or a script file when passing pipeline variables to nested PowerShell.","sources":["AGENTS.md"],"regression":"The corrected read-only inspection completed successfully; pnpm verify build then passed. No project source or hosted state was affected."}
 ```
+
+```json
+{"id":"ERR-20261115-PRESERVATION-VERIFICATION","status":"resolved","area":"local-verification","cause":"The initial processing command used pytest instead of the repository's unittest runner; the next Windows run omitted UTF-8 and failed Unicode subprocess assertions. The artwork retention test also needed formatting.","prevention":"Use the frozen service environment with python -m unittest and PYTHONUTF8=1 on Windows; format changed tests before the combined gate.","sources":["processing/tests/test_source_entry_recovery.py","backend/src/ingredient-artwork-retention.test.ts"],"regression":"Frozen Python suite passes 573 tests in 46.998s; focused Biome passes. No runtime workaround or dependency change was needed."}
+```
+
+```json
+{"id":"ERR-20261115-AUTHORED-SCREEN-TESTS","status":"resolved","area":"browser-verification","cause":"Concurrent Playwright runs shared the default artifact directory; a retained menu-heading assertion also described the replaced fallback screen rather than authored S10.","prevention":"Use isolated output directories while iterating, run final browser configs sequentially, and check expectations against the imported authored screen.","sources":["tests/e2e/owner-workspace.spec.ts","playwright.portion-published.config.ts"],"regression":"Authored S10 32px title passes; isolated portion and performance browser regressions pass with screenshots. Final combined run is recorded in the correction PR."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T23:34:35.987Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:38:25.709Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:46:24.662Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261115-PRESERVATION-FINAL-GATE","status":"resolved","area":"browser-and-context-verification","cause":"The dedicated production portion spec was discovered by the default browser config without its base URL; simulated time raced asynchronous IndexedDB delivery; the restored performance frame skipped a heading level; and the audit document changed after its context refresh.","prevention":"Keep dedicated specs in their own config; poll observable delivery while advancing the fake clock; retain authored sizing on semantic headings; refresh context last and verify committed blobs.","sources":["playwright.config.ts","tests/e2e/menu-triggers-live.spec.ts","frontend/console/src/owner-dashboard/pages.tsx","frontend/console/src/owner-dashboard/performance.css","tests/e2e/owner-workspace.spec.ts","docs/screen-preservation-audit.md"],"regression":"Tracking file passed 27 repeated cases; workspace passed 43 cases including axe heading-order and 16px styling; dedicated production portion passed 2 cases. Final repository and Linux CI results are recorded on PR #205."}
+```
+
+```json
+{"id":"ERR-20261115-SDK-LOCAL-CONTENTION","status":"observed","area":"local-browser-verification","cause":"An eight-worker run timed out during the existing 360-step SDK retry/withdrawal test before its final assertion. No unexpected delivery assertion failed, but the discarded trace prevents a definitive timing diagnosis.","prevention":"Use bounded browser concurrency and preserve failed traces before another config clears the artifact directory. Do not weaken the withdrawal assertion.","sources":["tests/e2e/posthog-adapter.spec.ts"],"regression":"The unchanged SDK file passed 5/5 with two workers in 18.6s; the withdrawal case passed in 7.9s. This is focused recovery evidence, not an uninterrupted full-suite pass."}
+```
+
+```json
+{"id":"ERR-20261115-PERFORMANCE-HEADING-STYLE","status":"resolved","area":"screen-preservation","cause":"Changing the card heading selector to an ID removed the same authored typography from chart and unavailable-tab h3 headings.","prevention":"Retain shared selectors when adapting semantics; assert both the adapted heading and its unchanged siblings.","sources":["frontend/console/src/owner-dashboard/performance.css","tests/e2e/owner-workspace.spec.ts"],"regression":"New chart-heading assertion fails at 18.72px without the restored selector. Both performance/accessibility cases pass with the original 16px styling in 4.5s."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:54:00.059Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T00:46:28.817Z","exitCode":2}
+```
+
+```json
+{"id":"ERR-20261115-REVIEW-RELEASE-DEPENDENCY","status":"resolved","area":"narrow-release-composition","cause":"Promoting the authored review controller from develop omitted its existing RestaurantDetails and details imports; typechecking and the first browser startup exposed the missing dependency.","prevention":"Trace transitive imports when promoting a frontend slice to main; complete typechecking before starting dependent browser tests. Reuse the authored dependency rather than create a substitute.","sources":["frontend/console/src/owner/OwnerMenuWorkspace.tsx","frontend/console/src/onboarding/RestaurantDetails.tsx","frontend/console/src/onboarding/details.ts","frontend/console/src/onboarding/details.test.tsx"],"regression":"Original S05 source and tests promoted unchanged. pnpm check passes; workspace 45 cases and review preview 9 cases pass. No profile-save API or hosted acceptance is claimed."}
+```

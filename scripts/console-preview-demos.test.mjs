@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 // The synthetic console demos are built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS), never for
 // staging or production. Agreed with Sai and Jeffin.
 const DEMOS = [
+  { page: 'review-dishes.html', asset: /reviewDishes|menuReviewDemo/, label: /Synthetic demo/ },
   {
     page: 'first-dashboard.html',
     asset: /firstDashboard/,

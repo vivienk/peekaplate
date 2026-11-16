@@ -50,6 +50,26 @@ class FakeLLM:
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_valid_long_ingredient_preserves_extraction_when_sidecar_is_out_of_bounds(self):
+        phrase = 'x' * 257
+        class LongIngredient(FakeLLM):
+            def invoke(self, messages):
+                answer = super().invoke(messages)
+                answer['parsed'].dishes[0].ingredients = [phrase]
+                answer['raw'].content = answer['parsed'].model_dump_json()
+                return answer
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'menu.pdf'
+            # Fit the complete phrase inside the page, rather than testing clipped text.
+            path.write_bytes(make_pdf([{'text': 'Dish 1 8.50 CAD Ingredients: ' + phrase}]).replace(b'/F1 12 Tf', b'/F1  2 Tf'))
+            folder = Path(directory) / 'run'
+            report = run_pipeline(path, folder, llm=LongIngredient(), input_mode='ocr')
+            self.assertEqual(report.status, 'complete', report.errors)
+            self.assertEqual(report.drafts[0].ingredients, [phrase])
+            self.assertEqual(json.loads((folder/'extraction.json').read_text())['status'], 'complete')
+            self.assertFalse((folder/'ingredient-review.json').exists())
+            self.assertEqual(json.loads((folder/'timings.json').read_text())['ingredient_review']['status'], 'unavailable')
+
     def run_case(self, directory, count, llm):
         path = Path(directory)/"menu.pdf"
         path.write_bytes(make_pdf([{"text":f"Menu prices\nDish {i} 8.50 CAD"} for i in range(1, count+1)]))
@@ -64,6 +84,11 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(len(report.drafts), 35)
             self.assertTrue((Path(directory)/"run/pages.json").exists())
             self.assertFalse((Path(directory)/"run/review.json").exists())
+            from peekaplate_processing.ingredient_intelligence import IngredientReviewHandoff
+            handoff = IngredientReviewHandoff.model_validate_json((Path(directory)/"run/ingredient-review.json").read_text())
+            self.assertEqual(len(handoff.assessments), 35)
+            self.assertTrue(all(a.status == "unknown" and not a.publishable for a in handoff.assessments))
+            self.assertEqual([a.draft_id for a in handoff.assessments], [e.draft_id for e in report.evidence])
             for index, evidence in enumerate(report.evidence):
                 span = evidence.spans[0]; segment = report.segments[index]
                 self.assertEqual(segment.segment_id, span.segment_id)

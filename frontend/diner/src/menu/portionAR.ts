@@ -7,7 +7,7 @@ export function portionWorldWidth(size?: PublicPortion['physical_size']) {
   return size ? size.plate.width_mm / 1000 / size.plate.boundary.width : 0.3;
 }
 
-// Local review only. The caller imports this module behind the explicit DEV fixture gate.
+// Loaded on deliberate camera entry; local review fixtures also offer the portal automatically.
 export function bindPortionAR(
   controls: HTMLElement,
   source: () => HTMLImageElement | null,
@@ -16,8 +16,9 @@ export function bindPortionAR(
   orientation?: { request: () => void; release: () => void },
   physicalSize?: PublicPortion['physical_size'],
   originalSource?: () => HTMLImageElement | null,
+  entry?: HTMLButtonElement,
 ) {
-  const open = document.createElement('button');
+  const open = entry ?? document.createElement('button');
   open.type = 'button';
   open.textContent = 'View on your table';
   controls.append(open);

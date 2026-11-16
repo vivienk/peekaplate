@@ -5,6 +5,7 @@
 @import "@peekaplate/ui/components.css";
 
 @import "./dish-presentation.css";
+@import "./performance.css";
 :root {
   --bg: var(--pp-role-surface);
   --panel: var(--pp-color-orange-100);
@@ -82,14 +83,6 @@ button {
   outline-offset: 3px;
   border-radius: 12px;
 }
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
 h1,
 h2,
 h3,
@@ -116,24 +109,6 @@ h2 {
 h3 {
   font-size: 18px;
   line-height: 1.25;
-}
-.eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
-}
-.num {
-  font-variant-numeric: tabular-nums;
-}
-.muted {
-  color: var(--muted);
-}
-.lede {
-  color: var(--muted);
-  max-width: 62ch;
-  font-size: 17px;
 }
 
 /* shell */
@@ -304,33 +279,6 @@ h3 {
   color: var(--muted);
   white-space: nowrap;
 }
-
-.card {
-  background: var(--glass);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  border: 1px solid var(--glass-b);
-  border-radius: 24px;
-  padding: 22px;
-  box-shadow: var(--shadow);
-  min-width: 0;
-}
-.card.flat {
-  box-shadow: none;
-}
-.card-h {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-.card-h .sub {
-  color: var(--muted);
-  font-size: 14px;
-  margin-top: 2px;
-}
 .grid {
   display: grid;
   gap: 20px;
@@ -343,23 +291,6 @@ h3 {
 }
 .g-main {
   grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-}
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.pagehead {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 24px;
 }
 
 /* data labels */
@@ -576,75 +507,6 @@ button.drow:hover {
   color: var(--muted);
   font-size: 13px;
 }
-
-/* bars */
-.hb {
-  display: grid;
-  gap: 11px;
-}
-.hb-row {
-  display: grid;
-  grid-template-columns: minmax(112px, 176px) minmax(0, 1fr) 64px;
-  gap: 12px;
-  align-items: center;
-  font-size: 14.5px;
-}
-.hb-row .nm {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  line-height: 1.25;
-  font-weight: 500;
-}
-.hb-row .nm small {
-  display: block;
-  color: var(--muted);
-  font-size: 12.5px;
-  font-weight: 400;
-}
-.hb-btn {
-  background: none;
-  border: 0;
-  padding: 4px 0;
-  text-align: left;
-  width: 100%;
-  color: inherit;
-  border-radius: 12px;
-  cursor: pointer;
-}
-.hb-btn:hover {
-  background: color-mix(in srgb, var(--pp-color-orange-100) 60%, transparent);
-}
-.hb-track {
-  height: 16px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--pp-color-gray-900) 7%, transparent);
-  display: flex;
-  gap: 2px;
-  overflow: hidden;
-}
-.hb-seg {
-  height: 100%;
-  border-radius: 0 4px 4px 0;
-  min-width: 2px;
-  transition: width 0.5s ease;
-}
-.hb-val {
-  text-align: right;
-  font-weight: 700;
-}
-.hb-row.nodata .hb-track {
-  background-image: repeating-linear-gradient(
-    135deg,
-    transparent 0 6px,
-    color-mix(in srgb, var(--pp-color-gray-900) 12%, transparent) 6px 8px
-  );
-}
-.hb-row.nodata .hb-val {
-  color: var(--unk);
-  font-weight: 500;
-  font-size: 12.5px;
-  line-height: 1.2;
-}
 .legend {
   display: flex;
   gap: 16px;
@@ -700,52 +562,6 @@ button.drow:hover {
 .chartbox {
   position: relative;
 }
-.tbl {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14.5px;
-}
-.tbl th {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
-}
-.tbl td {
-  padding: 10px;
-  border-bottom: 1px solid var(--line);
-  vertical-align: middle;
-}
-.tbl tr:last-child td {
-  border-bottom: 0;
-}
-.tbl .r {
-  text-align: right;
-}
-.tbl tbody tr.click {
-  cursor: pointer;
-}
-.tbl tbody tr.click:hover td {
-  background: color-mix(in srgb, var(--pp-color-orange-100) 55%, transparent);
-}
-.tbl th button {
-  all: unset;
-  cursor: pointer;
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-}
-.tbl th button:focus-visible {
-  outline: 2px solid var(--ink);
-}
-.scrollx {
-  overflow-x: auto;
-}
 .seg {
   display: inline-flex;
   background: color-mix(in srgb, var(--pp-color-gray-900) 7%, transparent);
@@ -765,33 +581,6 @@ button.drow:hover {
 }
 .seg button[aria-pressed="true"] {
   background: var(--ink);
-  color: var(--pp-color-white);
-}
-.tabs {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-.tabs button {
-  flex: none;
-  border: 1.5px solid var(--line);
-  background: color-mix(in srgb, var(--pp-color-white) 85%, transparent);
-  border-radius: 99px;
-  padding: 9px 20px;
-  font-weight: 500;
-  font-size: 15px;
-  min-height: 44px;
-  transition:
-    background 0.2s,
-    border-color 0.2s;
-}
-.tabs button:hover {
-  border-color: var(--ink);
-}
-.tabs button[aria-pressed="true"] {
-  background: var(--ink);
-  border-color: var(--ink);
   color: var(--pp-color-white);
 }
 
@@ -851,38 +640,6 @@ button.drow:hover {
 }
 article.insight {
   scroll-margin-top: 16px;
-}
-/* notices */
-.note {
-  display: flex;
-  gap: 11px;
-  padding: 14px 16px;
-  border-radius: 20px;
-  background: var(--panel);
-  font-size: 14.5px;
-  color: var(--ink2);
-  align-items: flex-start;
-}
-.note.warn,
-.note.coral {
-  background: var(--coral-soft);
-  color: var(--coral-ink);
-}
-.note.good {
-  background: var(--good-soft);
-  color: var(--good);
-}
-.note .ic {
-  flex: none;
-  margin-top: 2px;
-}
-.empty {
-  border: 1.5px dashed var(--line2);
-  border-radius: 22px;
-  padding: 22px;
-  text-align: center;
-  color: var(--ink2);
-  background: color-mix(in srgb, var(--pp-color-white) 40%, transparent);
 }
 
 /* report / insights */
@@ -1733,9 +1490,6 @@ article.insight {
   .drow > .hidem {
     display: none;
   }
-  .hb-row {
-    grid-template-columns: minmax(90px, 120px) minmax(0, 1fr) 54px;
-  }
   .hero {
     border-radius: 28px;
   }
@@ -1787,16 +1541,6 @@ h3 {
 p {
   line-height: 1.45;
 }
-.lede {
-  font-size: 14.5px;
-  line-height: 1.45;
-  max-width: 58ch;
-}
-.eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  font-weight: 600;
-}
 .brand b {
   font-size: 21px;
 }
@@ -1833,9 +1577,6 @@ p {
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 3px 9px;
-}
-.card-h .sub {
-  font-size: 13px;
 }
 .kpi .v {
   font-family: var(--sans);
@@ -1889,23 +1630,6 @@ p {
   padding: 8px 14px;
   min-height: 36px;
 }
-.note {
-  font-size: 14px;
-}
-.tbl {
-  font-size: 14px;
-}
-.tbl th {
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-}
-.hb-row {
-  font-size: 14px;
-}
-.hb-row .nm small {
-  font-size: 12px;
-}
 .dn small {
   font-size: 12.5px;
 }
@@ -1918,11 +1642,6 @@ p {
 .dcard h3 {
   font-family: var(--sans);
   font-size: 16px;
-}
-.tabs button {
-  font-size: 14px;
-  min-height: 40px;
-  padding: 8px 18px;
 }
 .seg button {
   font-size: 13.5px;
@@ -1999,9 +1718,6 @@ p {
 .rpt-title h1 {
   margin-top: 4px;
 }
-.card h2 {
-  font-size: 17px;
-}
 .rpt-sum {
   margin-top: 12px;
   max-width: 68ch;
@@ -2041,9 +1757,6 @@ p {
 .rpt-tbl td:last-child,
 .rpt-tbl th:last-child {
   padding-right: 4px;
-}
-.tbl .r {
-  text-align: right;
 }
 .rpt-note {
   margin-top: 14px;
@@ -2151,17 +1864,6 @@ h3 {
 }
 .nav button[aria-current="page"] {
   font-weight: 600;
-}
-.tbl {
-  font-size: 14px;
-  color: var(--pp-color-gray-900);
-}
-.tbl th {
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--muted);
 }
 .rpt-title .eyebrow {
   font-size: 13px;
@@ -2393,101 +2095,8 @@ h3 {
   font-weight: 500;
   color: var(--muted);
 }
-
-/* dish search + scalable table */
-.dsearch {
-  position: relative;
-  display: flex;
-  align-items: center;
-  min-width: 240px;
-  flex: 0 1 300px;
-}
-.dsearch > .ic {
-  position: absolute;
-  left: 14px;
-  color: var(--muted);
-  pointer-events: none;
-}
-.dsearch input {
-  width: 100%;
-  min-height: 42px;
-  border: 1px solid var(--line2);
-  background: var(--pp-color-white);
-  border-radius: 99px;
-  padding: 9px 40px 9px 38px;
-  font: inherit;
-  font-size: 14px;
-  color: var(--pp-color-gray-900);
-}
-.dsearch input::-webkit-search-cancel-button {
-  display: none;
-}
-.dsearch input:focus-visible {
-  outline: 3px solid var(--ink);
-  outline-offset: 2px;
-}
-.dclear {
-  all: unset;
-  position: absolute;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: var(--muted);
-}
-.dclear:hover {
-  background: color-mix(in srgb, var(--pp-color-black) 6%, transparent);
-  color: var(--ink);
-}
-.dclear:focus-visible {
-  outline: 2px solid var(--ink);
-}
-.dtable {
-  max-height: min(560px, 62vh);
-  overflow: auto;
-}
-.dtable .tbl thead th {
-  position: sticky;
-  top: 0;
-  background: var(--surface, var(--pp-color-orange-50));
-  z-index: 1;
-}
-.dtable .tbl td,
-.dtable .tbl th {
-  padding: 10px 6px;
-}
-.dtable .tbl td:first-child .row {
-  gap: 4px;
-}
-.dtable .tbl td svg {
-  width: 64px;
-  height: auto;
-}
-.dtable .tbl th,
-.dtable .tbl th button {
-  white-space: normal;
-}
-.dtable .tbl td.r {
-  white-space: nowrap;
-}
-/* tabs and segmented controls: slightly smaller text */
-.tabs button {
-  font-size: 13px;
-}
 .seg button {
   font-size: 12.5px;
-}
-.ctlrow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.ctlrow .dsearch {
-  flex: 0 1 360px;
 }
 /* chatbot: smaller text */
 .chatbox.ai .aih-top h3 {
@@ -2556,24 +2165,6 @@ h1 {
 }
 /* Icons: Rania's Figma SVG files drawn as a mask in the current text colour (see ui.tsx). No
    fill behind icons (design review 04). */
-.ic {
-  display: inline-block;
-  flex: none;
-  background-color: currentColor;
-  -webkit-mask: var(--ic) center / contain no-repeat;
-  mask: var(--ic) center / contain no-repeat;
-}
-.note > .ic {
-  color: var(--pp-color-orange-700);
-  margin-top: 1px;
-}
-.note.good > .ic {
-  color: var(--pp-color-success-700);
-}
-.note.warn > .ic,
-.note.coral > .ic {
-  color: var(--coral-ink);
-}
 .rpt-act h2 .ic {
   color: var(--pp-color-orange-700);
   margin-right: 2px;
@@ -2692,16 +2283,6 @@ h1 {
 }
 .back-link {
   justify-self: start;
-}
-/* Dish names in the Dish performance table wrap so every column still fits at 1440px. */
-.dtable .tbl td:first-child .ob {
-  min-width: 8em;
-  font-size: 14px;
-  line-height: 20px;
-  color: var(--pp-color-gray-900);
-}
-.dtable .tbl td:first-child .row {
-  gap: 4px;
 }
 .sq-head .ob--text.pp-button {
   font-size: 12px;
