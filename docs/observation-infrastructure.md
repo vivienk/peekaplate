@@ -314,29 +314,35 @@ in the shared run. See the [staging release approval][data01-staging-approval],
 [REL-02][data01-rel02], and the [DATA-12 evidence task][data01-data12].
 
 The staging operator reported PostHog enabled through #211 and #212 and
-verified 13 durable canonical browser facts. The PostHog export contains 30
-staging observations with distinct event IDs: 9 menu views, 13 dish views,
-4 dish-detail opens and 4 activity checkpoints. Its event timestamps span
-06:28:57.929–06:30:27.409 UTC. These timestamps describe only the exported
-events. The operator's actual run start and end remain pending. A separate,
-labelled synthetic report check used 90 events and covered the 9/10/11-session
-suppression boundaries. The Queue was re-paused after the run. Matching
-individual events, receipts, archive records and report outcomes remains
+re-paused the Queue after collection. The PostHog export contains 30 distinct
+event IDs from 06:28:57.929–06:30:27.409 UTC. These are event timestamps. The
+operator's actual start and end and the next authorized retest window remain
 pending.
+
+The redacted operator packet lists 39 browser event IDs. Its canonical snapshot
+was taken at 06:32:06.255 UTC. An exact `event_id` join with the PostHog export
+verified 11 events with a canonical index entry, a typed fact, and matching R2
+archive checksum and metadata. They comprise 3 menu views, 3 dish views, 3 dish
+detail opens and 2 activity checkpoints. Seven of the 11 also have an accepted
+receipt. Of the other 19 export IDs, 18 occur in the browser packet without a
+durable match in that snapshot and 1 has no browser entry. Two additional
+durable browser events have no match in the PostHog export. The available
+files leave these matches unresolved. The separate 90-event synthetic report
+fixture has its own provenance and is excluded from all browser join counts.
 
 | Case | Evidence available for this run | Disposition |
 | --- | --- | --- |
 | D01-01 | Pre-consent and privacy-signal cases lack attributed observations. | Pending case evidence |
 | D01-02 | Fixture-mode silence lacks attributed network and outbox evidence. | Pending case evidence |
-| D01-03 | PostHog export confirms 30 stored staging observations across four event types. The operator reported 13 durable browser facts. The selected control and its event ID, receipt, archive and fact remain to be matched. | Partial evidence; pending reconciliation |
+| D01-03 | 11 exact PostHog-to-canonical matches across four event types, including 7 with accepted receipts. The selected control still needs a case-level evidence mapping. | Partial browser reconciliation |
 | D01-04 | The isolated PostHog failure and canonical delivery need a matched case record. | Pending case evidence |
 | D01-05 | The canonical retry sequence and PostHog logical capture count need a matched case record. | Pending case evidence |
 | D01-06 | Offline, reload and recovery need a matched case record. | Pending case evidence |
 | D01-07 | Mixed and uncertain receipts need a matched batch and outbox record. | Pending case evidence |
 | D01-08 | Withdrawal and re-opt-in need a matched send, retry and persistence record. | Pending case evidence |
 | D01-09 | Publication and token checks are pending. | Pending token and publication evidence |
-| D01-10 | Save, Unsave and Undo need case evidence for each agreed storage mode. | Pending case evidence |
-| D01-11 | The 30 exported PostHog observations carry distinct event IDs. Identical retries and conflicting reuse need evidence joined by event ID across the receipt, archive, index and facts. | Pending reconciliation |
+| D01-10 | The Save retest completed at 06:41:35.557 UTC and yielded 7 accepted per-event receipts. The canonical snapshot predates the retest. Later index, archive and fact evidence is pending for those IDs. Save, Unsave and Undo still need evidence for each agreed storage mode. | Save retest pending canonical evidence |
+| D01-11 | The packet records a retry on one of the 11 exact matches. Identical replay and conflicting reuse still need case-level evidence across the receipt, archive, index and fact. | Pending case evidence |
 | D01-12 | The separately labelled synthetic path covered the 9/10/11-session boundaries. Authorized owner, cross-tenant and revoked access, exact reporting window, and reconciliation to this run's canonical facts are pending. | Partial synthetic report evidence |
 
 Zhiliang owns DATA-01 reconciliation. Link the DATA-12 ledger under this
