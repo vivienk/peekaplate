@@ -141,3 +141,15 @@ photo attachment and serving-size persistence lack the needed connection;
 review confirmations are not a persisted verification decision. Complete
 verification is local UI state, not approval or publication. A real hosted
 end-to-end acceptance run remains separate from synthetic browser coverage.
+
+
+Local evidence for this follow-up: `TMPDIR=/private/tmp pnpm check` passed
+1,892 unit tests (five existing skips), 107 script checks, lint/types/context/docs;
+`pnpm verify build` passed. After the retry review correction,
+`pnpm verify lint typecheck context:check docs:check` and
+`pnpm exec playwright test --config playwright.workspace.config.ts --workers=4`
+passed (44 browser cases). Independent architecture/correctness review covered
+runtime head `6d48a7f9`; the manual-retry finding was resolved. Browser evidence
+uses synthetic HTTP, including original-byte upload, empty/failed/partial results,
+S05-to-correction flow and explicit same-job retries. Full cross-app browser,
+Docker database and hosted/provider acceptance were not run for this slice.

@@ -366,7 +366,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "4d94fee3612e0639599ff30810d947f0c45099ab6a8985834cd156bd6c9128d9"
+      "sourceFingerprint": "8a5d2bc3a183f1f69a113a88602c704998ef9084c7a5b2bd736cb055d39e784c"
     },
     {
       "id": "backend",
@@ -1039,14 +1039,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "Stacked on PR206: reused owner-menu client and job-state helper for selected-import processing outcomes, sequential status/draft reads and same-job explicit retries. Added synthetic OCR intake-to-review/correction coverage; no backend or hosted controls changed.",
+      "summary": "Stacked on PR206: reused owner-menu client and job-state helper for selected-import processing outcomes, sequential status/draft reads and same-job explicit retries. Checks passed: 1,892 unit tests, 107 scripts, build and 44 synthetic workspace browser cases. Independent review corrected retry visibility; no backend or hosted controls changed.",
       "files": [
         "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
         "frontend/console/src/owner-menu/jobs.ts",
         "tests/e2e/owner-workspace.spec.ts",
         "docs/owner-onboarding-wiring.md"
       ],
-      "next": "Complete local checks and independent review; merge dependencies and verify paired staging extraction release before hosted acceptance."
+      "next": "Merge PR163/PR206 dependencies, retarget, and verify paired staging extraction release before hosted acceptance."
     }
   ]
 }
