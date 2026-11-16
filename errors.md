@@ -4459,3 +4459,13 @@ The empty focused search kept its dark-surface placeholder colour on a light sur
 ## PR162 portable browser artifacts — November 15, 2026
 
 CI run `43757839050` passed application/Python/build/database checks but three landscape cases failed with ENOENT writing screenshots under `/private/tmp`. The local machine already had that directory, masking the portability issue. Landscape and opt-in upload captures now use `testInfo.outputPath` so each test gets a runner-owned artifact directory. The three affected cases pass in 13.1s without changing their assertions or application code. PR documentation also failed because the required contract labels were missing; the description was corrected without weakening its check.
+# ERR-20261115-DATA01-CORS — routing diner observation preflight
+
+Hosted preflight from the configured routing-staging diner returned 204 without
+Access-Control-Allow-Origin. Public-menu reads allowed that origin but observation
+writes used the older fixed list, preventing browser delivery before token checks.
+The regression in backend/src/index.test.ts failed with null instead of the exact
+origin, then passed after both paths reused the existing staging-only rule.
+Production/unconfigured/lookalike origins and missing-token denial are covered.
+Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
+

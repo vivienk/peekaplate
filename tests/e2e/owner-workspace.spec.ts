@@ -632,6 +632,9 @@ for (const width of [1440, 390]) {
     await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
     await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Synthetic Garden Soup' })).toBeVisible();
+    await expect(
+      page.getByText('Fictional soup used only for testing.', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText('CA$8.50')).toBeVisible();
     await page.getByText('Ingredients and allergens', { exact: true }).click();
     await expect(page.getByText('Allergen information not provided.')).toBeVisible();

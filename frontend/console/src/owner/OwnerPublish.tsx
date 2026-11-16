@@ -288,6 +288,7 @@ function DraftMenu({ preview }: { preview: PreparedMenuPreview }) {
                           currency: dish.price.currency,
                         }).format(Number(dish.price.amount))}
                       </p>
+                      {dish.description && <p>{dish.description}</p>}
                       <details>
                         <summary>Ingredients and allergens</summary>
                         <p>
