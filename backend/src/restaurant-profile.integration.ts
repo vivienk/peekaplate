@@ -110,11 +110,15 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Restaurant profile persistence and au
       sourceHash: createHash('sha256').update(bytes).digest('hex'),
       idempotencyKey: crypto.randomUUID(),
     };
-    const put = vi.fn(async () => {});
-    const photo = await storeRestaurantPhoto(runtime, actor, venue, upload, 'image/png', put);
-    expect(await storeRestaurantPhoto(runtime, actor, venue, upload, 'image/png', put)).toEqual(
-      photo,
-    );
+    let stored: ArrayBuffer | null = null;
+    const put = vi.fn(async (_key: string, value: ArrayBuffer) => {
+      stored = value;
+    });
+    const read = async () => stored;
+    const photo = await storeRestaurantPhoto(runtime, actor, venue, upload, 'image/png', put, read);
+    expect(
+      await storeRestaurantPhoto(runtime, actor, venue, upload, 'image/png', put, read),
+    ).toEqual(photo);
     expect(put).toHaveBeenCalledTimes(1);
     const changed = Uint8Array.from([...bytes, 3]);
     await expect(
@@ -166,6 +170,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Restaurant profile persistence and au
       },
     };
     const origin = 'https://api.example.test';
+    const uploadKey = crypto.randomUUID();
     const uploaded = await app.request(
       `${origin}/venues/${venue}/profile/photos`,
       {
@@ -173,7 +178,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Restaurant profile persistence and au
         headers: {
           Authorization: 'Bearer synthetic',
           'Content-Type': 'image/png',
-          'Idempotency-Key': crypto.randomUUID(),
+          'Idempotency-Key': uploadKey,
         },
         body: bytes,
       },
@@ -213,6 +218,32 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Restaurant profile persistence and au
     expect(JSON.stringify(exported.restaurant)).not.toContain(fields.street);
     expect(JSON.stringify(exported.restaurant)).not.toContain(fields.phone);
     expect(JSON.stringify(exported.restaurant)).not.toContain(fields.email);
+    for (const key of [uploadKey, crypto.randomUUID()]) {
+      objects.clear();
+      const repaired = await app.request(
+        `${origin}/venues/${venue}/profile/photos`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer synthetic',
+            'Content-Type': 'image/png',
+            'Idempotency-Key': key,
+          },
+          body: bytes,
+        },
+        env,
+      );
+      expect(repaired.status).toBe(201);
+      expect(await repaired.json()).toEqual(photo);
+      const recovered = await loadOwnerRestaurant(
+        origin,
+        'synthetic',
+        venue,
+        'https://assets.example.test',
+        ((url, init) => app.request(String(url), init, env)) as typeof fetch,
+      );
+      expect(recovered.logoFile?.bytes).toEqual(Uint8Array.from(bytes));
+    }
     const events = await admin.query(
       "SELECT version,schema_version,event_type,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_type='restaurant_profile' ORDER BY version",
       [venue],

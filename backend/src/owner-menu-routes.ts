@@ -112,8 +112,17 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     const upload = await readMenuUpload(c.req.raw);
     return c.json(
       await services.database(c.env, (client) =>
-        storeRestaurantPhoto(client, actor, venue, upload, type, (key, bytes) =>
-          bucket.put(key, bytes),
+        storeRestaurantPhoto(
+          client,
+          actor,
+          venue,
+          upload,
+          type,
+          (key, bytes) => bucket.put(key, bytes),
+          async (key) => {
+            const object = await bucket.get(key);
+            return object ? object.arrayBuffer() : null;
+          },
         ),
       ),
       201,

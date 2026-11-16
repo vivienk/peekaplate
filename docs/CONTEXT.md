@@ -271,7 +271,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a112cc9352941a16dcbdce7c7f6790042c86006cd189136c0d45646c0260708d"
+      "sourceFingerprint": "7f194002a016437cdb7e3d63c460232ffe10705fab5953686d883965e4a9af7b"
     },
     {
       "id": "console",
@@ -597,6 +597,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.workerd-harness.ts",
         "backend/src/restaurant-profile.ts",
         "backend/src/restaurant-profile.test.ts",
+        "backend/src/restaurant-profile.integration.ts",
+        "backend/src/bundle-producer/logo-image.ts",
+        "backend/src/bundle-producer/logo-image.test.ts",
         "backend/src/bundle-producer/restaurant.ts",
         "backend/src/bundle-producer/restaurant.test.ts",
         "migrations/20261116020000_owner_flow_profile.sql",
@@ -613,7 +616,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "6a5ff7eb09eb6aa65096b228bf8779fe372c9f05a43972ef89cdc549a11f5c5e"
+      "sourceFingerprint": "10775cd122bbfaf22704d740db24fa168fa514cba33e04dfefcd5c8719a45207"
     },
     {
       "id": "database",
