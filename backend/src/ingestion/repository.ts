@@ -1,4 +1,5 @@
 import type { StructuredDishDraft } from '@peekaplate/contracts';
+import { placeholderLabels, recordArtworkPlaceholders } from '../ingredient-artwork-placeholders';
 
 export type DatabaseClient = {
   query<R = Record<string, unknown>>(
@@ -309,7 +310,7 @@ export async function persistExtractedDrafts(
     resultStorageKey?: string | null | undefined;
     leaseTimeoutMinutes?: number | undefined;
   },
-): Promise<{ persistedCount: number; supersededCount: number }> {
+): Promise<{ persistedCount: number; supersededCount: number; placeholderCount: number }> {
   const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
   const targetStatus = params.status ?? 'complete';
 
@@ -419,6 +420,14 @@ export async function persistExtractedDrafts(
     );
     const supersededCount = supersedeResult.rowCount ?? 0;
 
+    // 4b. Record an artwork placeholder for each new ingredient label, in the same transaction,
+    // so a failed save leaves none behind. Placeholders approve nothing and change no draft.
+    const placeholderCount = await recordArtworkPlaceholders(client, {
+      tenantId: params.tenantId,
+      jobId: params.jobId,
+      labels: placeholderLabels(params.drafts),
+    });
+
     // 5. Finalize job status and release lease
     const completionResult = await client.query(
       `UPDATE app_private.menu_ingestion_jobs
@@ -451,7 +460,7 @@ export async function persistExtractedDrafts(
     }
 
     await client.query('COMMIT;');
-    return { persistedCount, supersededCount };
+    return { persistedCount, supersededCount, placeholderCount };
   } catch (error) {
     try {
       await client.query('ROLLBACK;');

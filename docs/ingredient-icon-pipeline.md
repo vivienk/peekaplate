@@ -136,6 +136,31 @@ plural/seed aliases. Other explicit ingredient phrases now receive deterministic
 artwork identities without adding food-classification rules. Chicken is not mapped to grilled chicken,
 rice is not mapped to sushi rice, and egg is not mapped to poached egg.
 
+## Ingredient placeholders from the OCR pipeline
+
+When the OCR pipeline saves a menu's drafts (`persistExtractedDrafts`), every
+ingredient label it found is recorded once per venue in
+`app_private.ingredient_artwork_placeholder` (migration
+`20261116010000_ingredient_artwork_placeholders.sql`), in the same transaction as
+the drafts, so a failed save leaves none behind. Labels use the artwork label
+rules (`artworkLabel` + `ArtworkLabelSchema`); names they cannot express, such as
+ones with digits, are skipped, and one job records at most 500 labels. A repeated
+label keeps the first job that saw it.
+
+A placeholder carries no image and approves nothing: it is a separate table, so
+the event-sourced `ingredient_artwork_current` review flow, its versions and the
+diner are unchanged. The diner keeps its fallback (bundled Figma icon or the
+ingredient name) until a person approves artwork. Runtime may only read and
+insert placeholders (no update or delete), under forced tenant RLS.
+
+`GET /venues/:venueId/ingredient-icons/pending` (signed-in staff of that venue,
+`INGREDIENT_ARTWORK_ENABLED=true`, `no-store`) lists labels with no approved
+artwork: never approved or revoked. It is the to-do list for artwork generation
+and review; it does not start generation. Tests:
+`backend/src/ingredient-artwork-placeholders.test.ts`,
+`backend/src/ingredient-artwork-placeholders.integration.ts` and
+`tests/db/artwork_placeholders.sql`.
+
 ## Implemented local slice
 
 `ingredient_icons.py` provides a private post-processing API and CLI. It validates
