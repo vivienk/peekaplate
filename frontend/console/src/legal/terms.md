@@ -1,8 +1,8 @@
-# Terms and Conditions
+# Terms of Service
 
 *PeekaPlate for restaurant owners*
 
-These are the rules for using PeekaPlate as a restaurant owner. Our **Privacy Policy** explains what happens to your data. You agree to both when you create an account.
+These are the rules for using PeekaPlate as a restaurant owner. Our Privacy Policy explains what happens to your data. You agree to both when you create an account.
 
 **Last updated:** November 14, 2026
 
@@ -54,7 +54,7 @@ PeekaPlate is a **pilot**. We may limit it to selected restaurants.
 
 ## Order files
 
-Uploading order files is covered by the **Pilot Order-Outcome Data Agreement**. You accept that agreement in the console first. Uploads are blocked until you do.
+Uploading order files is covered by the Pilot Order-Outcome Data Agreement. You accept that agreement in the console first. Uploads are blocked until you do.
 
 - Upload only the approved columns.
 - **Never include diner personal data,** such as names, emails, phone numbers, addresses, payment details, or loyalty IDs. Files with extra columns are rejected.
@@ -103,7 +103,7 @@ We may remove content or suspend access that breaks these rules or puts others a
 
 ## Deleting your data and closing your account
 
-- **Order data:** ask us at [contact email] or in the console. We confirm receipt within **5 business days** and delete live data within **30 days**. One named person runs the deletion and a second person checks it.
+- **Order data:** ask us at hello@peekaplate.io or in the console. We confirm receipt within **5 business days** and delete live data within **30 days**. One named person runs the deletion and a second person checks it.
 - **Diner activity data for your restaurant:** ask us, and we delete it by restaurant or by time window.
 - **Honest limits on deleting:**
   - Our database backups cannot be edited for one restaurant. Backup copies expire on the provider's normal schedule.
@@ -127,7 +127,7 @@ We may remove content or suspend access that breaks these rules or puts others a
 
 ## Questions
 
-**Email:** [contact email]
+**Email:** hello@peekaplate.io
 **Mail:** PeekaPlate, [mailing address]
 
 If you are not happy with how we handled something, write to us and we will respond within 10 business days.

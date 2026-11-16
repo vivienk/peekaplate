@@ -66,7 +66,7 @@ describe('LegalBody', () => {
 
 describe('owner legal documents', () => {
   it('loads both documents with their titles and sections', () => {
-    expect(LEGAL_DOCUMENTS.terms.title).toBe('Terms and Conditions');
+    expect(LEGAL_DOCUMENTS.terms.title).toBe('Terms of Service');
     expect(LEGAL_DOCUMENTS.privacy.title).toBe('Privacy Policy');
     const headings = (id: 'terms' | 'privacy') =>
       LEGAL_DOCUMENTS[id].blocks.flatMap((block) => (block.kind === 'heading' ? [block.text] : []));

@@ -130,12 +130,16 @@ test('Terms of Service and Privacy Policy open their documents in pop-ups', asyn
   // server and none goes to PostHog (Sai, 15 Nov).
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
-  const terms = page.getByRole('checkbox', { name: /I agree to the Terms of Service/ });
+  // The checkbox is announced with the whole sentence, link names included (Rania, 16 Nov).
+  const terms = page.getByRole('checkbox', {
+    name: 'I agree to the Terms of Service and Privacy Policy, and confirm I’m authorized to manage this restaurant.',
+    exact: true,
+  });
   const termsLink = page.getByRole('button', { name: 'Terms of Service' });
 
   // Opening a document doesn't tick the agreement.
   await termsLink.click();
-  const dialog = page.getByRole('dialog', { name: 'Terms and Conditions' });
+  const dialog = page.getByRole('dialog', { name: 'Terms of Service' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'The legal bits' })).toBeVisible();
   await expect(terms).not.toBeChecked();
@@ -144,7 +148,7 @@ test('Terms of Service and Privacy Policy open their documents in pop-ups', asyn
   ).toEqual([]);
 
   // The text scrolls inside the pop-up; the footer Close button returns focus to the link.
-  const body = dialog.getByRole('region', { name: 'Terms and Conditions' });
+  const body = dialog.getByRole('region', { name: 'Terms of Service text' });
   await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await expect(dialog.getByText('You are choosing to try PeekaPlate.')).toBeInViewport();
   await dialog.getByRole('button', { name: 'Close', exact: true }).last().click();
@@ -159,6 +163,10 @@ test('Terms of Service and Privacy Policy open their documents in pop-ups', asyn
   const privacy = page.getByRole('dialog', { name: 'Privacy Policy' });
   await expect(privacy).toBeVisible();
   await expect(privacy.getByRole('table').first()).toContainText('Supabase');
+  await expect(privacy.getByRole('region', { name: 'Privacy Policy text' })).toBeVisible();
+  // Policy names inside the documents are plain text, not bold look-alike links.
+  await expect(privacy.getByText(/Our Terms of Service cover/)).toBeVisible();
+  await expect(privacy.locator('strong', { hasText: 'Terms of Service' })).toHaveCount(0);
   expect(
     (await new AxeBuilder({ page }).include('dialog').analyze()).violations.map((v) => v.id),
   ).toEqual([]);

@@ -2,7 +2,7 @@
 
 *PeekaPlate for restaurant owners*
 
-This page explains what information PeekaPlate collects from restaurant owners and staff, what we do with it, who sees it, and what you can ask us to do. Our **Terms and Conditions** cover the rules for using PeekaPlate. The notice shown to diners on a menu is separate.
+This page explains what information PeekaPlate collects from restaurant owners and staff, what we do with it, who sees it, and what you can ask us to do. Our Terms of Service cover the rules for using PeekaPlate. The notice shown to diners on a menu is separate.
 
 **Last updated:** November 14, 2026
 
@@ -21,7 +21,7 @@ The rest of this page explains all of that. Take your time. You can ask us quest
 
 ## Who we are
 
-PeekaPlate ("we", "us") runs the PeekaPlate console and the diner menu service. You can reach us at [contact email].
+PeekaPlate ("we", "us") runs the PeekaPlate console and the diner menu service. You can reach us at hello@peekaplate.io.
 
 ## What we ask you for
 
@@ -124,7 +124,7 @@ You can:
 - **Close your account.** We tell you that you can export your data or ask for deletion. If we hear nothing for **90 days,** we delete your order data.
 - **Stop.** You do not need to explain.
 
-To ask, email [contact email]. We may need to check that you are an authorized owner first.
+To ask, email hello@peekaplate.io. We may need to check that you are an authorized owner first.
 
 **Honest limits on deleting:**
 - Our database backups cannot be edited for one restaurant, so backup copies expire on the provider's normal schedule.
@@ -153,7 +153,7 @@ If we change something important, we will tell you at least 14 days before it ta
 
 ## Questions
 
-**Email:** [contact email]
+**Email:** hello@peekaplate.io
 **Mail:** PeekaPlate, [mailing address]
 
 If you are not happy with how we handled something, write to us and we will respond within 10 business days.

@@ -1,4 +1,4 @@
-// FE-04 follow-up: the Terms and Conditions and Privacy Policy pop-ups opened from the S01 Create
+// FE-04 follow-up: the Terms of Service and Privacy Policy pop-ups opened from the S01 Create
 // account agreement. A native modal <dialog>: it traps focus, makes the page behind inert, and
 // closes on Escape, on the close buttons, or on a click outside it. Focus returns to the link that
 // opened it. Reading a document doesn't tick the agreement; the owner still ticks the checkbox.
@@ -67,8 +67,8 @@ export function LegalDialog({
             </svg>
           </button>
         </header>
-        {/* Focusable so keyboard users can scroll it; named by the dialog title. */}
-        <section className="pp-legal__body" tabIndex={0} aria-labelledby={titleId}>
+        {/* Focusable so keyboard users can scroll it, with its own name (Rania, 16 Nov). */}
+        <section className="pp-legal__body" tabIndex={0} aria-label={`${title} text`}>
           <LegalBody blocks={blocks} />
         </section>
         <footer className="pp-legal__footer">

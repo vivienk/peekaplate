@@ -459,6 +459,9 @@ function CreateStep({
               className="pp-auth-terms__box"
               type="checkbox"
               checked={terms}
+              // The links inside the label make some screen readers drop their words from the
+              // checkbox name, so the full visible sentence is given explicitly (Rania, 16 Nov).
+              aria-label={AGREEMENT_LABEL}
               aria-invalid={errors.terms ? true : undefined}
               aria-describedby={errors.terms ? termsErrorId : undefined}
               onChange={(event) => {
@@ -518,6 +521,10 @@ function CreateStep({
     </>
   );
 }
+
+// The S01 agreement sentence, word for word as shown next to the checkbox.
+const AGREEMENT_LABEL =
+  'I agree to the Terms of Service and Privacy Policy, and confirm I’m authorized to manage this restaurant.';
 
 // S02: sign in for an email with an account (S02 handoff, sections 1-7).
 function SignInStep({

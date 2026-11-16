@@ -1,4 +1,4 @@
-/* Terms and Conditions / Privacy Policy pop-up. There is no Figma frame for it yet, so it reuses the
+/* Terms of Service / Privacy Policy pop-up. There is no Figma frame for it yet, so it reuses the
  * owner pop-up surface (owner-dialog: surface-container, outline-variant edge, 24 radius) with a
  * header, a scrolling body and a footer, the same shape as the pop-up Adam shared. */
 .pp-legal {
