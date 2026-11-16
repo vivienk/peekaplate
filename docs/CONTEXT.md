@@ -270,7 +270,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "4059ab5494cec3380760202eafbd93387b1b5b1fb8ff6e48f2693c8c7cdfb469"
+      "sourceFingerprint": "cf0ac90c7a01f2dd214a26092a7b79da727e8bcea3f55f2a7d1a257fac6af7d4"
     },
     {
       "id": "console",
@@ -612,7 +612,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "3c486e9976e335edddc20356fafe80c8ecd13f4d6c4389d63ca44c65bf4a35aa"
+      "sourceFingerprint": "c63b91b4cd0d353557f68476b4e81003133e3c15134540166afad81666f7e738"
     },
     {
       "id": "database",
@@ -662,7 +662,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c7907c2e1fff93ac7a9139ed8c04850c7c51fab0884cb069158cb2eb351719f9"
+      "sourceFingerprint": "7ca37034afe3e90b2ef00cb489af457fb4a3fbf6e746bdb838411e20261e6aad"
     },
     {
       "id": "measurement",
@@ -1117,7 +1117,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "diner"
       ],
-      "summary": "Connects saved Screen 5 branding to operator bundle preparation and diner header; accepts exact revision-bound approved portions and retains ingredient fallback icons. Automated checks are recorded in the PR.",
+      "summary": "Connects saved Screen 5 branding to operator bundle preparation and diner header; accepts exact revision-bound approved portions and retains ingredient fallback icons. Automated checks are recorded in the PR. Follow-up isolates browser fixture lifecycle, bounds the full DB lane at five minutes, fixes demo header wait, and documents Noka staging acceptance.",
       "files": [
         "docs/diner-published-mapping.md",
         "backend/src/restaurant-profile.ts",

@@ -37,3 +37,65 @@ Deployment requires the migration, backend/frontend release, saved owner logo, o
 ## Synthetic browser evidence
 
 These screenshots exercise the real published-menu loader with labelled synthetic assets, not a live restaurant publication. The wide logo stays centered and intact at [390px](evidence/published-logo-390.png) and [1280px](evidence/published-logo-1280.png). Automated checks also cover 320px and 768px widths, missing logos, cross-dish navigation and invalid portion assets.
+
+## Noka staging acceptance checklist
+
+The PR's [diner preview](https://pr-215.peekaplate-diner-preview.pages.dev) and
+[console preview](https://pr-215.peekaplate-console-preview.pages.dev) are static,
+fixture-only builds with API access disabled. They are not the Noka acceptance
+site. Verify their `/peekaplate-preview.json` commit before reviewing a new push.
+
+1. **Release operator:** apply the forward migration above and deploy the reviewed
+   backend and console commits to staging. Build the diner with
+   `VITE_MENU_SOURCE=live`,
+   `VITE_PUBLIC_API_URL=https://peekaplate-api-staging.vxkong.workers.dev`, staging
+   mode and `/diner/` base, then deploy the assembled artifact to the existing
+   `routing-staging.peekaplate-diner-staging.pages.dev` branch. Record all three
+   deployed commit IDs. Preserve existing auth, runtime database and private
+   storage bindings. No production/DNS change is required.
+2. **Noka owner:** identify the actual tenant/menu IDs and sign in with current
+   owner membership. Save the real logo in Restaurant Details (Screen 5), reload,
+   and confirm the same image and profile version. Confirm dish revisions, prices,
+   ingredients, food declarations and photographic rights; the external restaurant
+   menu URL alone supplies none of those approvals. Missing food information stays
+   unknown and must not be inferred from generated artwork.
+3. **Asset/operator handoff:** provide verified T0 card/detail assets for those
+   revisions and, for at least two test dishes, approved captured portion layers
+   with exact dish/revision IDs, URL, size, dimensions and SHA-256. Run the producer
+   above with `--owner-profile-api` and protected environment credentials. Inspect
+   its diagnostics and exact output bytes. Host only the public bundle/logo/T0/
+   portion files on immutable deployment URLs under the permitted staging diner
+   Pages host; never upload the private request, handoff report or source captures.
+   Verify anonymous HTTPS reads, exact hashes and CORS for the routing-staging
+   origin. Then rerun the identical producer request with `--admit` through the
+   privileged operator connection. Admission is not publication.
+4. **Artwork reviewer:** enable `INGREDIENT_ARTWORK_ENABLED=true` in the staging
+   backend with its private artwork bucket binding (or the existing ingestion
+   bucket fallback). Approve the real generated icon bytes for Noka's normalized
+   ingredient labels through `/venues/:venueId/ingredient-icons/review`, with
+   current command IDs/versions. Confirm the public label lookup and hashed image
+   endpoints return only currently approved artwork. Missing approval should
+   deliberately display the local fallback, not trigger generation.
+5. **Noka owner:** open Menu → Review and publish, select the admitted snapshot,
+   inspect it, and explicitly approve/publish. Retrieve the actual returned diner
+   link (`Location` or authenticated `GET /venues/:venueId/menus/:menuId/diner-link`).
+   Do not assume the slug is `noka_ramen`: it is server-assigned and may differ.
+   The expected host is
+   `https://routing-staging.peekaplate-diner-staging.pages.dev/diner/{assigned-slug}`.
+6. **Acceptance reviewer:** open that exact URL without a staff session. Record
+   the publication ID/revision/hash and deployed commits. Check logo fidelity at
+   320/390/768/1280px; open two different dishes, View Portion and browser Back;
+   verify each layer belongs to the displayed revision; verify no-WebGL 2.5D and
+   correct-dish photo fallback; inspect approved ingredient artwork and fallback
+   labels. Use browser request blocking for missing images, and a separate
+   synthetic publication for tampered/wrong-revision/revocation/withdrawal cases;
+   do not alter Noka's approved files or revoke its artwork merely for a test.
+   Record console/network failures, CORS, screenshots and physical-device camera
+   results separately. A static preview or successful local suite cannot satisfy
+   this hosted checklist.
+
+Outstanding inputs are Noka's authorized tenant/menu identity and owner session,
+restaurant-confirmed content, actual uploaded logo, approved T0/portion/artwork
+assets, and release/operator execution. This PR does not provision or publish
+those inputs. The public `noka_ramen` lookup was rechecked on November 16, 2026 and
+still returned 404; the owner-assigned link is the authority if it differs.

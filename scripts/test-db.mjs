@@ -213,7 +213,9 @@ export function runIntegrationTests(database, run = spawnSync) {
       cwd: root,
       encoding: 'utf8',
       stdio: 'inherit',
-      timeout: 120_000,
+      // Covers sequential suite imports and Worker startup as the integration lane grows.
+      // Individual tests/hooks retain their 15s/45s deadlines in vitest.db.config.ts.
+      timeout: 300_000,
       env: {
         ...process.env,
         PEEKAPLATE_DB_TEST_URL: database.runtimeUrl,

@@ -313,7 +313,7 @@ test('local captured-dish demo loads real textures and tilts without route mocks
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
-  await expect(page.locator('.pp-logo__name')).toBeVisible();
+  await expect(page.locator('.pp-logo')).toBeVisible();
   await openPortion(page);
   await expect(page.locator('.pp-portion__status')).toContainText('shared sample cutout');
   const canvas = page.locator('.pp-portion__css');
