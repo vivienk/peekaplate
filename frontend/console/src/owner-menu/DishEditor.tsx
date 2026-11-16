@@ -107,6 +107,10 @@ export function DishEditor({
   const extracted = value.origin === 'extracted';
   const uncertain = new Set(value.source?.uncertainFields ?? []);
   const set = (patch: Partial<DishForm>) => onChange({ ...value, ...patch });
+  // The two required boxes (image license, AI-text review) must be ticked before the dish can be saved.
+  const blocked =
+    (Boolean(onReviewConfirmedChange) && !reviewConfirmed) ||
+    (Boolean(onLicenseConfirmedChange) && !licenseConfirmed);
   const issueFor = (field: ApprovalIssue) =>
     issues.includes(field) ? ISSUE_TEXT[field].text : undefined;
   const check = (field: string, message: string) => (uncertain.has(field) ? message : undefined);
@@ -125,7 +129,8 @@ export function DishEditor({
 
   const verify = (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    // Enter in a field submits the form, so the gate is checked here too, not only on the button.
+    if (busy || blocked) return;
     if (!onVerify) {
       onSave();
       return;
@@ -427,15 +432,7 @@ export function DishEditor({
           <Button kind="outlined" onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </Button>
-          <Button
-            kind="primary"
-            onClick={onSave}
-            disabled={
-              busy ||
-              (Boolean(onReviewConfirmedChange) && !reviewConfirmed) ||
-              (Boolean(onLicenseConfirmedChange) && !licenseConfirmed)
-            }
-          >
+          <Button kind="primary" onClick={onSave} disabled={busy || blocked}>
             {saveLabel}
           </Button>
           {onVerify && (

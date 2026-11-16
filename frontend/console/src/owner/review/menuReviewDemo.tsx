@@ -238,6 +238,7 @@ function Demo() {
             orig={editing.orig}
             cancel={onBackToReview}
             toReview={onContinue}
+            requireReviewBox
           />
         </main>
       )}
