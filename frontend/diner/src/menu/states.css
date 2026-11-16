@@ -1,0 +1,116 @@
+/* State screens (Figma Menu_Offline): offline, "Something went wrong", "No dishes to show yet" and
+ * the S5-FE-10 withdrawn / unavailable menu share one centred template: illustration, bold title, grey
+ * description and the orange button. No back arrow. Sizes come from the Figma frame (390 x 844). */
+/* Two classes so this wins over the older .pp-menu--state rule (60vh) in style.css: the state panel is
+ * the menu screen's panel, full viewport height, same width and background. */
+.pp-menu.pp-state {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0; /* Figma spaces the parts itself: 4px under the title, 20px above the button */
+  /* Same panel as the menu screen (.pp-menu: 390px wide, full height, 16px sides). The top padding
+   * keeps the content off the top edge of the page; the content is centred in what remains. */
+  padding-top: var(--pp-space-80);
+  padding-bottom: var(--pp-space-48);
+  text-align: center;
+}
+/* Figma illustration: a 200px box holding a 181.82px icon (9.09px padding). No size token. */
+.pp-state__icon {
+  box-sizing: border-box;
+  width: 12.5rem;
+  height: 12.5rem;
+  padding: 0.568rem;
+  object-fit: contain;
+  margin: 0;
+}
+/* The wifi illustration is a black outline; lighten it to the grey of the other illustrations. */
+.pp-state__icon--mono {
+  filter: invert(0.46);
+}
+/* Figma H4/Bold: 24px / 32px. */
+.pp-state__title {
+  margin: 0;
+  color: var(--pp-role-on-surface);
+  font-size: var(--pp-font-size-h4, 1.5rem);
+  line-height: var(--pp-line-height-h4, 2rem);
+  font-weight: var(--pp-font-weight-bold);
+}
+/* Figma H5/Medium: 18px / 28px, 4px under the title. */
+.pp-state .pp-state-text {
+  margin: var(--pp-space-4, 0.25rem) 0 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-medium, 500);
+  max-width: 22.375rem; /* the 358px content width of the frame */
+}
+/* Figma button: 40px high, 12px 20px padding, Paragraph 2/Semi Bold (14px / 24px), 318px wide, 20px
+ * below the text. */
+.pp-state .pp-button {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 19.875rem;
+  min-width: 0;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  padding: var(--pp-space-12) var(--pp-space-20);
+  margin-top: var(--pp-space-20);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-button-label);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+/* Loading state: same centred layout as the other states, with the spinner in the middle and the
+ * text below it, and the same room at the top so nothing touches the top edge of the page. */
+.pp-menu.pp-menu--loading {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pp-space-16);
+  padding-top: var(--pp-space-80);
+  padding-bottom: var(--pp-space-48);
+  text-align: center;
+}
+.pp-menu--loading .pp-loading-text {
+  margin: 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-medium, 500);
+}
+
+/* S5-FE-10 Retry notice: shown above the menu when a re-read failed and the menu may be out of date.
+ * Same text and button sizes as the state screens (358px content, 318px / 40px button). */
+.pp-refresh-notice {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--pp-space-12);
+  width: 100%;
+  max-width: 22.375rem;
+  margin: var(--pp-space-24) auto var(--pp-space-16);
+  padding: var(--pp-space-16);
+  text-align: center;
+}
+.pp-refresh-notice .pp-notice {
+  margin: 0;
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-button-label);
+}
+.pp-refresh-notice .pp-button {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 19.875rem;
+  min-width: 0;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  padding: var(--pp-space-12) var(--pp-space-20);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-button-label);
+  font-weight: var(--pp-font-weight-semibold);
+}

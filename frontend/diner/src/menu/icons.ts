@@ -6,9 +6,12 @@
 import generatedCatalogue from '../assets/icons/generated-ingredients/catalogue.json';
 import back from '../assets/icons/ui/back-navigation.svg';
 import close from '../assets/icons/ui/close.svg';
+import cloud from '../assets/icons/ui/cloud.svg';
+import cutlery from '../assets/icons/ui/cutllery.svg';
 import heart from '../assets/icons/ui/heart.svg';
 import search from '../assets/icons/ui/search.svg';
 import unsaveHeart from '../assets/icons/ui/unsave-heart.svg';
+import wifi from '../assets/icons/ui/wifi.svg';
 import { ALLERGENS, DIETARY_VALUES, LEGACY_ALLERGEN_CODES } from './types';
 
 type UrlModules = Record<string, string>;
@@ -52,7 +55,18 @@ const allergenIcons = byKey(glob.allergens);
 const dietaryIcons = byKey(glob.dietary);
 const ingredientIcons = byKey(glob.ingredients);
 
-export const UI_ICONS = { heart, search, back, unsaveHeart, close } as const;
+// offline, error and empty are the state-screen illustrations (offline, "Something went wrong" and
+// "No dishes to show yet").
+export const UI_ICONS = {
+  heart,
+  search,
+  back,
+  unsaveHeart,
+  close,
+  offline: wifi,
+  error: cloud,
+  empty: cutlery,
+} as const;
 
 // Accepts the label screens show ("Nuts"), the code ("nuts") or a legacy code ("tree nut").
 export function allergenIcon(value: string): string | null {

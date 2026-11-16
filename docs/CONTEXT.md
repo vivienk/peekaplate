@@ -118,7 +118,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Verified live/fixture menus, details, Search, Save/Saved and Compare retain shared IDs/timing and tenant-free client authority. Consent gates both destinations; fixtures never send. Publication swaps clear exposure links; aliases resolve server locators before public reads. Live artwork refresh/revocation retains fallback. Optional View Portion adds captured layers, photo fallback, orientation and camera cleanup to the existing detail lifecycle. Preview close preserves Menu/Saved/Compare return labels. Local uploads/generated models remain review-only and publication-ineligible. Physical scale and hosted camera acceptance remain pending.",
+      "summary": "Verified live/fixture menus, details, Search, Save/Saved and Compare retain shared IDs/timing and tenant-free client authority. Consent gates both destinations; fixtures never send. Publication swaps clear exposure links; aliases resolve server locators before public reads. Live artwork refresh/revocation retains fallback. Optional View Portion adds captured layers, photo fallback, orientation and camera cleanup to the existing detail lifecycle. Preview close preserves Menu/Saved/Compare return labels. Local uploads/generated models remain review-only and publication-ineligible. Physical scale and hosted camera acceptance remain pending. A confirmed 404 clears the menu with Check again; Saved hides missing dishes.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -205,6 +205,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/tracking-delivery.spec.ts",
         "tests/e2e/published-refresh.spec.ts",
         "tests/e2e/published-integrity.spec.ts",
+        "tests/e2e/published-withdrawal.spec.ts",
         "docs/diner-connection.md",
         "frontend/diner/src/save/screens.ts",
         "frontend/diner/src/save/save.css",
@@ -267,7 +268,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "6af9eca2acabcd7a28886d9dc9ab21248e93cd8f2e80d908b5b859bb0bacc6a8"
+      "sourceFingerprint": "8b5b1d4a9a45f9832f07c75e9e52a43af2faa2ab72ee40e618404c2247bc5040"
     },
     {
       "id": "console",
@@ -602,7 +603,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e8403b18c9356839fe5d371e1e359bcfc1524339fb1d264632ebc847186f2b56"
+      "sourceFingerprint": "2d6d6715dfbe43638149203c5e431936d139ca030a33d4861ba7496abe25d642"
     },
     {
       "id": "database",
@@ -981,19 +982,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "Reconcile opt-in synthetic owner analysis with merged menu wiring; client retains exact destinations, cancellation and typed access denial.",
-      "files": [
-        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
-        "backend/owner-ai-handoff.test.mjs",
-        "docs/owner-ai-responses.md"
-      ],
-      "next": "Merge analysis before shell panel; preserve unknown-freshness abstention and hosted activation gates."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
-        "console"
-      ],
       "summary": "The signed-in owner shell includes the opt-in AI panel with typed access cleanup and distinct displayed-report/analysis evidence periods, preserving merged menu workspace wiring.",
       "files": [],
       "next": "Retarget after #164; test pending sign-out, mobile, flag-off and hosted configuration gates before activation."
@@ -1095,6 +1083,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/search.spec.ts"
       ],
       "next": "Review physical-device design separately; no hosted release follows from this merge."
+    },
+    {
+      "date": "2026-11-16",
+      "modules": [
+        "diner"
+      ],
+      "summary": "S5-FE-10 deliberately reverses keep-the-menu-after-404. A confirmed 404 clears the menu on every screen with Check again; network and 5xx errors keep it and show a Retry notice. A replacement from detail or Saved returns to the new list with a notice. Saved IDs stay in storage and are hidden when missing from the menu. Copy is interim.",
+      "files": [
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/refresh.ts",
+        "frontend/diner/src/save/save-state.ts",
+        "tests/e2e/published-withdrawal.spec.ts",
+        "docs/diner-connection.md"
+      ],
+      "next": "Design approves copy and return path; Sai updates hosted check 6 with the release and marks it passed only after testing the deployed build; confirm release scope, a cap on hidden saved IDs and the token-expiry state."
     },
     {
       "date": "2026-11-15",

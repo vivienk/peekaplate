@@ -338,6 +338,11 @@ test('Saved uses the refreshed dish revision before opening its detail', async (
     (window as unknown as { renameDish: string | null }).renameDish = id;
   }, dishId);
   await swapPublication(page);
+  // S5-FE-10 Option A: a replacement while Saved is open returns to the new list with a notice;
+  // the Saved screen then shows the refreshed dish revision.
+  await expect(page.getByText('This menu was updated.')).toBeVisible();
+  await expect(page.locator('.pp-saved__item')).toHaveCount(0);
+  await page.locator('.pp-saved').click();
   await expect(page.locator('.pp-saved__item')).toContainText('Updated Avocado Toast');
   await page.locator('.pp-saved__open').click();
   await expect(page.locator('.pp-detail')).toContainText('Updated Avocado Toast');
