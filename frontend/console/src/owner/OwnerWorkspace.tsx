@@ -325,6 +325,28 @@ function reportPeriod(window: { start_time: string; end_time: string }): string 
   return PERIOD_FORMAT.formatRange(start, end);
 }
 const percent = (value: number | null) => `${((value ?? 0) * 100).toFixed(1)}%`;
+const EXACT_FORMAT = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit',
+  timeZone: 'UTC',
+  timeZoneName: 'short',
+});
+// Two periods named for the owner: by date, or with exact UTC times when the dates read the same
+// (a rolling window shifted by seconds would otherwise look identical).
+export function periodPair(
+  report: { start_time: string; end_time: string },
+  analysis: { start: string; end: string },
+): { report: string; analysis: string } {
+  const analysisWindow = { start_time: analysis.start, end_time: analysis.end };
+  const byDate = { report: reportPeriod(report), analysis: reportPeriod(analysisWindow) };
+  if (byDate.report !== byDate.analysis) return byDate;
+  const exact = (window: { start_time: string; end_time: string }) =>
+    `${EXACT_FORMAT.format(new Date(window.start_time))} – ${EXACT_FORMAT.format(new Date(window.end_time))}`;
+  return { report: exact(report), analysis: exact(analysisWindow) };
+}
 // The analysis reads its own server snapshot. Its suggestion is shown only when that snapshot
 // covers exactly the report period on screen (compared as instants, so "…07:00:00Z" and
 // "…07:00:00.000Z" match); otherwise it would read as advice about numbers the owner isn't seeing.
@@ -458,16 +480,23 @@ function LiveAiPanel({
           !samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
             <div className="owner-ai__answer" data-ai-period="mismatch">
               <h3>Different report period</h3>
-              <p>
-                This analysis covers{' '}
-                {reportPeriod({
-                  start_time: shown.result.timeWindow.start,
-                  end_time: shown.result.timeWindow.end,
-                })}
-                , not the report on screen ({reportPeriod(report.report_metadata.date_window)}), so
-                no suggestion is shown. Refresh the report, then ask again.
+              {(() => {
+                const periods = periodPair(
+                  report.report_metadata.date_window,
+                  shown.result.timeWindow,
+                );
+                return (
+                  <p>
+                    This analysis was calculated for {periods.analysis}, which is not exactly the
+                    report period shown here ({periods.report}). Its suggestion is not shown, so it
+                    can’t be mistaken for advice about these numbers.
+                  </p>
+                );
+              })()}
+              <p className="owner-muted">
+                Suggestions appear only when the analysis and the report on screen cover the same
+                period. No menu changes or customer messages are sent.
               </p>
-              <p className="owner-muted">No menu changes or customer messages are sent.</p>
             </div>
           )}
         {shown?.kind === 'result' &&

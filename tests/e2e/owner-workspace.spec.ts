@@ -1657,6 +1657,8 @@ test('an analysis for a different period than the report on screen shows no sugg
   await panel.getByRole('button', { name: 'Review report' }).click();
   await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
   await expect(panel.getByText(/Nov 11\s*–\s*12, 2026/)).toBeVisible();
+  // Honest guidance: no promise that refreshing and asking again will match.
+  await expect(panel.getByText(/refresh/i)).toHaveCount(0);
   await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
   await expect(panel.getByText(/open rate/i)).toHaveCount(0);
   await expect(panel.getByText('Review the approved dish card', { exact: false })).toHaveCount(0);
@@ -1667,6 +1669,17 @@ test('an analysis for a different period than the report on screen shows no sugg
   await panel.getByRole('button', { name: 'Review report' }).click();
   await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
   await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+
+  // The real path: report and analysis each compute a rolling window from their own request time,
+  // so an analysis requested 25 seconds later covers a shifted window. Still no suggestion, and
+  // the message names both periods with exact times because their dates read the same.
+  state.analysisWindow = { start: '2026-10-19T07:00:25Z', end: '2026-10-20T07:00:25Z' };
+  await panel.getByLabel('Review focus').selectOption('crm');
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+  await expect(panel.getByText(/Oct 19, 7:00:25\s*AM UTC/)).toBeVisible();
+  await expect(panel.getByText(/Oct 19, 7:00:00\s*AM UTC/)).toBeVisible();
 
   // The same instants written differently (".000Z") count as the same period.
   state.analysisWindow = { start: '2026-10-19T07:00:00.000Z', end: '2026-10-20T07:00:00.000Z' };
