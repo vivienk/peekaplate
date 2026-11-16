@@ -29,3 +29,9 @@ Local API and synthetic browser tests do not establish hosted acceptance.
 Live activation requires the migration, Worker deployment, exact origin and
 bundle CORS, and an actual approved publication. As of this implementation,
 the deployed staging directory returns 404; no backend resources were changed.
+
+Verification: focused API suite 17 tests passed; workspace typecheck and lint
+passed. All SQL lanes passed, including eight directory assertions. The later
+real-Worker/database integration stage timed out at the harness 120-second limit;
+full database suite is therefore FAIL, not accepted. No hosted changes made.
+Architecture and correctness reviews of 80e27743 found no supported defects.

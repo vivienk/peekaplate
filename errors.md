@@ -2842,3 +2842,18 @@ Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T10:00:06.739Z","exitCode":2}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-16T10:09:02.196Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-16T10:09:19.642Z","exitCode":1}
+```
+
+Directory implementation validation: test response typing fixed by asserting the
+whole unknown JSON value. Typecheck passes. Docker image preparation succeeded
+on retry; SQL assertions pass, but full real-Worker DB integration still hits
+the harness timeout. This does not establish hosted readiness.
