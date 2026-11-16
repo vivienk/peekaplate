@@ -113,7 +113,7 @@ server signature/hash verification remains authoritative.
 ## PR206 OCR screen integration
 
 This follow-up is stacked on `feat/s8-menu-review` at
-`7884ed1dddb9680383eb898532e844259c1790e8`; PR206 is still open and itself
+`698d1f42b299e61c4a66461ca217c310bf5a4a86`; PR206 is still open and itself
 stacks on PR163. Retarget after those dependencies merge. Existing integration
 points are reused, not replaced:
 
@@ -153,3 +153,10 @@ runtime head `6d48a7f9`; the manual-retry finding was resolved. Browser evidence
 uses synthetic HTTP, including original-byte upload, empty/failed/partial results,
 S05-to-correction flow and explicit same-job retries. Full cross-app browser,
 Docker database and hosted/provider acceptance were not run for this slice.
+
+
+PR206 subsequently added an Enter-key confirmation guard at `698d1f42`.
+That update was merged without altering its checkbox behavior. All nine affected
+OCR/manual-save/correction browser cases passed again; a bounded compatibility
+review found no issue. The earlier 44-case workspace pass covers the broader
+navigation, account/access and desktop/mobile journeys.
