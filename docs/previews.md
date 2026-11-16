@@ -14,6 +14,7 @@ A PR preview is a temporary copy of the diner and console pages built from one p
    - Owner menu preview and publish demo (S13: the phone shows the same PR's diner preview, then Publish Confirmation, Published with Copy Link, Not ready and a failed publish, picked in the demo bar; fictional data and an example link, nothing is published): `https://pr-<number>.peekaplate-console-preview.pages.dev/owner-menu-preview.html`. Preview builds only. Previews allow exactly one frame pairing for this: a console preview may frame a diner preview, and a diner preview may be framed only by a console preview (`scripts/preview.mjs`).
    - Owner first dashboard arrival demo (S4-FE-03, fictional restaurant): `https://pr-<number>.peekaplate-console-preview.pages.dev/first-dashboard.html`. Preview builds only, like the component demo.
    - Console owner dashboard demo (fictional sample data plus a synthetic owner report): `https://pr-<number>.peekaplate-console-preview.pages.dev/owner-dashboard.html`. Preview builds only, like the component demo.
+   - Owner menu review and publish demo (S10, S5-FE-10, fictional dishes): `https://pr-<number>.peekaplate-console-preview.pages.dev/review-dishes.html`. Preview builds only; "Publish Menu" only shows the success pop-up locally and calls no API.
 3. Each new push to the PR rebuilds the preview and updates the same comment. Check that its commit matches the latest PR commit before reviewing.
 4. Report findings as PR review comments, with the link, browser and screen size.
 

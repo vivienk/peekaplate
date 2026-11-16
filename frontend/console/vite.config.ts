@@ -44,6 +44,7 @@ export default defineConfig(({ command }) => ({
               ownerMenuPreview: page('owner-menu-preview.html'),
               firstDashboard: page('first-dashboard.html'),
               ownerDashboard: page('owner-dashboard.html'),
+              reviewDishes: page('review-dishes.html'),
             }
           : {
               ownerAuth: page('owner-auth.html'),
