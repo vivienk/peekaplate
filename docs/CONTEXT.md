@@ -603,7 +603,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e8403b18c9356839fe5d371e1e359bcfc1524339fb1d264632ebc847186f2b56"
+      "sourceFingerprint": "2d6d6715dfbe43638149203c5e431936d139ca030a33d4861ba7496abe25d642"
     },
     {
       "id": "database",
@@ -977,19 +977,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-15",
-      "modules": [
-        "console"
-      ],
-      "summary": "Reconcile opt-in synthetic owner analysis with merged menu wiring; client retains exact destinations, cancellation and typed access denial.",
-      "files": [
-        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
-        "backend/owner-ai-handoff.test.mjs",
-        "docs/owner-ai-responses.md"
-      ],
-      "next": "Merge analysis before shell panel; preserve unknown-freshness abstention and hosted activation gates."
-    },
     {
       "date": "2026-11-15",
       "modules": [
