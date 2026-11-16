@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
+import type { RestaurantProfile } from '@peekaplate/contracts';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
 import type { DishDraft, MenuJob } from '../../frontend/console/src/owner-menu/api';
@@ -62,6 +63,8 @@ function claims(authorization: string | undefined): { sub?: string; version?: nu
 
 async function fixture(context: BrowserContext) {
   const state = {
+    profile: null as RestaurantProfile | null,
+    profilePng: null as Buffer | null,
     venues: [venue],
     reportStatus: 200,
     denyIdentity: false,
@@ -199,6 +202,30 @@ async function fixture(context: BrowserContext) {
       const headers = { 'Access-Control-Allow-Origin': origin };
       if (state.menuStatus !== 200)
         return route.fulfill({ status: state.menuStatus, json: { error: 'forbidden' }, headers });
+      if (path === 'restaurant-profile') {
+        if (request.method() === 'PUT') {
+          const input = request.postDataJSON();
+          if (input.expectedVersion !== (state.profile?.version ?? 0))
+            return route.fulfill({ status: 409, json: { error: 'version_conflict' }, headers });
+          const bytes = input.logoPngBase64 ? Buffer.from(input.logoPngBase64, 'base64') : null;
+          if (bytes) state.profilePng = bytes;
+          state.profile = {
+            version: input.expectedVersion + 1,
+            details: input.details,
+            logo: bytes
+              ? {
+                  width: bytes.readUInt32BE(16),
+                  height: bytes.readUInt32BE(20),
+                  sizeBytes: bytes.length,
+                  sha256: createHash('sha256').update(bytes).digest('hex'),
+                }
+              : (state.profile?.logo ?? null),
+          };
+        }
+        return route.fulfill({ json: { profile: state.profile }, headers });
+      }
+      if (path.startsWith('restaurant-profile/logo/') && state.profilePng)
+        return route.fulfill({ contentType: 'image/png', body: state.profilePng, headers });
       if (path === 'menus/jobs') {
         state.jobsReads++;
         if (state.delayJobs)
@@ -1929,4 +1956,30 @@ test('an unready or unavailable extraction does not hide other saved work', asyn
     page.getByText('Draft saved. This has not approved or published your menu.'),
   ).toBeVisible();
   expect(state.drafts[venue.venueId]).toHaveLength(2);
+});
+
+test('Screen 5 saves a normalized uploaded logo and restores it after reload', async ({
+  page,
+  context,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await page.getByRole('button', { name: /Restaurant details/i }).click();
+  await page.getByLabel('Restaurant name', { exact: true }).fill('Synthetic logo cafe');
+  await page.getByLabel('City', { exact: true }).fill('Test city');
+  await page.getByLabel('Street address', { exact: true }).fill('Test street');
+  await page.getByLabel('Phone number', { exact: true }).fill('1234567890');
+  await page.locator('input[type=file]').setInputFiles('tests/fixtures/portion/foreground.png');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => state.profile?.version).toBe(1);
+  expect(state.profile?.logo).toMatchObject({ width: 64, height: 64 });
+  await page.reload();
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await page.getByRole('button', { name: /Restaurant details/i }).click();
+  await expect(page.getByLabel('Restaurant name', { exact: true })).toHaveValue(
+    'Synthetic logo cafe',
+  );
+  await expect(page.locator('img[src^="blob:"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });

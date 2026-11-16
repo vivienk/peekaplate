@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/menu and observation.v2 contracts verify exact bundle identity and normalized authority-free payloads. Reports enforce per-metric cohorts, complementary suppression and hidden internal counts; comparison_report.v1 stays a separate internal contract. Review, ingredient and artwork contracts retain source/digest and tenant authority. Order outcomes validate civil-time fields and quarantine rows. Workspace exposes actor-bound owner/editor venues, never setup status. PublicPortionSchema is optional, bounded and dish/revision-bound; private review manifests are not publication approval. Hosted acceptance remains separate.",
+      "summary": "Strict staff/publication/menu and observation.v2 contracts verify exact bundle identity and normalized authority-free payloads. Reports enforce per-metric cohorts, complementary suppression and hidden internal counts; comparison_report.v1 stays a separate internal contract. Review, ingredient and artwork contracts retain source/digest and tenant authority. Order outcomes validate civil-time fields and quarantine rows. Workspace exposes actor-bound owner/editor venues, never setup status. PublicPortionSchema is optional, bounded and dish/revision-bound; private review manifests are not publication approval. Hosted acceptance remains separate. Screen 5 profile/logo commands are versioned and bounded; saved branding is not publication.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -72,7 +72,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-workspace.test.ts",
         "packages/contracts/src/ingredient-artwork.ts",
         "packages/contracts/src/owner-analysis.ts",
-        "packages/contracts/src/portion.ts"
+        "packages/contracts/src/portion.ts",
+        "packages/contracts/src/restaurant-profile.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -118,7 +119,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Verified live/fixture menus, details, Search, Save/Saved and Compare retain shared IDs/timing and tenant-free client authority. Consent gates both destinations; fixtures never send. Publication swaps clear exposure links; aliases resolve server locators before public reads. Live artwork refresh/revocation retains fallback. Optional View Portion adds captured layers, photo fallback, orientation and camera cleanup to the existing detail lifecycle. Preview close preserves Menu/Saved/Compare return labels. Local uploads/generated models remain review-only and publication-ineligible. Physical scale and hosted camera acceptance remain pending.",
+      "summary": "Verified live/fixture menus, details, Search, Save/Saved and Compare retain shared IDs/timing and tenant-free client authority. Consent gates both destinations; fixtures never send. Publication swaps clear exposure links; aliases resolve server locators before public reads. Live artwork refresh/revocation retains fallback. Optional View Portion adds captured layers, photo fallback, orientation and camera cleanup to the existing detail lifecycle. Preview close preserves Menu/Saved/Compare return labels. Local uploads/generated models remain review-only and publication-ineligible. Physical scale and hosted camera acceptance remain pending. Published logos replace the generic header, approved portion payloads offer CSS/table preview, and unknown ingredients retain a neutral fallback icon.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -258,7 +259,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionPlacement.test.ts",
         "frontend/diner/src/menu/portionOrientation.ts",
         "frontend/diner/src/menu/portionOrientation.test.ts",
-        "tests/e2e/portion-landscape.spec.ts"
+        "tests/e2e/portion-landscape.spec.ts",
+        "docs/diner-published-mapping.md",
+        "frontend/diner/src/assets/icons/ingredients/unknown.svg"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -272,7 +275,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console reuses authored auth, dashboard, S5 source form, S6/S7 upload and S8/S9/S10 review screens. Review rows reload effective candidate corrections through the existing review-session API. S10 completes authenticated photo and draft verification with expected versions, stable commands and confirmed reload; it never publishes. No saved draft implies review/license attestations, and edited content/photo resets confirmation. Empty menus do not imply missing profiles, and local S5 details cannot claim submission. Unknown food facts, tenant/session isolation and failure handling are preserved. Profile persistence and extracted-photo editing remain gaps; final publication and hosted acceptance are separate. Existing S13 prepared-menu publication remains a separate step.",
+      "summary": "Owner console reuses authored auth, dashboard, S5 source form, S6/S7 upload and S8/S9/S10 review screens. Review rows reload effective candidate corrections through the existing review-session API. S10 completes authenticated photo and draft verification with expected versions, stable commands and confirmed reload; it never publishes. No saved draft implies review/license attestations, and edited content/photo resets confirmation. Empty menus do not imply missing profiles, and local S5 details cannot claim submission. Unknown food facts, tenant/session isolation and failure handling are preserved. Profile persistence and extracted-photo editing remain gaps; final publication and hosted acceptance are separate. Existing S13 prepared-menu publication remains a separate step. Screen 5 saves and reloads the private profile/logo through staff APIs; the existing form preserves full-image proportions.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -400,7 +403,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/menu-review.spec.ts",
         "frontend/console/src/owner/review/fromDishDraft.ts",
         "frontend/console/src/owner/review/fromDishDraft.test.ts",
-        "frontend/console/src/owner/review/MenuReviewStage.test.tsx"
+        "frontend/console/src/owner/review/MenuReviewStage.test.tsx",
+        "frontend/console/src/onboarding/prepareLogo.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -415,7 +419,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces have versioned private draft/photo/upload flows; owner-only staging prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog; public reads and ingestion share exact configured staging-origin CORS. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are idempotent. AI trust/issuance remains gated. Artwork uses blob-locked repair before approval. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job including redelivery. Hosted rollout/acceptance stays separate.",
+      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces have versioned private draft/photo/upload flows; owner-only staging prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog; public reads and ingestion share exact configured staging-origin CORS. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are idempotent. AI trust/issuance remains gated. Artwork uses blob-locked repair before approval. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job including redelivery. Hosted rollout/acceptance stays separate. Screen 5 now saves a tenant-scoped private profile and immutable normalized logo. Operator bundle preparation can export verified saved branding and revision-bound approved portion payloads; hosting/publication remain gated.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -589,7 +593,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.test.ts",
         "backend/src/owner-publication-http.test.ts",
         "backend/src/owner-publication.integration.ts",
-        "backend/src/owner-publication.workerd-harness.ts"
+        "backend/src/owner-publication.workerd-harness.ts",
+        "backend/src/restaurant-profile.ts",
+        "backend/src/restaurant-profile.test.ts",
+        "backend/src/bundle-producer/restaurant.ts",
+        "backend/src/bundle-producer/restaurant.test.ts",
+        "migrations/20261116010000_restaurant_profile.sql",
+        "docs/diner-published-mapping.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -981,19 +991,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "Reconcile opt-in synthetic owner analysis with merged menu wiring; client retains exact destinations, cancellation and typed access denial.",
-      "files": [
-        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
-        "backend/owner-ai-handoff.test.mjs",
-        "docs/owner-ai-responses.md"
-      ],
-      "next": "Merge analysis before shell panel; preserve unknown-freshness abstention and hosted activation gates."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
-        "console"
-      ],
       "summary": "The signed-in owner shell includes the opt-in AI panel with typed access cleanup and distinct displayed-report/analysis evidence periods, preserving merged menu workspace wiring.",
       "files": [],
       "next": "Retarget after #164; test pending sign-out, mobile, flag-off and hosted configuration gates before activation."
@@ -1111,6 +1108,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-onboarding-wiring.md"
       ],
       "next": "Complete pinned review/CI, merge the authored slice before reconciling PR205. Profile persistence/extracted-photo editing and hosted acceptance remain unclaimed."
+    },
+    {
+      "date": "2026-11-16",
+      "modules": [
+        "contracts",
+        "backend",
+        "console",
+        "diner"
+      ],
+      "summary": "Connects saved Screen 5 branding to operator bundle preparation and diner header; accepts exact revision-bound approved portions and retains ingredient fallback icons. Automated checks are recorded in the PR.",
+      "files": [
+        "docs/diner-published-mapping.md",
+        "backend/src/restaurant-profile.ts",
+        "backend/src/bundle-producer/restaurant.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/portion.spec.ts"
+      ],
+      "next": "Review migration/storage and final check evidence; deploy only after operator hosting and approval. Noka source URL is not a PeekaPlate publication; tested noka_ramen staging lookup returned 404."
     }
   ]
 }

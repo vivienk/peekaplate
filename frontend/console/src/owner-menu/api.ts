@@ -23,12 +23,15 @@ import {
   PreparedMenusSchema,
   type PublishMenu,
   PublishMenuSchema,
+  RestaurantProfileSchema,
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
   ReviewCandidateItemResponseSchema,
   type SaveOwnerDishDraft,
   SaveOwnerDishDraftSchema,
+  type SaveRestaurantProfile,
+  SaveRestaurantProfileSchema,
   type VerifyDishDraft,
   VerifyDishDraftSchema,
 } from '@peekaplate/contracts';
@@ -312,6 +315,29 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   });
 
   return {
+    async readRestaurantProfile(venueId: string) {
+      return request(venuePath(venueId, '/restaurant-profile'), { method: 'GET' }, (body) =>
+        RestaurantProfileSchema.nullable().parse(field(body, 'profile')),
+      );
+    },
+    async saveRestaurantProfile(venueId: string, input: SaveRestaurantProfile) {
+      return request(
+        venuePath(venueId, '/restaurant-profile'),
+        json('PUT', SaveRestaurantProfileSchema.parse(input)),
+        (body) => RestaurantProfileSchema.parse(field(body, 'profile')),
+      );
+    },
+    async restaurantLogo(venueId: string, sha: string): Promise<Blob> {
+      return request(
+        venuePath(venueId, `/restaurant-profile/logo/${encodeURIComponent(sha)}`),
+        { method: 'GET', blob: true },
+        (body) => {
+          if (!(body instanceof Blob) || body.type !== 'image/png' || body.size > 1_000_000)
+            throw new Error('Invalid logo');
+          return body;
+        },
+      );
+    },
     async listPreparedMenus(venueId: string) {
       return request(
         venuePath(venueId, '/prepared-menus'),

@@ -10,6 +10,7 @@ import {
   MenuUrlIntakeSchema,
   RejectDraftPhotoSchema,
   SaveOwnerDishDraftSchema,
+  SaveRestaurantProfileSchema,
   VenueScopeSchema,
   VerifyDishDraftSchema,
 } from '@peekaplate/contracts';
@@ -41,6 +42,12 @@ import {
   withOwnerMenuTransaction,
 } from './owner-menu';
 
+import {
+  readRestaurantProfile,
+  restaurantLogoKey,
+  saveRestaurantProfile,
+} from './restaurant-profile';
+
 type Services = {
   verify(authorization: string, env: Bindings): Promise<string>;
   authorizeVenue(actor: string, venue: string, env: Bindings): Promise<void>;
@@ -68,6 +75,46 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
       throw new IngestionError('invalid_json', 400);
     }
   };
+
+  app.get('/venues/:venueId/restaurant-profile', async (c) => {
+    const { actor, venue } = await identity(c);
+    const profile = await services.database(c.env, (client) =>
+      withOwnerMenuTransaction(client, actor, venue, () => readRestaurantProfile(client, venue)),
+    );
+    return c.json({ profile });
+  });
+  app.put('/venues/:venueId/restaurant-profile', async (c) => {
+    const { actor, venue } = await identity(c);
+    const input = SaveRestaurantProfileSchema.safeParse(await json(c));
+    if (!input.success) return c.json({ error: 'invalid_request' }, 400);
+    const storage = c.env.INGESTION_REPORTS_BUCKET;
+    if (!storage) throw new AuthUnavailableError();
+    const profile = await services.database(c.env, (client) =>
+      saveRestaurantProfile(client, actor, venue, input.data, storage),
+    );
+    return c.json({ profile });
+  });
+  app.get('/venues/:venueId/restaurant-profile/logo/:sha', async (c) => {
+    const { actor, venue } = await identity(c);
+    const profile = await services.database(c.env, (client) =>
+      withOwnerMenuTransaction(client, actor, venue, () => readRestaurantProfile(client, venue)),
+    );
+    if (!profile?.logo || profile.logo.sha256 !== c.req.param('sha'))
+      return c.json({ error: 'not_found' }, 404);
+    const storage = c.env.INGESTION_REPORTS_BUCKET;
+    const object = await storage?.get?.(restaurantLogoKey(venue, profile.logo.sha256));
+    if (!object || object.size !== profile.logo.sizeBytes) throw new AuthUnavailableError();
+    const bytes = await object.arrayBuffer();
+    if (
+      bytes.byteLength !== profile.logo.sizeBytes ||
+      createHash('sha256').update(new Uint8Array(bytes)).digest('hex') !== profile.logo.sha256
+    )
+      throw new AuthUnavailableError();
+    c.header('Content-Type', 'image/png');
+    c.header('Cache-Control', 'private, no-store');
+    c.header('X-Content-Type-Options', 'nosniff');
+    return c.body(bytes);
+  });
 
   app.put('/venues/:venueId/drafts/:draftId', async (c) => {
     const { actor, venue } = await identity(c);

@@ -201,7 +201,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       if (
         (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
         uploadedPortion === undefined &&
-        (cameraSample || new URLSearchParams(location.search).get('scenario') === 'portion-demo')
+        (cameraSample || fixtureCamera)
       ) {
         const { originalReviewPortion } = await import('./portionDemo');
         const original = originalReviewPortion(parsed.data, visual);
@@ -247,10 +247,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       status.textContent =
         sampleNotice ??
         (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate');
-      if (
-        (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-        (visualSelect || fixtureCamera || uploadedPortion)
-      ) {
+      if (dish.portion || visualSelect || fixtureCamera || uploadedPortion) {
         if (import.meta.env.DEV && visualSelect && uploadedPortion === undefined) {
           const module = await import('./portion3d').catch(() => null);
           if (!module) return;
@@ -273,7 +270,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
           renderManifest.physical_size,
           () => stage.querySelector<HTMLImageElement>('img.pp-detail__image'),
         );
-        if (!portalOffered) {
+        if (!portalOffered && (cameraSample || fixtureCamera || uploadedPortion)) {
           portalOffered = true;
           ar.show();
         }
@@ -312,11 +309,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     scroll = window.scrollY;
     history.pushState({ ...history.state, ppPortion: key }, '');
     void show();
-    if (
-      (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-      (fixtureCamera || cameraSample || uploadedPortion)
-    )
-      orientation.request();
+    if (dish.portion || fixtureCamera || cameraSample || uploadedPortion) orientation.request();
   };
   const backClick = (event: Event) => {
     if (!active) return;

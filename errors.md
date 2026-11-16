@@ -4469,3 +4469,20 @@ origin, then passed after both paths reused the existing staging-only rule.
 Production/unconfigured/lookalike origins and missing-token denial are covered.
 Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
 
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T10:04:42.388Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-16T10:06:30.671Z","exitCode":1}
+```
+
+
+## ERR-20261116-DINER-MAPPING · Local implementation checks
+
+The new producer regression first failed because `portion` was rejected by the request schema. The header regression was added for ignored published logos; its first combined run also exposed incomplete DOM test doubles. Generic fallback icons required updating the previous no-icon expectations and DOM doubles. The profile test double initially inferred a zero-argument query and failed TypeScript; its SQL argument is now explicit. Regression locations: `backend/src/bundle-producer/produce.test.ts`, `frontend/diner/src/menu/menuScreen.test.ts`, `frontend/diner/src/menu/icons.test.ts`, `backend/src/restaurant-profile.test.ts`.
+
+Local setup initially used Node 24.14 and offline installation missed a locked package. Node 24.16 (Intel) and the locked dependencies were downloaded; no dependency versions changed. The first browser launch found port 5173 occupied, so bounded test copies use isolated ports 5193/5194. No existing server was stopped. Final results are recorded in the PR; these initial failures are not acceptance evidence.

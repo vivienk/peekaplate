@@ -6,6 +6,7 @@ import type { RestaurantDetails as Details } from '../onboarding/details';
 import { MenuProcessing } from '../onboarding/MenuProcessing';
 import { menuFileKind } from '../onboarding/menu-source';
 import { OnboardingLayout } from '../onboarding/OnboardingLayout';
+import { prepareLogo } from '../onboarding/prepareLogo';
 import { RestaurantDetails } from '../onboarding/RestaurantDetails';
 import { type MenuUpload, UploadMenu } from '../onboarding/UploadMenu';
 import { Btn, Icon } from '../owner-dashboard/controls';
@@ -132,7 +133,10 @@ export function OwnerMenuWorkspace({
   const [verified, setVerified] = useState(false);
   // A dish added manually from "Choose how to add your menu" goes to the S8 list after Save.
   const [afterManualSave, setAfterManualSave] = useState(false);
-  // S5: restaurant details are kept on this screen only until the details API is connected.
+  // S5: saved profile is private; a new approved bundle is required to publish changes.
+  const [profileVersion, setProfileVersion] = useState(0);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileRead, setProfileRead] = useState(0);
   const [details, setDetails] = useState<Details | null>(null);
   const [detailsPhotoUrl, setDetailsPhotoUrl] = useState<string | null>(null);
   // S9: dishes the owner reviewed in this session, and the state of the "I have reviewed" checkbox.
@@ -655,6 +659,42 @@ export function OwnerMenuWorkspace({
       setVerified(true);
     });
 
+  useEffect(() => {
+    const active = runtime.current;
+    if (!active || view !== 'details') return;
+    setProfileLoaded(false);
+    let stopped = false;
+    void active.client
+      .readRestaurantProfile(venueId)
+      .then(async (profile) => {
+        if (stopped || !current(active)) return;
+        setDetails(profile?.details ?? null);
+        setProfileVersion(profile?.version ?? 0);
+        setDetailsPhotoUrl((previous) => {
+          if (previous) URL.revokeObjectURL(previous);
+          return null;
+        });
+        if (profile?.logo) {
+          const blob = await active.client.restaurantLogo(venueId, profile.logo.sha256);
+          if (stopped || !current(active)) return;
+          setDetailsPhotoUrl((previous) => {
+            if (previous) URL.revokeObjectURL(previous);
+            return URL.createObjectURL(blob);
+          });
+        }
+        if (!stopped && current(active)) {
+          setProfileLoaded(true);
+          setError(null);
+        }
+      })
+      .catch((reason) => {
+        if (!stopped && current(active)) failure(reason);
+      });
+    return () => {
+      stopped = true;
+    };
+  }, [view, venueId, current, failure, profileRead]);
+
   if (!loaded)
     return renderShell(
       <section>
@@ -671,27 +711,45 @@ export function OwnerMenuWorkspace({
     view === 'details' ? (
       <>
         <p role="status">
-          Restaurant details are not saved to your account yet. This form keeps changes in this tab
-          only.
+          Saved changes appear for diners after the next menu review and publication.
         </p>
+        {!profileLoaded && error && (
+          <Button onClick={() => setProfileRead((value) => value + 1)}>
+            Reload restaurant details
+          </Button>
+        )}
         <RestaurantDetails
           mode={details ? 'dashboard' : 'onboarding'}
           saved={details ?? undefined}
           savedPhotoUrl={detailsPhotoUrl}
-          onSave={(next, photo) => {
-            const editingSaved = details !== null;
-            setDetails(next);
-            if (photo)
-              setDetailsPhotoUrl((previous) => {
-                if (previous) URL.revokeObjectURL(previous);
-                return URL.createObjectURL(photo);
-              });
-            // First save continues to S6 (Choose how to add your menu); an edit returns to S12.
-            setNotice(
-              'Restaurant details are kept in this tab only. Profile saving is not connected yet; nothing was submitted for review.',
-            );
-            setView(editingSaved ? 'overview' : 'sources');
-          }}
+          saving={busy || !profileLoaded}
+          saveFailed={Boolean(error)}
+          onSave={(next, photo) =>
+            void run(async (active) => {
+              const editingSaved = details !== null;
+              const logoPngBase64 = photo ? await prepareLogo(photo) : undefined;
+              if (!current(active)) return;
+              const input = {
+                commandId: command('restaurant-profile', [profileVersion, next, logoPngBase64]),
+                expectedVersion: profileVersion,
+                details: next,
+                ...(logoPngBase64 ? { logoPngBase64 } : {}),
+              };
+              const profile = await active.client.saveRestaurantProfile(venueId, input);
+              if (!current(active)) return;
+              setDetails(profile.details);
+              setProfileVersion(profile.version);
+              if (photo)
+                setDetailsPhotoUrl((previous) => {
+                  if (previous) URL.revokeObjectURL(previous);
+                  return URL.createObjectURL(photo);
+                });
+              setNotice(
+                'Restaurant details saved. Publish a reviewed menu to update the diner header.',
+              );
+              setView(editingSaved ? 'overview' : 'sources');
+            })
+          }
           onLeave={() => setView('overview')}
         />
       </>

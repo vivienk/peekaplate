@@ -337,3 +337,28 @@ describe('sha256Hex', () => {
     );
   });
 });
+
+it('saves and reloads the Screen 5 profile through the authenticated versioned endpoint', async () => {
+  const profile = {
+    version: 1,
+    details: {
+      name: 'Synthetic logo cafe',
+      city: 'Test city',
+      street: 'Test street',
+      line2: '',
+      phone: '1234567890',
+      email: '',
+    },
+    logo: null,
+  };
+  const { api, calls } = client([
+    { status: 200, body: { profile } },
+    { status: 200, body: { profile } },
+  ]);
+  const input = { commandId: crypto.randomUUID(), expectedVersion: 0, details: profile.details };
+  expect(await api.saveRestaurantProfile(VENUE, input)).toEqual(profile);
+  expect(await api.readRestaurantProfile(VENUE)).toEqual(profile);
+  expect(calls[0]?.url).toContain(`/venues/${VENUE}/restaurant-profile`);
+  expect(header(calls[0], 'Authorization')).toBe('Bearer staff-token');
+  expect(JSON.parse(String(calls[0]?.init.body))).toEqual(input);
+});

@@ -26,6 +26,11 @@ import {
   verifyOwnerDish,
 } from './owner-menu';
 import { cleanupStagedMenuPhotos } from './owner-menu-retention';
+import {
+  readRestaurantProfile,
+  replayRestaurantProfile,
+  saveRestaurantProfile,
+} from './restaurant-profile';
 import { saveCandidateReviewCommand } from './review-command';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -73,6 +78,79 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       idempotencyKey: key,
     };
   };
+  it('persists Screen 5 with tenant isolation, version checks, idempotent receipts and replay', async () => {
+    const commandId = crypto.randomUUID();
+    const details = {
+      name: 'Synthetic Bistro',
+      city: 'Test city',
+      street: 'Test street',
+      line2: '',
+      phone: '1234567890',
+      email: '',
+    };
+    const png =
+      'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAJElEQVR4nO3MMQEAAAgDoEU0ju01hIcPBCABADiarrkeAEA+LbVgAsefyYE+AAAAAElFTkSuQmCC';
+    const storage = { put: vi.fn(async () => ({})) };
+    const input = { commandId, expectedVersion: 0, details, logoPngBase64: png };
+    const first = await saveRestaurantProfile(runtime, actor, venue, input, storage);
+    expect(first.logo).toMatchObject({ width: 32, height: 32 });
+    expect(await saveRestaurantProfile(runtime, actor, venue, input, storage)).toEqual(first);
+    expect(storage.put).toHaveBeenCalledTimes(1);
+    await expect(
+      saveRestaurantProfile(runtime, actor, other, input, storage),
+    ).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(
+      saveRestaurantProfile(runtime, viewer, venue, input, storage),
+    ).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(
+      saveRestaurantProfile(
+        runtime,
+        actor,
+        venue,
+        { ...input, details: { ...details, name: 'Changed' } },
+        storage,
+      ),
+    ).rejects.toMatchObject({ code: 'command_conflict' });
+    await expect(
+      saveRestaurantProfile(
+        runtime,
+        actor,
+        venue,
+        { ...input, commandId: crypto.randomUUID() },
+        storage,
+      ),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
+    const updated = await saveRestaurantProfile(
+      runtime,
+      actor,
+      venue,
+      {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 1,
+        details: { ...details, name: 'Saved name' },
+      },
+      storage,
+    );
+    expect(updated.logo).toEqual(first.logo);
+    const events = (
+      await admin.query(
+        "SELECT tenant_id,stream_id,version,schema_version,event_type,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_type='restaurant_profile' ORDER BY version",
+        [venue],
+      )
+    ).rows;
+    expect(replayRestaurantProfile(events)).toEqual(updated);
+    expect(JSON.stringify(events)).not.toContain(png);
+    expect(await readRestaurantProfile(admin, venue)).toEqual(updated);
+    expect(
+      (
+        await admin.query(
+          "SELECT id FROM app_private.outbox WHERE tenant_id=$1 AND topic='restaurant.profile.saved'",
+          [venue],
+        )
+      ).rowCount,
+    ).toBe(2);
+  });
+
   it('saves incomplete work and resumes exactly; command replay and event replay do not duplicate writes', async () => {
     const id = crypto.randomUUID();
     const command = crypto.randomUUID();

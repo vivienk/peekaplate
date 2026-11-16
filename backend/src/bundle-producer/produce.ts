@@ -4,6 +4,7 @@ import {
   type PublicMenuContentBundle,
   PublicMenuContentBundleSchema,
   type PublicMenuDish,
+  type PublicPortion,
   sha256,
   verifyPublicMenuContentBytes,
 } from '@peekaplate/contracts';
@@ -61,6 +62,7 @@ export type ProducedMenuBundle = {
 };
 
 export type BundleProducerErrorCode =
+  | 'asset_revision_mismatch'
   | 'invalid_request'
   | 'dish_not_found'
   | 'asset_dish_mismatch'
@@ -83,6 +85,7 @@ type AssetManifestEntry = {
   dish_id: string;
   dish_revision_id: string;
   asset_id: string;
+  portion?: PublicPortion;
   card: { url: string; sha256: string; width: number; height: number };
   detail: { url: string; sha256: string; width: number; height: number };
 };
@@ -146,7 +149,11 @@ export async function produceMenuBundle(
 
   assetEntries.sort((left, right) => (left.dish_id < right.dish_id ? -1 : 1));
   const assetManifestHash = await sha256(
-    canonicalJson({ schema_version: 1, assets: assetEntries }),
+    canonicalJson({
+      schema_version: 1,
+      assets: assetEntries,
+      ...(input.restaurant.logo ? { restaurant_logo: input.restaurant.logo } : {}),
+    }),
   );
 
   const pending = parseBundle({
@@ -249,6 +256,16 @@ async function buildDish(
 
   const identity = { dish_id: source.dishId, dish_revision_id: source.dishRevisionId };
   if (
+    requested.portion &&
+    (requested.portion.dish_id !== source.dishId ||
+      requested.portion.dish_revision_id !== source.dishRevisionId)
+  ) {
+    throw new BundleProducerError(
+      'asset_revision_mismatch',
+      'Portion must belong to the approved dish revision',
+    );
+  }
+  if (
     gaps.length > 0 ||
     !price.ok ||
     !currency ||
@@ -278,6 +295,7 @@ async function buildDish(
     dish: {
       ...identity,
       complete: true,
+      ...(requested.portion ? { portion: requested.portion } : {}),
       name: source.name.trim(),
       description,
       price: { amount: price.amount, currency },
@@ -294,6 +312,7 @@ async function buildDish(
     asset: {
       ...identity,
       asset_id: manifest.asset_id,
+      ...(requested.portion ? { portion: requested.portion } : {}),
       card: {
         url: assetUrl(card.path),
         sha256: card.sha256,

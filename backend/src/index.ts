@@ -1075,6 +1075,8 @@ export function createApp(services: Dependencies = dependencies) {
     onError: (c) => c.json({ error: 'body_too_large' }, 413),
   });
   app.use('/venues/*', async (c, next) => {
+    if (c.req.method === 'PUT' && /^\/venues\/[^/]+\/restaurant-profile$/.test(c.req.path))
+      return artworkLimit(c, next);
     if (c.req.method === 'POST' && /^\/venues\/[^/]+\/ingredient-icons\/review$/.test(c.req.path))
       return artworkLimit(c, next);
     if (
@@ -1101,7 +1103,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
   app.use('/venues/*', async (c, next) => {
     if (
-      !/^\/venues\/[^/]+\/(?:prepared-menus(?:\/|$)|ingredient-icons(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+      !/^\/venues\/[^/]+\/(?:restaurant-profile(?:\/|$)|prepared-menus(?:\/|$)|ingredient-icons(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
         c.req.path,
       )
     )

@@ -19,7 +19,8 @@ type Mode =
   | 'dimensions'
   | 'slow'
   | 'no-photo'
-  | 'original-missing';
+  | 'original-missing'
+  | 'branding';
 async function openMenu(page: Page, mode: Mode = 'valid') {
   const content = JSON.parse(
     readFileSync('packages/contracts/fixtures/public-menu-bundle.v1/bundle.json', 'utf8'),
@@ -42,6 +43,13 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
         })),
       };
     }
+  if (mode === 'branding')
+    content.restaurant.logo = {
+      url: 'https://assets.example.test/logo.png',
+      width: 64,
+      height: 64,
+      alt: 'Saved owner logo',
+    };
   const bytes = JSON.stringify(content);
   await page.route('**/src/menu/menuScreen.ts*', async (route) => {
     const response = await route.fetch();
@@ -53,25 +61,36 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
     });
   });
   await page.route('**/public/venues/**', (route) =>
-    route.fulfill({
-      json: {
-        schemaVersion: 1,
-        venueId: content.venue_id,
-        menuId: content.menu_id,
-        menuRevisionId: content.menu_revision_id,
-        publicationId: '44444444-4444-4444-8444-444444444444',
-        publicationHash: 'a'.repeat(64),
-        availabilityVersion: 1,
-        tier: 'T0',
-        bundle: {
-          url: 'https://bundle.example.test/portion.json',
-          contentHash: hash(bytes),
-          assetManifestHash: 'b'.repeat(64),
-        },
-        menuToken: 'synthetic-only',
-        tokenExpiresAt: new Date(Date.now() + 1800000).toISOString(),
-      },
-    }),
+    route.request().url().includes('/ingredient-icons')
+      ? route.fulfill(
+          route.request().url().includes('/image?')
+            ? { contentType: 'image/png', body: blue }
+            : {
+                json: {
+                  schemaVersion: 1,
+                  icons: [{ label: 'leeks', version: 1, status: 'approved', sha256: hash(blue) }],
+                },
+              },
+        )
+      : route.fulfill({
+          json: {
+            schemaVersion: 1,
+            venueId: content.venue_id,
+            menuId: content.menu_id,
+            menuRevisionId: content.menu_revision_id,
+            publicationId: '44444444-4444-4444-8444-444444444444',
+            publicationHash: 'a'.repeat(64),
+            availabilityVersion: 1,
+            tier: 'T0',
+            bundle: {
+              url: 'https://bundle.example.test/portion.json',
+              contentHash: hash(bytes),
+              assetManifestHash: 'b'.repeat(64),
+            },
+            menuToken: 'synthetic-only',
+            tokenExpiresAt: new Date(Date.now() + 1800000).toISOString(),
+          },
+        }),
   );
   await page.route('https://bundle.example.test/portion.json', (route) =>
     route.fulfill({ contentType: 'application/json', body: bytes }),
@@ -1080,3 +1099,43 @@ for (const name of [
     ).toHaveCount(0);
   });
 }
+
+test('published owner branding fits narrow and wide headers and restores name after image failure', async ({
+  page,
+}) => {
+  await openMenu(page, 'branding');
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const logo = page.locator('.pp-logo__image');
+    await expect(logo).toBeVisible();
+    await expect(logo).toHaveJSProperty('naturalWidth', 64);
+    expect(await logo.evaluate((image) => getComputedStyle(image).objectFit)).toBe('contain');
+    const box = await logo.boundingBox();
+    expect(box!.width).toBeLessThanOrEqual(240);
+    expect(box!.height).toBe(72);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  await expect(page.locator('.pp-logo__name, .pp-logo__emblem')).toHaveCount(0);
+  await page
+    .locator('.pp-logo__image')
+    .evaluate((image) => image.dispatchEvent(new Event('error')));
+  await expect(page.locator('.pp-logo__name')).toHaveText('Synthetic Fixture Bistro');
+});
+
+test('approved artwork follows the published ingredient label and falls back on unavailable images', async ({
+  page,
+}) => {
+  await openMenu(page, 'branding');
+  await page.locator('.pp-card__open').first().click();
+  const tile = page.locator('.pp-ingredient').filter({ hasText: /^Leeks$/ });
+  await expect(tile.locator('img')).toHaveAttribute('src', /ingredient-icons\/image\?label=leeks/);
+  await tile.locator('img').evaluate((image) => image.dispatchEvent(new Event('error')));
+  await expect(tile.locator('img')).not.toHaveAttribute('src', /ingredient-icons/);
+  await expect(tile.locator('.pp-ingredient__name')).toHaveText('Leeks');
+  await page.locator('.pp-detail__back').click();
+  await page.locator('.pp-card__open').nth(1).click();
+  await expect(page.locator('.pp-ingredient__name').first()).not.toHaveText('Leeks');
+  await expect(page.locator('.pp-ingredient img[src*="label=leeks"]')).toHaveCount(0);
+});
