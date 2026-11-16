@@ -1657,6 +1657,10 @@ test('the AI panel opens beside the live report and uses only the signed-in owne
     'font-size',
     '16px',
   );
+  await expect(page.getByRole('heading', { name: 'Open rate', level: 3 })).toHaveCSS(
+    'font-size',
+    '16px',
+  );
   await page.screenshot({ path: testInfo.outputPath('owner-workspace-ai.png'), fullPage: true });
   await page.getByRole('button', { name: 'Restaurant Setup', exact: true }).click();
   await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);

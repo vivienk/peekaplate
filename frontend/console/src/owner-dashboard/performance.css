@@ -7,7 +7,8 @@
   line-height: 1.2;
   letter-spacing: -0.022em;
 }
-.performance-page #ad-h {
+.performance-page #ad-h,
+.performance-page h3 {
   font-size: 16px;
   font-weight: 600;
   line-height: 1.3;

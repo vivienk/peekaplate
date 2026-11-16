@@ -2804,6 +2804,10 @@ runtime behavior, migration or hosted resource changed during this failure.
 {"id":"ERR-20261115-SDK-LOCAL-CONTENTION","status":"observed","area":"local-browser-verification","cause":"An eight-worker run timed out during the existing 360-step SDK retry/withdrawal test before its final assertion. No unexpected delivery assertion failed, but the discarded trace prevents a definitive timing diagnosis.","prevention":"Use bounded browser concurrency and preserve failed traces before another config clears the artifact directory. Do not weaken the withdrawal assertion.","sources":["tests/e2e/posthog-adapter.spec.ts"],"regression":"The unchanged SDK file passed 5/5 with two workers in 18.6s; the withdrawal case passed in 7.9s. This is focused recovery evidence, not an uninterrupted full-suite pass."}
 ```
 
+```json
+{"id":"ERR-20261115-PERFORMANCE-HEADING-STYLE","status":"resolved","area":"screen-preservation","cause":"Changing the card heading selector to an ID removed the same authored typography from chart and unavailable-tab h3 headings.","prevention":"Retain shared selectors when adapting semantics; assert both the adapted heading and its unchanged siblings.","sources":["frontend/console/src/owner-dashboard/performance.css","tests/e2e/owner-workspace.spec.ts"],"regression":"New chart-heading assertion fails at 18.72px without the restored selector. Both performance/accessibility cases pass with the original 16px styling in 4.5s."}
+```
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:54:00.059Z","exitCode":1}
