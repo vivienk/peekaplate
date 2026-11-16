@@ -1,3 +1,4 @@
+import { PublicPortionSchema } from '@peekaplate/contracts';
 import {
   ALLERGENS,
   type CompleteDish,
@@ -62,7 +63,13 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
       dish.dietary.some((d) => chipKey(d) === chipKey(value)) &&
       !(glutenFreeExcluded && value === 'Gluten-free'),
   );
+  const portion = PublicPortionSchema.safeParse(dish.portion);
   return {
+    ...(portion.success &&
+    portion.data.dish_id === dish.dish_id &&
+    portion.data.dish_revision_id === dish.dish_revision_id
+      ? { portion: portion.data }
+      : {}),
     kind: 'complete',
     dishId: dish.dish_id,
     dishRevisionId: dish.dish_revision_id,

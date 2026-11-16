@@ -1,0 +1,293 @@
+{
+  "source_pr": 147,
+  "source_commit": "d8e186b450845f5f6035eb32ab1858d9c7a7a3ce",
+  "preview_only": true,
+  "pipeline_sha256": "7874dcfe2fc0b54e29a10d29bf235976aa6efcc857cc55abcb38fa7bc5324ef6",
+  "background": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"640\"></svg>",
+  "entries": [
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000001",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000001",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/avocado-toast.webp",
+          "sha256": "a8bd1c4efcbfc5a8a67e6a9fcf51ee8b2a79178a36fb5c8fca19fc974d598be0",
+          "size_bytes": 72722,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000002",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000002",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/harvest-power-bowl.webp",
+          "sha256": "4b4c7a19f71519f6f926962b12843c4c9c03c032673f341c264e69f07db9933c",
+          "size_bytes": 95280,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000003",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000003",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/classic-eggs-benedict.webp",
+          "sha256": "dce9b6acd8f5692528f2501117d922042a2df4a2e6443209d9a82811ba98f51f",
+          "size_bytes": 68842,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000004",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000004",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/garden-avocado-salad.webp",
+          "sha256": "91cdc1681dfe59e76576c8d5c83ff039ea3bba28449e7d4f51404d8f54b0f0dd",
+          "size_bytes": 90842,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000005",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000005",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/berry-pancake-stack.webp",
+          "sha256": "a4112fbb1c3df979472df424d34e9ac3f131c8754a123643ba109b46969d0c7e",
+          "size_bytes": 82034,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000006",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000006",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/salmon-poke-bowl.webp",
+          "sha256": "3e83d63a4588793b9844b8de927da537db51387f1b2031379164997187b9770a",
+          "size_bytes": 83288,
+          "depth": 1
+        }
+      ]
+    }
+  ],
+  "ingestions": [
+    {
+      "asset_id": "portion_128dda3cf28e520d0421bab2855c07e6",
+      "provenance": {
+        "recipe": "photo-to-portion-v3",
+        "dish_id": "a1000000-0000-4000-8000-000000000001",
+        "revision_id": "a2000000-0000-4000-8000-000000000001",
+        "source_sha256": "a8bd1c4efcbfc5a8a67e6a9fcf51ee8b2a79178a36fb5c8fca19fc974d598be0",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
+        "plate_calibration": null,
+        "segmentation": null,
+        "segmentation_failed": false
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_040a75fdc9f771f85608089edbb51718",
+      "provenance": {
+        "recipe": "photo-to-portion-v3",
+        "dish_id": "a1000000-0000-4000-8000-000000000002",
+        "revision_id": "a2000000-0000-4000-8000-000000000002",
+        "source_sha256": "4b4c7a19f71519f6f926962b12843c4c9c03c032673f341c264e69f07db9933c",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
+        "plate_calibration": null,
+        "segmentation": null,
+        "segmentation_failed": false
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_4856426930ae063176894afeb43130bf",
+      "provenance": {
+        "recipe": "photo-to-portion-v3",
+        "dish_id": "a1000000-0000-4000-8000-000000000003",
+        "revision_id": "a2000000-0000-4000-8000-000000000003",
+        "source_sha256": "dce9b6acd8f5692528f2501117d922042a2df4a2e6443209d9a82811ba98f51f",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
+        "plate_calibration": null,
+        "segmentation": null,
+        "segmentation_failed": false
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_dea1e1d3656098c382dcb18d864a3984",
+      "provenance": {
+        "recipe": "photo-to-portion-v3",
+        "dish_id": "a1000000-0000-4000-8000-000000000004",
+        "revision_id": "a2000000-0000-4000-8000-000000000004",
+        "source_sha256": "91cdc1681dfe59e76576c8d5c83ff039ea3bba28449e7d4f51404d8f54b0f0dd",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
+        "plate_calibration": null,
+        "segmentation": null,
+        "segmentation_failed": false
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_7b405f6db2dcba5c2ad51f21120698b4",
+      "provenance": {
+        "recipe": "photo-to-portion-v3",
+        "dish_id": "a1000000-0000-4000-8000-000000000005",
+        "revision_id": "a2000000-0000-4000-8000-000000000005",
+        "source_sha256": "a4112fbb1c3df979472df424d34e9ac3f131c8754a123643ba109b46969d0c7e",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
+        "plate_calibration": null,
+        "segmentation": null,
+        "segmentation_failed": false
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_9ed354079f4ac980c93c5c72bb60a91c",
+      "provenance": {
+        "recipe": "photo-to-portion-v3",
+        "dish_id": "a1000000-0000-4000-8000-000000000006",
+        "revision_id": "a2000000-0000-4000-8000-000000000006",
+        "source_sha256": "3e83d63a4588793b9844b8de927da537db51387f1b2031379164997187b9770a",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
+        "plate_calibration": null,
+        "segmentation": null,
+        "segmentation_failed": false
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    }
+  ]
+}

@@ -33,6 +33,7 @@ import { evidenceExcerpts } from '../owner-menu/evidence';
 import { errorMessage } from '../owner-menu/jobs';
 import { Button } from '../ui';
 import { FirstDashboardContent } from './FirstDashboard';
+import { OwnerPublish } from './OwnerPublish';
 import { draftToReviewDish } from './review/fromDishDraft';
 import { ReviewDishes } from './review/MenuReview';
 import { initialReview, isMenuReady } from './review/reviewDishes';
@@ -64,6 +65,7 @@ export function OwnerMenuWorkspace({
   actorId,
   venueId,
   restaurantName,
+  canPublish,
   section,
   navigation,
   getAccessToken,
@@ -76,6 +78,7 @@ export function OwnerMenuWorkspace({
   actorId: string;
   venueId: string;
   restaurantName: string;
+  canPublish: boolean;
   section: 'overview' | 'menu';
   navigation: number;
   getAccessToken: () => Promise<string | null>;
@@ -110,6 +113,7 @@ export function OwnerMenuWorkspace({
     | 'review'
     | 'edit'
     | 'processing'
+    | 'publish'
   >('overview');
   const viewGeneration = useRef(0);
   const setView = useCallback((next: typeof view) => {
@@ -845,6 +849,16 @@ export function OwnerMenuWorkspace({
           }}
         />
       </>
+    ) : view === 'publish' && canPublish ? (
+      <OwnerPublish
+        key={`${actorId}:${venueId}`}
+        apiBase={apiBase}
+        actorId={actorId}
+        venueId={venueId}
+        getAccessToken={getAccessToken}
+        onAccessFailure={onAccessFailure}
+        onBack={() => setView('list')}
+      />
     ) : view === 'overview' ? (
       <FirstDashboardContent
         setup={{
@@ -884,6 +898,11 @@ export function OwnerMenuWorkspace({
           <Btn kind="text" disabled={busy} onClick={reload}>
             Reload saved work
           </Btn>
+          {canPublish && (
+            <Btn kind="outlined" disabled={busy} onClick={() => setView('publish')}>
+              Review and publish
+            </Btn>
+          )}
         </div>
         <p>
           Saving these drafts does not change a live menu. Required confirmations and explicit
@@ -1010,7 +1029,9 @@ export function OwnerMenuWorkspace({
     </section>
   );
   if (view === 'review') return content;
-  return ['details', 'sources', 'url', 'photo', 'pdf', 'processing', 'edit'].includes(view) ? (
+  return ['details', 'sources', 'url', 'photo', 'pdf', 'processing', 'edit', 'publish'].includes(
+    view,
+  ) ? (
     <OnboardingLayout
       restaurantName={shownName}
       bare={['photo', 'pdf', 'edit'].includes(view)}
