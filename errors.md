@@ -4486,3 +4486,20 @@ Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
 The new producer regression first failed because `portion` was rejected by the request schema. The header regression was added for ignored published logos; its first combined run also exposed incomplete DOM test doubles. Generic fallback icons required updating the previous no-icon expectations and DOM doubles. The profile test double initially inferred a zero-argument query and failed TypeScript; its SQL argument is now explicit. Regression locations: `backend/src/bundle-producer/produce.test.ts`, `frontend/diner/src/menu/menuScreen.test.ts`, `frontend/diner/src/menu/icons.test.ts`, `backend/src/restaurant-profile.test.ts`.
 
 Local setup initially used Node 24.14 and offline installation missed a locked package. Node 24.16 (Intel) and the locked dependencies were downloaded; no dependency versions changed. The first browser launch found port 5173 occupied, so bounded test copies use isolated ports 5193/5194. No existing server was stopped. Final results are recorded in the PR; these initial failures are not acceptance evidence.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-16T10:18:12.130Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-16T10:23:30.925Z","exitCode":1}
+```
+
+
+### ERR-20261116-DINER-MAPPING follow-up
+
+The unrestricted focused profile database integration passed (persistence, unauthorized venue/viewer rejection, stale versions, idempotency and replay). The standard full database runner exceeded its 120-second integration deadline after all 13 SQL test files passed. The first full unit run could not bind local auth test sockets or write the Worker tool log; 1,941 assertions passed, while auth/Worker setup and local-session cleanup failed. The full test runner was then rerun with local server access. Browser authoring corrected strict label selectors, the configured auth origin, and duplicate notice rendering. Browser testing also found the unknown-status dashboard hid the profile edit action; `FirstDashboard` now exposes editing independently from verification state. Review fixes and regressions cover broken-logo replacement and conflict recovery without losing the form's edits.
+
+The unrestricted full Vitest run passed 1,962 tests (5 skipped). The script suite passed 116/117; its unchanged app-site overlap test compared `/var` and `/private/var` aliases and received the filesystem's EINVAL rather than the expected application error. Final checks use canonical `TMPDIR=/private/tmp`. No app-site source change is included.

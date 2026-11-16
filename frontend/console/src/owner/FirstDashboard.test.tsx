@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { FirstDashboard } from './FirstDashboard';
+import { FirstDashboard, FirstDashboardContent } from './FirstDashboard';
 import type { OwnerSetup } from './setup';
 
 const noop = () => {};
@@ -172,4 +172,17 @@ describe('FirstDashboard (S12 first dashboard arrival, S6-FE-14 onboarding)', ()
     expect(page).not.toContain('Finish setting up');
     expect(render(published)).toContain('data-ai-state="empty"');
   });
+});
+
+it('offers connected profile editing without inventing verification or publication status', () => {
+  const html = renderToStaticMarkup(
+    <FirstDashboardContent
+      detailsEditable
+      setup={{ ...figmaState, detailsStatus: 'unknown', published: null }}
+      onOpenStep={noop}
+    />,
+  );
+  expect(html).toContain('Edit restaurant details');
+  expect(text(html)).toContain('Status unavailable');
+  expect(text(html)).not.toContain("We've checked your restaurant details");
 });

@@ -65,6 +65,7 @@ async function fixture(context: BrowserContext) {
   const state = {
     profile: null as RestaurantProfile | null,
     profilePng: null as Buffer | null,
+    logoStatus: 200,
     venues: [venue],
     reportStatus: 200,
     denyIdentity: false,
@@ -224,6 +225,8 @@ async function fixture(context: BrowserContext) {
         }
         return route.fulfill({ json: { profile: state.profile }, headers });
       }
+      if (path.startsWith('restaurant-profile/logo/') && state.logoStatus !== 200)
+        return route.fulfill({ status: state.logoStatus, json: { error: 'unavailable' }, headers });
       if (path.startsWith('restaurant-profile/logo/') && state.profilePng)
         return route.fulfill({ contentType: 'image/png', body: state.profilePng, headers });
       if (path === 'menus/jobs') {
@@ -1964,22 +1967,46 @@ test('Screen 5 saves a normalized uploaded logo and restores it after reload', a
 }) => {
   const state = await fixture(context);
   await signIn(page);
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await page.getByRole('button', { name: 'Restaurant Setup', exact: true }).click();
   await page.getByRole('button', { name: /Restaurant details/i }).click();
-  await page.getByLabel('Restaurant name', { exact: true }).fill('Synthetic logo cafe');
-  await page.getByLabel('City', { exact: true }).fill('Test city');
-  await page.getByLabel('Street address', { exact: true }).fill('Test street');
-  await page.getByLabel('Phone number', { exact: true }).fill('1234567890');
+  await page
+    .getByRole('textbox', { name: 'Restaurant name', exact: true })
+    .fill('Synthetic logo cafe');
+  await page.getByRole('textbox', { name: 'City', exact: true }).fill('Test city');
+  await page.getByRole('textbox', { name: 'Street address', exact: true }).fill('Test street');
+  await page.getByRole('textbox', { name: 'Phone number', exact: true }).fill('1234567890');
   await page.locator('input[type=file]').setInputFiles('tests/fixtures/portion/foreground.png');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(() => state.profile?.version).toBe(1);
   expect(state.profile?.logo).toMatchObject({ width: 64, height: 64 });
   await page.reload();
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await page.getByRole('button', { name: 'Restaurant Setup', exact: true }).click();
   await page.getByRole('button', { name: /Restaurant details/i }).click();
-  await expect(page.getByLabel('Restaurant name', { exact: true })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Restaurant name', exact: true })).toHaveValue(
     'Synthetic logo cafe',
   );
   await expect(page.locator('img[src^="blob:"]')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+  state.logoStatus = 503;
+  await page.getByRole('button', { name: 'Back to dashboard', exact: true }).click();
+  await page.getByRole('button', { name: /Restaurant details/i }).click();
+  await expect(
+    page.getByText('Your saved logo could not load. You can upload a replacement.'),
+  ).toBeVisible();
+  await page
+    .getByRole('textbox', { name: 'Restaurant name', exact: true })
+    .fill('Unsaved corrected name');
+  await page
+    .locator('input[type=file]')
+    .setInputFiles('tests/fixtures/portion/foreground-blue.png');
+  // Another owner saves before this form submits.
+  state.profile!.version = 2;
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('button', { name: 'Reload latest version', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Restaurant name', exact: true })).toHaveValue(
+    'Unsaved corrected name',
+  );
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => state.profile?.version).toBe(3);
+  expect(state.profile?.details.name).toBe('Unsaved corrected name');
 });

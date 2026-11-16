@@ -81,7 +81,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "1d0d617910820048285c294efbc2e6d5661c140bdc6bd48dd87c25a93ed70e28"
+      "sourceFingerprint": "5c26722bc6e2ffed9a4c8d853a195951c730ed959029ba129bd4e79a56dfca3f"
     },
     {
       "id": "tokens",
@@ -270,7 +270,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "6af9eca2acabcd7a28886d9dc9ab21248e93cd8f2e80d908b5b859bb0bacc6a8"
+      "sourceFingerprint": "4059ab5494cec3380760202eafbd93387b1b5b1fb8ff6e48f2693c8c7cdfb469"
     },
     {
       "id": "console",
@@ -414,12 +414,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "449c60ba7fff066a95a5d4a873b6fd9b522a4748c27e8584449b884c6b8a7ba5"
+      "sourceFingerprint": "7f0f7d06e56b124747fea291775c1b6aae40ff4547df2a1dab643a62af2a4329"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces have versioned private draft/photo/upload flows; owner-only staging prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog; public reads and ingestion share exact configured staging-origin CORS. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are idempotent. AI trust/issuance remains gated. Artwork uses blob-locked repair before approval. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job including redelivery. Hosted rollout/acceptance stays separate. Screen 5 now saves a tenant-scoped private profile and immutable normalized logo. Operator bundle preparation can export verified saved branding and revision-bound approved portion payloads; hosting/publication remain gated.",
+      "summary": "Runtime owns staff authorization, tenant-scoped commands, menu ingestion, review/publication, observations and owner reports. Screen 5 persists private versioned branding with command receipts, events and outbox; operator preparation exports hash-verified saved logos and exact-revision approved portions into immutable bundles. Owner APIs remain staging/local gated; hosting and publication require existing approval commands. See source-linked module docs for individual acceptance boundaries.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -612,7 +612,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e8403b18c9356839fe5d371e1e359bcfc1524339fb1d264632ebc847186f2b56"
+      "sourceFingerprint": "3c486e9976e335edddc20356fafe80c8ecd13f4d6c4389d63ca44c65bf4a35aa"
     },
     {
       "id": "database",

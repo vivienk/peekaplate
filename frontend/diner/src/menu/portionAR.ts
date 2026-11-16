@@ -7,7 +7,8 @@ export function portionWorldWidth(size?: PublicPortion['physical_size']) {
   return size ? size.plate.width_mm / 1000 / size.plate.boundary.width : 0.3;
 }
 
-// Local review only. The caller imports this module behind the explicit DEV fixture gate.
+// Loaded after a validated portion is ready. Opening table preview is an explicit action;
+// fixture-only generated models remain gated by the caller.
 export function bindPortionAR(
   controls: HTMLElement,
   source: () => HTMLImageElement | null,

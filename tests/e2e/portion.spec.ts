@@ -46,8 +46,8 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
   if (mode === 'branding')
     content.restaurant.logo = {
       url: 'https://assets.example.test/logo.png',
-      width: 64,
-      height: 64,
+      width: 320,
+      height: 80,
       alt: 'Saved owner logo',
     };
   const bytes = JSON.stringify(content);
@@ -96,6 +96,11 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
     route.fulfill({ contentType: 'application/json', body: bytes }),
   );
   await page.route('https://assets.example.test/**', async (route) => {
+    if (route.request().url().endsWith('/logo.png'))
+      return route.fulfill({
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="80" viewBox="0 0 320 80"><rect x="1" y="1" width="318" height="78" rx="8" fill="#f8ead5"/><text x="160" y="49" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#33291e">SYNTHETIC LOGO</text></svg>',
+      });
     const layer = /\/([01])\.png$/.exec(route.request().url());
     if (layer && mode === 'slow') await new Promise((resolve) => setTimeout(resolve, 9000));
     if (
@@ -1102,17 +1107,19 @@ for (const name of [
 
 test('published owner branding fits narrow and wide headers and restores name after image failure', async ({
   page,
-}) => {
+}, testInfo) => {
   await openMenu(page, 'branding');
   for (const width of [320, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     const logo = page.locator('.pp-logo__image');
     await expect(logo).toBeVisible();
-    await expect(logo).toHaveJSProperty('naturalWidth', 64);
+    await expect(logo).toHaveJSProperty('naturalWidth', 320);
     expect(await logo.evaluate((image) => getComputedStyle(image).objectFit)).toBe('contain');
     const box = await logo.boundingBox();
     expect(box!.width).toBeLessThanOrEqual(240);
     expect(box!.height).toBe(72);
+    if (width === 390 || width === 1280)
+      await page.screenshot({ path: testInfo.outputPath(`published-logo-${width}.png`) });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -1129,7 +1136,7 @@ test('approved artwork follows the published ingredient label and falls back on 
 }) => {
   await openMenu(page, 'branding');
   await page.locator('.pp-card__open').first().click();
-  const tile = page.locator('.pp-ingredient').filter({ hasText: /^Leeks$/ });
+  const tile = page.locator('.pp-ingredient').filter({ hasText: /Leeks/ });
   await expect(tile.locator('img')).toHaveAttribute('src', /ingredient-icons\/image\?label=leeks/);
   await tile.locator('img').evaluate((image) => image.dispatchEvent(new Event('error')));
   await expect(tile.locator('img')).not.toHaveAttribute('src', /ingredient-icons/);

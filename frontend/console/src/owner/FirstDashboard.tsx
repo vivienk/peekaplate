@@ -191,6 +191,7 @@ export function FirstDashboardAside({
 }
 
 export function FirstDashboardContent({
+  detailsEditable = false,
   setup,
   onOpenStep,
   showPublishSuccess,
@@ -198,7 +199,7 @@ export function FirstDashboardContent({
 }: Pick<
   FirstDashboardProps,
   'setup' | 'onOpenStep' | 'showPublishSuccess' | 'onClosePublishSuccess'
->) {
+> & { detailsEditable?: boolean }) {
   const steps = setupSteps(setup);
   const progress = setupProgress(setup);
   const progressKnown = steps.every((step) => step.state !== 'unknown');
@@ -283,7 +284,15 @@ export function FirstDashboardContent({
               <p>{step.description}</p>
             </div>
             <div className="owner-step__action">
-              {step.action ? (
+              {detailsEditable && step.id === 'details' && !step.action ? (
+                <Button
+                  variant="outline"
+                  className="owner-button"
+                  onClick={() => onOpenStep('details')}
+                >
+                  Edit restaurant details
+                </Button>
+              ) : step.action ? (
                 <Button
                   variant="outline"
                   className="owner-button"

@@ -137,6 +137,7 @@ export function OwnerMenuWorkspace({
   const [profileVersion, setProfileVersion] = useState(0);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [profileRead, setProfileRead] = useState(0);
+  const [profileConflict, setProfileConflict] = useState(false);
   const [details, setDetails] = useState<Details | null>(null);
   const [detailsPhotoUrl, setDetailsPhotoUrl] = useState<string | null>(null);
   // S9: dishes the owner reviewed in this session, and the state of the "I have reviewed" checkbox.
@@ -675,12 +676,19 @@ export function OwnerMenuWorkspace({
           return null;
         });
         if (profile?.logo) {
-          const blob = await active.client.restaurantLogo(venueId, profile.logo.sha256);
-          if (stopped || !current(active)) return;
-          setDetailsPhotoUrl((previous) => {
-            if (previous) URL.revokeObjectURL(previous);
-            return URL.createObjectURL(blob);
-          });
+          try {
+            const blob = await active.client.restaurantLogo(venueId, profile.logo.sha256);
+            if (stopped || !current(active)) return;
+            setDetailsPhotoUrl((previous) => {
+              if (previous) URL.revokeObjectURL(previous);
+              return URL.createObjectURL(blob);
+            });
+          } catch (reason) {
+            if (stopped || !current(active)) return;
+            if (reason instanceof OwnerMenuApiError && [401, 403].includes(reason.status))
+              throw reason;
+            setNotice('Your saved logo could not load. You can upload a replacement.');
+          }
         }
         if (!stopped && current(active)) {
           setProfileLoaded(true);
@@ -718,6 +726,24 @@ export function OwnerMenuWorkspace({
             Reload restaurant details
           </Button>
         )}
+        {profileConflict && (
+          <Button
+            disabled={busy}
+            onClick={() =>
+              void run(async (active) => {
+                const latest = await active.client.readRestaurantProfile(venueId);
+                if (!current(active)) return;
+                setProfileVersion(latest?.version ?? 0);
+                setProfileConflict(false);
+                setNotice(
+                  'Latest saved version loaded. Your edits are still here; review them before saving over that version.',
+                );
+              })
+            }
+          >
+            Reload latest version
+          </Button>
+        )}
         <RestaurantDetails
           mode={details ? 'dashboard' : 'onboarding'}
           saved={details ?? undefined}
@@ -735,10 +761,17 @@ export function OwnerMenuWorkspace({
                 details: next,
                 ...(logoPngBase64 ? { logoPngBase64 } : {}),
               };
-              const profile = await active.client.saveRestaurantProfile(venueId, input);
+              const profile = await active.client
+                .saveRestaurantProfile(venueId, input)
+                .catch((reason) => {
+                  if (current(active) && reason instanceof OwnerMenuApiError && reason.isConflict)
+                    setProfileConflict(true);
+                  throw reason;
+                });
               if (!current(active)) return;
               setDetails(profile.details);
               setProfileVersion(profile.version);
+              setProfileConflict(false);
               if (photo)
                 setDetailsPhotoUrl((previous) => {
                   if (previous) URL.revokeObjectURL(previous);
@@ -944,6 +977,7 @@ export function OwnerMenuWorkspace({
       />
     ) : view === 'overview' ? (
       <FirstDashboardContent
+        detailsEditable
         setup={{
           venueId,
           restaurantName: shownName,
