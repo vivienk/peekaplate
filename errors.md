@@ -2821,3 +2821,14 @@ runtime behavior, migration or hosted resource changed during this failure.
 ```json
 {"id":"ERR-20261115-REVIEW-RELEASE-DEPENDENCY","status":"resolved","area":"narrow-release-composition","cause":"Promoting the authored review controller from develop omitted its existing RestaurantDetails and details imports; typechecking and the first browser startup exposed the missing dependency.","prevention":"Trace transitive imports when promoting a frontend slice to main; complete typechecking before starting dependent browser tests. Reuse the authored dependency rather than create a substitute.","sources":["frontend/console/src/owner/OwnerMenuWorkspace.tsx","frontend/console/src/onboarding/RestaurantDetails.tsx","frontend/console/src/onboarding/details.ts","frontend/console/src/onboarding/details.test.tsx"],"regression":"Original S05 source and tests promoted unchanged. pnpm check passes; workspace 45 cases and review preview 9 cases pass. No profile-save API or hosted acceptance is claimed."}
 ```
+
+# ERR-20261115-DATA01-CORS — routing diner observation preflight
+
+Hosted preflight from the configured routing-staging diner returned 204 without
+Access-Control-Allow-Origin. Public-menu reads allowed that origin but observation
+writes used the older fixed list, preventing browser delivery before token checks.
+The regression in backend/src/index.test.ts failed with null instead of the exact
+origin, then passed after both paths reused the existing staging-only rule.
+Production/unconfigured/lookalike origins and missing-token denial are covered.
+Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
+

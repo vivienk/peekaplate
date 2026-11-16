@@ -363,7 +363,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker owns verified tenant commands, publication, observations, ingestion and owner reports. Command paths share the existing transactional owner/editor membership check. Existing #165 ingredient-artwork review/read/revocation uses the private R2 prefix, hash-bound approved bytes, tenant projection and dry-run cleanup. Publication remains owner-only; artwork approval changes no food facts. Matching extraction budget host/container deployment and controlled provider acceptance remain separately coordinated.",
+      "summary": "Hono Worker owns verified tenant commands, publication, observations, ingestion and owner reports. Public reads and observation ingestion share exact configured staging-origin CORS. Command paths share the existing transactional owner/editor membership check. Existing #165 ingredient-artwork review/read/revocation uses the private R2 prefix, hash-bound approved bytes, tenant projection and dry-run cleanup. Publication remains owner-only; artwork approval changes no food facts. Matching extraction budget host/container deployment and controlled provider acceptance remain separately coordinated.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -527,7 +527,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "cffa8a40cb2e4ee090cf71f72b274e5cf3c50de1bf999d8a3c62a53d9bc8e8ed"
+      "sourceFingerprint": "11ab88b5a4d173909986c5e62f5774359f574ea4d46b4d702f61f47588362bb8"
     },
     {
       "id": "database",
@@ -656,7 +656,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "8aa57c03a02b87ffb1111b5a354ff571609e59a159b68bb747ea4d296554276a"
+      "sourceFingerprint": "7d7131602f43625fa0295498270740d96eb208d502038192dfa44ae584e6d916"
     },
     {
       "id": "agents",
