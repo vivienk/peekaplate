@@ -73,6 +73,7 @@ async function fixture(context: BrowserContext) {
     invalidActor: false,
     drafts: {} as Record<string, DishDraft[]>,
     profiles: {} as Record<string, RestaurantProfile>,
+    afterVerification: null as ((draft: DishDraft) => void) | null,
     profileStatus: 200,
     setupStatus: 200,
     delaySetup: false,
@@ -410,6 +411,7 @@ async function fixture(context: BrowserContext) {
         if (!draft || draft.draft_version !== input.expectedVersion)
           return route.fulfill({ status: 409, json: { error: 'version_conflict' }, headers });
         draft.verification_status = 'verified';
+        state.afterVerification?.(draft);
         return route.fulfill({ json: { draft }, headers });
       }
       if (/^drafts\/[^/]+\/photos\/[^/]+\/approve$/.test(path)) {
@@ -589,8 +591,8 @@ async function addCategory(page: Page, category: string) {
 
 async function openAccount(page: Page) {
   const menu = page.locator('details.pp-onboard__account-menu');
-  await expect(menu).toBeAttached();
-  if ((await menu.getAttribute('open')) === null) await menu.locator('summary').click();
+  if ((await menu.count()) && (await menu.getAttribute('open')) === null)
+    await menu.locator('summary').click();
 }
 
 async function preparedPublication(context: BrowserContext) {
@@ -1106,6 +1108,9 @@ test('profile save reloads authenticated details and never verifies an owner sub
   await expect.poll(() => state.profiles[venue.venueId]?.version).toBe(1);
   expect(state.profiles[venue.venueId]?.status).toBe('submitted');
   await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Welcome to PeekaPlate', exact: true }),
+  ).toBeVisible();
   await openAccount(page);
   await page.getByRole('button', { name: 'Restaurant details', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Street address/ })).toHaveValue(
@@ -1545,6 +1550,9 @@ test('a delayed review session cannot reopen an editor after shell navigation', 
     },
   ];
   await signIn(page);
+  await expect(
+    page.getByRole('button', { name: `Edit ${item.effective.name}`, exact: true }),
+  ).toBeVisible();
   state.reviewStarted = false;
   state.delayReview = true;
   await page.getByRole('button', { name: `Edit ${item.effective.name}`, exact: true }).click();
@@ -2059,6 +2067,19 @@ test('authored S10 verifies actual saved drafts without publication and preserve
   await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
   await page.reload();
   await page.getByRole('button', { name: 'Edit: Add your menu', exact: true }).click();
+  state.afterVerification = (draft) => {
+    draft.removed_at = new Date().toISOString();
+    const replacement = structuredClone(draft);
+    replacement.id = crypto.randomUUID();
+    replacement.draft_id = replacement.id;
+    replacement.removed_at = null;
+    replacement.verification_status = 'not_verified';
+    state.drafts[venue.venueId]!.push(replacement);
+    state.afterVerification = null;
+  };
+  await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Saved data changed');
+  await expect(page.getByRole('dialog', { name: 'Menu verified' })).toHaveCount(0);
   state.venues = [];
   state.menuStatus = 403;
   await page.getByRole('button', { name: 'Complete verification', exact: true }).click();

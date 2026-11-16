@@ -727,6 +727,7 @@ export function OwnerMenuWorkspace({
           (draft) =>
             !confirmed.some(
               (saved) =>
+                !saved.removed_at &&
                 saved.id === draft.id &&
                 saved.draft_version === draft.draft_version &&
                 saved.verification_status === 'verified',

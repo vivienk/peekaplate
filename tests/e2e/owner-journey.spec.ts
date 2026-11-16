@@ -13,7 +13,10 @@ for (const width of [1440, 390]) {
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );
-      await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true });
+      await page.screenshot({
+        path: info.outputPath(`${name}-${width}.png`),
+        fullPage: !['s11-menu-verified', 's13-confirmation'].includes(name),
+      });
     };
     await page.goto('http://127.0.0.1:5174/owner-onboarding.html?journey');
     await expect(page.getByText('Synthetic S05–S13 walkthrough.')).toBeVisible();
@@ -62,6 +65,12 @@ for (const width of [1440, 390]) {
       'Ember & Stone',
     );
     await shot('s13-preview');
+    const phone = page.getByRole('region', { name: 'Draft diner menu', exact: true });
+    await phone.locator('article').last().scrollIntoViewIfNeeded();
+    await expect(phone.locator('article').last()).toBeInViewport();
+    await phone
+      .getByRole('heading', { name: 'Ember & Stone', exact: true })
+      .scrollIntoViewIfNeeded();
     await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Publish your menu?' })).toBeVisible();
     await shot('s13-confirmation');

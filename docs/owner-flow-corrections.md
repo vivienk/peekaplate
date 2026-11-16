@@ -106,7 +106,7 @@ and migration; the old staging API cannot satisfy the new profile/setup reads.
 ## Pictures and verification
 
 The 24 screenshots below use real rendered components with fictional local
-state. Browser navigation passed at 1440px and 390px in 16.7s including startup.
+state. Browser navigation passed at 1440px and 390px in 14.3s including startup.
 They are not hosted acceptance or physical-phone/camera calibration.
 
 ![Desktop flow](review/owner-flow-screens/flow-overview-1440.jpg)
@@ -129,4 +129,11 @@ They are not hosted acceptance or physical-phone/camera calibration.
 Local database checks passed: 382 pgTAP assertions, 158 Worker/database integration
 tests (36.89s for integration), plus the disposable local Worker command smoke.
 The suite uses the restricted runtime role, not a privileged substitute.
-Final whole-repository/browser verification is recorded on the PR's final commit.
+Connected-workspace Chromium checks passed 50/50 in 54.4s, including persisted
+save/reload, private photos, exact active-draft verification, denial and session
+switches. The related authored onboarding/review/photo/preview suite passed 52/52
+in 1.1 minutes. `pnpm check` passed 1,957 unit and 117 script tests; builds and
+strict preview isolation checks passed. The hosted PR walkthrough was navigated
+in Brave through S05, URL import simulation, edit/review, verification, dashboard
+and official S13 confirmation/example-link state. That checks the hosted demo,
+not real API/extraction/publication acceptance. Final commit/CI are on the PR.

@@ -4519,6 +4519,13 @@ The original S05 photo-baseline regression exposed a compatibility distinction:
 private blob URL arrival is not a changed saved photo. The live adapter supplies
 stable photo identity; callers without it retain the authored URL-baseline rule.
 
+The final snapshot also rejects a removed original when another tab adds a new
+unverified draft with the same active count. The fixture reproduces the stale
+success before the identity predicate is corrected. The final 50-case workspace
+suite passes in 54.4s. Its delayed-review test now waits for initial hydration
+before delaying the intended editor request; direct loading/picker states retain
+their existing account-menu helper behavior.
+
 
 <!-- automatic observation; not root cause -->
 ```json
