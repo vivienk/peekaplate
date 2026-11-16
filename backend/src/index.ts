@@ -25,6 +25,7 @@ import {
   PreparedMenuPreviewSchema,
   PreparedMenusSchema,
   type PublicMenuResponse,
+  PublicRestaurantDirectorySchema,
   PublishMenuSchema,
   RestaurantSlugSchema,
   type ReviewCandidateCommand,
@@ -95,7 +96,7 @@ import {
   readDinerLink,
   withdrawMenu,
 } from './publication-command';
-import { resolveRestaurantLink } from './restaurant-link';
+import { listPublishedRestaurants, resolveRestaurantLink } from './restaurant-link';
 import { retrieveMenuEvidence } from './retrieval';
 import { type ReviewArtifactObject, verifyReviewArtifact } from './review-artifact';
 import {
@@ -125,6 +126,7 @@ export type Bindings = {
   OWNER_AI_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   APP_ENV?: string;
   DINER_PUBLIC_ORIGIN?: string;
+  MARKET_PUBLIC_ORIGIN?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
   LOCAL_DATABASE_URL?: string;
@@ -223,6 +225,10 @@ type Dependencies = {
     menuId: string,
     env: Bindings,
   ) => Promise<PublicMenuRecord | undefined>;
+  listPublishedRestaurants?: (
+    after: string | null,
+    env: Bindings,
+  ) => ReturnType<typeof listPublishedRestaurants>;
   resolveRestaurantLink?: (slug: string, env: Bindings) => ReturnType<typeof resolveRestaurantLink>;
   readDinerLink?: (
     actorId: string,
@@ -554,6 +560,8 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  listPublishedRestaurants: (after, env) =>
+    withDatabase(env, (client) => listPublishedRestaurants(client, after)),
   resolveRestaurantLink: (slug, env) =>
     withDatabase(env, (client) => resolveRestaurantLink(client, slug)),
   readDinerLink: (actorId, venueId, menuId, env) =>
@@ -970,7 +978,11 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/public/*',
     cors({
-      origin: (origin, c) => allowedDinerOrigin(origin, c.env),
+      origin: (origin, c) => {
+        const market = c.env?.MARKET_PUBLIC_ORIGIN;
+        if (market && /^https:\/\/[^/]+$/.test(market) && origin === market) return origin;
+        return allowedDinerOrigin(origin, c.env);
+      },
       allowMethods: ['GET', 'OPTIONS'],
       maxAge: 86400,
     }),
@@ -979,6 +991,17 @@ export function createApp(services: Dependencies = dependencies) {
     verify: services.verify,
     authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
     database: withDatabase,
+  });
+  app.get('/public/restaurants', async (c) => {
+    const after = c.req.query('after') ?? null;
+    if (after !== null && !MenuScopeSchema.shape.venueId.safeParse(after).success)
+      return c.json({ error: 'invalid_request' }, 400);
+    if (!services.listPublishedRestaurants) throw new AuthUnavailableError();
+    return c.json(
+      PublicRestaurantDirectorySchema.parse(
+        await services.listPublishedRestaurants(after, c.env ?? {}),
+      ),
+    );
   });
   app.get('/public/restaurants/:slug', async (c) => {
     const slug = RestaurantSlugSchema.safeParse(c.req.param('slug'));

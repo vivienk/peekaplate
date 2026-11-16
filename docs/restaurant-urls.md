@@ -40,8 +40,7 @@ new publish command before it receives a link; old command retries stay effect-f
 The diner resolves /diner/:slug through GET /public/restaurants/:slug. A bounded
 security-definer lookup returns only the published venue/menu IDs; the existing
 public reader, token issuance, exact-byte hash and identity checks remain the
-content authority. Missing/withdrawn links return 404. There is no list endpoint,
-draft fallback, cross-tenant write or browser database credential.
+content authority. Missing/withdrawn links return 404. The public directory described in [market-directory](market-directory.md) adds published scope discovery. There is no draft fallback, cross-tenant write or browser database credential.
 
 The production URL origin is https://peekaplate.app. Staging explicitly uses the
 isolated routing-staging Pages branch configured by DINER_PUBLIC_ORIGIN. Only

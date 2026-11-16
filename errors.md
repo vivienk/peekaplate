@@ -2832,3 +2832,13 @@ origin, then passed after both paths reused the existing staging-only rule.
 Production/unconfigured/lookalike origins and missing-token denial are covered.
 Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
 
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-16T09:58:12.188Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T10:00:06.739Z","exitCode":2}
+```

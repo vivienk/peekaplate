@@ -1473,3 +1473,5 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
   queuedAt: z.string().datetime(),
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
+
+export { PublicRestaurantDirectorySchema } from './restaurant-directory';

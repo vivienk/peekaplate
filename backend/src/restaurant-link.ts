@@ -53,3 +53,17 @@ export async function resolveRestaurantLink(client: Client, slug: string) {
   );
   return result.rows[0];
 }
+
+/** Public discovery contains scopes only; approved bundle bytes remain authoritative. */
+export async function listPublishedRestaurants(client: Client, after: string | null) {
+  const result = await client.query<{ venueId: string; menuId: string }>(
+    'SELECT * FROM app_private.list_published_restaurants($1)',
+    [after],
+  );
+  const restaurants = result.rows.slice(0, 64);
+  return {
+    schemaVersion: 1 as const,
+    restaurants,
+    nextCursor: result.rows.length > 64 ? restaurants.at(-1)!.venueId : null,
+  };
+}

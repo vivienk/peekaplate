@@ -59,7 +59,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-analysis.ts",
         "packages/contracts/src/portion.ts",
         "packages/contracts/src/ingredient-artwork.ts",
-        "packages/contracts/package.json"
+        "packages/contracts/package.json",
+        "packages/contracts/src/restaurant-directory.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -67,7 +68,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "6295c5c2f8ba6bef188f49d9417dd46a0faf6379a9195d683af2560842e3700c"
+      "sourceFingerprint": "bd24ba1ea456675b70b211fe4e84695a4fbbc94d59a69176b8962c9952d72573"
     },
     {
       "id": "tokens",
@@ -219,7 +220,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "66cdee1e1156f15268754c620fc687ba24023a78d2eacfc8de7b068e06077f91"
+      "sourceFingerprint": "21e7a638e13499f0e24a53d4467150859c4c16e64e3ab81198280d0efe868f49"
     },
     {
       "id": "console",
@@ -363,7 +364,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker owns verified tenant commands, publication, observations, ingestion and owner reports. Public reads and observation ingestion share exact configured staging-origin CORS. Command paths share the existing transactional owner/editor membership check. Existing #165 ingredient-artwork review/read/revocation uses the private R2 prefix, hash-bound approved bytes, tenant projection and dry-run cleanup. Publication remains owner-only; artwork approval changes no food facts. Matching extraction budget host/container deployment and controlled provider acceptance remain separately coordinated.",
+      "summary": "Hono Worker owns verified tenant commands, publication, observations, ingestion and owner reports. Public reads and observation ingestion share exact configured staging-origin CORS. Command paths share the existing transactional owner/editor membership check. Existing #165 ingredient-artwork review/read/revocation uses the private R2 prefix, hash-bound approved bytes, tenant projection and dry-run cleanup. Publication remains owner-only; artwork approval changes no food facts. Matching extraction budget host/container deployment and controlled provider acceptance remain separately coordinated. Public restaurant discovery exposes only published scopes with bounded keyset pages; exact market CORS applies to public reads only. Hosted directory activation remains pending.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -514,7 +515,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingredient-artwork.test.ts",
         "backend/src/ingredient-artwork-retention.test.ts",
         "backend/src/ingredient-artwork.integration.ts",
-        "migrations/20261113020000_ingredient_artwork.sql"
+        "migrations/20261113020000_ingredient_artwork.sql",
+        "backend/src/restaurant-directory.test.ts",
+        "docs/market-directory.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -527,7 +530,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "11ab88b5a4d173909986c5e62f5774359f574ea4d46b4d702f61f47588362bb8"
+      "sourceFingerprint": "59b4dae6c101f16a37187baea8bb7329b13925bcb66c5010bef57c7fd80d52aa"
     },
     {
       "id": "database",
@@ -560,7 +563,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner_menu_workspace.sql",
         "migrations/20261114010000_restaurant_menu_links.sql",
         "tests/db/restaurant_links.sql",
-        "migrations/20261113010000_menu_verification_lifecycle.sql"
+        "migrations/20261113010000_menu_verification_lifecycle.sql",
+        "migrations/20261116010000_public_restaurant_directory.sql",
+        "tests/db/restaurant_directory.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -571,7 +576,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "fddecfbbd520d63d37b42c6ad95127370471437e687f3b9b97ccd079681a7b9d"
+      "sourceFingerprint": "8be63c275af45b51d7185765c9d151d8b337e1c916b092449bb69341376242cd"
     },
     {
       "id": "measurement",
