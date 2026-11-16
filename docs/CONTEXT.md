@@ -612,7 +612,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c63b91b4cd0d353557f68476b4e81003133e3c15134540166afad81666f7e738"
+      "sourceFingerprint": "3d0c8829906c896598657add5a549308e8ed66c96165ddfdd7ac72bcedb7d939"
     },
     {
       "id": "database",
@@ -1117,7 +1117,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "diner"
       ],
-      "summary": "Connects saved Screen 5 branding to operator bundle preparation and diner header; accepts exact revision-bound approved portions and retains ingredient fallback icons. Automated checks are recorded in the PR. Follow-up isolates browser fixture lifecycle, bounds the full DB lane at five minutes, fixes demo header wait, and documents Noka staging acceptance.",
+      "summary": "Connects saved Screen 5 branding to operator bundle preparation and diner header; accepts exact revision-bound approved portions and retains ingredient fallback icons. Automated checks are recorded in the PR. Follow-up owns browser fixture lifecycle, bounds the full DB lane at five minutes, fixes demo header wait, and documents Noka staging acceptance.",
       "files": [
         "docs/diner-published-mapping.md",
         "backend/src/restaurant-profile.ts",

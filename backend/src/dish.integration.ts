@@ -384,19 +384,23 @@ afterAll(async () => {
 describe('owner menu browser transport', () => {
   let browser: Browser | undefined;
   let page: Page;
+  let consoleServer: Server | undefined;
 
   beforeAll(async () => {
     // Chromium startup is fixture setup, not part of the command's 15s deadline.
     browser = await chromium.launch();
     page = await browser.newPage();
-    // Supply only the document at the real allowed console origin. Never adopt an
-    // unrelated server on port 5174; all Worker/API requests still use real HTTP.
-    await page.route('http://127.0.0.1:5174/workspace-check.html', (route) =>
-      route.fulfill({
-        contentType: 'text/html',
-        body: '<!doctype html><title>Synthetic owner workspace transport</title>',
-      }),
+    // Own the real allowed console origin. A conflicting listener is a setup
+    // error, never permission to navigate an unrelated app or reuse its state.
+    consoleServer = createServer((_, res) =>
+      res
+        .writeHead(200, { 'Content-Type': 'text/html' })
+        .end('<!doctype html><title>Synthetic owner workspace transport</title>'),
     );
+    await new Promise<void>((resolve, reject) => {
+      consoleServer!.once('error', reject);
+      consoleServer!.listen(5174, '127.0.0.1', resolve);
+    });
     await page.goto('http://127.0.0.1:5174/workspace-check.html');
   });
 
@@ -404,6 +408,11 @@ describe('owner menu browser transport', () => {
     // Hooks also close the page after a timed-out test, cancelling pending fetches
     // before another suite can use the same Worker/database.
     await browser?.close();
+    if (consoleServer?.listening) {
+      await new Promise<void>((resolve, reject) =>
+        consoleServer!.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
   });
 
   it('saves and resumes a private draft/photo through Chromium and the actual Worker/database', async () => {

@@ -4516,3 +4516,12 @@ The extended disposable-database integration run completed with 151 passed and t
 The standard local database runner again exhausted its 120-second child-process deadline. An isolated diagnostic reproduced only the browser-transport case at 15 seconds; analytics completed in 3.1 seconds and real-JWT persistence in 0.3 seconds. Chromium startup/document navigation consumed the same test budget as API assertions, and the fixture silently reused an unrelated listener when port 5174 was occupied. It now routes only the synthetic document at the allowed console origin, moves browser startup into the existing bounded setup hook, and closes the browser in teardown even after timeout. Worker API/database calls and all authorization/persistence assertions remain real. The sequential integration process budget is five minutes; individual test/hook deadlines remain 15/45 seconds. The launcher regression still rejects child timeout/nonzero results. Full rerun results belong in the PR.
 
 CI run 43849900559 already passed all 154 database integration tests, but its browser lane found an old local-demo selector for the removed text wordmark. The demo now waits for the header container; the dedicated published-logo test still checks image rendering and broken-image text recovery. PR documentation failed because three required contract field labels were missing; the description now supplies those labels without relaxing its validator.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-16T10:46:32.976Z","exitCode":1}
+```
+
+The first lifecycle fix used a routed HTML document; Chromium then rejected its first real API fetch, and the complete suite reported 153 passed/1 failed. Restored an owned real HTTP document server in the setup hook, with occupied-port errors now failing setup instead of adopting another server. No browser security flag or API/CORS assertion was bypassed.
+
+Final `TMPDIR=/private/tmp VITEST_MAX_WORKERS=2 pnpm verify test:db` passed all 13 SQL files, all 154 integration tests (39.46s Vitest duration), and the local Worker startup/demo/cleanup smoke. The original three timed-out cases passed with their existing 15-second deadlines.
