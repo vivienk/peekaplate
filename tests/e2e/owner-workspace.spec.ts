@@ -1064,6 +1064,7 @@ test('manual dish and original private photo survive save and reload', async ({
   await addCategory(page, 'Soup');
   await page.getByLabel('Price', { exact: true }).fill('9.50');
   await page.getByLabel('Currency', { exact: true }).fill('USD');
+  await page.getByLabel('Serving Size', { exact: true }).fill('2');
   const original = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
     'base64',
@@ -1079,11 +1080,13 @@ test('manual dish and original private photo survive save and reload', async ({
   expect([...state.photos.values()][0]).toEqual(original);
   expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
     allergens: { status: 'unknown', items: [] },
+    servingCount: 2,
   });
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
   await expect(page.getByLabel('Price', { exact: true })).toHaveValue('9.50');
+  await expect(page.getByLabel('Serving Size', { exact: true })).toHaveValue('2');
   await expect(page.getByRole('img', { name: 'Private draft dish' })).toBeVisible();
   const license = page.getByRole('checkbox', {
     name: 'I have the legal license to use this image',

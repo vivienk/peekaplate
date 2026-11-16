@@ -94,6 +94,7 @@ describe('manual dishes', () => {
         ingredients: { status: 'unknown', items: [] },
         allergens: { status: 'unknown', items: [] },
         photoId: null,
+        servingCount: null,
       },
     });
   });
@@ -185,6 +186,34 @@ describe('approval', () => {
       expectedVersion: 0,
       expectedDraftVersion: 1,
       confirmed: true,
+    });
+  });
+});
+
+describe('serving count from Screen 9', () => {
+  it('saves a manual count and keeps unknowns unknown', () => {
+    const form = { ...emptyManualDish(), name: 'Soup', servingCount: '2' };
+    expect(manualSaveCommand(form, 0, crypto.randomUUID()).fields.servingCount).toBe(2);
+    expect(
+      manualSaveCommand({ ...form, servingCount: '' }, 0, crypto.randomUUID()).fields.servingCount,
+    ).toBeNull();
+    for (const count of ['0', '-1', '1.5', '101', 'two'])
+      expect(() =>
+        manualSaveCommand({ ...form, servingCount: count }, 0, crypto.randomUUID()),
+      ).toThrow(/Serving size/);
+  });
+  it('persists an extracted count as an explicit correction, including clearing it', () => {
+    const item = firstItem();
+    const form = dishFromReviewItem(EXTRACTION_ID, item);
+    expect(form.servingCount).toBe('');
+    expect(reviewCorrection(item, { ...form, servingCount: '2' })).toMatchObject({
+      serving_count: 2,
+    });
+    item.effective.serving_count = 2;
+    const resumed = dishFromReviewItem(EXTRACTION_ID, item);
+    expect(resumed.servingCount).toBe('2');
+    expect(reviewCorrection(item, { ...resumed, servingCount: '' })).toMatchObject({
+      serving_count: null,
     });
   });
 });

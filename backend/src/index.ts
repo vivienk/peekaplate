@@ -917,6 +917,7 @@ export async function approveDishDraftAtomic(
     const revisionCommandId = crypto.randomUUID();
     const facts = manual
       ? {
+          ...(manual.servingCount !== undefined ? { servingCount: manual.servingCount } : {}),
           category: manual.category,
           priceAmount: manual.priceAmount,
           priceCurrency: manual.priceCurrency,
@@ -926,6 +927,9 @@ export async function approveDishDraftAtomic(
         }
       : reviewed
         ? {
+            ...(resolved.serving_count !== undefined
+              ? { servingCount: resolved.serving_count }
+              : {}),
             category: resolved.category,
             priceAmount: resolved.price_amount,
             priceCurrency: resolved.price_currency,

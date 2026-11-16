@@ -237,6 +237,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       name: 'Fictional soup',
       category: 'Soup',
       description: 'Fictional vegetables',
+      servingCount: 2,
       priceAmount: '8.50',
       priceCurrency: 'USD',
       ingredients: { status: 'confirmed', items: ['Carrot'] },
@@ -258,6 +259,12 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       expectedDraftVersion: 1,
       confirmed: true,
     });
+    expect(result.publishedRevision.facts?.servingCount).toBe(2);
+    expect(
+      (await loadApprovedDishSources(runtime, venue, [result.publishedRevision.dishId])).get(
+        result.publishedRevision.dishId,
+      )?.servingCount,
+    ).toBe(2);
     expect(result.publishedRevision.facts?.ingredients).toEqual(['Carrot']);
     expect(result.publishedRevision.facts?.allergens).toBeNull();
     expect(

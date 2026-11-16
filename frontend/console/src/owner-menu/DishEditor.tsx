@@ -285,9 +285,13 @@ export function DishEditor({
           <TextField
             id="dish-serving"
             label="Serving Size"
-            value=""
-            disabled
-            hint="Not connected to saved drafts yet."
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={value.servingCount ?? ''}
+            onChange={(event) => set({ servingCount: event.target.value })}
+            hint="People served: 1 for one person, 2 for two. Actual-size AR also requires a measured plate for this serving."
           />
         </div>
         <div className="pp-field">

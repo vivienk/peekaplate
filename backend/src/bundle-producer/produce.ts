@@ -20,6 +20,7 @@ import {
 
 /** Approved facts for one dish, already resolved from `dish_current`, drafts and RES-01.2. */
 export type ApprovedDishSource = {
+  servingCount?: number | null;
   dishId: string;
   dishRevisionId: string;
   name: string;
@@ -266,6 +267,16 @@ async function buildDish(
     );
   }
   if (
+    requested.portion?.physical_size &&
+    (source.servingCount == null ||
+      requested.portion.physical_size.serving_count !== source.servingCount)
+  ) {
+    throw new BundleProducerError(
+      'asset_revision_mismatch',
+      'Plate calibration must match the approved serving count',
+    );
+  }
+  if (
     gaps.length > 0 ||
     !price.ok ||
     !currency ||
@@ -295,6 +306,7 @@ async function buildDish(
     dish: {
       ...identity,
       complete: true,
+      ...(source.servingCount != null ? { serving_count: source.servingCount } : {}),
       ...(requested.portion ? { portion: requested.portion } : {}),
       name: source.name.trim(),
       description,

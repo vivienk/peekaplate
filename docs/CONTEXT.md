@@ -81,7 +81,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5c26722bc6e2ffed9a4c8d853a195951c730ed959029ba129bd4e79a56dfca3f"
+      "sourceFingerprint": "79fa08d7c47d651f7ac55fb5304bdb4d5df76bd79e091141f43b8b1b540a9ac0"
     },
     {
       "id": "tokens",
@@ -261,7 +261,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionOrientation.test.ts",
         "tests/e2e/portion-landscape.spec.ts",
         "docs/diner-published-mapping.md",
-        "frontend/diner/src/assets/icons/ingredients/unknown.svg"
+        "frontend/diner/src/assets/icons/ingredients/unknown.svg",
+        "frontend/diner/src/menu/portionSize.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -270,7 +271,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "cf0ac90c7a01f2dd214a26092a7b79da727e8bcea3f55f2a7d1a257fac6af7d4"
+      "sourceFingerprint": "2e67447630a38b621544e23ce71c5c03ec45f96e7079021710440fac3bba4f84"
     },
     {
       "id": "console",
@@ -414,7 +415,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7f0f7d06e56b124747fea291775c1b6aae40ff4547df2a1dab643a62af2a4329"
+      "sourceFingerprint": "ecd16c4b64f5fd2ed6de3ffc22bb10e5d9cfc136aacc037df949c80c8104d18a"
     },
     {
       "id": "backend",
@@ -612,7 +613,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "3d0c8829906c896598657add5a549308e8ed66c96165ddfdd7ac72bcedb7d939"
+      "sourceFingerprint": "ccb22969c789e51c8b8762074038770b6a617f52d1d50060317e2253d340a0ae"
     },
     {
       "id": "database",
@@ -991,15 +992,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "The signed-in owner shell includes the opt-in AI panel with typed access cleanup and distinct displayed-report/analysis evidence periods, preserving merged menu workspace wiring.",
-      "files": [],
-      "next": "Retarget after #164; test pending sign-out, mobile, flag-off and hosted configuration gates before activation."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
-        "console"
-      ],
       "summary": "Restore authored dashboard, onboarding and Screen 9 composition while preserving the existing authenticated menu controller. Reproduced missing dashboard/form frames before correction; explicit unavailable setup facts avoid fake progress. Hosted mobile readback exposed an intrinsic-width restaurant selector; constrain the shared picker/select and verify long names in dashboard and onboarding account menu.",
       "files": [
         "frontend/console/src/owner/FirstDashboard.tsx",
@@ -1126,6 +1118,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/portion.spec.ts"
       ],
       "next": "Review migration/storage and final check evidence; deploy only after operator hosting and approval. Noka source URL is not a PeekaPlate publication; tested noka_ramen staging lookup returned 404."
+    },
+    {
+      "date": "2026-11-16",
+      "modules": [
+        "contracts",
+        "backend",
+        "console",
+        "diner"
+      ],
+      "summary": "Screen 9 serving count persists through manual/OCR review and approved dish snapshots to published diner details. Measured AR requires matching serving-bound plate calibration; counts never scale lengths and 2.5D remains approximate.",
+      "files": [
+        "docs/diner-published-mapping.md",
+        "packages/contracts/src/owner-menu.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "backend/src/bundle-producer/produce.ts",
+        "frontend/diner/src/menu/portionSize.ts"
+      ],
+      "next": "Run contract, persistence, producer and browser checks; keep PR draft. Real Noka measurements and physical-device validation remain required."
     }
   ]
 }

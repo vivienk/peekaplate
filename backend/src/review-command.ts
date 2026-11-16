@@ -126,6 +126,7 @@ export function resolveEffectiveFields(
   corrected: CandidateReviewRecord['corrected'],
 ): ResolvedCandidateFields {
   return ResolvedCandidateFieldsSchema.parse({
+    ...(corrected.serving_count !== undefined ? { serving_count: corrected.serving_count } : {}),
     name: corrected.name !== undefined ? corrected.name : candidate.original.name,
     description:
       corrected.description !== undefined ? corrected.description : candidate.original.description,

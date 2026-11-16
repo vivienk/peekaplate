@@ -697,3 +697,54 @@ it('publishes an explicitly approved portion for the exact dish revision and bin
     code: 'asset_revision_mismatch',
   });
 });
+
+it('publishes approved serving count and refuses calibration for another serving', async () => {
+  const input = requestInput();
+  const portion = {
+    schema_version: 1,
+    dish_id: LEEKS,
+    dish_revision_id: id(120),
+    width: 64,
+    height: 64,
+    physical_size: {
+      serving_count: 2,
+      source: 'owner',
+      validation_status: 'pending',
+      foreground_sha256: 'a'.repeat(64),
+      plate: {
+        shape: 'round',
+        width_mm: 280,
+        depth_mm: 280,
+        source_sha256: 'b'.repeat(64),
+        source_width_px: 64,
+        source_height_px: 64,
+        boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        confirmed: true,
+      },
+    },
+    layers: [0, 1].map((depth) => ({
+      url: `https://assets.example.test/${depth}.png`,
+      depth,
+      sha256: 'a'.repeat(64),
+      size_bytes: 100,
+    })),
+  };
+  input.categories[0]!.dishes[0]!.portion = portion;
+  const approved = await produceMenuBundle(
+    parseRequest(input),
+    sources({ [LEEKS]: { servingCount: 2 } }),
+    assets(),
+  );
+  expect(approved.bundle.categories[0]!.dishes[0]).toMatchObject({ serving_count: 2, portion });
+  for (const servingCount of [1, null])
+    await expect(
+      produceMenuBundle(parseRequest(input), sources({ [LEEKS]: { servingCount } }), assets()),
+    ).rejects.toMatchObject({ code: 'asset_revision_mismatch' });
+  input.categories[0]!.dishes[0]!.portion = {
+    ...portion,
+    physical_size: { ...portion.physical_size, serving_count: undefined },
+  };
+  await expect(
+    produceMenuBundle(parseRequest(input), sources({ [LEEKS]: { servingCount: 2 } }), assets()),
+  ).rejects.toMatchObject({ code: 'asset_revision_mismatch' });
+});

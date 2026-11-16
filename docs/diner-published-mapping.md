@@ -99,3 +99,31 @@ restaurant-confirmed content, actual uploaded logo, approved T0/portion/artwork
 assets, and release/operator execution. This PR does not provision or publish
 those inputs. The public `noka_ramen` lookup was rechecked on November 16, 2026 and
 still returned 404; the owner-assigned link is the authority if it differs.
+
+## Serving count and measured table placement
+
+Screen 9's Serving Size now records a whole number of people (1–100), or unknown
+when blank. Both manual draft snapshots and extracted-dish review corrections
+persist it; explicit approval snapshots it onto the dish revision. The producer
+reads that approved snapshot into `serving_count`; later draft edits cannot change
+an already published dish. Old events/bundles without the optional field remain
+readable and never acquire an invented serving count. No schema migration is
+needed: existing versioned JSON snapshots store the added optional field.
+
+For measured AR, the operator must supply `portion.physical_size.serving_count`
+equal to the approved dish's count, together with the existing owner-confirmed
+plate dimensions, source boundary and foreground hash. The producer rejects
+missing/mismatched serving bindings on calibrated portions. The diner checks the
+binding again before offering measured table AR. Serving two people never doubles
+a length: a separately measured 320 mm plate for two uses 320 mm, and a 240 mm
+plate for one uses 240 mm. Each distinct serving option needs its own approved dish
+revision/assets and measurements; there is no diner-side serving multiplier.
+
+WebXR hit-test placement uses metres and locks the measured plate footprint at
+1:1, with the visual-size slider hidden. The image remains a flat cutout, not a
+measurement of food height/volume; device validation is still pending. The
+ordinary camera preview and CSS 2.5D fallback are labelled approximate. Missing
+count/calibration, a different serving, or unavailable tracked AR must never be
+presented as actual-size placement. The existing local upload/calibration tools
+remain review-only; restaurant measurements and physical-device acceptance are
+still required before claiming the Noka result is true to scale.

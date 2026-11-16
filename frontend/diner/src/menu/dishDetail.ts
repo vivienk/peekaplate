@@ -96,6 +96,7 @@ export function renderDishDetail(
             <h2 class="pp-detail__name">${escapeHtml(dish.name)}</h2>
             <p class="pp-detail__price">${escapeHtml(formatPrice(dish.price))}</p>
           </div>
+          ${dish.servingCount ? `<p class="pp-detail__servings">Serves ${dish.servingCount} ${dish.servingCount === 1 ? 'person' : 'people'}</p>` : ''}
           <p class="pp-detail__description">${escapeHtml(dish.description)}</p>
         </div>
 

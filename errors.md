@@ -4525,3 +4525,12 @@ CI run 43849900559 already passed all 154 database integration tests, but its br
 The first lifecycle fix used a routed HTML document; Chromium then rejected its first real API fetch, and the complete suite reported 153 passed/1 failed. Restored an owned real HTTP document server in the setup hook, with occupied-port errors now failing setup instead of adopting another server. No browser security flag or API/CORS assertion was bypassed.
 
 Final `TMPDIR=/private/tmp VITEST_MAX_WORKERS=2 pnpm verify test:db` passed all 13 SQL files, all 154 integration tests (39.46s Vitest duration), and the local Worker startup/demo/cleanup smoke. The original three timed-out cases passed with their existing 15-second deadlines.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T17:44:40.365Z","exitCode":2}
+```
+
+## ERR-20261116-SERVING-AR
+
+Source inspection found the authored Screen 9 Serving Size input disabled and absent from saved/approved/public contracts. Added optional owner-confirmed count through both manual and extracted review paths. The first focused suite exposed a stale exact expected draft payload (new unknown count is null); updated it to retain the explicit unknown. Typecheck caught the explicit-undefined count under exact optional properties; the AR call boundary now declares that input. New producer/scale regressions bind measurements to the approved count, not a count-based multiplier. Existing events without the optional field retain their shape.

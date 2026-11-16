@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ServingCountSchema } from './portion';
 import {
   type ReviewCandidate,
   ReviewCandidateResultSchema,
@@ -47,11 +48,13 @@ export const ReviewEditableFieldSchema = z.enum([
   'price_amount',
   'price_currency',
   'ingredients',
+  'serving_count',
 ]);
 export type ReviewEditableField = z.infer<typeof ReviewEditableFieldSchema>;
 
 export const CandidateCorrectedFieldsSchema = z
   .strictObject({
+    serving_count: ServingCountSchema.nullable().optional(),
     name: postgresText.trim().min(1).max(160).optional(),
     description: postgresText.trim().min(1).max(4000).nullable().optional(),
     category: postgresText.trim().min(1).max(160).nullable().optional(),
@@ -136,6 +139,7 @@ export const ReviewCandidateCommandSchema = z
 export type ReviewCandidateCommand = z.infer<typeof ReviewCandidateCommandSchema>;
 
 export const ResolvedCandidateFieldsSchema = z.strictObject({
+  serving_count: ServingCountSchema.nullable().optional(),
   name: postgresText.min(1).max(160),
   description: postgresText.max(4000).nullable(),
   category: postgresText.nullable(),
@@ -158,6 +162,7 @@ export const CandidateReviewRecordSchema = z.strictObject({
   version: z.number().int().nonnegative().max(2_147_483_647),
   reviewStatus: ReviewCandidateStatusSchema,
   corrected: z.strictObject({
+    serving_count: ServingCountSchema.nullable().optional(),
     name: postgresText.min(1).max(160).optional(),
     description: postgresText.max(4000).nullable().optional(),
     category: postgresText.nullable().optional(),

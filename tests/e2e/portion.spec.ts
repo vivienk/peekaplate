@@ -20,7 +20,9 @@ type Mode =
   | 'slow'
   | 'no-photo'
   | 'original-missing'
-  | 'branding';
+  | 'branding'
+  | 'measured-serving'
+  | 'mismatched-serving';
 async function openMenu(page: Page, mode: Mode = 'valid') {
   const content = JSON.parse(
     readFileSync('packages/contracts/fixtures/public-menu-bundle.v1/bundle.json', 'utf8'),
@@ -29,6 +31,8 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
     for (const dish of category.dishes) {
       if (!dish.complete || mode === 'missing' || mode === 'no-photo') continue;
       const dishImages = dish.name === 'Roast Chicken' ? [images[0]!, blue] : images;
+      if (mode === 'measured-serving' || mode === 'mismatched-serving')
+        dish.serving_count = dish.name === 'Roast Chicken' ? 2 : 1;
       dish.portion = {
         schema_version: 1,
         dish_id: mode === 'wrong-dish' ? content.menu_id : dish.dish_id,
@@ -42,6 +46,24 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
           depth,
         })),
       };
+      if (mode === 'measured-serving' || mode === 'mismatched-serving') {
+        dish.portion.physical_size = {
+          serving_count: mode === 'mismatched-serving' ? 3 : dish.serving_count,
+          source: 'owner',
+          validation_status: 'pending',
+          foreground_sha256: hash(dishImages[1]!),
+          plate: {
+            shape: 'round',
+            width_mm: dish.serving_count === 1 ? 240 : 320,
+            depth_mm: dish.serving_count === 1 ? 240 : 320,
+            source_sha256: 'b'.repeat(64),
+            source_width_px: 64,
+            source_height_px: 64,
+            boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+            confirmed: true,
+          },
+        };
+      }
     }
   if (mode === 'branding')
     content.restaurant.logo = {
@@ -1146,3 +1168,64 @@ test('approved artwork follows the published ingredient label and falls back on 
   await expect(page.locator('.pp-ingredient__name').first()).not.toHaveText('Leeks');
   await expect(page.locator('.pp-ingredient img[src*="label=leeks"]')).toHaveCount(0);
 });
+
+for (const matched of [true, false]) {
+  test(`published serving calibration ${matched ? 'enables measured AR' : 'rejects a different serving'} and keeps 2.5D approximate`, async ({
+    page,
+  }) => {
+    await cameraFixture(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'xr', {
+        configurable: true,
+        value: {
+          isSessionSupported: async () => true,
+          requestSession: async () => {
+            (window as any).measuredArRequested = true;
+            throw new DOMException('Synthetic unsupported device', 'NotSupportedError');
+          },
+        },
+      });
+    });
+    await openMenu(page, matched ? 'measured-serving' : 'mismatched-serving');
+    for (const [name, count, cm] of [
+      ['Charred Leeks', 1, 24],
+      ['Roast Chicken', 2, 32],
+    ] as const) {
+      await page.getByRole('button', { name: `Open ${name}`, exact: true }).click();
+      await expect(page.locator('.pp-detail__servings')).toHaveText(
+        `Serves ${count} ${count === 1 ? 'person' : 'people'}`,
+      );
+      await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+      await expect(page.locator('.pp-portion__status')).toContainText(
+        'Approximate 2.5D preview — not actual size.',
+      );
+      await page.getByText('Preview controls', { exact: true }).click();
+      await page.getByRole('button', { name: 'View on your table', exact: true }).click();
+      const portal = page.getByRole('dialog', { name: 'Dish on your table' });
+      await portal.getByText('Adjust view', { exact: true }).click();
+      if (matched) {
+        await expect(portal.locator('.pp-ar__scale-status')).toContainText(`${cm} × ${cm} cm`);
+        await expect(portal.locator('.pp-ar__scale-status')).toContainText(
+          'camera scale is approximate',
+        );
+        await portal
+          .getByRole('button', { name: 'Place measured size on table', exact: true })
+          .click();
+        await expect
+          .poll(() => page.evaluate(() => (window as any).measuredArRequested))
+          .toBe(true);
+        await expect(portal.locator('.pp-ar__scale-status')).toContainText('Approximate preview');
+      } else {
+        await expect(
+          portal.getByRole('button', { name: 'Place measured size on table', exact: true }),
+        ).toHaveCount(0);
+        await expect(portal.locator('.pp-ar__scale-status')).toContainText(
+          'matching serving/plate measurements not supplied',
+        );
+      }
+      await portal.getByRole('button', { name: 'Back to preview', exact: true }).click();
+      await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+      await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
+    }
+  });
+}
