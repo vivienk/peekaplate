@@ -55,6 +55,7 @@ export function OwnerWorkspace({
   const [selectedId, setSelectedId] = useState('');
   const [page, setPage] = useState<OwnerPage>('setup');
   const [navigation, setNavigation] = useState(0);
+  const [detailsRequested, setDetailsRequested] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [setupRead, setSetupRead] = useState<{ actor: string; value: RestaurantSetup } | null>(
     null,
@@ -89,6 +90,7 @@ export function OwnerWorkspace({
   }, [apiBase, owner.id, getAccessToken, attempt, onSessionExpired]);
 
   const refresh = useCallback(() => {
+    setDetailsRequested(false);
     setState({ kind: 'loading' });
     setPage('setup');
     setAttempt((value) => value + 1);
@@ -189,6 +191,7 @@ export function OwnerWorkspace({
         onChange={(event) => {
           if (!canLeave()) return;
           setSelectedId(event.target.value);
+          setDetailsRequested(false);
           setPage('setup');
         }}
       >
@@ -226,6 +229,34 @@ export function OwnerWorkspace({
       <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />
     );
 
+  const accountActions = (
+    <>
+      {picker}
+      <Button
+        variant="text"
+        onClick={() => {
+          if (!canLeave()) return;
+          setDetailsRequested(true);
+          setPage('setup');
+          setNavigation((value) => value + 1);
+        }}
+      >
+        Restaurant details
+      </Button>
+      <Button
+        variant="text"
+        onClick={() => {
+          if (canLeave()) refresh();
+        }}
+      >
+        Refresh access
+      </Button>
+      {signOut}
+      <small className="owner-workspace-design-note">
+        (Account placement awaiting design review)
+      </small>
+    </>
+  );
   const renderShell = (content: ReactNode) => (
     <div className="owner-root owner-workspace">
       <OwnerShell
@@ -239,6 +270,7 @@ export function OwnerWorkspace({
         }
         onNavigate={(next) => {
           if (pages.has(next) && canLeave()) {
+            setDetailsRequested(false);
             setPage(next);
             setNavigation((value) => value + 1);
           }
@@ -247,21 +279,7 @@ export function OwnerWorkspace({
         topbar={
           <div className="owner-workspace-toolbar">
             <FirstDashboardTopbar setup={workspaceSetup} />
-            <OwnerAccountMenu>
-              {picker}
-              <Button
-                variant="text"
-                onClick={() => {
-                  if (canLeave()) refresh();
-                }}
-              >
-                Refresh access
-              </Button>
-              {signOut}
-              <small className="owner-workspace-design-note">
-                (Account placement awaiting design review)
-              </small>
-            </OwnerAccountMenu>
+            <OwnerAccountMenu>{accountActions}</OwnerAccountMenu>
           </div>
         }
       >
@@ -288,17 +306,13 @@ export function OwnerWorkspace({
       canPublish={selected.permission === 'owner'}
       section={page === 'menu' ? 'menu' : 'overview'}
       navigation={navigation}
+      detailsRequested={detailsRequested}
       getAccessToken={getAccessToken}
       onAccessFailure={accessFailure}
       onDirtyChange={setDirty}
       onSetupChange={updateSetup}
       renderShell={renderShell}
-      accountActions={
-        <>
-          {picker}
-          {signOut}
-        </>
-      }
+      accountActions={accountActions}
     />
   );
 }

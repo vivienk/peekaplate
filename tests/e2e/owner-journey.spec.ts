@@ -36,6 +36,11 @@ for (const width of [1440, 390]) {
     await shot('s08-processing');
     await expect(page.getByRole('heading', { name: 'Your dishes', exact: true })).toBeVisible();
     await shot('s10-review-dishes');
+    await page.getByRole('button', { name: 'Save and Exit', exact: true }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: 'Add your menu' })).toContainText(
+      'Added',
+    );
+    await screen.selectOption('s10');
     await page
       .getByRole('button', { name: /Edit .*|Review .*/ })
       .first()

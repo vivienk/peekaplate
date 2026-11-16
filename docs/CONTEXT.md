@@ -404,6 +404,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/review/fromDishDraft.test.ts",
         "frontend/console/src/owner/review/MenuReviewStage.test.tsx",
         "frontend/console/src/owner-dashboard/DishFormView.tsx",
+        "frontend/console/src/publish/DraftMenu.tsx",
         "frontend/console/src/onboarding/OwnerJourneyDemo.tsx",
         "tests/e2e/owner-journey.spec.ts",
         "docs/owner-flow-corrections.md"
@@ -416,7 +417,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "85d247f26005ca552e8c99729430e7d6e1b7d31e2bd84078086a30bb2da36b14"
+      "sourceFingerprint": "2e7b9c15b9c017e7313dc164c9283342f259ee172170bbf576428f89457ad962"
     },
     {
       "id": "backend",

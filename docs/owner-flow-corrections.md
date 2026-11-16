@@ -48,6 +48,10 @@ navigation/state only. It does not implement another S05–S13 visual system.
   and transport. Profile and private-photo metadata force tenant RLS. Browser
   fields cannot supply verification status or tenant authority. Changed details
   return to submitted; they do not become verified or published.
+- The existing account control exposes Restaurant details in both dashboard and
+  onboarding frames. Leaving unsaved work still requires confirmation. A private
+  photo's delayed blob URL does not reset typing; a changed saved photo identity
+  still resets the original form's baseline.
 - Private profile-photo uploads are bounded and hash/idempotency bound. Reads
   reauthorize and verify the stored bytes. Blob URLs carry no token.
 - Serving size is stored for manual drafts and candidate corrections. Owner
@@ -60,6 +64,11 @@ navigation/state only. It does not implement another S05–S13 visual system.
   preserves draft-save replay, source evidence, photos and exact Undo identity.
   Unchanged removal/Undo preserves content verification. Stale versions and
   accepted/published drafts cannot be overwritten by removal.
+- Verification's final reread excludes removed drafts, matching the visible
+  review list. The regression removes a dish, restores it, removes it again,
+  then verifies only the remaining dish with a stable retry command.
+- Cross-tab identity changes fence old session-expiration callbacks, so a late
+  old-owner request cannot cancel the new owner's verified session.
 
 Migration `20261116020000_owner_flow_profile.sql` is new and forward-only. It has
 not been applied to hosted staging by the local checks. Existing applied

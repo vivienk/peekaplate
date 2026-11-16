@@ -4506,6 +4506,19 @@ publication controller. The existing DraftMenu presentation was moved unchanged
 to a data-only file used by both controller and demo. No analytics assertion was
 weakened. All five console-preview build/isolation tests pass (3.79s).
 
+## ERR-20261116-OWNER-REMOVAL-VERIFY — visible draft snapshot
+
+Independent review found that verification's final count still included removed
+drafts. A remove/Undo/remove/verify browser sequence reproduced a false conflict
+after successful writes. The confirmed snapshot now uses the same nonremoved
+predicate as the rendered review list. The extended S10 regression passes.
+
+The PDF cross-check also identified the missing account-to-details transition
+and demo-only progress coupling. Both reuse existing screens and setup rules.
+The original S05 photo-baseline regression exposed a compatibility distinction:
+private blob URL arrival is not a changed saved photo. The live adapter supplies
+stable photo identity; callers without it retain the authored URL-baseline rule.
+
 
 <!-- automatic observation; not root cause -->
 ```json

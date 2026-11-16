@@ -72,6 +72,7 @@ export function OwnerMenuWorkspace({
   canPublish,
   section,
   navigation,
+  detailsRequested = false,
   getAccessToken,
   onAccessFailure,
   onDirtyChange,
@@ -86,6 +87,7 @@ export function OwnerMenuWorkspace({
   canPublish: boolean;
   section: 'overview' | 'menu';
   navigation: number;
+  detailsRequested?: boolean;
   getAccessToken: () => Promise<string | null>;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
   onDirtyChange: (dirty: boolean) => void;
@@ -301,12 +303,12 @@ export function OwnerMenuWorkspace({
     };
   }, [actorId, apiBase, getAccessToken, load, current, failure]);
   useEffect(() => {
-    setView(section === 'menu' ? 'list' : 'overview');
+    setView(detailsRequested ? 'details' : section === 'menu' ? 'list' : 'overview');
     setEditing(null);
     setPendingPhoto(null);
     setEditBack(null);
     setVerified(false);
-  }, [section, navigation, setView]);
+  }, [section, navigation, detailsRequested, setView]);
 
   useEffect(() => {
     const active = runtime.current;
@@ -718,8 +720,9 @@ export function OwnerMenuWorkspace({
       if (!current(active) || generation !== viewGeneration.current) return;
       if (
         !confirmed ||
-        confirmed.filter((draft) => !['rejected', 'superseded'].includes(draft.review_status))
-          .length !== reviewDrafts.length ||
+        confirmed.filter(
+          (draft) => !draft.removed_at && !['rejected', 'superseded'].includes(draft.review_status),
+        ).length !== reviewDrafts.length ||
         reviewDrafts.some(
           (draft) =>
             !confirmed.some(
@@ -751,10 +754,11 @@ export function OwnerMenuWorkspace({
       <>
         <RestaurantDetails
           onDirtyChange={setDetailsDirty}
-          key={`${venueId}:${profile?.version ?? 0}`}
+          key={`${venueId}:${profile?.version ?? 0}:${navigation}`}
           mode={details ? 'dashboard' : 'onboarding'}
           saved={details ?? undefined}
           savedPhotoUrl={detailsPhotoUrl}
+          savedPhotoId={profile?.fields.photoId ?? null}
           saving={busy}
           saveFailed={Boolean(error)}
           onSave={(next, photo) => {

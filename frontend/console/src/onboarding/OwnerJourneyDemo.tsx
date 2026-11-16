@@ -126,7 +126,7 @@ export function OwnerJourneyDemo() {
       : details
         ? ('submitted' as const)
         : ('missing' as const),
-    menuAdded: menuVerified,
+    menuAdded: visibleItems.length > 0,
     published,
   };
   const onboarding = (body: React.ReactNode, bare = false) => (

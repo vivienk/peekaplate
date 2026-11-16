@@ -30,6 +30,8 @@ export type RestaurantDetailsProps = {
   saved?: Details | undefined;
   // The saved photo's address, when there is one.
   savedPhotoUrl?: string | null | undefined;
+  // Private photo identity stays stable while its authenticated blob URL loads.
+  savedPhotoId?: string | null;
   // Save status from the caller: a request is running, or the last one failed.
   saving?: boolean;
   saveFailed?: boolean;
@@ -53,6 +55,7 @@ export function RestaurantDetails(props: RestaurantDetailsProps) {
   const baseline = JSON.stringify([
     props.mode,
     ...Object.keys(EMPTY_DETAILS).map((field) => props.saved?.[field as DetailsField] ?? ''),
+    props.savedPhotoId === undefined ? (props.savedPhotoUrl ?? '') : props.savedPhotoId,
   ]);
   return <RestaurantDetailsForm key={baseline} {...props} />;
 }

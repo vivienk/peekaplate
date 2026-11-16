@@ -589,8 +589,8 @@ async function addCategory(page: Page, category: string) {
 
 async function openAccount(page: Page) {
   const menu = page.locator('details.pp-onboard__account-menu');
-  if ((await menu.count()) && (await menu.getAttribute('open')) === null)
-    await menu.locator('summary').click();
+  await expect(menu).toBeAttached();
+  if ((await menu.getAttribute('open')) === null) await menu.locator('summary').click();
 }
 
 async function preparedPublication(context: BrowserContext) {
@@ -1106,7 +1106,8 @@ test('profile save reloads authenticated details and never verifies an owner sub
   await expect.poll(() => state.profiles[venue.venueId]?.version).toBe(1);
   expect(state.profiles[venue.venueId]?.status).toBe('submitted');
   await page.reload();
-  await page.getByRole('button', { name: 'Edit: Restaurant details', exact: true }).click();
+  await openAccount(page);
+  await page.getByRole('button', { name: 'Restaurant details', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Street address/ })).toHaveValue(
     '100 Fictional Street',
   );
@@ -1118,6 +1119,18 @@ test('profile save reloads authenticated details and never verifies an owner sub
     '101 Fictional Street',
   );
   expect(state.profiles[venue.venueId]?.fields.street).toBe('100 Fictional Street');
+  await openAccount(page);
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.getByRole('button', { name: 'Restaurant details', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: /^Street address/ })).toHaveValue(
+    '101 Fictional Street',
+  );
+  await openAccount(page);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Restaurant details', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: /^Street address/ })).toHaveValue(
+    '100 Fictional Street',
+  );
 });
 
 test('a delayed restaurant photo does not reset unsaved restaurant details', async ({
@@ -1999,6 +2012,12 @@ test('authored S10 verifies actual saved drafts without publication and preserve
       },
     },
   ];
+  const second = structuredClone(state.drafts[venue.venueId]![0]!);
+  second.id = crypto.randomUUID();
+  second.draft_id = second.id;
+  second.name = 'Fictional Salad';
+  second.manual_fields!.name = second.name;
+  state.drafts[venue.venueId]!.push(second);
   state.verificationStatus = 409;
   await signIn(page, undefined, false);
   await page
@@ -2009,6 +2028,18 @@ test('authored S10 verifies actual saved drafts without publication and preserve
   await expect(page.locator('.review-table')).toBeVisible();
   await expect(page.getByRole('main')).toHaveCount(1);
 
+  await page.getByRole('button', { name: 'Remove Fictional Salad', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Remove Fictional Salad', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Remove Fictional Salad', exact: true }).click();
+  await expect
+    .poll(
+      () => state.drafts[venue.venueId]?.find((draft) => draft.id === second.id)?.removal_version,
+    )
+    .toBe(3);
   await expect(page.getByText('9.50 CAD', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Saved data changed');
