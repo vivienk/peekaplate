@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-// S13 owner menu preview and publish (preview-only demo). The phone frames the local diner dev
+// S13 owner menu preview and publish (preview-only demo, no demo controls). The phone frames the local diner dev
 // server, which the default config starts on 127.0.0.1:5173.
 const demo = 'http://127.0.0.1:5174/owner-menu-preview.html';
 
@@ -54,7 +54,7 @@ test('publishing asks for confirmation, then shows the returned link with Copy L
   // Escape cancels without publishing.
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByText('Requests sent: 0')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Preview your menu' })).toBeVisible();
 
   await publish.click();
   await dialog.getByRole('button', { name: 'Publish Menu' }).click();
@@ -75,37 +75,9 @@ test('publishing asks for confirmation, then shows the returned link with Copy L
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
     'https://peekaplate.app/diner/ember-stone',
   );
+  // The demo has no dashboard: leaving starts it again.
   await page.getByRole('button', { name: 'Go to dashboard' }).click();
-  await expect(page.getByText('In the product this opens the S12 dashboard.')).toBeVisible();
-});
-
-test('a menu that is not ready cannot be published and points to the dishes', async ({ page }) => {
-  await page.goto(demo);
-  await page.getByLabel('Menu', { exact: true }).selectOption('not-ready');
-  const alert = page.getByRole('alert');
-  await expect(alert).toContainText('Your menu isn’t ready to publish');
-  await expect(alert).toContainText('2 dishes are missing a price or category.');
-  const publish = page.getByRole('button', { name: 'Publish Menu' });
-  await expect(publish).toHaveAttribute('aria-disabled', 'true');
-  // It stays focusable but does nothing.
-  await publish.click({ force: true });
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await alert.getByRole('button', { name: 'Review dishes' }).click();
-  await expect(page.getByText('In the product this opens S10 Review dishes.')).toBeVisible();
-});
-
-test('a failed publish keeps the menu a draft and lets the owner try again', async ({ page }) => {
-  await page.goto(demo);
-  await page.getByLabel('Publish answer').selectOption('failure');
-  await page.getByRole('button', { name: 'Publish Menu' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
-  await expect(page.getByRole('alert')).toContainText('We couldn’t publish your menu');
   await expect(page.getByRole('heading', { level: 1, name: 'Preview your menu' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Menu link' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Publish Menu' })).not.toHaveAttribute(
-    'aria-disabled',
-    'true',
-  );
 });
 
 test('the preview fits a phone screen without sideways scrolling', async ({ page }) => {
@@ -113,4 +85,11 @@ test('the preview fits a phone screen without sideways scrolling', async ({ page
   await page.goto(demo);
   await expect(page.getByRole('heading', { level: 1, name: 'Preview your menu' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test('the demo page has no demo controls', async ({ page }) => {
+  await page.goto(demo);
+  await expect(page.getByRole('heading', { level: 1, name: 'Preview your menu' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Demo controls' })).toHaveCount(0);
+  await expect(page.getByText('Synthetic demo', { exact: false })).toHaveCount(0);
 });

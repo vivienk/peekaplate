@@ -21,8 +21,10 @@ const DEMOS = [
   { page: 'owner-sign-in.html', asset: /ownerSignIn/, label: /Synthetic demo/ },
   // FE-05/FE-06: the owner onboarding demo answers saves itself, so it never reaches staging.
   { page: 'owner-onboarding.html', asset: /ownerOnboarding/, label: /Synthetic demo/ },
-  // S13: the menu preview demo answers the publish request itself, so it never reaches staging.
-  { page: 'owner-menu-preview.html', asset: /ownerMenuPreview/, label: /Synthetic demo/ },
+  // S13: the menu preview demo answers the publish request itself, so it never reaches staging. It
+  // has no demo bar (Jeffin, 16 Nov), so it is identified by its screen title instead of a
+  // "Synthetic demo" label; it stays preview-only, noindex and free of analytics like the others.
+  { page: 'owner-menu-preview.html', asset: /ownerMenuPreview/, label: /Preview your menu/ },
 ];
 // Normal builds carry the provider-backed sign-in pages instead; preview builds do not.
 const LIVE_AUTH = ['owner-auth.html', 'auth-confirm.html', 'auth-reset.html'];
