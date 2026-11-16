@@ -423,7 +423,9 @@ test('live reduced-motion preference immediately centers and updates instruction
   await stage.press('ArrowRight');
   expect(hash(await page.locator('.pp-portion__css').screenshot())).toBe(still);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await expect(page.locator('.pp-portion__status')).toHaveText('Drag to tilt the plate');
+  await expect(page.locator('.pp-portion__status')).toHaveText(
+    'Approximate 2.5D preview — not actual size. Drag to tilt the plate.',
+  );
 });
 
 test('PR25 interactive cutout fallback stays tiltable without WebGL', async ({ page }) => {
@@ -1200,6 +1202,11 @@ for (const matched of [true, false]) {
         'Approximate 2.5D preview — not actual size.',
       );
       await page.getByText('Preview controls', { exact: true }).click();
+      await page.getByRole('button', { name: 'Show original photo', exact: true }).click();
+      await page.getByRole('button', { name: 'Show review candidate', exact: true }).click();
+      await expect(page.locator('.pp-portion__status')).toContainText(
+        'Approximate 2.5D preview — not actual size.',
+      );
       await page.getByRole('button', { name: 'View on your table', exact: true }).click();
       const portal = page.getByRole('dialog', { name: 'Dish on your table' });
       await portal.getByText('Adjust view', { exact: true }).click();

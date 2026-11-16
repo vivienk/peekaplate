@@ -396,7 +396,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     status.textContent = showOriginal
       ? 'Original photo.'
       : (sampleNotice ??
-        (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate'));
+        `${approximatePortionLabel(dish.servingCount)} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`);
   };
   const motionChanged = () => {
     reset();

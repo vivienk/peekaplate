@@ -4541,3 +4541,5 @@ Source inspection found the authored Screen 9 Serving Size input disabled and ab
 ```
 
 The independent review found `publicBundleToWire` omitted `serving_count`, disabling measured AR on actual published deliveries. A new published-loader regression failed before the mapping fix and all 31 loader tests passed afterward. The first full check passed 1967 unit tests and 117 script tests but detected a stale diner context fingerprint; refreshed it after reviewing the serving-count handoff. Browser regressions passed saved/reloaded Screen 9 count, matching published calibration, cross-dish navigation, mismatched calibration rejection, and approximate fallback labels.
+
+The full affected browser run passed 57 cases and failed an outdated exact motion-label expectation after adding the required approximate notice. Updated the expectation. A separate original-photo comparison path still replaced that notice; the new serving browser regression reproduced the missing label before the one-line fix. The comparison return now uses the same approximate label as initial display and motion changes.
