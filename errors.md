@@ -4556,3 +4556,10 @@ The full reconciled database suite passed 14 SQL files and 158 integration tests
 ```
 
 Final typecheck caught the optional storage-reader interface in the retry repair route. The route now treats an unavailable reader as an unverified object and restores the authenticated exact bytes through the existing writer; it does not claim a verified object without reading it.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-16T22:37:38.938Z","exitCode":1}
+```
+
+The follow-up callback edit introduced two extra spaces; the aggregate formatter caught it before type/unit stages. Applied the repository formatter and refreshed context before rerunning.
