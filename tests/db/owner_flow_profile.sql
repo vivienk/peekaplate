@@ -1,0 +1,15 @@
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS pgtap;
+SELECT plan(10);
+SELECT has_table('app_private','restaurant_profile','S05 has a durable tenant profile');
+SELECT has_table('app_private','restaurant_profile_photo','profile photo metadata is private');
+SELECT has_column('app_private','dish_drafts','removed_at','draft removal preserves its record');
+SELECT has_column('app_private','dish_drafts','removal_version','removal has an independent version');
+SELECT ok((SELECT bool_and(c.relrowsecurity AND c.relforcerowsecurity) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app_private' AND c.relname IN('restaurant_profile','restaurant_profile_photo')),'profile tables force tenant RLS');
+SELECT ok(has_column_privilege('peekaplate_runtime','app_private.restaurant_profile','fields','UPDATE'),'runtime can save fields');
+SELECT ok(NOT has_column_privilege('peekaplate_runtime','app_private.restaurant_profile','status','UPDATE'),'owner runtime cannot verify restaurant details');
+SELECT ok(NOT has_table_privilege('peekaplate_runtime','app_private.restaurant_profile_photo','DELETE'),'runtime cannot erase photo history');
+SELECT ok(CASE WHEN EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN NOT has_table_privilege('anon','app_private.restaurant_profile','SELECT') ELSE true END,'anonymous browser has no profile access');
+SELECT ok(CASE WHEN EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN NOT has_table_privilege('authenticated','app_private.restaurant_profile_photo','SELECT') ELSE true END,'browser identity alone has no photo access');
+SELECT * FROM finish();
+ROLLBACK;

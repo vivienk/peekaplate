@@ -23,12 +23,18 @@ import {
   PreparedMenusSchema,
   type PublishMenu,
   PublishMenuSchema,
+  RestaurantProfileResponseSchema,
+  RestaurantSetupSchema,
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
   ReviewCandidateItemResponseSchema,
   type SaveOwnerDishDraft,
   SaveOwnerDishDraftSchema,
+  type SaveRestaurantProfile,
+  SaveRestaurantProfileSchema,
+  type SetDraftRemoval,
+  SetDraftRemovalSchema,
   type VerifyDishDraft,
   VerifyDishDraftSchema,
 } from '@peekaplate/contracts';
@@ -59,6 +65,8 @@ export type UploadGroup = { id: string; jobs: MenuJob[]; ready?: boolean };
 // A dish draft (backend DishDraftRow). Extracted drafts are corrected through the review API;
 // only manual drafts are saved with PUT /drafts/:draftId.
 export type DishDraft = {
+  removed_at?: string | null;
+  removal_version?: number;
   id: string;
   job_id: string | null;
   draft_id: string;
@@ -312,6 +320,78 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   });
 
   return {
+    async setDraftRemoval(venueId: string, draftId: string, input: SetDraftRemoval) {
+      return request(
+        venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/removal`),
+        json('POST', SetDraftRemovalSchema.parse(input)),
+        (body) => {
+          const value = draft(field(body, 'draft'));
+          if (
+            value.id !== draftId ||
+            Boolean(value.removed_at) !== input.removed ||
+            value.removal_version !== input.expectedRemovalVersion + 1
+          )
+            throw new Error('removal scope');
+          return value;
+        },
+      );
+    },
+    async readProfile(venueId: string) {
+      return request(
+        venuePath(venueId, '/profile'),
+        { method: 'GET' },
+        (body) => RestaurantProfileResponseSchema.parse(body).profile,
+      );
+    },
+    async saveProfile(venueId: string, input: SaveRestaurantProfile) {
+      return request(
+        venuePath(venueId, '/profile'),
+        json('PUT', SaveRestaurantProfileSchema.parse(input)),
+        (body) => RestaurantProfileResponseSchema.parse(body).profile,
+      );
+    },
+    async readSetup(venueId: string) {
+      return request(venuePath(venueId, '/setup'), { method: 'GET' }, (body) => {
+        const setup = RestaurantSetupSchema.parse(body);
+        if (setup.venueId !== venueId) throw new Error('setup scope');
+        return setup;
+      });
+    },
+    async uploadProfilePhoto(venueId: string, file: Blob, idempotencyKey: string) {
+      if (
+        !IDEMPOTENCY_KEY.test(idempotencyKey) ||
+        !['image/jpeg', 'image/png'].includes(file.type) ||
+        !file.size ||
+        file.size > MAX_FILE_BYTES
+      )
+        throw new OwnerMenuApiError(0, 'invalid_request');
+      return request(
+        venuePath(venueId, '/profile/photos'),
+        {
+          method: 'POST',
+          upload: true,
+          body: file,
+          headers: { 'Content-Type': file.type, 'Idempotency-Key': idempotencyKey },
+        },
+        (body) => withId<{ id: string }>(body),
+      );
+    },
+    async readProfilePhoto(venueId: string, photoId: string) {
+      return request(
+        venuePath(venueId, `/profile/photos/${encodeURIComponent(photoId)}`),
+        { method: 'GET', blob: true },
+        (body) => {
+          if (
+            !(body instanceof Blob) ||
+            !['image/jpeg', 'image/png'].includes(body.type) ||
+            !body.size ||
+            body.size > MAX_FILE_BYTES
+          )
+            throw new Error('profile photo');
+          return body;
+        },
+      );
+    },
     async listPreparedMenus(venueId: string) {
       return request(
         venuePath(venueId, '/prepared-menus'),

@@ -10,6 +10,8 @@ import {
   MenuUrlIntakeSchema,
   RejectDraftPhotoSchema,
   SaveOwnerDishDraftSchema,
+  SaveRestaurantProfileSchema,
+  SetDraftRemovalSchema,
   VenueScopeSchema,
   VerifyDishDraftSchema,
 } from '@peekaplate/contracts';
@@ -36,10 +38,18 @@ import {
   promoteDraftPhoto,
   rejectDraftPhoto,
   saveOwnerDishDraft,
+  setDraftRemoval,
   storeDraftPhoto,
   verifyOwnerDish,
   withOwnerMenuTransaction,
 } from './owner-menu';
+import {
+  readRestaurantProfile,
+  readRestaurantSetup,
+  restaurantPhoto,
+  saveRestaurantProfile,
+  storeRestaurantPhoto,
+} from './restaurant-profile';
 
 type Services = {
   verify(authorization: string, env: Bindings): Promise<string>;
@@ -69,6 +79,68 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     }
   };
 
+  app.get('/venues/:venueId/profile', async (c) => {
+    const { actor, venue } = await identity(c);
+    return c.json({
+      profile: await services.database(c.env, (client) =>
+        readRestaurantProfile(client, actor, venue),
+      ),
+    });
+  });
+  app.get('/venues/:venueId/setup', async (c) => {
+    const { actor, venue } = await identity(c);
+    return c.json(
+      await services.database(c.env, (client) => readRestaurantSetup(client, actor, venue)),
+    );
+  });
+  app.put('/venues/:venueId/profile', async (c) => {
+    const { actor, venue } = await identity(c);
+    const input = SaveRestaurantProfileSchema.safeParse(await json(c));
+    if (!input.success) return c.json({ error: 'invalid_request' }, 400);
+    return c.json({
+      profile: await services.database(c.env, (client) =>
+        saveRestaurantProfile(client, actor, venue, input.data),
+      ),
+    });
+  });
+  app.post('/venues/:venueId/profile/photos', async (c) => {
+    const { actor, venue } = await identity(c);
+    const bucket = c.env.INGESTION_REPORTS_BUCKET;
+    if (!bucket) throw new AuthUnavailableError();
+    const type = c.req.header('Content-Type')?.split(';')[0]?.trim() ?? '';
+    if (!['image/jpeg', 'image/png'].includes(type))
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    const upload = await readMenuUpload(c.req.raw);
+    return c.json(
+      await services.database(c.env, (client) =>
+        storeRestaurantPhoto(client, actor, venue, upload, type, (key, bytes) =>
+          bucket.put(key, bytes),
+        ),
+      ),
+      201,
+    );
+  });
+  app.get('/venues/:venueId/profile/photos/:photoId', async (c) => {
+    const { actor, venue } = await identity(c);
+    const photoId = c.req.param('photoId');
+    if (!DraftPhotoScopeSchema.shape.photoId.safeParse(photoId).success)
+      return c.json({ error: 'invalid_request' }, 400);
+    const photo = await services.database(c.env, (client) =>
+      restaurantPhoto(client, actor, venue, photoId),
+    );
+    const object = await c.env.INGESTION_REPORTS_BUCKET?.get?.(photo.storage_key);
+    if (!object) throw new AuthUnavailableError();
+    const bytes = await object.arrayBuffer();
+    if (
+      bytes.byteLength !== photo.size_bytes ||
+      createHash('sha256').update(new Uint8Array(bytes)).digest('hex') !== photo.source_hash
+    )
+      throw new AuthUnavailableError();
+    c.header('Content-Type', photo.content_type);
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header('Cache-Control', 'private, no-store');
+    return c.body(bytes);
+  });
   app.put('/venues/:venueId/drafts/:draftId', async (c) => {
     const { actor, venue } = await identity(c);
     const scope = DraftScopeSchema.safeParse(c.req.param());
@@ -96,6 +168,17 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
       ),
     );
     return c.json(result);
+  });
+  app.post('/venues/:venueId/drafts/:draftId/removal', async (c) => {
+    const { actor, venue } = await identity(c);
+    const scope = DraftScopeSchema.safeParse(c.req.param());
+    const input = SetDraftRemovalSchema.safeParse(await json(c));
+    if (!scope.success || !input.success) return c.json({ error: 'invalid_request' }, 400);
+    return c.json({
+      draft: await services.database(c.env, (client) =>
+        setDraftRemoval(client, actor, venue, scope.data.draftId, input.data),
+      ),
+    });
   });
 
   app.get('/venues/:venueId/drafts/:draftId', async (c) => {

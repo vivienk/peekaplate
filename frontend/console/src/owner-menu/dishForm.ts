@@ -25,6 +25,7 @@ export type DishForm = {
   name: string;
   category: string;
   description: string;
+  servingSize: string;
   priceAmount: string;
   priceCurrency: string;
   ingredients: { status: ValueStatus; items: string[] };
@@ -51,6 +52,7 @@ export function emptyManualDish(): DishForm {
     name: '',
     category: '',
     description: '',
+    servingSize: '',
     priceAmount: '',
     priceCurrency: '',
     ingredients: { status: 'unknown', items: [] },
@@ -81,15 +83,16 @@ export function dishFromReviewItem(
     name: effective.name,
     category: text(effective.category),
     description: text(effective.description),
+    servingSize: text(effective.serving_size),
     priceAmount: text(effective.price_amount),
     priceCurrency: text(effective.price_currency),
     ingredients:
       ingredients && ingredients.length > 0
         ? { status: 'proposed', items: [...ingredients] }
         : { status: 'unknown', items: [] },
-    // Extraction never supplies allergens; the owner has to add and confirm them.
-    allergens: { status: 'unknown', items: [] },
-    photoId: null,
+    // Only an explicit owner correction can add these; extraction never supplies them.
+    allergens: effective.allergens ?? { status: 'unknown', items: [] },
+    photoId: effective.photo_id ?? null,
     source: {
       extractionId,
       candidateId: review.candidateId,
@@ -116,6 +119,7 @@ export function dishFromManualDraft(draft: DishDraft): DishForm {
     name: text(fields.name),
     category: text(fields.category),
     description: text(fields.description),
+    servingSize: text(fields.servingSize),
     priceAmount: text(fields.priceAmount),
     priceCurrency: text(fields.priceCurrency),
     ingredients: { status: fields.ingredients.status, items: [...fields.ingredients.items] },
@@ -147,6 +151,7 @@ export function manualSaveCommand(
       name: orNull(form.name),
       category: orNull(form.category),
       description: orNull(form.description),
+      servingSize: orNull(form.servingSize),
       priceAmount: orNull(form.priceAmount),
       priceCurrency: orNull(form.priceCurrency)?.toUpperCase() ?? null,
       ingredients: list(form.ingredients),
@@ -180,6 +185,15 @@ export function reviewCorrection(
     form.ingredients.status === 'unknown' ? null : [...new Set(form.ingredients.items)];
   const before = effective.ingredients ?? null;
   if (JSON.stringify(ingredients) !== JSON.stringify(before)) corrected.ingredients = ingredients;
+  if (orNull(form.servingSize) !== (effective.serving_size ?? null))
+    corrected.serving_size = orNull(form.servingSize);
+  const allergens = list(form.allergens);
+  if (
+    JSON.stringify(allergens) !==
+    JSON.stringify(effective.allergens ?? { status: 'unknown', items: [] })
+  )
+    corrected.allergens = allergens;
+  if (form.photoId !== (effective.photo_id ?? null)) corrected.photo_id = form.photoId;
   return Object.keys(corrected).length === 0 ? null : corrected;
 }
 

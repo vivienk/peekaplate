@@ -9,6 +9,11 @@ import {
 } from './owner-menu';
 
 describe('owner working drafts', () => {
+  it('preserves the authored serving-size field without inventing it for old drafts', () => {
+    expect(OwnerDishFieldsSchema.parse({ servingSize: '1 bowl' }).servingSize).toBe('1 bowl');
+    expect(OwnerDishFieldsSchema.parse({}).servingSize).toBeNull();
+    expect(OwnerDishFieldsSchema.safeParse({ servingSize: '\u0000' }).success).toBe(false);
+  });
   it('permits incomplete saved work but never invents confirmed ingredients or allergens', () => {
     const fields = OwnerDishFieldsSchema.parse({});
     expect(fields.name).toBeNull();

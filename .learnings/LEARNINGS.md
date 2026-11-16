@@ -153,6 +153,12 @@ progress. Keep sample design content confined to labelled demos.
 Related: docs/owner-onboarding-wiring.md, tests/e2e/owner-workspace.spec.ts.
 Pattern: frontend.composition-before-wiring; first occurrence, no policy promotion.
 
+November 16 correction follow-up: extracting the existing S09 presentation lets
+the demo and authenticated adapter share the authored markup without sharing
+fixture providers. A saved-profile browser test also caught excess metadata
+crossing a text-form boundary; adapt only the form's actual fields. Review the
+whole rendered composition and save/reopen behavior, not just a successful POST.
+
 ## LRN-20261115-CONFLICT-001 · Bound conflict repair to marker lines
 
 **Logged**: November 15, 2026 · **Status**: resolved · **Area**: tooling

@@ -1539,3 +1539,4 @@ export {
   type VerifyOrderDeletionResponse,
   VerifyOrderDeletionResponseSchema,
 } from './order-outcome';
+export * from './restaurant-profile';

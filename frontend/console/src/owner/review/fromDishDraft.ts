@@ -24,6 +24,7 @@ export function draftToReviewDish(
         name: fields.name,
         category: fields.category,
         description: fields.description,
+        servingSize: fields.servingSize,
         priceAmount: fields.priceAmount,
         priceCurrency: fields.priceCurrency,
         ingredients: fields.ingredients,

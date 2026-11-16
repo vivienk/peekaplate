@@ -38,6 +38,7 @@ export type RestaurantDetailsProps = {
   onSave: (details: Details, photo: File | null) => void;
   // "Go to dashboard" (onboarding) or "Back to dashboard" (dashboard): both open S12.
   onLeave: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 const ERROR_SUMMARY = { title: 'Please correct the highlighted errors before saving.', body: '' };
@@ -52,7 +53,6 @@ export function RestaurantDetails(props: RestaurantDetailsProps) {
   const baseline = JSON.stringify([
     props.mode,
     ...Object.keys(EMPTY_DETAILS).map((field) => props.saved?.[field as DetailsField] ?? ''),
-    props.savedPhotoUrl ?? null,
   ]);
   return <RestaurantDetailsForm key={baseline} {...props} />;
 }
@@ -65,6 +65,7 @@ function RestaurantDetailsForm({
   saveFailed = false,
   onSave,
   onLeave,
+  onDirtyChange,
 }: RestaurantDetailsProps) {
   const original = saved ?? EMPTY_DETAILS;
   const [values, setValues] = useState<Details>(original);
@@ -78,6 +79,10 @@ function RestaurantDetailsForm({
   const errors = useMemo(() => detailsErrors(values), [values]);
   const valid = Object.keys(errors).length === 0;
   const changed = detailsChanged(values, original) || photo !== null;
+  useEffect(() => {
+    onDirtyChange?.(changed);
+    return () => onDirtyChange?.(false);
+  }, [changed, onDirtyChange]);
   // Save is available once the form is valid; from the dashboard it also needs a change (S05
   // handoff, sections 3–5).
   const ready = valid && (mode === 'onboarding' || changed);

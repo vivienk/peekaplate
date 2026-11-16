@@ -1,4 +1,8 @@
-import type { ExtractionReviewSessionResponse } from '@peekaplate/contracts';
+import type {
+  ExtractionReviewSessionResponse,
+  RestaurantProfile,
+  RestaurantSetup,
+} from '@peekaplate/contracts';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { AddMenuLink } from '../onboarding/AddMenuLink';
 import { ChooseMenuSource, type MenuSource } from '../onboarding/ChooseMenuSource';
@@ -30,7 +34,7 @@ import {
   reviewCorrection,
 } from '../owner-menu/dishForm';
 import { evidenceExcerpts } from '../owner-menu/evidence';
-import { errorMessage } from '../owner-menu/jobs';
+import { errorMessage, menuProcessingState } from '../owner-menu/jobs';
 import { Button } from '../ui';
 import { FirstDashboardContent } from './FirstDashboard';
 import { OwnerPublish } from './OwnerPublish';
@@ -73,6 +77,7 @@ export function OwnerMenuWorkspace({
   onDirtyChange,
   renderShell,
   accountActions,
+  onSetupChange,
 }: {
   apiBase: string;
   actorId: string;
@@ -86,6 +91,7 @@ export function OwnerMenuWorkspace({
   onDirtyChange: (dirty: boolean) => void;
   renderShell: (content: ReactNode) => ReactNode;
   accountActions: ReactNode;
+  onSetupChange?: (setup: RestaurantSetup | null) => void;
 }) {
   const runtime = useRef<Active | null>(null);
   const running = useRef(false);
@@ -130,10 +136,17 @@ export function OwnerMenuWorkspace({
   const [editBack, setEditBack] = useState<'review' | null>(null);
   // S8: "Complete verification" shows the Menu verified pop-up; Go to dashboard leaves it.
   const [verified, setVerified] = useState(false);
-  // A dish added manually from "Choose how to add your menu" goes to the S8 list after Save.
-  const [afterManualSave, setAfterManualSave] = useState(false);
-  // S5: restaurant details are kept on this screen only until the details API is connected.
+  const [removed, setRemoved] = useState<{
+    draft: DishDraft;
+    dish: ReturnType<typeof draftToReviewDish>;
+    index: number;
+  } | null>(null);
   const [details, setDetails] = useState<Details | null>(null);
+  const [detailsDirty, setDetailsDirty] = useState(false);
+  const [profile, setProfile] = useState<RestaurantProfile | null>(null);
+  const [setup, setSetup] = useState<RestaurantSetup | null>(null);
+  const [profileUnavailable, setProfileUnavailable] = useState(false);
+  const profilePhotoAttempt = useRef<{ file: File; key: string } | null>(null);
   const [detailsPhotoUrl, setDetailsPhotoUrl] = useState<string | null>(null);
   // S9: dishes the owner reviewed in this session, and the state of the "I have reviewed" checkbox.
   const [reviewedIds, setReviewedIds] = useState<ReadonlySet<string>>(new Set());
@@ -164,6 +177,10 @@ export function OwnerMenuWorkspace({
         setJobs([]);
         setEditing(null);
         setLoaded(false);
+        setProfile(null);
+        setDetails(null);
+        setSetup(null);
+        onSetupChange?.(null);
         onAccessFailure(reason.status === 401 ? 'signed_out' : 'denied');
       } else
         setError(
@@ -174,15 +191,32 @@ export function OwnerMenuWorkspace({
             : 'We could not complete that request. Try again.',
         );
     },
-    [onAccessFailure],
+    [onAccessFailure, onSetupChange],
   );
   const load = useCallback(
     async (active: Active) => {
       const generation = ++readGeneration.current;
-      const [nextJobs, nextDrafts] = await Promise.all([
-        active.client.listJobs(venueId),
-        active.client.listDrafts(venueId),
+      let metadata: [RestaurantProfile | null, RestaurantSetup] | null = null;
+      const [profileRead, setupRead] = await Promise.allSettled([
+        active.client.readProfile(venueId),
+        active.client.readSetup(venueId),
       ]);
+      for (const result of [profileRead, setupRead]) {
+        if (
+          result.status === 'rejected' &&
+          result.reason instanceof OwnerMenuApiError &&
+          [401, 403].includes(result.reason.status)
+        )
+          throw result.reason;
+      }
+      // A profile outage must not hide menu work, but neither request may swallow an auth denial.
+      if (profileRead.status === 'fulfilled' && setupRead.status === 'fulfilled')
+        metadata = [profileRead.value, setupRead.value];
+      if (!current(active) || generation !== readGeneration.current) return;
+      // #207: terminal status must not be paired with an earlier draft snapshot.
+      const nextJobs = await active.client.listJobs(venueId);
+      if (!current(active) || generation !== readGeneration.current) return;
+      const nextDrafts = await active.client.listDrafts(venueId);
       const nextReviews: Record<string, ExtractionReviewSessionResponse> = {};
       let unavailable = false;
       for (const jobId of new Set(
@@ -219,13 +253,32 @@ export function OwnerMenuWorkspace({
       }
       if (!current(active) || generation !== readGeneration.current) return;
       setReviews(nextReviews);
+      if (metadata) {
+        setProfile(metadata[0]);
+        const fields = metadata[0]?.fields;
+        setDetails(
+          fields
+            ? {
+                name: fields.name,
+                city: fields.city,
+                street: fields.street,
+                line2: fields.line2,
+                phone: fields.phone,
+                email: fields.email,
+              }
+            : null,
+        );
+      }
+      setProfileUnavailable(!metadata);
+      setSetup(metadata?.[1] ?? null);
+      onSetupChange?.(metadata?.[1] ?? null);
       setReviewUnavailable(unavailable);
       setJobs(nextJobs);
       setDrafts(nextDrafts);
       setLoaded(true);
       return nextDrafts;
     },
-    [venueId, current, command],
+    [venueId, current, command, onSetupChange],
   );
   useEffect(() => {
     void actorId;
@@ -253,8 +306,29 @@ export function OwnerMenuWorkspace({
     setPendingPhoto(null);
     setEditBack(null);
     setVerified(false);
-    setAfterManualSave(false);
   }, [section, navigation, setView]);
+
+  useEffect(() => {
+    const active = runtime.current;
+    let disposed = false;
+    let url: string | null = null;
+    setDetailsPhotoUrl(null);
+    if (active && profile?.fields.photoId)
+      void active.client
+        .readProfilePhoto(venueId, profile.fields.photoId)
+        .then((blob) => {
+          if (disposed || !current(active)) return;
+          url = URL.createObjectURL(blob);
+          setDetailsPhotoUrl(url);
+        })
+        .catch((reason) => {
+          if (!disposed && current(active)) failure(reason);
+        });
+    return () => {
+      disposed = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [profile?.fields.photoId, venueId, current, failure]);
 
   // Private images use authenticated byte reads, never bearer tokens in image URLs.
   useEffect(() => {
@@ -282,9 +356,9 @@ export function OwnerMenuWorkspace({
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [pendingPhoto, editing?.form.photoId, editing?.id, venueId, current, failure]);
-  const dirty = Boolean(
-    editing && (JSON.stringify(editing.form) !== editing.saved || pendingPhoto),
-  );
+  const dirty =
+    (view === 'details' && detailsDirty) ||
+    Boolean(editing && (JSON.stringify(editing.form) !== editing.saved || pendingPhoto));
   useEffect(() => {
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
@@ -337,35 +411,28 @@ export function OwnerMenuWorkspace({
     }, 5000);
     return () => window.clearInterval(timer);
   }, [view, load, current, failure]);
+  const selectedJobs = jobs.filter((job) => processingIds.includes(job.id));
+  const processing = menuProcessingState(selectedJobs);
+  const selectedJobsLoaded =
+    processingIds.length > 0 && selectedJobs.length === processingIds.length;
   useEffect(() => {
-    const selected = jobs.filter((job) => processingIds.includes(job.id));
-    if (
-      view === 'processing' &&
-      selected.length &&
-      selected.every((job) => !['queued', 'running'].includes(job.status))
-    ) {
-      if (drafts.length > 0) {
-        // S8: once reading finishes, the owner reviews the dishes found before verifying them. A source
-        // that failed or was only partly read is named, and can be retried from Menu.
-        const unread = selected.filter((job) =>
-          ['failed', 'incomplete'].includes(job.status),
-        ).length;
-        setView('review');
-        setNotice(
-          unread > 0
-            ? `${unread} ${unread === 1 ? 'source' : 'sources'} could not be read fully. Review the dishes found, add any missing dish, or retry the source from Menu.`
-            : 'We read your menu. Review each dish before you verify it.',
-        );
-      } else {
-        setView('list');
-        setNotice(
-          'Processing status updated. Review the saved dishes and any failed sources below.',
-        );
-      }
+    if (view !== 'processing' || !selectedJobsLoaded) return;
+    if (processing.phase === 'ready' || processing.phase === 'partial') {
+      setView('review');
+      setNotice(
+        processing.phase === 'partial'
+          ? 'Some sources could not be read fully. Review the dishes found, add missing dishes, or retry the source from Menu.'
+          : 'We read your menu. Review each dish before you verify it.',
+      );
+    } else if (processing.phase === 'cancelled') {
+      setView('list');
+      setNotice('Processing cancelled. Previously saved dishes remain available.');
     }
-  }, [view, jobs, drafts, processingIds, setView]);
+  }, [view, selectedJobsLoaded, processing.phase, setView]);
   const editManual = (draft?: DishDraft) => {
-    const form = draft ? dishFromManualDraft(draft) : emptyManualDish();
+    const form = draft
+      ? dishFromManualDraft(draft)
+      : { ...emptyManualDish(), priceCurrency: 'USD' };
     setEditing({
       id: draft?.id ?? crypto.randomUUID(),
       draft: draft ?? null,
@@ -382,7 +449,6 @@ export function OwnerMenuWorkspace({
     selection.current = null;
     setUploads([]);
     if (next === 'manual') {
-      setAfterManualSave(true);
       editManual();
     } else
       setView(next === 'upload' ? 'photo' : (next ?? (drafts.length > 0 ? 'review' : 'sources')));
@@ -543,7 +609,20 @@ export function OwnerMenuWorkspace({
           (value) => value.candidate.candidate_id === editing.form.source?.candidateId,
         );
         if (!item) return;
-        const corrected = reviewCorrection(item, editing.form);
+        let savedForm = editing.form;
+        if (pendingPhoto) {
+          if (photoAttempt.current?.file !== pendingPhoto)
+            photoAttempt.current = { file: pendingPhoto, key: newIdempotencyKey() };
+          const photo = await active.client.uploadDraftPhoto(
+            venueId,
+            editing.id,
+            pendingPhoto,
+            photoAttempt.current.key,
+          );
+          if (!current(active)) return;
+          savedForm = { ...savedForm, photoId: photo.id };
+        }
+        const corrected = reviewCorrection(item, savedForm);
         if (corrected) {
           const input = {
             expectedVersion: item.review.version,
@@ -564,6 +643,7 @@ export function OwnerMenuWorkspace({
             },
           );
           if (!current(active)) return;
+          setPendingPhoto(null);
           const form = dishFromReviewItem(session.extractionResult.extraction_id, updated);
           setEditing({
             ...editing,
@@ -585,17 +665,16 @@ export function OwnerMenuWorkspace({
         setReviewedIds((ids) => new Set(ids).add(editing.id));
       setNotice('Draft saved. This has not approved or published your menu.');
       // S8: Save in the dish form returns to the review list, as Cancel does.
-      if (editBack === 'review' || afterManualSave) {
+      {
         setEditing(null);
         setPendingPhoto(null);
         setEditBack(null);
-        setAfterManualSave(false);
         setView('review');
       }
     });
 
   const reviewDrafts = drafts.filter(
-    (draft) => !['rejected', 'superseded'].includes(draft.review_status),
+    (draft) => !draft.removed_at && !['rejected', 'superseded'].includes(draft.review_status),
   );
   const reviewDishes = reviewDrafts.map((draft) => {
     const session = draft.job_id ? reviews[draft.job_id] : undefined;
@@ -670,27 +749,42 @@ export function OwnerMenuWorkspace({
   const content =
     view === 'details' ? (
       <>
-        <p role="status">
-          Restaurant details are not saved to your account yet. This form keeps changes in this tab
-          only.
-        </p>
         <RestaurantDetails
+          onDirtyChange={setDetailsDirty}
+          key={`${venueId}:${profile?.version ?? 0}`}
           mode={details ? 'dashboard' : 'onboarding'}
           saved={details ?? undefined}
           savedPhotoUrl={detailsPhotoUrl}
+          saving={busy}
+          saveFailed={Boolean(error)}
           onSave={(next, photo) => {
             const editingSaved = details !== null;
-            setDetails(next);
-            if (photo)
-              setDetailsPhotoUrl((previous) => {
-                if (previous) URL.revokeObjectURL(previous);
-                return URL.createObjectURL(photo);
+            void run(async (active) => {
+              let photoId = profile?.fields.photoId ?? null;
+              if (photo) {
+                if (profilePhotoAttempt.current?.file !== photo)
+                  profilePhotoAttempt.current = { file: photo, key: newIdempotencyKey() };
+                photoId = (
+                  await active.client.uploadProfilePhoto(
+                    venueId,
+                    photo,
+                    profilePhotoAttempt.current.key,
+                  )
+                ).id;
+              }
+              const fields = { ...next, photoId };
+              await active.client.saveProfile(venueId, {
+                commandId: command('profile', [profile?.version ?? 0, fields]),
+                expectedVersion: profile?.version ?? 0,
+                fields,
               });
-            // First save continues to S6 (Choose how to add your menu); an edit returns to S12.
-            setNotice(
-              'Restaurant details are kept in this tab only. Profile saving is not connected yet; nothing was submitted for review.',
-            );
-            setView(editingSaved ? 'overview' : 'sources');
+              await load(active);
+              if (!current(active)) return;
+              setNotice(
+                'Restaurant details saved and submitted for team verification. This does not publish your menu.',
+              );
+              setView(editingSaved ? 'overview' : 'sources');
+            });
           }}
           onLeave={() => setView('overview')}
         />
@@ -702,13 +796,52 @@ export function OwnerMenuWorkspace({
         {notice && <p role="status">{notice}</p>}
         <ReviewDishes
           restaurantName={shownName}
-          state={initialReview(reviewDishes)}
-          completing={busy}
-          verificationUnavailable={
-            reviewDrafts.some((draft) => draft.origin !== 'manual')
-              ? 'Extracted dish photo review is not connected yet. Save your corrections; verification remains pending.'
-              : undefined
+          state={{
+            ...initialReview(reviewDishes),
+            removed: removed ? { dish: removed.dish, index: removed.index } : null,
+            notice: removed ? 'removed' : null,
+          }}
+          onRemoveDish={(id) =>
+            void run(async (active) => {
+              const draft = reviewDrafts.find((value) => value.id === id);
+              const dish = reviewDishes.find((value) => value.id === id);
+              if (!draft || !dish) return;
+              const input = {
+                expectedDraftVersion: draft.draft_version!,
+                expectedRemovalVersion: draft.removal_version ?? 0,
+                removed: true,
+              };
+              const saved = await active.client.setDraftRemoval(venueId, id, {
+                ...input,
+                commandId: command('remove', [id, input]),
+              });
+              if (!current(active)) return;
+              setRemoved({ draft: saved, dish, index: reviewDrafts.indexOf(draft) });
+              setVerified(false);
+              setDrafts((rows) => rows.map((row) => (row.id === id ? saved : row)));
+              await load(active);
+            })
           }
+          onUndoRemove={() =>
+            void run(async (active) => {
+              if (!removed) return;
+              const draft = removed.draft;
+              const input = {
+                expectedDraftVersion: draft.draft_version!,
+                expectedRemovalVersion: draft.removal_version!,
+                removed: false,
+              };
+              const saved = await active.client.setDraftRemoval(venueId, draft.id, {
+                ...input,
+                commandId: command('restore', [draft.id, input]),
+              });
+              if (!current(active)) return;
+              setRemoved(null);
+              setDrafts((rows) => rows.map((row) => (row.id === draft.id ? saved : row)));
+              await load(active);
+            })
+          }
+          completing={busy}
           onAddDish={() => {
             setEditBack('review');
             editManual();
@@ -767,7 +900,19 @@ export function OwnerMenuWorkspace({
     ) : view === 'processing' ? (
       <>
         <MenuProcessing
-          state="processing"
+          secondaryAction={
+            <Btn kind="outlined" onClick={() => setView('list')}>
+              View saved dishes
+            </Btn>
+          }
+          state={
+            selectedJobsLoaded && processing.phase === 'failed'
+              ? 'failed'
+              : selectedJobsLoaded && processing.phase === 'empty'
+                ? 'no-dishes'
+                : 'processing'
+          }
+          failureReason={errorMessage(processing.errorCodes[0] ?? 'extraction_failed')}
           step={
             jobs
               .filter((job) => processingIds.includes(job.id))
@@ -789,55 +934,54 @@ export function OwnerMenuWorkspace({
           }
           onTryAnother={() => setView('sources')}
         />
-        <Button onClick={() => setView('list')}>View saved dishes</Button>
       </>
     ) : view === 'edit' && editing ? (
       <>
         <DishEditor
           value={editing.form}
+          photoUrl={photoUrl}
+          existing={Boolean(editing.draft)}
           categories={drafts.map((draft) => draft.category ?? '').filter(Boolean)}
           photo={
-            editing.form.origin === 'manual' ? (
-              <>
-                <div className={`s09-photo${photoUrl ? ' has' : ''}`}>
-                  {photoUrl ? (
-                    <img src={photoUrl} alt="Private draft dish" />
-                  ) : (
-                    <span>No photo yet</span>
-                  )}
-                </div>
-                <Btn
-                  kind="outlined"
-                  size="md"
-                  disabled={busy}
-                  onClick={() => photoPicker.current?.click()}
-                >
-                  {photoUrl ? 'Replace photo' : 'Upload photo'}
-                </Btn>
-                <input
-                  id="live-dish-photo"
-                  ref={photoPicker}
-                  aria-label="Dish photo"
-                  className="pp-onboard-hidden-input"
-                  type="file"
-                  accept="image/jpeg,image/png"
-                  disabled={busy}
-                  onChange={(event) => {
-                    const selectedFile = event.target.files?.[0];
-                    const file = selectedFile ? typedMenuFile(selectedFile) : undefined;
-                    if (
-                      file &&
-                      file.size > 0 &&
-                      file.size <= 12_000_000 &&
-                      ['image/jpeg', 'image/png'].includes(file.type)
-                    ) {
-                      setPendingPhoto(file);
-                      setLicenseChecked(false);
-                    } else if (file) setError('Choose a JPEG or PNG up to 12 MB.');
-                  }}
-                />
-              </>
-            ) : undefined
+            <>
+              <div className={`s09-photo${photoUrl ? ' has' : ''}`}>
+                {photoUrl ? (
+                  <img src={photoUrl} alt="Private draft dish" />
+                ) : (
+                  <span>No photo yet</span>
+                )}
+              </div>
+              <Btn
+                kind="outlined"
+                size="md"
+                disabled={busy}
+                onClick={() => photoPicker.current?.click()}
+              >
+                {photoUrl ? 'Replace photo' : 'Upload photo'}
+              </Btn>
+              <input
+                id="live-dish-photo"
+                ref={photoPicker}
+                aria-label="Dish photo"
+                className="pp-onboard-hidden-input"
+                type="file"
+                accept="image/jpeg,image/png"
+                disabled={busy}
+                onChange={(event) => {
+                  const selectedFile = event.target.files?.[0];
+                  const file = selectedFile ? typedMenuFile(selectedFile) : undefined;
+                  if (
+                    file &&
+                    file.size > 0 &&
+                    file.size <= 12_000_000 &&
+                    ['image/jpeg', 'image/png'].includes(file.type)
+                  ) {
+                    setPendingPhoto(file);
+                    setLicenseChecked(false);
+                  } else if (file) setError('Choose a JPEG or PNG up to 12 MB.');
+                }}
+              />
+            </>
           }
           onChange={(form) => {
             if (!busy) {
@@ -864,7 +1008,6 @@ export function OwnerMenuWorkspace({
             ) {
               setEditing(null);
               setPendingPhoto(null);
-              setAfterManualSave(false);
               if (editBack === 'review') {
                 setEditBack(null);
                 setView('review');
@@ -882,18 +1025,25 @@ export function OwnerMenuWorkspace({
         getAccessToken={getAccessToken}
         onAccessFailure={onAccessFailure}
         onBack={() => setView('list')}
+        onDone={() =>
+          void run(async (active) => {
+            await load(active);
+            if (current(active)) setView('overview');
+          })
+        }
       />
     ) : view === 'overview' ? (
       <FirstDashboardContent
         setup={{
           venueId,
           restaurantName: shownName,
-          detailsStatus: 'unknown',
-          menuAdded: loaded ? drafts.length > 0 : null,
-          published: null,
+          detailsStatus: setup?.detailsStatus ?? 'unknown',
+          menuAdded: setup?.menuAdded ?? (loaded ? reviewDrafts.length > 0 : null),
+          published: setup?.published ?? null,
         }}
         onOpenStep={(step) => {
           if (step === 'details') setView('details');
+          if (step === 'publish' && canPublish) setView('publish');
           if (step === 'menu') {
             setVerified(false);
             setView(drafts.length > 0 ? 'review' : 'sources');
@@ -957,12 +1107,17 @@ export function OwnerMenuWorkspace({
                       disabled={busy}
                       onClick={() =>
                         void run(async (active) => {
+                          const generation = viewGeneration.current;
                           await active.client.retryJob(
                             venueId,
                             job.id,
                             command('retry', [job.id, job.attempt_count]),
                           );
                           await load(active);
+                          if (current(active) && generation === viewGeneration.current) {
+                            setProcessingIds([job.id]);
+                            setView('processing');
+                          }
                         })
                       }
                     >
@@ -1001,42 +1156,44 @@ export function OwnerMenuWorkspace({
             <p>No saved dishes yet.</p>
           ) : (
             <>
-              {drafts.map((draft) => {
-                const effective = reviewDishes.find((dish) => dish.id === draft.id);
-                return (
-                  <div key={draft.id} className="mrow">
-                    <span className="thumb">
-                      <Icon n="menu" s={24} />
-                    </span>
-                    <span className="dn">
-                      {effective?.name ?? draft.name ?? 'Untitled dish'}
-                      <small>
-                        {draft.origin === 'manual' ? 'Manual draft' : 'Extracted draft'}
-                      </small>
-                    </span>
-                    <span className="hidem">
-                      {effective?.category ?? draft.category ?? 'Not set'}
-                    </span>
-                    <span className="hidem num">
-                      {effective?.priceAmount ?? draft.price_amount ?? '—'}{' '}
-                      {effective?.priceCurrency ?? draft.price_currency ?? ''}
-                    </span>
-                    <span className="lab st">{draft.review_status}</span>
-                    <span className="hidem">
-                      <span className="lab st">Not connected</span>
-                    </span>
-                    <Btn
-                      kind="outlined"
-                      size="md"
-                      disabled={busy || !['pending', 'edited'].includes(draft.review_status)}
-                      onClick={() => openDraft(draft)}
-                      aria-label={`Edit ${effective?.name ?? draft.name ?? 'untitled dish'}`}
-                    >
-                      Edit
-                    </Btn>
-                  </div>
-                );
-              })}
+              {drafts
+                .filter((draft) => !draft.removed_at)
+                .map((draft) => {
+                  const effective = reviewDishes.find((dish) => dish.id === draft.id);
+                  return (
+                    <div key={draft.id} className="mrow">
+                      <span className="thumb">
+                        <Icon n="menu" s={24} />
+                      </span>
+                      <span className="dn">
+                        {effective?.name ?? draft.name ?? 'Untitled dish'}
+                        <small>
+                          {draft.origin === 'manual' ? 'Manual draft' : 'Extracted draft'}
+                        </small>
+                      </span>
+                      <span className="hidem">
+                        {effective?.category ?? draft.category ?? 'Not set'}
+                      </span>
+                      <span className="hidem num">
+                        {effective?.priceAmount ?? draft.price_amount ?? '—'}{' '}
+                        {effective?.priceCurrency ?? draft.price_currency ?? ''}
+                      </span>
+                      <span className="lab st">{draft.review_status}</span>
+                      <span className="hidem">
+                        <span className="lab st">Not connected</span>
+                      </span>
+                      <Btn
+                        kind="outlined"
+                        size="md"
+                        disabled={busy || !['pending', 'edited'].includes(draft.review_status)}
+                        onClick={() => openDraft(draft)}
+                        aria-label={`Edit ${effective?.name ?? draft.name ?? 'untitled dish'}`}
+                      >
+                        Edit
+                      </Btn>
+                    </div>
+                  );
+                })}
             </>
           )}
         </MenuTable>
@@ -1050,16 +1207,24 @@ export function OwnerMenuWorkspace({
       {error && view !== 'edit' && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       {reviewNotice}
+      {profileUnavailable && (
+        <p role="status">
+          Restaurant details and setup status are temporarily unavailable. Saved menu work remains
+          available.
+        </p>
+      )}
       {content}
     </section>
   );
   if (view === 'review') return content;
+  if (view === 'edit' && section === 'menu' && editBack !== 'review') return renderShell(body);
   return ['details', 'sources', 'url', 'photo', 'pdf', 'processing', 'edit', 'publish'].includes(
     view,
   ) ? (
     <OnboardingLayout
       restaurantName={shownName}
-      bare={['photo', 'pdf', 'edit'].includes(view)}
+      // S13 (publish) draws its own Figma card, like Screen 9 (edit).
+      bare={['photo', 'pdf', 'edit', 'publish'].includes(view)}
       accountActions={accountActions}
     >
       {error && view !== 'edit' && <p role="alert">{error}</p>}

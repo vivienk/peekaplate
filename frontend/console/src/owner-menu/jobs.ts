@@ -54,10 +54,12 @@ export function menuProcessingState(jobs: readonly MenuJob[]): MenuProcessingSta
   const errorCodes = [...new Set(live.flatMap((job) => (job.error_code ? [job.error_code] : [])))];
 
   let phase: MenuProcessingPhase;
-  if (ordered.length > 0 && live.length === 0) phase = 'cancelled';
+  if (ordered.length === 0) phase = 'processing';
+  else if (live.length === 0) phase = 'cancelled';
   else if (uploaded < live.length) phase = 'uploading';
   else if (live.some((job) => !FINISHED.has(job.status))) phase = 'processing';
-  else if (live.every((job) => job.status === 'failed')) phase = 'failed';
+  else if (draftCount === 0 && live.some((job) => ['failed', 'incomplete'].includes(job.status)))
+    phase = 'failed';
   else if (draftCount === 0) phase = 'empty';
   else if (live.some((job) => job.status !== 'complete')) phase = 'partial';
   else phase = 'ready';

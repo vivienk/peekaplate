@@ -4469,3 +4469,45 @@ origin, then passed after both paths reused the existing staging-only rule.
 Production/unconfigured/lookalike origins and missing-token denial are covered.
 Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
 
+## ERR-20261116-OWNER-PROFILE-ADAPTER — saved details reopen
+
+The new profile-save/reload browser case reproduced a S05 crash: the adapter
+passed profile `photoId` into the authored text-only details form. Its existing
+field validator correctly expects strings, and `null.trim()` failed. The live
+adapter now explicitly passes the six authored text fields; private photo data
+stays on the existing photo prop. The same regression passes after the fix,
+including submission status and cancelled sign-out retaining unsaved edits.
+
+## ERR-20261116-OWNER-TEST-FIXTURES — fixed candidate during browser checks
+
+The first workspace run used obsolete processing/navigation expectations and an
+incomplete required serving-size fixture. Assertions now follow #207's explicit
+empty/queued states and still verify saved work; valid dish fixtures include the
+authored required fields. Editing served source during that run also triggered
+Vite HMR while a photo case was clicking Continue. An uninterrupted rerun passes
+that case. Candidate source must stay unchanged until browser execution ends.
+
+Two read commands used guessed filenames and returned path-not-found. Subsequent
+inspection used targeted file discovery; no missing-file result was treated as
+implementation evidence.
+
+## ERR-20261116-OWNER-SESSION-GENERATION — cross-tab identity change
+
+The connected workspace suite exposed an old request returning a local token
+denial after another tab had signed in as a new owner. Its stale callback expired
+the new session before React cleanup ran. Session-expiration callbacks now check
+the identity generation that created them. The original cross-tab regression
+passes five consecutive runs (13.8s); actor-bound token rejection is preserved.
+
+## ERR-20261116-PREVIEW-CONTROLLER-IMPORT — synthetic walkthrough isolation
+
+The strict preview build rejected a contracts label pulled in through the live
+publication controller. The existing DraftMenu presentation was moved unchanged
+to a data-only file used by both controller and demo. No analytics assertion was
+weakened. All five console-preview build/isolation tests pass (3.79s).
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-16T08:53:58.689Z","exitCode":1}
+```

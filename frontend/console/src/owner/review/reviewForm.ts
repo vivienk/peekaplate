@@ -24,6 +24,7 @@ const orNull = (value: string): string | null => (value.trim() === '' ? null : v
 export function dishToForm(dish: ReviewDish): DishForm {
   return {
     origin: 'manual',
+    servingSize: dish.servingSize ?? '',
     name: dish.name ?? '',
     category: dish.category ?? '',
     description: dish.description ?? '',
@@ -56,6 +57,6 @@ export function formToDish(form: DishForm, id: string, previous?: ReviewDish): R
   };
   const priceCurrency = orNull(form.priceCurrency) ?? previous?.priceCurrency;
   if (priceCurrency !== undefined) dish.priceCurrency = priceCurrency;
-  if (previous?.servingSize !== undefined) dish.servingSize = previous.servingSize;
+  dish.servingSize = orNull(form.servingSize);
   return dish;
 }

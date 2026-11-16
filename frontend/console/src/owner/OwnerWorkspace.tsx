@@ -1,3 +1,4 @@
+import type { RestaurantSetup } from '@peekaplate/contracts';
 import {
   OWNER_ANALYSIS_ACTIONS,
   OWNER_ANALYSIS_LIMITATION,
@@ -55,6 +56,13 @@ export function OwnerWorkspace({
   const [page, setPage] = useState<OwnerPage>('setup');
   const [navigation, setNavigation] = useState(0);
   const [dirty, setDirty] = useState(false);
+  const [setupRead, setSetupRead] = useState<{ actor: string; value: RestaurantSetup } | null>(
+    null,
+  );
+  const updateSetup = useCallback(
+    (value: RestaurantSetup | null) => setSetupRead(value ? { actor: owner.id, value } : null),
+    [owner.id],
+  );
   const canLeave = () =>
     !dirty || window.confirm('Leave these unsaved changes? Your saved draft stays available.');
   const pickerId = useId();
@@ -96,6 +104,16 @@ export function OwnerWorkspace({
   const selected =
     venues.find((venue) => venue.venueId === selectedId) ??
     (venues.length === 1 ? venues[0] : undefined);
+  const workspaceSetup =
+    setupRead?.actor === owner.id && setupRead.value.venueId === selected?.venueId
+      ? setupRead.value
+      : {
+          venueId: selected?.venueId ?? '',
+          restaurantName: selected?.name ?? '',
+          detailsStatus: 'unknown' as const,
+          menuAdded: null,
+          published: null,
+        };
   const pages = useMemo(
     () =>
       new Set<OwnerPage>(
@@ -205,23 +223,14 @@ export function OwnerWorkspace({
         onAccessFailure={accessFailure}
       />
     ) : (
-      <FirstDashboardAside
-        setup={{
-          venueId: selected.venueId,
-          restaurantName: selected.name,
-          detailsStatus: 'unknown',
-          menuAdded: null,
-          published: null,
-        }}
-        ariaLabel="Analysis availability"
-      />
+      <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />
     );
 
   const renderShell = (content: ReactNode) => (
     <div className="owner-root owner-workspace">
       <OwnerShell
         venueId={selected.venueId}
-        restaurantName={selected.name}
+        restaurantName={workspaceSetup.restaurantName}
         current={page}
         available={pages}
         lockedHint="Some screens are not connected in this workspace yet."
@@ -237,15 +246,7 @@ export function OwnerWorkspace({
         aside={aside}
         topbar={
           <div className="owner-workspace-toolbar">
-            <FirstDashboardTopbar
-              setup={{
-                venueId: selected.venueId,
-                restaurantName: selected.name,
-                detailsStatus: 'unknown',
-                menuAdded: null,
-                published: null,
-              }}
-            />
+            <FirstDashboardTopbar setup={workspaceSetup} />
             <OwnerAccountMenu>
               {picker}
               <Button
@@ -290,6 +291,7 @@ export function OwnerWorkspace({
       getAccessToken={getAccessToken}
       onAccessFailure={accessFailure}
       onDirtyChange={setDirty}
+      onSetupChange={updateSetup}
       renderShell={renderShell}
       accountActions={
         <>

@@ -27,6 +27,7 @@ export const OwnerDishFieldsSchema = z.strictObject({
   name: text.trim().min(1).max(160).nullable().default(null),
   category: text.trim().min(1).max(160).nullable().default(null),
   description: text.trim().max(4000).nullable().default(null),
+  servingSize: text.trim().min(1).max(160).nullable().default(null),
   priceAmount: z
     .string()
     .regex(/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/)
@@ -48,6 +49,13 @@ export const SaveOwnerDishDraftSchema = z.strictObject({
   fields: OwnerDishFieldsSchema,
 });
 export type SaveOwnerDishDraft = z.infer<typeof SaveOwnerDishDraftSchema>;
+export const SetDraftRemovalSchema = z.strictObject({
+  commandId: z.uuid(),
+  expectedDraftVersion: z.number().int().min(1).max(2_147_483_646),
+  expectedRemovalVersion: z.number().int().min(0).max(2_147_483_646),
+  removed: z.boolean(),
+});
+export type SetDraftRemoval = z.infer<typeof SetDraftRemovalSchema>;
 
 // A reviewed revision can preserve unknowns; unknown/proposed values never become public facts.
 export const ApprovedDishFactsSchema = z.strictObject({

@@ -253,6 +253,7 @@ describe('owner menu client', () => {
         // An unknown allergen status cannot carry items.
         fields: {
           name: 'Soup',
+          servingSize: null,
           category: null,
           description: null,
           priceAmount: null,
