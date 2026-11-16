@@ -2812,3 +2812,12 @@ runtime behavior, migration or hosted resource changed during this failure.
 ```json
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:54:00.059Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T00:46:28.817Z","exitCode":2}
+```
+
+```json
+{"id":"ERR-20261115-REVIEW-RELEASE-DEPENDENCY","status":"resolved","area":"narrow-release-composition","cause":"Promoting the authored review controller from develop omitted its existing RestaurantDetails and details imports; typechecking and the first browser startup exposed the missing dependency.","prevention":"Trace transitive imports when promoting a frontend slice to main; complete typechecking before starting dependent browser tests. Reuse the authored dependency rather than create a substitute.","sources":["frontend/console/src/owner/OwnerMenuWorkspace.tsx","frontend/console/src/onboarding/RestaurantDetails.tsx","frontend/console/src/onboarding/details.ts","frontend/console/src/onboarding/details.test.tsx"],"regression":"Original S05 source and tests promoted unchanged. pnpm check passes; workspace 45 cases and review preview 9 cases pass. No profile-save API or hosted acceptance is claimed."}
+```

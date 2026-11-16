@@ -66,6 +66,7 @@ describe('owner menu client', () => {
     expect(header(calls[0], 'Authorization')).toBe('Bearer staff-token');
     expect(JSON.parse(String(calls[0]?.init.body))).toEqual({ commandId });
   });
+
   it('reads private image bytes with staff auth and rejects non-image responses', async () => {
     let type = 'image/png';
     const send = vi.fn<typeof fetch>(

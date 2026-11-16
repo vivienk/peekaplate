@@ -1,4 +1,4 @@
-﻿/* S5-FE-10 S10 "Menu Review" (Figma frames S10_Review and S10_Ready to publish).
+/* S5-FE-10 S10 "Menu Review" (Figma frames S10_Review and S10_Ready to publish).
  * Every value comes from @peekaplate/tokens. Shared owner values (--owner-pending-*, buttons, focus
  * ring, visually-hidden) come from owner.css through the .owner-root wrapper. Sizes follow the Figma
  * frame "S10_Review — Default" (1200px card, 80px padding, 32px Edit button and trash, 48px footer
@@ -359,6 +359,12 @@
   .review-table {
     table-layout: fixed;
   }
+}
+
+/* S8 "Pending Review" pill (Figma: blue label). */
+.review-status--information {
+  background: var(--pp-color-info-100);
+  color: var(--pp-role-on-surface);
 }
 
 .review-root :focus-visible {

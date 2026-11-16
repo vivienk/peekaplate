@@ -1,4 +1,4 @@
-﻿// S5-FE-10 / S10 "Menu Review" screen (Figma frames S10_Review — Default and S10_Ready to publish).
+// S5-FE-10 / S10 "Menu Review" screen (Figma frames S10_Review — Default and S10_Ready to publish).
 // Presentational: the parent owns the draft data, the S09 form and navigation, and passes them in, so
 // the owner draft API can be connected without changing this UI. This screen never publishes:
 // "Complete verification" shows the "Menu verified" pop-up (verification does not publish), and its
@@ -18,20 +18,26 @@ import {
 } from './reviewDishes';
 
 export interface ReviewDishesProps {
-  embedded?: boolean;
-  busy?: boolean;
-  removalUnavailable?: string;
   verificationUnavailable?: string | undefined;
-  canEditDish?: (id: string) => boolean;
   restaurantName: string;
   state: ReviewState;
   /** Opens the empty S09 form. */
   onAddDish: () => void;
   /** Opens the selected dish in S09. */
   onEditDish: (id: string) => void;
-  onRemoveDish: (id: string) => void;
-  onUndoRemove: () => void;
-  /** Left button while a dish is not Ready. Confirmed: goes back to Screen 8. */
+  /** When omitted, the trash button is not shown (the owner API has no draft removal yet). */
+  onRemoveDish?: (id: string) => void;
+  onUndoRemove?: () => void;
+  /**
+   * S8 (Review menu, before verification): a dish with every detail shows "Pending Review" until the
+   * whole menu is Ready; then every dish shows "Ready" and the footer offers Complete verification.
+   * S10 leaves this off and shows "Ready" per dish.
+   */
+  /** Ignored: the row button is "Review" until the dish is Ready, then "Edit" (Figma S08/S10). */
+  pendingReview?: boolean;
+  /** Ignored, see pendingReview. */
+  editLabel?: 'Edit' | 'Review';
+  /** Left footer button while a dish is not Ready: "Import more dishes". The parent opens S06 (drafts are already saved). */
   onCancel: () => void;
   /** Saves progress and opens the first-time dashboard. */
   onSaveAndExit: () => void;
@@ -119,11 +125,6 @@ function TrashIcon() {
 const dishName = (dish: ReviewDish) => dish.name?.trim() || 'Unnamed dish';
 
 export function ReviewDishes({
-  embedded = false,
-  busy = false,
-  removalUnavailable,
-  verificationUnavailable,
-  canEditDish = () => true,
   restaurantName,
   state,
   onAddDish,
@@ -133,6 +134,7 @@ export function ReviewDishes({
   onCancel,
   onSaveAndExit,
   onCompleteVerification,
+  verificationUnavailable,
   completing = false,
   completeError = null,
   verified = false,
@@ -144,7 +146,6 @@ export function ReviewDishes({
   const removedId = state.removed?.dish.id ?? null;
   const ready = isMenuReady(state.dishes);
   const count = state.dishes.length;
-  const Content = embedded ? 'section' : 'main';
 
   // The button the owner just used disappears with its row (Remove) or with the notice (Undo), so
   // keyboard focus moves to the next useful control instead of being lost.
@@ -164,34 +165,26 @@ export function ReviewDishes({
 
   return (
     <div className="owner-root review-root" ref={rootRef}>
-      {!embedded && (
-        <header className="review-topbar">
-          <span className="review-brand">
-            <img src={ICONS.logo} alt="" width={28} height={28} />
-            <span className="review-brand__name">PeekaPlate</span>
-          </span>
-          <span className="review-identity">
-            <span className="review-identity__kind">Owner Portal</span>
-            <span className="review-identity__name">{restaurantName}</span>
-          </span>
-        </header>
-      )}
+      <header className="review-topbar">
+        <span className="review-brand">
+          <img src={ICONS.logo} alt="" width={28} height={28} />
+          <span className="review-brand__name">PeekaPlate</span>
+        </span>
+        <span className="review-identity">
+          <span className="review-identity__kind">Owner Portal</span>
+          <span className="review-identity__name">{restaurantName}</span>
+        </span>
+      </header>
 
-      <Content className="review-card" id="owner-review">
+      <main className="review-card" id="owner-review">
         <div className="review-head">
           <div>
             <h1>Your dishes</h1>
             <p className="review-sub">
-              {count} dish{count === 1 ? '' : 'es'} {embedded ? 'saved' : 'extracted'}
+              {count} dish{count === 1 ? '' : 'es'} extracted
             </p>
           </div>
-          <Button
-            variant="text"
-            className="owner-button review-add"
-            aria-label="Add dish"
-            disabled={busy}
-            onClick={onAddDish}
-          >
+          <Button variant="text" className="owner-button review-add" onClick={onAddDish}>
             + Add dish
           </Button>
         </div>
@@ -200,7 +193,12 @@ export function ReviewDishes({
           {state.notice === 'removed' && (
             <div className="review-notice review-notice--removed">
               <strong>Dish removed.</strong>
-              <button type="button" className="review-undo" ref={undoRef} onClick={onUndoRemove}>
+              <button
+                type="button"
+                className="review-undo"
+                ref={undoRef}
+                onClick={() => onUndoRemove?.()}
+              >
                 Undo
               </button>
             </div>
@@ -226,12 +224,13 @@ export function ReviewDishes({
                   <th scope="col">Category</th>
                   <th scope="col">Price</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Review / Remove</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {state.dishes.map((dish) => {
                   const status = dishStatus(dish);
+                  const editLabel = status.ready ? 'Edit' : 'Review';
                   const name = dishName(dish);
                   return (
                     <tr key={dish.id} data-dish-id={dish.id}>
@@ -249,25 +248,24 @@ export function ReviewDishes({
                       <td>
                         <span className="review-actions">
                           <Button
-                            disabled={busy || !canEditDish(dish.id)}
                             variant="outline"
                             className="owner-button review-edit"
                             data-edit-dish-id={dish.id}
-                            aria-label={`Review ${name}`}
+                            aria-label={`${editLabel} ${name}`}
                             onClick={() => onEditDish(dish.id)}
                           >
-                            Review
+                            {editLabel}
                           </Button>
-                          <button
-                            disabled={busy || Boolean(removalUnavailable)}
-                            title={removalUnavailable}
-                            type="button"
-                            className="review-trash"
-                            aria-label={`Remove ${name}`}
-                            onClick={() => onRemoveDish(dish.id)}
-                          >
-                            <TrashIcon />
-                          </button>
+                          {onRemoveDish && (
+                            <button
+                              type="button"
+                              className="review-trash"
+                              aria-label={`Remove ${name}`}
+                              onClick={() => onRemoveDish(dish.id)}
+                            >
+                              <TrashIcon />
+                            </button>
+                          )}
                         </span>
                       </td>
                     </tr>
@@ -287,18 +285,13 @@ export function ReviewDishes({
         <div className="review-footer">
           {ready ? (
             <>
-              <Button
-                variant="outline"
-                className="owner-button"
-                disabled={busy}
-                onClick={onSaveAndExit}
-              >
+              <Button variant="outline" className="owner-button" onClick={onSaveAndExit}>
                 Save and Exit
               </Button>
               <Button
                 variant="action"
                 className="owner-button"
-                disabled={completing || busy || Boolean(verificationUnavailable)}
+                disabled={completing || Boolean(verificationUnavailable)}
                 title={verificationUnavailable}
                 aria-busy={completing}
                 onClick={onCompleteVerification}
@@ -308,21 +301,16 @@ export function ReviewDishes({
             </>
           ) : (
             <>
-              <Button variant="outline" className="owner-button" disabled={busy} onClick={onCancel}>
-                Cancel
+              <Button variant="outline" className="owner-button" onClick={onCancel}>
+                Import more dishes
               </Button>
-              <Button
-                variant="action"
-                className="owner-button"
-                disabled={busy}
-                onClick={onSaveAndExit}
-              >
+              <Button variant="action" className="owner-button" onClick={onSaveAndExit}>
                 Save and Exit
               </Button>
             </>
           )}
         </div>
-      </Content>
+      </main>
       {verified && <MenuVerifiedDialog onGoToDashboard={onGoToDashboard} />}
     </div>
   );

@@ -58,7 +58,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-workspace.test.ts",
         "packages/contracts/src/owner-analysis.ts",
         "packages/contracts/src/portion.ts",
-        "packages/contracts/src/ingredient-artwork.ts"
+        "packages/contracts/src/ingredient-artwork.ts",
+        "packages/contracts/package.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -66,7 +67,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c11fcbf1b60e8c6da7368aba3fa9eb10a59113bd9afcdecff61827a933e9e154"
+      "sourceFingerprint": "6295c5c2f8ba6bef188f49d9417dd46a0faf6379a9195d683af2560842e3700c"
     },
     {
       "id": "tokens",
@@ -223,7 +224,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner auth/workspace reuses authored shell, setup, source selection and persisted dish editor. Original #163 S10 now receives real draft/photo verification without publishing. Demo and live dish performance share one authored frame and CSS; actual API metrics keep suppression, unknown freshness and unsupported capabilities explicit. S13 alone remains intentionally temporary. Live profile/Overview/Actions/AI and unsupported extracted-field persistence remain incomplete; no fixture metrics or inferred food facts substitute for them.",
+      "summary": "Owner auth/workspace preserves authored shell, setup and source selection. #206 supplies the single S08/S10 review controller, effective saved corrections, recovery-safe hydration and explicit attestations; verification uses existing draft/photo APIs without publication. Existing S05 details remain explicitly local-only. Demo and live performance share one authored frame/CSS with actual API metrics, suppression and unknown freshness. S13 alone is intentionally temporary. Profile persistence, extracted-photo verification, Overview/Actions/live AI and unsupported metrics remain incomplete.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -334,7 +335,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/review/review.css",
         "frontend/console/src/owner/review/reviewDishes.test.tsx",
         "frontend/console/src/owner/review/reviewDishes.ts",
-        "docs/screen-preservation-audit.md"
+        "docs/screen-preservation-audit.md",
+        "frontend/console/src/owner/review/MenuReviewStage.test.tsx",
+        "frontend/console/src/owner/review/fromDishDraft.test.ts",
+        "frontend/console/src/owner/review/fromDishDraft.ts",
+        "frontend/console/src/owner/review/fromMenuItem.test.tsx",
+        "frontend/console/src/owner/review/fromMenuItem.ts",
+        "frontend/console/src/owner/review/menuReviewDemo.tsx",
+        "frontend/console/src/owner/review/reviewForm.test.tsx",
+        "frontend/console/src/owner/review/reviewForm.ts",
+        "frontend/console/src/onboarding/RestaurantDetails.tsx",
+        "frontend/console/src/onboarding/details.ts",
+        "frontend/console/src/onboarding/details.test.tsx",
+        "frontend/console/review-dishes.html",
+        "tests/e2e/menu-review.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -344,7 +358,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "0946e2863e2f5dcfda1b9752e38f0b1e5651e401a58624ff8a924f597286628c"
+      "sourceFingerprint": "be377a4bec990bfa8bed6300c8036ab2616bcecaf0651a819a15c599aad82246"
     },
     {
       "id": "backend",
@@ -642,7 +656,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "3ca0afffc0342885276ce2f935e53b171f51ccc6e8b5ca1a45abc4b726080d34"
+      "sourceFingerprint": "8aa57c03a02b87ffb1111b5a354ff571609e59a159b68bb747ea4d296554276a"
     },
     {
       "id": "agents",
@@ -849,22 +863,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-14",
       "modules": [
-        "console",
-        "backend",
-        "contracts"
-      ],
-      "summary": "Narrow main release candidate for merged Auth143/146, shell125/139, report reader128 and session/restaurant bridge179. Promote complete merged console sources while retaining live/demo build isolation. Backend promotes authenticated workspace discovery plus the merged half-open report-window correction; deployed main bindings, migrations, extraction and diner sources remain unchanged.",
-      "sources": [
-        "docs/owner-session-workspace.md",
-        "docs/owner-auth.md",
-        "backend/src/owner-workspace.ts",
-        "frontend/console/src/auth/live.tsx"
-      ],
-      "next": "Obtain final exact-commit approval, deploy staging API and console, and record hosted session/CORS evidence on the release PR. Keep menu setup/upload/publication UI integrations and production separate."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
         "console"
       ],
       "summary": "Correct the hosted Pages callback mismatch: exact /auth-confirm and /auth-reset aliases share the existing same-purpose parser and entry classification. Existing .html allowlist, origin validation, PKCE and URL scrubbing remain unchanged. Both clean-path browser regressions fail against previous code.",
@@ -999,6 +997,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/staff-venue.ts"
       ],
       "next": "Complete combined checks and pinned reviews; then approve exact main release, apply original staging artwork migration and capture genuine hosted screens/artwork/viewer evidence. Never infer whole-product completion from this bounded correction."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console",
+        "contracts"
+      ],
+      "summary": "Prioritize Harshita #206 at 9a05e13; release reuses its controller, review components, client and editor unchanged, plus existing S05 dependencies. Supersedes the correction branch embedded review; keeps shared performance, existing S13, portal and artwork changes. No new backend endpoint or token definition.",
+      "files": [
+        "docs/screen-preservation-audit.md",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner/review/fromDishDraft.ts"
+      ],
+      "next": "Complete combined regression checks, pinned reviews and exact-commit approvals; then verify the staging release with genuine staff access and screenshots. Do not equate local-only profile state or unavailable extracted-photo verification with a completed flow."
     }
   ]
 }

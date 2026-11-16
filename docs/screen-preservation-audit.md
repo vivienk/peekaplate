@@ -4,7 +4,7 @@ Scope: the correction to main `79aa7f9`, following the deployed `ba70ce9` releas
 
 ## What was wrong and what changes
 
-- The live menu workspace still used a fallback draft table instead of the authored S10 review screen. It now composes the original `ReviewDishes` implementation from [#163](https://github.com/vivienk/peekaplate/pull/163), with authenticated verification/photo-approval methods in the existing API client. S10 verifies only; it does not approve a dish for publication or publish a menu.
+- The live menu workspace lacked the authored review journey. It now reuses [#206](https://github.com/vivienk/peekaplate/pull/206) at `9a05e13`, including the original [#163](https://github.com/vivienk/peekaplate/pull/163) review components. Harshita's separate review screen, controller, effective-correction adapter, attestation controls and API client replace this PR's earlier embedded-review wiring. S10 verifies only; it does not approve a dish for publication or publish a menu.
 - Dish performance displayed the evidence table rather than Jeffin's performance layout. Demo and live reports now share `PerfFrame` and the original performance CSS. The live adapter shows only actual report fields; it does not import sample restaurant metrics. Unsupported category/period metrics remain unavailable.
 - The published 2.5D viewer lacked an entry into the existing camera portal. Its explicit table-view action now loads that portal lazily. The original photo, CSS viewer, camera controls and failure fallback are retained. There is no calibrated-size or physical-phone acceptance claim.
 - The diner already contained the approved-ingredient-artwork client, but main/staging lacked #165's API, storage projection and processing entrypoints. This release promotes those existing modules and their #51 ingredient-review dependency. It uses the existing private R2 bucket; generation is an operator process, followed by explicit review of the exact bytes, not an automatic public image on menu upload.
@@ -15,10 +15,10 @@ Scope: the correction to main `79aa7f9`, following the deployed `ba70ce9` releas
 | Flow | Existing implementation reused | Wiring in this correction |
 | --- | --- | --- |
 | Sign in, signup, recovery | #143 / #146 auth components | No screen replacement |
-| Restaurant setup and shell | #125 / #139 `OwnerShell`, `FirstDashboardContent` | Existing account menu; desktop side columns stay fixed while center scrolls |
+| Restaurant setup and shell | #125 / #139 `OwnerShell`, `FirstDashboardContent`; existing S05 `RestaurantDetails` used by #206 | Existing account menu; desktop side columns stay fixed while center scrolls; S05 clearly identifies local-only form state |
 | Choose source, URL, photo, PDF, processing | #171 onboarding components | Existing upload/job client retained |
-| Add/edit a saved dish | #156 `DishEditor`, shared #172 form presentation | Saved evidence/unknown fields retained |
-| S10 review | #163 `ReviewDishes`, `reviewDishes`, `review.css` | Real draft/photo verification; retry identities and access cleanup retained |
+| Add/edit a saved dish | #156 `DishEditor`, shared #172 form presentation, #206 confirmations | Saved evidence/unknown fields retained; opening a saved draft never implies review or photo rights |
+| S08/S10 review | #163 components reconciled in #206 | One controller; effective saved corrections, isolated extraction-read failures, real draft/photo verification, retry identities and access cleanup |
 | S13 publish | Existing temporary `OwnerPublish` | Intentionally temporary; explicit approval/publish and returned diner URL unchanged |
 | Dish performance | Jeffin's `Perf` presentation | One shared frame/style source, actual report adapter and privacy statuses |
 | Diner Menu, Search, Detail, Saved, Compare | Existing merged diner screens, including #196 | No replacement screen |
@@ -31,7 +31,7 @@ Scope: the correction to main `79aa7f9`, following the deployed `ba70ce9` releas
 
 Release PRs promoting the same feature to main are not duplicate runtime implementations. The persisted dish editor and synthetic form demo have different evidence/state contracts and already share presentation. The draft correction adapter and contract-level effective-field resolver also accept different shapes; this audit did not establish that they are interchangeable. They are retained. Loading, error, no-access and account controls are integration states, not evidence that a Figma screen has been implemented.
 
-The original S10 source is imported without merging all of #163. Its separate PR must be reconciled against this source reuse; do not replace the screen again. Remove/Undo remains unavailable in the live table because no persisted delete command exists. Extracted candidates still need their supported correction/verification contract; this PR does not invent allergen confirmation or photo evidence when those fields are absent.
+Merge #206 into develop first; it includes #163's original review source. This release takes the corrected review directory, owner-menu controller/client/editor and their tests unchanged from #206. The separate Menu management table and review screen have distinct purposes and share the same saved data. No second verification controller remains. Remove/Undo is omitted from the live review screen because no persisted delete command exists. Extracted corrections are read from the existing review session; extracted-photo verification remains explicitly unavailable rather than inventing evidence. Do not merge an older #163 implementation over this reconciled source.
 
 ## Ingredient pipeline and rollout
 
@@ -44,6 +44,8 @@ Use [the original ingredient pipeline guide](ingredient-icon-pipeline.md). Exact
 
 ## Verification record
 
+- #206 at `9a05e13`: both reviews and GitHub CI run `43781681703` passed, including quality, database and browser gates. Its source is the review-flow reference for this release.
+- Combined #205/#206 local checks: 1,659 unit tests (5 existing skips), 98 script tests, types/lint/context/docs passed. The workspace suite passed 45 cases (3 existing skips) in 46.9 seconds, including persisted corrections, unready-source recovery, verification-only commands, S13 publication, the shared performance layout and desktop/mobile screenshots. The original review demo passed 9 browser cases in 18.2 seconds. API traffic in these browser suites is synthetic; this is not hosted acceptance.
 - PASS: production published-portion browser regression, 2 cases; 30 portion units and bundle budget check. Camera/WebGL failure keeps the menu usable.
 - PASS: authored S10/client tests, 79 units; focused browser save/reload, conflict retry, stale-session and verification-only checks.
 - PASS: live performance tests, 24 units; desktop/mobile layout, center-only scrolling and account/menu regressions.
@@ -55,6 +57,7 @@ Use [the original ingredient pipeline guide](ingredient-icon-pipeline.md). Exact
 - The eight-worker default suite passed 259 cases with 3 skips, then timed out in the existing 360-step SDK withdrawal test before its final assertion. The entire SDK file passed 5/5 with two workers (18.6s; withdrawal case 7.9s). This is a focused recovery, not an uninterrupted full-suite PASS. Final Linux CI must pass before merge.
 - Corrected the dedicated-test discovery, fake-clock/IndexedDB delivery race and an invalid performance heading level. The latter changes semantics only; authored sizing remains unchanged. Refresh context after all source/audit edits, then check the committed graph.
 - Final Astra review caught a chart-heading selector lost during the semantic fix. Retaining the original `h3` selector beside the new card-title selector restores the shared typography. The new browser assertion failed at 18.72px without it, then both performance/accessibility cases passed at 16px (4.5s). This is corrected source, not an accepted visual deviation.
+- Integration typechecking first caught an omitted S05 import dependency. The original `RestaurantDetails` and validation/tests were promoted unchanged from develop; types and the combined checks then passed. No substitute form was written.
 - NOT RUN: corrected hosted rollout, fresh provider generation, physical-phone camera/scale acceptance. The existing staged artwork table was absent at preflight. These statuses must be replaced only with observed evidence.
 
 ## Remaining product boundaries

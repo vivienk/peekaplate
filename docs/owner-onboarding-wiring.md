@@ -132,3 +132,21 @@ uses the author's scoped 28px heading and describes unavailable connections
 without changing the demo. Browser-dropped files with no MIME use the existing
 extension policy to declare PDF/JPEG/PNG while retaining the original bytes;
 server signature/hash verification remains authoritative.
+
+## Review-source reconciliation with #206
+
+The correction release now takes Harshita's reconciled #206 controller, review
+components, dish editor and API client unchanged. It supersedes the earlier
+embedded S10 composition: Menu remains the authored management table, while the
+setup menu step opens the authored standalone review screen. Existing S13 still
+owns explicit approval/publication and the returned diner URL.
+
+The review list reads saved effective corrections, keeps other saved work usable
+when an extraction review is unavailable, and confirms persisted verification
+before reporting success. Review/photo-rights checkboxes are not inferred from a
+previous save. The existing S05 form is present but explicitly local-only until
+the restaurant-profile API exists. Extracted-photo verification remains blocked;
+unknown facts and unsupported actions are not turned into success states.
+
+See [the preservation audit](screen-preservation-audit.md) for exact provenance,
+verification evidence and staging rollout limits.
