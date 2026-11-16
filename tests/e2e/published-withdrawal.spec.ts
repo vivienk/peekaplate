@@ -62,7 +62,7 @@ async function open(page: Page, state: State) {
 
 // The re-read starts 5 minutes before the 30-minute token expires.
 const reread = (page: Page) => page.clock.fastForward(25 * 60_000 + 1000);
-const gone = (page: Page) => page.getByText('This menu is no longer available.', { exact: false });
+const gone = (page: Page) => page.getByText('This menu is no longer available', { exact: false });
 
 test('a 404 on the re-read removes the old menu, explains it and offers Check again', async ({
   page,

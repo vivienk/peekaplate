@@ -50,6 +50,7 @@ import {
   searchPanelMarkup,
 } from './searchView';
 import type { CompleteDish, Menu, MenuLoadResult } from './types';
+import './states.css';
 
 const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
   'demo',
@@ -150,17 +151,35 @@ function renderFailure(
     empty: 'No dishes are available right now.',
     unavailable: 'This menu is unavailable right now.',
     // INTERIM copy for S5-FE-10 (the server reported the menu gone); design confirmation pending.
-    withdrawn:
-      'This menu is no longer available. The restaurant may have updated or withdrawn it. Please check again.',
+    withdrawn: 'The restaurant may have updated or withdrawn it. Please check again.',
     error: 'We could not load the menu. Please try again.',
     offline: 'You appear to be offline. Please check your connection.',
   };
+  // State-screen template (Figma): illustration, bold title, grey description, orange button.
+  // The title and icons are decoration over the same text, so a missing icon hides nothing.
+  const titles: Record<string, string> = {
+    empty: 'No dishes to show yet',
+    withdrawn: 'This menu is no longer available',
+    error: 'Something went wrong',
+    offline: "You're offline",
+  };
+  const icons: Record<string, string> = {
+    empty: UI_ICONS.empty,
+    unavailable: UI_ICONS.empty,
+    withdrawn: UI_ICONS.error,
+    error: UI_ICONS.error,
+    offline: UI_ICONS.offline,
+  };
+  const title = titles[status];
+  const icon = icons[status];
   const showRetry =
     (status === 'error' || status === 'offline' || status === 'withdrawn') && Boolean(onRetry);
   const retryLabel = status === 'withdrawn' ? 'Check again' : 'Try again';
   container.innerHTML = `
     <h1 class="pp-sr-only">${escapeHtml(stateHeading())}</h1>
-    <div class="pp-menu pp-menu--state" role="status" aria-live="polite">
+    <div class="pp-menu pp-menu--state pp-state" role="status" aria-live="polite">
+      ${icon ? `<img class="pp-state__icon${status === 'offline' ? ' pp-state__icon--mono' : ''}" src="${icon}" alt="" aria-hidden="true" />` : ''}
+      ${title ? `<h2 class="pp-state__title">${escapeHtml(title)}</h2>` : ''}
       <p class="pp-state-text">${escapeHtml(messages[status] ?? 'We could not load the menu.')}</p>
       ${showRetry ? `<button class="pp-button" type="button" data-retry>${retryLabel}</button>` : ''}
       ${fixtureNotice()}

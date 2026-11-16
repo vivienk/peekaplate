@@ -141,5 +141,5 @@ test('active withdrawal stops both destinations and removes the old menu', async
   expect(recorded.sent).toHaveLength(sentAtWithdrawal);
   expect(recorded.captured).toHaveLength(capturedAtWithdrawal);
   await expect(page.locator('.pp-card__open')).toHaveCount(0);
-  await expect(page.getByText('This menu is no longer available.', { exact: false })).toBeVisible();
+  await expect(page.getByText('This menu is no longer available', { exact: false })).toBeVisible();
 });
