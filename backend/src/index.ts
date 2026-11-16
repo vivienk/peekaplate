@@ -457,6 +457,15 @@ export const DINER_CORS_ALLOWED_ORIGINS = [
   'http://127.0.0.1:5173',
 ] as const;
 
+function allowedDinerOrigin(origin: string, env: Bindings | undefined) {
+  return DINER_CORS_ALLOWED_ORIGINS.some((allowed) => allowed === origin) ||
+    (env?.APP_ENV === 'staging' &&
+      env.DINER_PUBLIC_ORIGIN === 'https://routing-staging.peekaplate-diner-staging.pages.dev' &&
+      origin === env.DINER_PUBLIC_ORIGIN)
+    ? origin
+    : undefined;
+}
+
 function dinerLinkResponse(link: { path: string }, env: Bindings) {
   const origin =
     env.APP_ENV === 'production'
@@ -1113,14 +1122,7 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/public/*',
     cors({
-      origin: (origin, c) =>
-        DINER_CORS_ALLOWED_ORIGINS.some((allowed) => allowed === origin) ||
-        (c.env?.APP_ENV === 'staging' &&
-          c.env.DINER_PUBLIC_ORIGIN ===
-            'https://routing-staging.peekaplate-diner-staging.pages.dev' &&
-          origin === c.env.DINER_PUBLIC_ORIGIN)
-          ? origin
-          : undefined,
+      origin: (origin, c) => allowedDinerOrigin(origin, c.env),
       allowMethods: ['GET', 'OPTIONS'],
       maxAge: 86400,
     }),
@@ -1148,7 +1150,7 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/observations',
     cors({
-      origin: [...DINER_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) => allowedDinerOrigin(origin, c.env),
       allowMethods: ['POST', 'OPTIONS'],
       allowHeaders: ['Authorization', 'Content-Type'],
       maxAge: 86400,
