@@ -258,10 +258,18 @@ export function DishFormView({
                     <img
                       src={portionReview.previewUrl}
                       alt={`Review-only 2.5D preview of ${dr.name || 'this dish'}`}
-                      style={{ display: 'block', width: '100%', height: 'auto', objectFit: 'contain' }}
+                      style={{
+                          display: 'block',
+                          width: '100%',
+                          height: 'auto',
+                          objectFit: 'contain',
+                        }}
                     />
                     <span className="s09-chip">Needs review</span>
-                    <p>This generated image is private and will not appear in View Portion until approved and published.</p>
+                    <p>
+                        This generated image is private and will not appear in View Portion until
+                        approved and published.
+                      </p>
                   </>
                 ) : (
                   <>
