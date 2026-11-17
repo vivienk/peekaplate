@@ -463,7 +463,23 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
             record.draft_revision_id !== photoId
           )
             throw new Error('portion review identity');
-          return { status: record.status as 'needs_review' | 'failed' };
+          return {
+            status: record.status as 'needs_review' | 'failed',
+            approved: record.approved === true,
+          };
+        },
+      );
+    },
+    async approveDraftPortion(venueId: string, draftId: string, photoId: string) {
+      return request(
+        venuePath(
+          venueId,
+          `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion/approve`,
+        ),
+        { method: 'POST' },
+        (body) => {
+          if (field(body, 'approved') !== true) throw new Error('portion approval');
+          return true;
         },
       );
     },
