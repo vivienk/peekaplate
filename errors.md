@@ -3246,3 +3246,8 @@ probe deadline to every host request, including the separate 220-second private
 portion request. Scope the health assertion to waitForReady; existing portion
 transport tests retain the processing deadline check. Runtime budgets are unchanged.
 The initial PR body also lacked required template headings; those were restored.
+
+PR223 browser CI passed318 cases but exposed three stale test expectations: the
+S10 count copy still said extracted, and the category-ID checks included unrelated
+native options from the demo AI selector. Update the exact copy and scope IDs to
+the category listbox; preserve its pointer, keyboard and accessibility assertions.
