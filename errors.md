@@ -5222,3 +5222,39 @@ CI run 44146794614 failed before workspace tests: the root Playwright suite coul
 
 Resolved: the first database attempt could not reach Docker Desktop; starting the existing daemon restored the unchanged runner. `pnpm verify test:db` passed all pgTAP files and 161 integration tests, including real summary buckets and sealed-scenario queries. Intermediate lint/context failures occurred while chart files and their fingerprints were being completed; final `pnpm check` passed 1,975 unit and 106 script tests, lint, types, context and docs. Independent review found an isolated known chart point disappeared beside a null bucket; `line-chart.test.tsx` reproduces the defect and verifies the corrected marker without displaying null as zero. Hosted reconciliation and deployment remain separate acceptance steps.
 
+## 2026-11-17 — Owner AI provider failures lost diagnostic evidence
+
+The two Responses callers replaced every provider failure with a generic public
+503 and retained no safe server diagnostic. They also rejected hyphen/underscore
+project IDs that the protected provisioning script accepts. Seven added regressions
+failed before the repair while 79 existing cases passed; the same 86 cases passed
+afterward. The tests distinguish a provider HTTP rejection, a timeout without an
+HTTP response, and invalid output after HTTP 200, while retaining the generic
+public body and the one-attempt boundary.
+
+The shared provider reader now bounds success and error bodies while streaming.
+Its 40 offline tests cover status preservation, unknown/malicious error codes,
+timeouts, stalled bodies/cancellation, redirects and logging failures. Only fixed
+classifications, numeric status and explicitly allowlisted codes reach server logs.
+No historical hosted status or root cause is inferred from these synthetic tests.
+
+The RTK wrapper was unavailable in this workspace; native Git and the pinned
+Corepack/pnpm commands were used. Initial template/workflow path lookups used
+nonexistent names; repository enumeration resolved the paths without source changes.
+
+Independent review identified a local limiter rejection and a post-provider
+database failure being mislabeled as invalid output in the first diagnostic patch.
+Two added regressions reproduced both classifications. Wrap reservation failures
+as request_budget and use an explicit internal fallback for unrelated local errors;
+the public 503 body and authority/version error handling are preserved.
+
+Three additional route regressions exposed a missing internal diagnostic for a
+failed or malformed report reread and a failed initial description draft read.
+These paths now log the fixed internal category, preserve the public response
+and make no provider call. A revoked membership still returns 403.
+
+The existing standalone launcher regression reproduced a CI failure when the
+analysis route imported a command error with TypeScript constructor parameter
+properties. The launcher uses Node's strip-only loader. Import the same shared
+error directly and use explicit class fields so the launcher can load it. The
+launcher test verifies startup and propagation of the frontend's exit status.

@@ -467,7 +467,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker preserves staff/JWKS, tenant authority, expected versions and transactional replay/outbox. Owner extraction, verification, preparation and publication reuse existing services and exact approved portion/photo identities. Authenticated bounded CPU cutouts reuse the extraction container. Reports, summary and daily openings share an owner-authorized read-only snapshot; signed references bind actor, venue, window and digest. Protected short-lived seals verify only one reconciled synthetic scenario; live freshness stays unknown. Description and ingredient assistance reuse source-bound current evidence without provider calls. Staging self-service atomically creates a new restaurant owned by the confirmed actor. Develop retains its separate order and comparison APIs.",
+      "summary": "Worker preserves staff/JWKS, tenant authority, expected versions and transactional replay/outbox. Owner extraction, verification, preparation and publication reuse existing services and exact approved portion/photo identities. Authenticated bounded CPU cutouts reuse the extraction container. Reports, summary and daily openings share an owner-authorized read-only snapshot; signed references bind actor, venue, window and digest. Protected short-lived seals verify only one reconciled synthetic scenario; live freshness stays unknown. Description selects supplied spans through Responses; ingredients reuse saved evidence without provider calls. Staging self-service atomically creates a new restaurant owned by the confirmed actor. Develop retains its separate order and comparison APIs. Owner AI logs only safe failure classifications, HTTP status and allowlisted codes; project validation matches provisioning.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -705,7 +705,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/synthetic-completeness.ts",
         "backend/src/owner-ai/synthetic-completeness.test.ts",
         "backend/src/owner-ai/synthetic-completeness.integration.ts",
-        "docs/owner-ai-synthetic-completeness.md"
+        "docs/owner-ai-synthetic-completeness.md",
+        "backend/src/owner-ai/provider.ts",
+        "backend/src/owner-ai/provider.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -718,7 +720,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "8404957fe746644fed4b958d3788f694f29620277e91fccb4483dc40194b781c"
+      "sourceFingerprint": "8c45fcd4c7eb8fd8b9ad4024ba31813c6e442cfe2e390e308c3b4297b0090ea7"
     },
     {
       "id": "database",
@@ -1113,25 +1115,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-16",
       "modules": [
-        "console",
-        "backend",
-        "contracts"
-      ],
-      "summary": "Reconciled PR213 authored S05–S13 with merged PR217 backend compatibility and PR218 report references. One review-data adapter now omits undefined serving size while preserving null/text, with a focused regression; all screen markup, CSS, tokens and other frontend files remain identical to PR213 b672363. Backend compatibility/reference files match merged develop. No hosted release/provider activation follows. Check PASS: 2001 units/117 scripts; database PASS: 396 SQL assertions/163 integrations plus Worker smoke; build PASS; workspace 59 and journey 3 browser cases PASS. These are local checks, not hosted acceptance.",
-      "files": [
-        "backend/src/owner-menu.ts",
-        "packages/contracts/src/owner-menu.ts",
-        "backend/src/owner-menu.integration.ts",
-        "docs/owner-flow-corrections.md",
-        "docs/owner-ai-responses.md",
-        "frontend/console/src/owner/review/fromDishDraft.ts",
-        "frontend/console/src/owner/review/fromDishDraft.test.ts"
-      ],
-      "next": "Coordinator reviews and publishes the resolved merge commit. Hosted migration/release, fresh provider extraction, physical-device scale and live AI header handoff remain separate gates; no staging activation was performed."
-    },
-    {
-      "date": "2026-11-16",
-      "modules": [
         "backend",
         "database",
         "console"
@@ -1257,6 +1240,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "Fix S13 handoff: retain preparation menu identity and load that exact snapshot in the existing PR208 MenuPreview. No screen/CSS replacement, auto-publication, or backend change.",
       "next": "Verify direct preview and safe retry on staging; provider credentials and report completeness remain separate AI gates."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "backend"
+      ],
+      "summary": "Repair owner AI diagnostic loss with a bounded shared Responses transport, server-only status/code classifications and provisioning-compatible project validation. Report and draft read failures log an internal category before provider use. Public errors, evidence gates, model, request/token limits and no-retry behavior remain. All 131 focused caller and transport tests pass offline.",
+      "files": [
+        "backend/src/owner-ai/provider.ts",
+        "backend/src/owner-ai/responses.ts",
+        "backend/src/owner-ai/dish-assistance.ts",
+        "backend/src/owner-ai/routes.ts",
+        "docs/owner-ai-responses.md"
+      ],
+      "next": "Finish pinned repository checks and independent review, then obtain required human PR approval. Approved staging deployment and a captured synthetic request remain necessary to diagnose the hosted failure; no historical provider result is inferred."
     }
   ]
 }
