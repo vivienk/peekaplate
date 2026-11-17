@@ -495,6 +495,14 @@ describe('S6-RES-04 synthetic publication handoff', () => {
       photoId: null,
     });
     const { dishId, revisionId } = await seedDish(venue, 'Charred Leeks', 'Grilled leeks.', facts);
+    const jobId = await seedJob(venue);
+    const candidateId = `private-candidate-${crypto.randomUUID()}`;
+    await seedDraft(venue, jobId, {
+      reviewStatus: 'accepted',
+      publishedDishId: dishId,
+      candidateId,
+    });
+    await seedCandidateReview(venue, jobId, candidateId, 'corrected', { price_amount: '99' });
     const assetId = 't0_00000000000000000000000000000001';
     const request = bundleRequest([{ dishId, assetId }]);
     request.categories[0]!.dishes[0]!.dietary = ['vegetarian'];
@@ -547,35 +555,39 @@ describe('S6-RES-04 synthetic publication handoff', () => {
       expectedVersion: 0,
       approvalId: approvalA.approvalId,
     });
-    let servedBytes = a.bytes;
+    const retainedA = new Uint8Array(a.bytes);
+    const hostedBytes = new Map([[a.bundleUrl, new Uint8Array(a.bytes)]]);
+    let servedBytes: Uint8Array | undefined;
     let pointerOverride: { menuRevisionId?: string; contentHash?: string } = {};
     let bundleFetches = 0;
     const deliveries: string[] = [];
     // Load the browser adapter at runtime without adding DOM globals to the Worker typecheck.
     const dinerAdapterPath = '../../../frontend/diner/src/menu/published';
     const { createPublishedMenuSource } = await import(dinerAdapterPath);
+    const fetcher = async (input: string | URL | Request) => {
+      if (String(input).startsWith('https://api.example.test/')) {
+        const pointer = await readPublicMenu(runtime, venue, request.menu_id);
+        if (!pointer) return new Response(null, { status: 404 });
+        const response = await createPublicMenuResponse(pointer, config);
+        return Response.json({
+          ...response,
+          menuRevisionId: pointerOverride.menuRevisionId ?? response.menuRevisionId,
+          bundle: {
+            ...response.bundle,
+            contentHash: pointerOverride.contentHash ?? response.bundle.contentHash,
+          },
+        });
+      }
+      bundleFetches++;
+      const bytes = servedBytes ?? hostedBytes.get(String(input));
+      return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 });
+    };
     const source = createPublishedMenuSource({
       apiBase: 'https://api.example.test',
       venueId: venue,
       menuId: request.menu_id,
       onDelivery: (delivery: { publicationId: string }) => deliveries.push(delivery.publicationId),
-      fetcher: async (input: string | URL | Request) => {
-        if (String(input).startsWith('https://api.example.test/')) {
-          const pointer = await readPublicMenu(runtime, venue, request.menu_id);
-          if (!pointer) return new Response(null, { status: 404 });
-          const response = await createPublicMenuResponse(pointer, config);
-          return Response.json({
-            ...response,
-            menuRevisionId: pointerOverride.menuRevisionId ?? response.menuRevisionId,
-            bundle: {
-              ...response.bundle,
-              contentHash: pointerOverride.contentHash ?? response.bundle.contentHash,
-            },
-          });
-        }
-        bundleFetches++;
-        return new Response(new Uint8Array(servedBytes));
-      },
+      fetcher,
     });
     const loadedA = await source.load();
     expect(loadedA.status).toBe('ready');
@@ -612,6 +624,7 @@ describe('S6-RES-04 synthetic publication handoff', () => {
         },
       ],
     });
+    expect(JSON.stringify(loadedA.menu)).not.toMatch(/private source text|private reviewer note/);
     expect(deliveries).toEqual([publicationA.publicationId]);
     expect(new TextDecoder().decode(a.bytes)).not.toMatch(
       /private source text|private reviewer note/,
@@ -628,6 +641,7 @@ describe('S6-RES-04 synthetic publication handoff', () => {
       ],
     );
     const b = await makeBundle(nextRevision);
+    hostedBytes.set(b.bundleUrl, new Uint8Array(b.bytes));
     expect(b.menuRevisionId).not.toBe(a.menuRevisionId);
     expect(b.bundleUrl).not.toBe(a.bundleUrl);
     expect(b.contentHash).not.toBe(a.contentHash);
@@ -640,6 +654,7 @@ describe('S6-RES-04 synthetic publication handoff', () => {
       approvalId: approvalB.approvalId,
     });
     expect(publicationB.publicationId).not.toBe(publicationA.publicationId);
+    servedBytes = a.bytes;
     deliveries.length = 0;
     expect(await source.load()).toEqual({ status: 'error' });
     expect(deliveries).toEqual([]);
@@ -651,7 +666,7 @@ describe('S6-RES-04 synthetic publication handoff', () => {
     pointerOverride = { contentHash: createHash('sha256').update(servedBytes).digest('hex') };
     expect(await source.load()).toEqual({ status: 'error' });
     expect(deliveries).toEqual([]);
-    servedBytes = b.bytes;
+    servedBytes = undefined;
     pointerOverride = {};
     const loadedB = await source.load();
     expect(loadedB.status).toBe('ready');
@@ -664,7 +679,7 @@ describe('S6-RES-04 synthetic publication handoff', () => {
       ],
     });
     expect(deliveries).toEqual([publicationB.publicationId]);
-    expect(new TextDecoder().decode(a.bytes)).toContain('Charred Leeks');
+    expect(new Uint8Array(await (await fetcher(a.bundleUrl)).arrayBuffer())).toEqual(retainedA);
     const pointerBeforeDenial = await readPublicMenu(runtime, venue, request.menu_id);
     const forbiddenApproval = {
       menuId: request.menu_id,
