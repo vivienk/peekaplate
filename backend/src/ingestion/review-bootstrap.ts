@@ -7,7 +7,8 @@ import {
   verifyReviewArtifact,
 } from '../review-artifact';
 import { upsertExtractionReviewSession } from '../review-command';
-import { getIngestionJob, IngestionError } from './repository';
+import { getIngestionJob, IngestionError, type DishDraftRow } from './repository';
+import { structuredHtmlReviewResult } from './html-menu';
 
 export async function bootstrapMenuReview(
   client: Client,
@@ -22,6 +23,33 @@ export async function bootstrapMenuReview(
     getIngestionJob(client, venue, jobId, { inTransaction: true }),
   );
   if (!job) throw new IngestionError('job_not_found', 404);
+  // HTML metadata drafts are stored with their exact source text and immutable
+  // source hash at intake. Only the backend constructs candidate originals.
+  // Upsert enforces the same completed job + source hash + report-key binding
+  // used by the Python producer; no user-provided candidates are trusted.
+  const provenance = job.source_provenance as Record<string, unknown> | null;
+  if (job.source_type === 'url' && provenance?.kind === 'jsonld_menu') {
+    if (!job.result_storage_key) throw new IngestionError('review_not_ready', 409);
+    const drafts = await withOwnerMenuTransaction(client, actor, venue, async () => {
+      const result = await client.query<DishDraftRow>(
+        `SELECT * FROM app_private.dish_drafts
+         WHERE tenant_id=$1 AND job_id=$2 AND review_status != 'superseded'
+         ORDER BY draft_index`,
+        [venue, jobId],
+      );
+      return result.rows;
+    });
+    const input = {
+      commandId,
+      jobId,
+      extractionResult: ReviewCandidateResultSchema.parse(
+        structuredHtmlReviewResult(job, drafts),
+      ),
+    };
+    return upsertExtractionReviewSession(client, actor, venue, input, {
+      jobReportKey: job.result_storage_key,
+    });
+  }
   if (!['complete', 'incomplete'].includes(job.status) || !job.result_storage_key)
     throw new IngestionError('review_not_ready', 409);
   const pattern = new RegExp(
