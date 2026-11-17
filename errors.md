@@ -5175,3 +5175,50 @@ CI caught a new test reading captured requests while the shared preview heading
 was still the loading heading. Wait for the authored preview phone before asserting
 the exact request identity; do not increase timeouts or change runtime behavior.
 The other 69 workspace cases passed in that run.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T17:56:42.641Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T17:58:08.991Z","exitCode":1}
+```
+
+## 2026-11-17 — Overview and restaurant-creation integration checks
+
+PR230 adds authenticated POST creation on the existing staff workspace route;
+the old GET-only CORS assertion was updated to include POST. The following full
+unit run hit an existing workerd SQLite I/O startup failure; the unchanged
+publication suite passed all 12 cases when rerun serially. No timeout or runtime
+guard was weakened.
+
+Hosted CI rejected the new KPI fixture because its zero opening count violated
+the summary's contributing-session floor. Use schema-validated fixture values
+and test a genuine zero average instead. The new creation case also selected
+the S05 required label including its marker; use the textbox's accessible name,
+as existing S05 tests do. Both corrections retain the original screen and API.
+# 2026-11-17 PR230 browser test collection
+
+CI run 44146794614 failed before workspace tests: the root Playwright suite could not resolve the runtime `@peekaplate/contracts/owner-report` import. Use the repository-relative contract source, matching root test execution. `pnpm exec playwright test --config playwright.workspace.config.ts --list` passes (74 tests); no browser or runtime behavior changed. An initial local listing used a nonexistent config filename; corrected to the existing `playwright.workspace.config.ts`.
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-17T18:37:39.923Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T18:38:35.019Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-17T18:40:23.815Z","exitCode":1}
+```
+# 2026-11-17 PR230 final chart and completeness checks
+
+Resolved: the first database attempt could not reach Docker Desktop; starting the existing daemon restored the unchanged runner. `pnpm verify test:db` passed all pgTAP files and 161 integration tests, including real summary buckets and sealed-scenario queries. Intermediate lint/context failures occurred while chart files and their fingerprints were being completed; final `pnpm check` passed 1,975 unit and 106 script tests, lint, types, context and docs. Independent review found an isolated known chart point disappeared beside a null bucket; `line-chart.test.tsx` reproduces the defect and verifies the corrected marker without displaying null as zero. Hosted reconciliation and deployment remain separate acceptance steps.
+

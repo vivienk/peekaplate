@@ -259,9 +259,9 @@ acceptance remain separate. This run reused retained genuine extraction output;
 it did not launch another OCR/model job. Keep normal delivery paused outside a
 controlled synthetic test window.
 
-## Owner client integration (November 15)
+## Owner client integration (historical November 15 slice)
 
-The FE-06.2 client reuses the authenticated workspace's exact local/staging API
+At this earlier client-only checkpoint, the FE-06.2 client reused the authenticated workspace's exact local/staging API
 origin allowlist, refuses redirects, retrieves a fresh nullable staff token for
 each request, and accepts a caller AbortSignal. An actor/venue change must abort
 and discard the previous workspace. Job/draft/photo/approval responses validate
@@ -279,3 +279,11 @@ wiring change; this client alone does not complete the DES-02 journey.
 The [owner onboarding wiring](owner-onboarding-wiring.md) connects the available
 screens to these existing APIs. Restaurant-settings persistence and final
 review/publication stay outside that slice; rollout evidence is separate.
+
+## Self-service test restaurants
+
+POST /staff/venues accepts only commandId and name under the existing staff bearer session, on local/staging only. The server allocates the restaurant identity and atomically records membership, command receipt, event and outbox. Retry the same name and command after a lost response; changed payload conflicts. Creation is limited to five per rolling day and twenty lifetime self-created restaurants per actor. Revoked ownership is rechecked on replay. Menu verification, food/photo confirmations and explicit publication remain separate owner actions; no operator approval is added.
+
+## Live Overview metrics
+
+The existing Jeffin Overview cards consume the optional validated owner-report summary. Distinct menu sessions, actual openings and completed-opening weighted interaction time use explicit current and baseline half-open windows with privacy suppression. Unsupported portion-preview and verified-order aggregates remain unavailable. No card falls back to prototype constants, sums dish-session counts, or averages dish averages. Synthetic dataset acceptance and positive AI freshness require separate hosted evidence; local tests do not establish either.

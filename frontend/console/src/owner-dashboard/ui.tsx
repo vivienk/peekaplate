@@ -99,7 +99,7 @@ function niceMax(v: number) {
 export type Series = {
   name: string;
   color: string;
-  values: number[];
+  values: (number | null)[];
   dash?: string;
   label?: boolean;
   faint?: boolean;
@@ -125,13 +125,17 @@ export function LineChart({
   const B = 26;
   const [hi, setHi] = useState<number | null>(null);
   const ref = useRef<SVGSVGElement>(null);
-  const max = niceMax(Math.max(...series.flatMap((s) => s.values)) * 1.05);
+  const peak = Math.max(
+    0,
+    ...series.flatMap((s) => s.values.filter((value): value is number => value !== null)),
+  );
+  const max = niceMax(peak > 0 ? peak * 1.05 : 1);
   const min = 0;
   const n = labels.length;
   const x = (i: number) => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1));
   const y = (v: number) => Tp + (h - Tp - B) * (1 - (v - min) / (max - min));
   const ticks = [0, 0.5, 1].map((f) => Math.round(max * f));
-  const at = (s: Series, i: number) => s.values[i] ?? 0;
+  const at = (s: Series, i: number) => s.values[i] ?? null;
   const move = (e: MouseEvent<SVGSVGElement>) => {
     if (!ref.current) return;
     const r = ref.current.getBoundingClientRect();
@@ -193,23 +197,34 @@ export function LineChart({
           <g key={s.name}>
             <path
               className="ln"
-              d={s.values.map((v, i) => `${i ? 'L' : 'M'}${x(i)} ${y(v)}`).join(' ')}
+              d={s.values
+                .map((v, i) =>
+                  v === null ? '' : `${i && s.values[i - 1] !== null ? 'L' : 'M'}${x(i)} ${y(v)}`,
+                )
+                .join(' ')}
               stroke={s.color}
               strokeDasharray={s.dash || undefined}
               opacity={s.faint ? 0.75 : 1}
             />
-            <circle
-              cx={x(n - 1)}
-              cy={y(at(s, n - 1))}
-              r="4.5"
-              fill={s.color}
-              stroke="var(--pp-color-white)"
-              strokeWidth="2"
-            />
-            {s.label !== false && (
+            {s.values.map(
+              (value, i) =>
+                value !== null &&
+                (i === n - 1 || (at(s, i - 1) === null && at(s, i + 1) === null)) && (
+                  <circle
+                    key={labels[i]}
+                    cx={x(i)}
+                    cy={y(value)}
+                    r="4.5"
+                    fill={s.color}
+                    stroke="var(--pp-color-white)"
+                    strokeWidth="2"
+                  />
+                ),
+            )}
+            {s.label !== false && at(s, n - 1) !== null && (
               <text
                 x={x(n - 1)}
-                y={y(at(s, n - 1)) - 10}
+                y={y(at(s, n - 1)!) - 10}
                 textAnchor="end"
                 style={{ fill: 'var(--ink)', fontWeight: 600 }}
               >
@@ -222,17 +237,20 @@ export function LineChart({
         {hi !== null && (
           <g>
             <line x1={x(hi)} x2={x(hi)} y1={Tp} y2={h - B} stroke="var(--line2)" strokeWidth="1" />
-            {series.map((s) => (
-              <circle
-                key={s.name}
-                cx={x(hi)}
-                cy={y(at(s, hi))}
-                r="5"
-                fill={s.color}
-                stroke="var(--pp-color-white)"
-                strokeWidth="2"
-              />
-            ))}
+            {series.map(
+              (s) =>
+                at(s, hi) !== null && (
+                  <circle
+                    key={s.name}
+                    cx={x(hi)}
+                    cy={y(at(s, hi)!)}
+                    r="5"
+                    fill={s.color}
+                    stroke="var(--pp-color-white)"
+                    strokeWidth="2"
+                  />
+                ),
+            )}
           </g>
         )}
       </svg>
@@ -241,8 +259,8 @@ export function LineChart({
           <b>{labels[hi]}</b>
           {series.map((s) => (
             <div key={s.name}>
-              {s.name}: {at(s, hi)}
-              {unit}
+              {s.name}: {at(s, hi) ?? 'Unavailable'}
+              {at(s, hi) !== null && unit}
             </div>
           ))}
         </div>

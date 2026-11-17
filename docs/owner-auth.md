@@ -247,3 +247,7 @@ The hosted 308 responses reproduced this gap after the first workspace release.
 The clean-path unit case and both SDK/browser flows fail before the correction
 and pass afterward. SDK browser responses are synthetic HTTP; this evidence
 does not establish fresh email delivery or a genuine hosted staff session.
+
+## Staging restaurant creation
+
+Confirmed staging/local users can choose Create test restaurant from the restaurant chooser, including an empty account. A single-restaurant account reaches the chooser through the existing Owner account menu. Creation assigns only the signed-in actor ownership of a new empty restaurant; signing in never grants access to another restaurant. Existing demo restaurants and credentials remain unchanged. The authoritative membership refresh opens the existing S05 details screen. This addition is staging testing UI, not a replacement onboarding design.

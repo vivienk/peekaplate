@@ -25,14 +25,19 @@ import {
 } from '../owner-dashboard/ai-preview/analysis-client';
 import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
 import { ReportView, useOwnerReport } from '../owner-dashboard/report-data';
-import { Button } from '../ui';
+import { Button, Input } from '../ui';
 import { FirstDashboardAside, FirstDashboardTopbar } from './FirstDashboard';
 import { Icon } from './icons';
 import type { MenuSnapshot } from './menu-snapshot';
 import { OwnerMenuWorkspace } from './OwnerMenuWorkspace';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
 import { fetchOwnerActions, type OwnerActionsState } from './owner-actions-api';
-import { fetchOwnerWorkspace, type WorkspaceState } from './workspace-api';
+import {
+  createTestRestaurant,
+  fetchOwnerWorkspace,
+  readWorkspaceApiBase,
+  type WorkspaceState,
+} from './workspace-api';
 import './owner.css';
 import '../owner-dashboard/owner-dashboard.css';
 import './workspace.css';
@@ -136,7 +141,7 @@ export function OwnerWorkspace({
   const venues = state.kind === 'ready' ? state.venues : [];
   const selected =
     venues.find((venue) => venue.venueId === selectedId) ??
-    (venues.length === 1 ? venues[0] : undefined);
+    (!selectedId && venues.length === 1 ? venues[0] : undefined);
   const workspaceSetup =
     setupRead?.actor === owner.id && setupRead.value.venueId === selected?.venueId
       ? setupRead.value
@@ -174,6 +179,22 @@ export function OwnerWorkspace({
       Sign out
     </Button>
   );
+  const createRestaurant =
+    apiBase && readWorkspaceApiBase(apiBase) ? (
+      <CreateTestRestaurant
+        key={`${owner.id}:${apiBase}`}
+        apiBase={apiBase}
+        getAccessToken={getAccessToken}
+        canLeave={canLeave}
+        onAccessFailure={accessFailure}
+        onCreated={(venueId) => {
+          refresh();
+          setSelectedId(venueId);
+          setDetailsRequested(true);
+          setNavigation((value) => value + 1);
+        }}
+      />
+    ) : null;
 
   if (!apiBase)
     return (
@@ -209,7 +230,12 @@ export function OwnerWorkspace({
     return (
       <main className="owner-workspace-state">
         <h1>No restaurant access yet</h1>
-        <p>Your account is ready. Contact PeekaPlate to connect your restaurant.</p>
+        <p>
+          {createRestaurant
+            ? 'Your account is ready. Create a test restaurant to start, or check access to an existing restaurant.'
+            : 'Your account is ready. Contact PeekaPlate to connect your restaurant.'}
+        </p>
+        {createRestaurant}
         <Button variant="outline" onClick={refresh}>
           Check access again
         </Button>
@@ -239,6 +265,7 @@ export function OwnerWorkspace({
           </option>
         ))}
       </select>
+      {createRestaurant}
     </div>
   );
   if (!selected)
@@ -394,6 +421,87 @@ export function OwnerWorkspace({
   );
 }
 
+function CreateTestRestaurant({
+  apiBase,
+  getAccessToken,
+  canLeave,
+  onAccessFailure,
+  onCreated,
+}: {
+  apiBase: string;
+  getAccessToken: () => Promise<string | null>;
+  canLeave: () => boolean;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+  onCreated: (venueId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const id = useId();
+  const pending = useRef<AbortController | null>(null);
+  const command = useRef<{ commandId: string; name: string } | null>(null);
+  useEffect(() => () => pending.current?.abort(), []);
+  const create = async (event: FormEvent) => {
+    event.preventDefault();
+    if (pending.current || !canLeave()) return;
+    const trimmed = name.trim();
+    if (command.current?.name !== trimmed)
+      command.current = { commandId: crypto.randomUUID(), name: trimmed };
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true);
+    setError('');
+    const result = await createTestRestaurant({
+      apiBase,
+      ...command.current,
+      getAccessToken,
+      signal: controller.signal,
+    });
+    if (controller.signal.aborted) return;
+    pending.current = null;
+    setBusy(false);
+    if (result.kind === 'created') {
+      onCreated(result.venue.venueId);
+      return;
+    }
+    if (result.kind === 'signed_out' || result.kind === 'denied') {
+      onAccessFailure(result.kind);
+      return;
+    }
+    setError(
+      result.kind === 'quota'
+        ? 'Your test restaurant limit has been reached. Use an existing restaurant.'
+        : result.kind === 'conflict'
+          ? 'This request was already used with a different name. Enter a new name to start another request.'
+          : result.kind === 'invalid'
+            ? 'Enter a restaurant name of 1–160 characters without control characters, then try again.'
+            : 'We could not confirm creation. Retry with the same name to safely check the same request.',
+    );
+  };
+  return open ? (
+    <form onSubmit={(event) => void create(event)} aria-label="Create test restaurant">
+      <label htmlFor={id}>Test restaurant name (Staging testing)</label>
+      <Input
+        id={id}
+        value={name}
+        required
+        maxLength={160}
+        disabled={busy}
+        onChange={(event) => setName(event.target.value)}
+      />
+      {error && <p role="alert">{error}</p>}
+      <Button type="submit" disabled={busy || !name.trim()}>
+        {busy ? 'Creating test restaurant…' : 'Create test restaurant'}
+      </Button>
+    </form>
+  ) : (
+    <Button variant="outline" onClick={() => setOpen(true)}>
+      Create test restaurant (Staging testing)
+    </Button>
+  );
+}
+
 const noop = () => {};
 function LiveDashboardReport({
   page,
@@ -436,6 +544,8 @@ function LiveDashboardReport({
   const live = {
     restaurantName,
     reportContent,
+    summary: report?.summary,
+    summaryFreshness: report?.report_metadata.freshness.is_stale,
     period: report ? reportPeriod(report.report_metadata.date_window) : undefined,
   };
   return (

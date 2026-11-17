@@ -136,6 +136,7 @@ import {
   type ExportableOwnerReport,
   serializeOwnerReportCsv,
 } from './owner-report-export';
+import { registerOwnerVenueCreation } from './owner-venue-create';
 import { listOwnerVenues } from './owner-workspace';
 import {
   createPublicMenuResponse,
@@ -274,6 +275,7 @@ export type Bindings = {
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
   EXTRACTION_TIMEOUT_MS?: string;
   OWNER_AI_DISH_ASSISTANCE_ENABLED?: string;
+  OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL?: string;
   SYNTHETIC_REPORT_VENUE_IDS?: string;
 };
 
@@ -758,6 +760,13 @@ const dependencies: Dependencies = {
       if (!syntheticReport) throw new AuthUnavailableError();
       return await queryOwnerReport(client, actorId, venueId, now, source, {
         trafficClass: syntheticReportTrafficClass(venueId),
+        includeSummary: true,
+        ...(env.APP_ENV === 'staging' && env.OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL
+          ? {
+              syntheticSeal: env.OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL,
+              validationNow: new Date(),
+            }
+          : {}),
       });
     } finally {
       await client.end();
@@ -1160,8 +1169,8 @@ export function createApp(services: Dependencies = dependencies) {
     '/staff/venues',
     cors({
       origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
-      allowMethods: ['GET', 'OPTIONS'],
-      allowHeaders: ['Authorization'],
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type'],
       maxAge: 86400,
     }),
   );
@@ -1181,6 +1190,11 @@ export function createApp(services: Dependencies = dependencies) {
     });
     if (!response.success) throw new AuthUnavailableError();
     return c.json(response.data);
+  });
+  registerOwnerVenueCreation(app, {
+    verify: services.verify,
+    database: withDatabase,
+    allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
   });
   app.get('/.well-known/jwks.json', async (c) => {
     if (!services.readMenuJwks) throw new AuthUnavailableError();
