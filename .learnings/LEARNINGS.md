@@ -153,6 +153,10 @@ progress. Keep sample design content confined to labelled demos.
 Related: docs/owner-onboarding-wiring.md, tests/e2e/owner-workspace.spec.ts.
 Pattern: frontend.composition-before-wiring; first occurrence, no policy promotion.
 
+November 17 S09 follow-up: retaining a component name is insufficient when new
+media bypasses its existing size constraints. Populate the authored image area
+and check rendered bounds; do not add an unrestricted-height preview inside it.
+
 November 17 release follow-up: compare candidate files with the deployed main
 branch, not only develop. A selective promotion can otherwise remove main-only
 authored performance presentation and lazy camera cleanup even when develop

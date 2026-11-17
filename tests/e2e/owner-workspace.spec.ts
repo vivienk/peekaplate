@@ -2924,6 +2924,14 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
   await expect(
     page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup' }),
   ).toBeVisible();
+  const portionCard = page.getByRole('region', { name: '2.5D preview', exact: true });
+  const portionImage = portionCard.getByRole('img', {
+    name: 'Review-only 2.5D preview of Fictional Lentil Soup',
+  });
+  await expect(portionImage).toBeVisible();
+  const imageBounds = await portionImage.boundingBox();
+  expect(imageBounds?.height).toBeGreaterThan(0);
+  expect(imageBounds?.height).toBeLessThanOrEqual(120);
   expect(generations).toBe(2);
   await page.getByRole('textbox', { name: /^Dish name/ }).fill('Fictional Lentil Soup updated');
   await expect(

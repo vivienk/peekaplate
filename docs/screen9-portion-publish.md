@@ -39,6 +39,12 @@ only to originals.
 The current 2.5D preview shows the **actual generated cutout**, not a synthetic
 2.5D fixture or 3D model. Diner camera/AR placement remains in PR #162.
 
+S09 keeps the original #172/#213 form and its existing right-hand 2.5D card.
+The generated image uses the same bounded 120px photo presentation as the
+authored photo card; it must not expand at its intrinsic height. Generation,
+private review status and explicit approval stay inside this card. No separate
+editor, preview page, design token or approval path is introduced.
+
 ## Private service configuration
 
 The Worker reuses the existing server-side `EXTRACTION_SERVICE_URL` and
