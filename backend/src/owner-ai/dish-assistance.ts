@@ -397,9 +397,17 @@ export function registerDishAssistanceRoutes(
       );
       return c.json({ error: 'service_unavailable' }, 503);
     }
-    const draft = await options.database(env, (db) =>
-      readDraft(db, actor, venue, id, input.data.expectedVersion),
-    );
+    const draft = await options
+      .database(env, (db) => readDraft(db, actor, venue, id, input.data.expectedVersion))
+      .catch((error: unknown) => {
+        if (!(error instanceof IngestionError || error instanceof CommandError)) {
+          logOwnerAiFailure('dish_description', undefined, {
+            category: 'internal',
+            httpStatus: null,
+          });
+        }
+        throw error;
+      });
     const facts = evidence(input.data, draft);
     const base = {
       schemaVersion: 'dish-assistance.v1',

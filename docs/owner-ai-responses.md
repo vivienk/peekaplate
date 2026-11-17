@@ -77,7 +77,7 @@ does not establish that OpenAI returned 503.
 | `timeout` / `transport` | The request or body could not complete. A null status means no HTTP response was observed. |
 | `invalid_response` | JSON, the model envelope, usage or selected evidence failed validation. A 200 status means transport succeeded, not that the output is usable. |
 | `configuration` / `request_budget` | A local configuration or reservation gate prevented the request. This is not an OpenAI error. |
-| `internal` | An unrelated local operation failed, such as the post-request draft reread. Do not attribute this to provider output. |
+| `internal` | The server could not read or validate the report, could not read a dish draft, or another local operation failed. |
 
 Both adapters use the same five-second whole-response deadline and 32 KiB streamed
 body limit, including error bodies. They make one attempt and never follow

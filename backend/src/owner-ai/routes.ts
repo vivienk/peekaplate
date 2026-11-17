@@ -7,6 +7,7 @@ import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import type { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
+import { CommandError } from '../dish-command';
 import type { Bindings } from '../index';
 import { configuredSyntheticReportVenues } from '../owner-report-scope';
 import { logOwnerAiFailure, OwnerAiProviderFailure } from './provider';
@@ -100,15 +101,22 @@ export function registerOwnerAnalysisRoutes(
     // The existing reader checks current owner membership in a tenant-scoped read-only transaction.
     // No browser report, metrics, prompt, model, policy or credential is accepted.
     const report = OwnerDishReportSchema.safeParse(
-      await options.readReport(
-        actor,
-        scope.data.venueId,
-        reference?.anchor ?? now,
-        env,
-        'synthetic',
-      ),
+      await options
+        .readReport(actor, scope.data.venueId, reference?.anchor ?? now, env, 'synthetic')
+        .catch((error: unknown) => {
+          if (!(error instanceof CommandError)) {
+            logOwnerAiFailure('owner_analysis', undefined, {
+              category: 'internal',
+              httpStatus: null,
+            });
+          }
+          throw error;
+        }),
     );
-    if (!report.success) return c.json({ error: 'service_unavailable' }, 503);
+    if (!report.success) {
+      logOwnerAiFailure('owner_analysis', undefined, { category: 'internal', httpStatus: null });
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
     if (reference && ownerReportSnapshot(report.data) !== reference.snapshot) {
       return c.json({ error: 'report_reference_unavailable' }, 409);
     }

@@ -5248,3 +5248,7 @@ Two added regressions reproduced both classifications. Wrap reservation failures
 as request_budget and use an explicit internal fallback for unrelated local errors;
 the public 503 body and authority/version error handling are preserved.
 
+Three additional route regressions exposed a missing internal diagnostic for a
+failed or malformed report reread and a failed initial description draft read.
+These paths now log the fixed internal category, preserve the public response
+and make no provider call. A revoked membership still returns 403.

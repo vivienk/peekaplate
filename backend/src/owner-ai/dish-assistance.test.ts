@@ -98,7 +98,9 @@ function setup() {
   };
   const app = new Hono<{ Bindings: Bindings }>();
   app.onError((error, c) =>
-    c.json({ error: 'denied' }, ('status' in error ? error.status : 500) as 403),
+    'status' in error
+      ? c.json({ error: 'denied' }, error.status as 403)
+      : c.json({ error: 'service_unavailable' }, 503),
   );
   registerDishAssistanceRoutes(app, {
     verify,
@@ -169,6 +171,21 @@ it('classifies a later database failure without blaming valid provider output', 
   expect(response.status).toBe(503);
   expect(await response.json()).toEqual({ error: 'service_unavailable' });
   expect(s.fetchImpl).toHaveBeenCalledTimes(1);
+  expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+    operation: 'dish_description',
+    category: 'internal',
+    httpStatus: null,
+    providerCode: null,
+  });
+});
+it('classifies an initial database failure before reserving or calling the provider', async () => {
+  const s = setup();
+  s.query.mockRejectedValue(new Error('private database details'));
+  const response = await s.run();
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: 'service_unavailable' });
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+  expect(s.limit).not.toHaveBeenCalled();
   expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
     operation: 'dish_description',
     category: 'internal',

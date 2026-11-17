@@ -720,7 +720,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4b27589eabb954892fac5fd1453f16cf59ddf251adc9fcdc9825348feda64505"
+      "sourceFingerprint": "10840a8a5f1112fb60c06bd822ffbc91ff0515745effe8263f2642424381e359"
     },
     {
       "id": "database",
@@ -1246,7 +1246,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "backend"
       ],
-      "summary": "Repair owner AI diagnostic loss with a bounded shared Responses transport, server-only status/code classifications and provisioning-compatible project validation. Public errors, evidence gates, model, request/token limits and no-retry behavior remain. Seven failing regressions are now green; 88 caller tests and 40 transport tests pass offline; independent review corrected local-failure classification with two additional regressions.",
+      "summary": "Repair owner AI diagnostic loss with a bounded shared Responses transport, server-only status/code classifications and provisioning-compatible project validation. Report and draft read failures log an internal category before provider use. Public errors, evidence gates, model, request/token limits and no-retry behavior remain. All 131 focused caller and transport tests pass offline.",
       "files": [
         "backend/src/owner-ai/provider.ts",
         "backend/src/owner-ai/responses.ts",
