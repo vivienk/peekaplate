@@ -5125,3 +5125,39 @@ the empty/duplicate result defect. Preserve the dish unchanged and report no
 additional suggestions through the existing status line. Both regressions and
 27 related tests pass. The initial optional draft-version type error in the new
 callback was corrected using the existing version-zero fallback; typecheck passes.
+
+## November 17 — empty ingredient suggestions changed review state
+
+Two focused regressions showed the existing ingredient callback marked a dish
+AI-assisted and reset review for empty or duplicate-only proposals. Preserve the
+dish unchanged and report no additional suggestions through its existing status
+line. The two regressions and 27 related tests pass. A transient optional-version
+type error was corrected with the existing version-zero fallback.
+
+The separate develop/main reconciliation passed 2,177 unit and 122 script tests.
+Its first focused workerd run hit SQLITE_BUSY_RECOVERY at publication startup;
+the unchanged publication file passed 12/12 serially. This is local runtime
+contention, not an application fix. Reconciled line-ending/export-order lint
+failures were formatted, then lint/typecheck/build passed.
+
+## November 17 — ingredient fixture PostgreSQL parameter typing
+
+PR227 CI run 44130472518 reached the real database and rejected the new fixture's
+shared UUID/text parameter with `inconsistent types deduced for parameter $1`.
+Both fixture inserts now cast the identity to UUID before its text projection;
+runtime SQL is unchanged. The PR body also lacked an exact command in its PASS
+entries; its verification records now use the required command format. Database
+acceptance remains pending the corrected CI run rather than being inferred from
+mocked unit tests.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T17:00:23.498Z","exitCode":1}
+```
+## November 17 — final develop synchronization runtime check
+
+The reconciled tree passed lint/typecheck and 2,176 unit cases before the same
+local workerd publication startup hit SQLITE_IOERR_TRUNCATE. The unchanged
+publication file passed 12/12 serially in 3.36 seconds; all 122 script tests also
+passed. Linux CI remains the final synchronization gate. No timeout or runtime
+behavior was weakened to mask this local storage failure.

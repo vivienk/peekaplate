@@ -98,7 +98,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('saved ingredient assistance (real dat
     await admin.query(
       `INSERT INTO app_private.menu_ingestion_jobs
        (id,tenant_id,source_type,source_hash,idempotency_key,status,finished_at,active_review_extraction_id)
-       VALUES($1,$2,'pdf',$3,$1::text,'complete',now(),$4)`,
+       VALUES($1::uuid,$2,'pdf',$3,$1::uuid::text,'complete',now(),$4)`,
       [job, venue, payload.source.sha256, payload.extraction_id],
     );
     await admin.query(
@@ -120,7 +120,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('saved ingredient assistance (real dat
     await admin.query(
       `INSERT INTO app_private.dish_drafts
        (id,tenant_id,job_id,draft_id,candidate_id,draft_index,name,source_id,source_text,evidence,draft_version)
-       VALUES($1,$2,$3,$1::text,$4,0,'Synthetic extracted bowl',$5,'Synthetic rice and tomato','{}',1)`,
+       VALUES($1::uuid,$2,$3,$1::uuid::text,$4,0,'Synthetic extracted bowl',$5,'Synthetic rice and tomato','{}',1)`,
       [draft, venue, job, candidate.candidate_id, payload.source.source_id],
     );
     if (correction !== undefined || rejected)
@@ -198,6 +198,21 @@ describe.skipIf(!runtimeUrl || !adminUrl)('saved ingredient assistance (real dat
     expect(await (await request(mismatch.draft)).json()).toMatchObject({
       status: 'abstained',
       ingredients: [],
+    });
+  });
+
+  it('withholds an old same-hash session when the active extraction is absent', async () => {
+    const { draft, job } = await extracted();
+    await admin.query(
+      'UPDATE app_private.menu_ingestion_jobs SET active_review_extraction_id=$2 WHERE id=$1',
+      [job, `extraction:${crypto.randomUUID().replaceAll('-', '')}`],
+    );
+    const response = await request(draft);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'abstained',
+      ingredients: [],
+      evidence: null,
     });
   });
 

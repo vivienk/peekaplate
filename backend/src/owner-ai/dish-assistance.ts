@@ -142,6 +142,7 @@ async function readIngredientProposal(
          AND j.status IN ('complete','incomplete')
        LEFT JOIN app_private.extraction_review_session s ON s.tenant_id=d.tenant_id
          AND s.job_id=j.id AND s.source_sha256=j.source_hash
+         AND s.extraction_id=j.active_review_extraction_id
        LEFT JOIN app_private.candidate_review_current r ON r.tenant_id=d.tenant_id
          AND r.extraction_id=s.extraction_id AND r.candidate_id=d.candidate_id
        WHERE d.tenant_id=$1 AND d.id=$2`,

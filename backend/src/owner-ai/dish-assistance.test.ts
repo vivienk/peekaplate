@@ -199,6 +199,10 @@ it('resurfaces only saved extraction proposals with their source identity', asyn
     venue,
     id,
   ]);
+  expect(s.query).toHaveBeenCalledWith(
+    expect.stringContaining('s.extraction_id=j.active_review_extraction_id'),
+    [venue, id],
+  );
   expect(s.fetchImpl).not.toHaveBeenCalled();
   expect(s.query.mock.calls.some(([sql]) => /INSERT|UPDATE|DELETE/.test(sql))).toBe(false);
 });

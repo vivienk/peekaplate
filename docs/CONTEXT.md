@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/menu and observation contracts retain identity, tenant and privacy boundaries. Canonical restaurant profile/setup commands are versioned and bounded; owner-submitted fields cannot grant verification. Owner draft/review contracts carry serving text, optional numeric count, corrected photo/allergen fields and versioned removal. Public branding/portion fields remain serializable and revision-bound; count is not physical scale. Existing report/cohort and intent evidence contracts stay separate. Legacy draft-request omission and explicit clearing require compatibility checks against unchanged frontend callers. Legacy omitted serving fields retain stored values; explicit null clears them without conflating command identity.",
+      "summary": "Shared tenant, command, owner-draft, menu-publication and diner-observation contracts remain strict. Serving count is not physical scale. Owner actions retain bounded versioned status transitions. Description assistance is version-bound and returns an exact evidence sentence as an unverified proposal; no generated food or allergen claims. Report privacy/status contracts and published revision-bound portions are unchanged. Ingredient assistance is a strict operation union; saved proposals carry evidence identity and remain unverified.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -121,7 +121,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Verified live/fixture menus, details, Search, Save/Saved and Compare retain shared IDs/timing and tenant-free client authority. Consent gates both destinations; fixtures never send. Publication swaps clear exposure links; aliases resolve server locators before public reads. Live artwork refresh/revocation retains fallback. Optional View Portion adds captured layers, photo fallback, orientation and camera cleanup to the existing detail lifecycle. Preview close preserves Menu/Saved/Compare return labels. Local uploads/generated models remain review-only and publication-ineligible. Physical scale and hosted camera acceptance remain pending. Published logos replace the generic header, approved portion payloads offer CSS/table preview, and unknown ingredients retain a neutral fallback icon. The same consent control hides only during portion preview/camera and returns on exit; no implicit opt-in or consent reset.",
+      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Verified portion blobs retain supported image MIME for opaque published SVG URLs; exact byte/hash and dimension checks remain. Release preserves deliberate camera entry while binding measurements to serving count; approximate fallbacks remain labelled. Consent-gated PostHog/canonical tracking remains the existing implementation; withdrawn publication denies new prepared-content reads. Consent hides only during the existing portion preview/camera state and returns on exit without resetting the choice.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -284,7 +284,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics.",
+      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics. Existing ingredient controls reuse saved proposals; empty or duplicate results preserve review state. Stale editor/session results are discarded.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -465,7 +465,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Canonical owner/profile/draft commands retain tenant authority, versions and replay. Part A prepares owner-verified drafts through existing approval/producer/admission; edits reopen the same canonical dish. Removal/Undo preserves unchanged verification and stable retries. Exact current publication controls public prepared bundles and selected photos/logos; reads are no-store. Owner previews use authenticated snapshot-bound blobs. Empty venues remain empty. Private 2.5D export binds the canonical approved photo/revision; retention reclaims rejected/orphaned artifacts. Structured HTML MenuItem intake persists pending drafts and reconstructs review originals server-side. Competing offers remain unpriced; file fallback reuses the fetched source and safe-fetch limits. Operator hosting/admission, profile verification, hosted processor/provider and release acceptance remain separate; the Menu profile-verification inconsistency is documented. Ingredient assistance returns only current saved so",
+      "summary": "Worker preserves staff/JWKS and tenant authority, expected versions and transactional event/outbox commands. Owner upload, verification, preparation and publication reuse existing services. Preparation validates approved private portion bytes against current photo/revision; serving uses the exact published snapshot so draft edits cannot hide live assets. Extraction host forwards bounded authenticated CPU cutout requests to the existing container. Report references bind actor, venue, window and digest; strict configured synthetic scopes choose separate live/test views. Owner Actions and CSV use existing owner checks. Description assistance selects literal evidence only and never saves or publishes. Unknown report freshness remains unusable for AI. Ingredient assistance reuses current saved source-bound values; corrections override originals, missing evidence abstains, and no provider is called. Develop retains its separate order and comparison APIs.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -706,7 +706,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e99451fda0b1c4053af600a6273b53886c38990d1989bb2442bd66029fd521f9"
+      "sourceFingerprint": "a8affbab7f53aec5008d7dce412709812fc0d09a8563015567cb70c232b47279"
     },
     {
       "id": "database",
@@ -1099,20 +1099,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "date": "2026-11-16",
       "modules": [
         "backend",
-        "console"
-      ],
-      "summary": "The opt-in owner panel preserves typed access cleanup and shows the displayed report and analysis periods separately. The synthetic report GET now signs a short-lived owner and venue report reference. Analysis reauthorizes, re-reads the referenced window and rejects changed evidence before evaluation.",
-      "files": [
-        "backend/src/owner-ai/report-reference.ts",
-        "backend/src/owner-ai/report-reference.test.ts",
-        "docs/owner-ai-responses.md"
-      ],
-      "next": "Have the console attach the current report reference header. Check sign-out, mobile, the disabled mode and hosted setup separately. Preserve unknown-freshness abstention."
-    },
-    {
-      "date": "2026-11-16",
-      "modules": [
-        "backend",
         "contracts",
         "database"
       ],
@@ -1257,6 +1243,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "Reconcile main release fixes into develop without dropping comparison/order/local-AI work. Reuse the existing dish-assistance route for saved ingredient proposals and existing portion state to hide repeated consent copy.",
       "next": "Run pinned CI and hosted signed-out S1/ingredient/portion checks. Protected staging credential deployment and authoritative report completeness remain separate AI activation gates."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "backend",
+        "console",
+        "diner",
+        "contracts"
+      ],
+      "summary": "Sync the same reviewed main ingredient/consent commits into develop, preserving existing order/comparison/local AI work. Active extraction authority and real SQL fixture regressions are included.",
+      "next": "Wait for PR227 CI, merge main normally, then update develop without force or bypass. Deploy exact main only; credential approval and report completeness remain external AI gates."
     }
   ]
 }
