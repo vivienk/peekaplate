@@ -665,10 +665,37 @@ async function preparedPublication(context: BrowserContext) {
     conflict: false,
     denied: false,
     linkFailure: false,
+    prepares: 0,
+    prepareFailure: false as false | 'unavailable' | 'menu_not_verified',
   };
   const headers = { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*' };
   await context.route('**/venues/*/prepared-menus**', async (route) => {
     if (state.denied) return route.fulfill({ status: 403, json: { error: 'forbidden' }, headers });
+    // Part A: opening S13 (and Prepare again) prepares first; preparing never publishes.
+    if (new URL(route.request().url()).pathname.endsWith('/prepared-menus/prepare')) {
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({
+          status: 204,
+          headers: { ...headers, 'Access-Control-Allow-Methods': 'POST' },
+        });
+      state.prepares += 1;
+      return state.prepareFailure
+        ? route.fulfill({
+            status: state.prepareFailure === 'menu_not_verified' ? 409 : 503,
+            json: { error: state.prepareFailure },
+            headers,
+          })
+        : route.fulfill({
+            json: {
+              menuId: menu.menuId,
+              menuRevisionId: menu.menuRevisionId,
+              completeDishes: 1,
+              diagnostics: [],
+              status: 'already_present',
+            },
+            headers,
+          });
+    }
     const liveMenu = {
       ...menu,
       publicationVersion: state.publicationVersion,
@@ -853,13 +880,11 @@ test('prepared publication conflict requires a fresh preview and denied access c
   await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
   await expect(
-    page.getByText(
-      'The menu changed. Reload prepared menus and review it again before publishing.',
-    ),
+    page.getByText('The menu changed. Prepare again and review it again before publishing.'),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toHaveCount(0);
   state.denied = true;
-  await page.getByRole('button', { name: 'Reload prepared menus' }).click();
+  await page.getByRole('button', { name: 'Prepare again' }).click();
   await expect(page.getByRole('heading', { name: 'Synthetic Garden Soup' })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Menu link' })).toHaveCount(0);
 });
@@ -2492,96 +2517,126 @@ for (const partial of [false, true]) {
   });
 }
 
-// Part A: completing S10 verification prepares the menu for S13 (never publishes); a failed
-// preparation keeps the verification and says what to do next.
-for (const outcome of ['prepared', 'failed'] as const) {
-  test(`completing verification prepares the S13 menu (${outcome})`, async ({ context, page }) => {
-    const state = await fixture(context);
-    const id = crypto.randomUUID();
-    const photoId = crypto.randomUUID();
-    state.drafts[venue.venueId] = [
-      {
-        id,
-        draft_id: id,
-        job_id: null,
-        origin: 'manual',
-        draft_version: 1,
+// Part A: S11 stays verification-only; Review and publish prepares the menu (never publishes),
+// says when preparation failed, and Prepare again retries it.
+test('completing verification does not prepare or approve anything', async ({ context, page }) => {
+  const state = await fixture(context);
+  const id = crypto.randomUUID();
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: null,
+      origin: 'manual',
+      draft_version: 1,
+      name: 'Fictional Lentil Soup',
+      category: 'Soup',
+      description: 'Slow cooked lentil soup with herbs.',
+      price_amount: '9.50',
+      price_currency: 'CAD',
+      ingredients: ['lentils'],
+      source_text: null,
+      review_warnings: [],
+      review_status: 'pending',
+      verification_status: 'not_verified',
+      manual_fields: {
         name: 'Fictional Lentil Soup',
         category: 'Soup',
         description: 'Slow cooked lentil soup with herbs.',
-        price_amount: '9.50',
-        price_currency: 'CAD',
-        ingredients: ['lentils'],
-        source_text: null,
-        review_warnings: [],
-        review_status: 'pending',
-        verification_status: 'not_verified',
-        manual_fields: {
-          name: 'Fictional Lentil Soup',
-          category: 'Soup',
-          description: 'Slow cooked lentil soup with herbs.',
-          priceAmount: '9.50',
-          priceCurrency: 'CAD',
-          servingSize: '1 bowl',
-          ingredients: { status: 'confirmed', items: ['lentils'] },
-          allergens: { status: 'confirmed', items: [] },
-          photoId,
-        },
+        priceAmount: '9.50',
+        priceCurrency: 'CAD',
+        servingSize: '1 bowl',
+        ingredients: { status: 'confirmed', items: ['lentils'] },
+        allergens: { status: 'confirmed', items: [] },
+        photoId: crypto.randomUUID(),
       },
-    ];
-    const second = structuredClone(state.drafts[venue.venueId]![0]!);
-    second.id = crypto.randomUUID();
-    second.draft_id = second.id;
-    second.name = 'Fictional Salad';
-    second.manual_fields!.name = second.name;
-    state.drafts[venue.venueId]!.push(second);
-    const prepares: string[] = [];
-    await context.route('**/venues/*/prepared-menus/prepare', async (route) => {
-      prepares.push(route.request().method());
-      if (route.request().method() === 'OPTIONS')
-        return route.fulfill({
-          status: 204,
-          headers: {
-            'Access-Control-Allow-Origin': origin,
-            'Access-Control-Allow-Headers': '*',
-            'Access-Control-Allow-Methods': 'POST',
-          },
-        });
-      const verified = state.drafts[venue.venueId]?.every(
-        (draft) => draft.verification_status === 'verified',
-      );
-      expect(verified).toBe(true);
-      return outcome === 'prepared'
-        ? route.fulfill({
-            json: {
-              menuId: id,
-              menuRevisionId: photoId,
-              completeDishes: 1,
-              diagnostics: [],
-              status: 'inserted',
-            },
-            headers: { 'Access-Control-Allow-Origin': origin },
-          })
-        : route.fulfill({
-            status: 409,
-            json: { error: 'nothing_to_prepare' },
-            headers: { 'Access-Control-Allow-Origin': origin },
-          });
-    });
-    await signIn(page, undefined, false);
-    await page.getByRole('button', { name: 'Edit: Add your menu', exact: true }).click();
-    await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
-    // Preparation starts right after the verified result is shown.
-    await expect.poll(() => prepares.filter((method) => method === 'POST').length).toBe(1);
-    await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
-    await expect(
-      page.getByText(
-        outcome === 'prepared'
-          ? /Your menu is ready to preview: 1 dish can be shown to diners/
-          : /Your dishes are verified\. We couldn’t prepare the menu preview yet/,
-      ),
-    ).toBeVisible();
-    expect(state.apiCalls.some((call) => /publications|\/approvals$/.test(call.path))).toBe(false);
-  });
-}
+    },
+  ];
+  await signIn(page, undefined, false);
+  await page.getByRole('button', { name: 'Edit: Add your menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
+  expect(
+    state.apiCalls.filter((call) =>
+      /prepare|\/drafts\/[^/]+\/approve$|approvals|publications/.test(call.path),
+    ),
+  ).toEqual([]);
+});
+
+test('Review and publish prepares the menu, shows a failure and retries with Prepare again', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  const state = await preparedPublication(context);
+  state.prepareFailure = 'unavailable';
+  await signIn(page);
+  await page.getByRole('button', { name: 'Review and publish' }).click();
+  await expect(page.getByRole('alert')).toContainText('Menu not prepared yet');
+  await expect(page.getByRole('alert')).toContainText('prepare again to retry');
+  // An earlier prepared menu stays available while preparation is retried.
+  await expect(
+    page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }),
+  ).toBeVisible();
+  await expect.poll(() => state.prepares).toBe(1);
+
+  state.prepareFailure = 'menu_not_verified';
+  await page.getByRole('button', { name: 'Prepare again' }).click();
+  await expect(page.getByRole('alert')).toContainText('need verifying again');
+  await expect.poll(() => state.prepares).toBe(2);
+
+  state.prepareFailure = false;
+  await page.getByRole('button', { name: 'Prepare again' }).click();
+  await expect(page.getByText('Menu not prepared yet')).toHaveCount(0);
+  await expect.poll(() => state.prepares).toBe(3);
+  // Preparing approved and published nothing: S13 still needs the explicit Publish.
+  expect(state.approvals).toEqual([]);
+  expect(state.publishes).toEqual([]);
+  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toBeVisible();
+  expect(state.publishes).toEqual([]);
+});
+
+test('a dish approved by an earlier preparation can still be edited (Back/Edit)', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const id = crypto.randomUUID();
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: null,
+      origin: 'manual',
+      draft_version: 2,
+      name: 'Fictional Lentil Soup',
+      category: 'Soup',
+      description: 'Slow cooked lentil soup with herbs.',
+      price_amount: '9.50',
+      price_currency: 'CAD',
+      ingredients: ['lentils'],
+      source_text: null,
+      review_warnings: [],
+      review_status: 'accepted',
+      verification_status: 'verified',
+      manual_fields: {
+        name: 'Fictional Lentil Soup',
+        category: 'Soup',
+        description: 'Slow cooked lentil soup with herbs.',
+        priceAmount: '9.50',
+        priceCurrency: 'CAD',
+        servingSize: '1 bowl',
+        ingredients: { status: 'confirmed', items: ['lentils'] },
+        allergens: { status: 'confirmed', items: [] },
+        photoId: null,
+      },
+    },
+  ];
+  await signIn(page);
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  const edit = page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true });
+  await expect(edit).toBeEnabled();
+  await edit.click();
+  await expect(page.getByRole('heading', { name: 'Edit dish' })).toBeVisible();
+});

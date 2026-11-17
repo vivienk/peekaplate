@@ -1,185 +1,168 @@
-import { verifyPublicMenuContentBytes } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import { buildPreparedBundle, imageSize, ownerMenuId, type VerifiedDish } from './owner-prepare';
+import {
+  type ApprovedDishSource,
+  BundleProducerError,
+  type OwnerApprovedPhoto,
+  produceMenuBundle,
+} from './bundle-producer/produce';
+import { MenuBundleRequestSchema } from './bundle-producer/request';
+import { assetUrl, ownerMenuId, PREPARED_ASSET_PATH, PREPARED_BUNDLE_PATH } from './owner-prepare';
 import { fetchPreparedMenu } from './owner-publication';
 
 const venue = '11111111-1111-4111-8111-111111111111';
 const origin = 'https://api.example.test';
-const png = (width: number, height: number) => {
-  const bytes = new Uint8Array(33);
-  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13], 0);
-  bytes.set(
-    [...'IHDR'].map((c) => c.charCodeAt(0)),
-    12,
-  );
-  new DataView(bytes.buffer).setUint32(16, width);
-  new DataView(bytes.buffer).setUint32(20, height);
-  return bytes;
-};
-const jpeg = (width: number, height: number) =>
-  new Uint8Array([
-    0xff,
-    0xd8,
-    0xff,
-    0xe0,
-    0x00,
-    0x04,
-    0x00,
-    0x00,
-    0xff,
-    0xc0,
-    0x00,
-    0x11,
-    0x08,
-    height >> 8,
-    height & 255,
-    width >> 8,
-    width & 255,
-    0x03,
-  ]);
-const dish = (overrides: Partial<VerifiedDish> = {}): VerifiedDish => ({
-  draftId: '22222222-2222-4222-8222-222222222221',
-  draftVersion: 2,
+const soupId = '22222222-2222-4222-8222-222222222221';
+const saladId = '22222222-2222-4222-8222-222222222222';
+const soupRevision = '44444444-4444-4444-8444-444444444441';
+const saladRevision = '44444444-4444-4444-8444-444444444442';
+const photoId = '33333333-3333-4333-8333-333333333331';
+const hash = 'a'.repeat(64);
+
+const source = (overrides: Partial<ApprovedDishSource> = {}): ApprovedDishSource => ({
+  dishId: soupId,
+  dishRevisionId: soupRevision,
   name: 'Fictional Lentil Soup',
-  description: 'Slow cooked lentils with herbs.',
-  category: 'Soups',
-  priceAmount: '9.5',
+  description: 'Slow cooked lentils.',
+  priceAmount: '9.50',
   priceCurrency: 'CAD',
-  ingredients: ['lentils', 'thyme'],
-  allergens: ['milk'],
-  photo: {
-    id: '33333333-3333-4333-8333-333333333331',
-    sha256: 'a'.repeat(64),
-    width: 800,
-    height: 600,
-  },
+  ingredients: ['lentils'],
+  reviewState: 'corrected',
+  approvedAllergens: ['milk'],
+  approvedCategory: 'Soups',
+  approvedPhotoId: photoId,
+  servingCount: 2,
+  ...overrides,
+});
+const photo = (overrides: Partial<OwnerApprovedPhoto> = {}): OwnerApprovedPhoto => ({
+  dishId: soupId,
+  dishRevisionId: soupRevision,
+  photoId,
+  url: assetUrl(origin, venue, photoId, hash),
+  sha256: hash,
+  width: 800,
+  height: 600,
   ...overrides,
 });
 
-describe('photo size from the approved bytes', () => {
-  it('reads PNG and JPEG headers and rejects anything else', () => {
-    expect(imageSize(png(1280, 960))).toEqual({ width: 1280, height: 960 });
-    expect(imageSize(jpeg(640, 480))).toEqual({ width: 640, height: 480 });
-    expect(imageSize(new Uint8Array([1, 2, 3]))).toBeNull();
-    expect(imageSize(png(0, 10))).toBeNull();
+async function request(dishes: { dish_id: string; portion?: unknown }[]) {
+  return MenuBundleRequestSchema.parse({
+    schema_version: 1,
+    venue_id: venue,
+    menu_id: await ownerMenuId(venue),
+    restaurant: { name: 'Synthetic Cafe', logo: null },
+    bundle_base_url: `${origin}${PREPARED_BUNDLE_PATH}`,
+    asset_base_url: `${origin}${PREPARED_ASSET_PATH}`,
+    categories: [
+      {
+        category_id: '55555555-5555-4555-8555-555555555555',
+        name: 'Soups',
+        dishes: dishes.map((dish) => ({
+          allergens: null,
+          dietary: [],
+          image_alt: 'Photo of the dish',
+          t0_asset_id: null,
+          ...dish,
+        })),
+      },
+    ],
   });
-});
+}
 
-describe('owner-prepared bundle (Part A)', () => {
-  it('builds a verified dish exactly as the public bundle contract requires', async () => {
-    const built = await buildPreparedBundle({
-      venueId: venue,
-      restaurantName: 'Synthetic Bridge Cafe',
-      origin,
-      dishes: [dish()],
-    });
-    const content = await verifyPublicMenuContentBytes(built.bytes, built.contentHash);
-    expect(content.menu_id).toBe(await ownerMenuId(venue));
-    expect(content.menu_revision_id).toBe(built.menuRevisionId);
-    const [category] = content.categories;
-    expect(category?.name).toBe('Soups');
-    const [first] = category?.dishes ?? [];
-    expect(first).toMatchObject({
+describe('existing producer with owner-approved photos and the text-only fallback (Part A)', () => {
+  it('uses the photo approved on the revision, and text-only for a dish without one', async () => {
+    const produced = await produceMenuBundle(
+      await request([{ dish_id: soupId }, { dish_id: saladId }]),
+      new Map([
+        [soupId, source()],
+        [
+          saladId,
+          source({
+            dishId: saladId,
+            dishRevisionId: saladRevision,
+            name: 'Fictional Side Salad',
+            approvedPhotoId: null,
+          }),
+        ],
+      ]),
+      new Map(),
+      { ownerPhotos: new Map([[soupId, photo()]]), missingPhoto: 'text_only' },
+    );
+    const [soup, salad] = produced.bundle.categories[0]!.dishes;
+    expect(soup).toMatchObject({
+      dish_id: soupId,
+      dish_revision_id: soupRevision,
       complete: true,
-      name: 'Fictional Lentil Soup',
-      price: { amount: '9.50', currency: 'CAD' },
+      serving_count: 2,
       allergens: ['milk'],
-      dietary: [],
+      images: { card: { url: photo().url, width: 800, height: 600, alt: 'Photo of the dish' } },
     });
-    if (!first?.complete) throw new Error('expected a complete dish');
-    expect(first.images?.card.url).toBe(
-      `${origin}/public/prepared-assets/${venue}/33333333-3333-4333-8333-333333333331/${'a'.repeat(64)}`,
+    expect(salad).toMatchObject({ dish_id: saladId, complete: true, images: null });
+    expect(produced.diagnostics).toEqual([]);
+    expect(produced.bundleUrl).toBe(
+      `${origin}${PREPARED_BUNDLE_PATH}/${venue}/${await ownerMenuId(venue)}/${produced.menuRevisionId}.json`,
     );
-    expect(first.images?.card).toMatchObject({
-      width: 800,
-      height: 600,
-      alt: 'Photo of Fictional Lentil Soup',
-    });
-    expect(built.bundleUrl).toBe(
-      `${origin}/public/prepared-bundles/${venue}/${built.menuId}/${built.menuRevisionId}.json`,
-    );
-    expect(built.completeDishes).toBe(1);
-    expect(built.diagnostics).toEqual([]);
   });
 
-  it('is deterministic, and a changed dish gives a new revision', async () => {
-    const input = { venueId: venue, restaurantName: 'Cafe', origin, dishes: [dish()] };
-    const a = await buildPreparedBundle(input);
-    const b = await buildPreparedBundle(input);
-    expect(b.contentHash).toBe(a.contentHash);
-    expect(b.menuRevisionId).toBe(a.menuRevisionId);
-    const changed = await buildPreparedBundle({ ...input, dishes: [dish({ draftVersion: 3 })] });
-    expect(changed.menuRevisionId).not.toBe(a.menuRevisionId);
-  });
-
-  it('turns incomplete verified dishes into identity-only placeholders with reasons', async () => {
-    const built = await buildPreparedBundle({
-      venueId: venue,
-      restaurantName: 'Cafe',
-      origin,
-      dishes: [
-        dish(),
-        dish({ draftId: '22222222-2222-4222-8222-222222222222', photo: null, description: ' ' }),
-        dish({
-          draftId: '22222222-2222-4222-8222-222222222223',
-          priceAmount: '1.999',
-          ingredients: [],
+  it('refuses a photo from another revision or not the selected one, and never calibrates it', async () => {
+    const run = (sources: ApprovedDishSource, owner: OwnerApprovedPhoto, portion?: unknown) =>
+      request([{ dish_id: soupId, ...(portion ? { portion } : {}) }]).then((req) =>
+        produceMenuBundle(req, new Map([[soupId, sources]]), new Map(), {
+          ownerPhotos: new Map([[soupId, owner]]),
+          missingPhoto: 'text_only',
         }),
-        dish({ draftId: '22222222-2222-4222-8222-222222222224', category: null, allergens: null }),
-      ],
-    });
-    const dishes = built.bundle.categories.flatMap((category) => category.dishes);
-    expect(dishes.filter((value) => value.complete)).toHaveLength(1);
-    expect(dishes.filter((value) => !value.complete)).toHaveLength(3);
-    expect(built.diagnostics.map((value) => value.code).sort()).toEqual(
-      [
-        'category_missing',
-        'description_missing',
-        'ingredients_missing',
-        'price_not_representable',
-      ].sort(),
+      );
+    await expect(run(source(), photo({ dishRevisionId: saladRevision }))).rejects.toBeInstanceOf(
+      BundleProducerError,
     );
-    expect(built.completeDishes).toBe(1);
+    await expect(run(source({ approvedPhotoId: null }), photo())).rejects.toMatchObject({
+      code: 'asset_revision_mismatch',
+    });
+    await expect(
+      run(source({ approvedPhotoId: '33333333-3333-4333-8333-333333333339' }), photo()),
+    ).rejects.toMatchObject({ code: 'asset_revision_mismatch' });
   });
 
-  it('publishes a verified dish without an approved photo as text-only (images: null)', async () => {
-    const built = await buildPreparedBundle({
-      venueId: venue,
-      restaurantName: 'Cafe',
-      origin,
-      dishes: [dish({ photo: null })],
+  it('keeps the operator path strict: no photo is still an identity-only placeholder', async () => {
+    const produced = await produceMenuBundle(
+      await request([{ dish_id: soupId }]),
+      new Map([[soupId, source({ approvedPhotoId: null })]]),
+      new Map(),
+    );
+    expect(produced.bundle.categories[0]!.dishes[0]).toEqual({
+      dish_id: soupId,
+      dish_revision_id: soupRevision,
+      complete: false,
     });
-    const [first] = built.bundle.categories[0]?.dishes ?? [];
-    expect(first).toMatchObject({ complete: true, name: 'Fictional Lentil Soup', images: null });
-    expect(built.completeDishes).toBe(1);
-    expect(built.diagnostics).toEqual([]);
-    const content = await verifyPublicMenuContentBytes(built.bytes, built.contentHash);
-    expect(content.categories[0]?.dishes[0]).toMatchObject({ images: null });
+    expect(produced.diagnostics).toEqual([{ dishId: soupId, code: 'asset_missing' }]);
   });
 
   it('keeps unknown allergens unknown (null), never an allergen-free claim', async () => {
-    const built = await buildPreparedBundle({
-      venueId: venue,
-      restaurantName: 'Cafe',
-      origin,
-      dishes: [dish({ allergens: null })],
-    });
-    const [first] = built.bundle.categories[0]?.dishes ?? [];
-    expect(first?.complete && first.allergens).toBeNull();
+    const produced = await produceMenuBundle(
+      await request([{ dish_id: soupId }]),
+      new Map([[soupId, source({ approvedAllergens: null })]]),
+      new Map(),
+      { ownerPhotos: new Map([[soupId, photo()]]), missingPhoto: 'text_only' },
+    );
+    expect(produced.bundle.categories[0]!.dishes[0]).toMatchObject({ allergens: null });
   });
 });
 
 describe('S13 preview reads owner-prepared bundles from its own bucket', () => {
-  it('reads the stored bytes without fetching and accepts its own photo addresses', async () => {
-    const built = await buildPreparedBundle({
-      venueId: venue,
-      restaurantName: 'Cafe',
-      origin,
-      dishes: [dish()],
+  it('reads the stored bytes without fetching and accepts its own photo and logo addresses', async () => {
+    const req = await request([{ dish_id: soupId }]);
+    req.restaurant.logo = {
+      url: `${origin}${PREPARED_ASSET_PATH}/${venue}/logo/${hash}.png`,
+      width: 8,
+      height: 4,
+      alt: 'Synthetic Cafe logo',
+    };
+    const built = await produceMenuBundle(req, new Map([[soupId, source()]]), new Map(), {
+      ownerPhotos: new Map([[soupId, photo()]]),
+      missingPhoto: 'text_only',
     });
     const menu = {
       venueId: venue,
-      menuId: built.menuId,
+      menuId: req.menu_id,
       menuRevisionId: built.menuRevisionId,
       contentApprovalId: built.contentApprovalId,
       assetApprovalId: built.assetApprovalId,
@@ -202,17 +185,13 @@ describe('S13 preview reads owner-prepared bundles from its own bucket', () => {
       },
     });
     expect(content.menu_revision_id).toBe(built.menuRevisionId);
-    expect(reads).toEqual([`prepared-menus/${venue}/${built.menuId}/${built.menuRevisionId}.json`]);
+    expect(reads).toEqual([`prepared-menus/${venue}/${req.menu_id}/${built.menuRevisionId}.json`]);
     // A bundle address for another revision, or another host's bundle, is refused.
     await expect(
-      fetchPreparedMenu(
-        { ...menu, menuRevisionId: built.menuId },
-        send as unknown as typeof fetch,
-        {
-          origin,
-          read: async () => built.bytes,
-        },
-      ),
+      fetchPreparedMenu({ ...menu, menuRevisionId: req.menu_id }, send as unknown as typeof fetch, {
+        origin,
+        read: async () => built.bytes,
+      }),
     ).rejects.toThrow();
     await expect(
       fetchPreparedMenu(menu, send as unknown as typeof fetch, {
@@ -260,7 +239,7 @@ describe('Part A HTTP boundary', () => {
     );
   });
 
-  it('serves admitted bundles and approved photos immutably with diner CORS, and 404s otherwise', async () => {
+  it('serves admitted bundles, approved photos and logos immutably, and 404s otherwise', async () => {
     const { createApp } = await import('./index');
     const readPreparedBundle = vi.fn(async (_v: string, _m: string, r: string) =>
       r === rev ? new TextEncoder().encode('{"ok":true}') : null,
@@ -269,11 +248,16 @@ describe('Part A HTTP boundary', () => {
       bytes: new Uint8Array([1, 2, 3]),
       contentType: 'image/png',
     }));
+    const readPreparedLogo = vi.fn(async () => ({
+      bytes: new Uint8Array([4, 5, 6]),
+      contentType: 'image/png',
+    }));
     const app = createApp({
       verify: async () => actorId,
       execute: vi.fn(),
       readPreparedBundle,
       readPreparedAsset,
+      readPreparedLogo,
     });
     const bundle = await app.request(
       `/public/prepared-bundles/${venueId}/${venueId}/${rev}.json`,
@@ -286,26 +270,36 @@ describe('Part A HTTP boundary', () => {
       'https://peekaplate-diner-staging.pages.dev',
     );
     expect(await bundle.text()).toBe('{"ok":true}');
-    const missing = await app.request(
-      `/public/prepared-bundles/${venueId}/${venueId}/${venueId}.json`,
-      {},
-      env,
-    );
-    expect(missing.status).toBe(404);
+    expect(
+      (await app.request(`/public/prepared-bundles/${venueId}/${venueId}/${venueId}.json`, {}, env))
+        .status,
+    ).toBe(404);
     expect(
       (await app.request(`/public/prepared-bundles/${venueId}/${venueId}/../x.json`, {}, env))
         .status,
     ).toBe(404);
-    const photo = await app.request(
+    const dishPhoto = await app.request(
       `/public/prepared-assets/${venueId}/${rev}/${'a'.repeat(64)}`,
       {},
       env,
     );
-    expect(photo.status).toBe(200);
-    expect(photo.headers.get('Content-Type')).toBe('image/png');
-    expect(photo.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(dishPhoto.status).toBe(200);
+    expect(dishPhoto.headers.get('Content-Type')).toBe('image/png');
+    expect(dishPhoto.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(
       (await app.request(`/public/prepared-assets/${venueId}/${rev}/not-a-hash`, {}, env)).status,
     ).toBe(404);
+    const logo = await app.request(
+      `/public/prepared-assets/${venueId}/logo/${'b'.repeat(64)}.png`,
+      {},
+      env,
+    );
+    expect(logo.status).toBe(200);
+    expect(readPreparedLogo).toHaveBeenCalledWith(venueId, 'b'.repeat(64), 'png', env);
+    expect(readPreparedAsset).toHaveBeenCalledTimes(1);
+    for (const bad of [`logo/${'b'.repeat(64)}.gif`, 'logo/short.png'])
+      expect((await app.request(`/public/prepared-assets/${venueId}/${bad}`, {}, env)).status).toBe(
+        404,
+      );
   });
 });

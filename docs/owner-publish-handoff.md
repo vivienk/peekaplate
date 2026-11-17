@@ -58,55 +58,61 @@ assets. Its operator uploads immutable assets/bundle bytes and admits the handof
 The browser and normal Worker runtime still cannot insert admission rows.
 
 This screen completes publication of **already prepared** menus. It does not
-automate arbitrary upload → approved T0 assets → admission; owner-verified dishes are prepared by the narrower path in "Automatic preparation after verification (Part A)" below. A restaurant with no
+automate arbitrary upload → approved T0 assets → admission; owner-verified dishes are prepared by the path in "Automatic preparation from Review and publish (Part A)" below. A restaurant with no
 prepared menu sees that state explicitly; no synthetic fallback is supplied.
 The staging demonstration uses labelled fictional content, not a real venue or
 a claim that new provider extraction has run.
 
-## Automatic preparation after verification (Part A)
+## Automatic preparation from Review and publish (Part A)
 
-Vivien confirmed for MVP that completing S10 verification prepares the menu automatically, so
-the owner continues to S13, previews it and explicitly publishes it. After the S11 "Menu
-verified" result, the console calls `POST /venues/:venueId/prepared-menus/prepare`
-(owner-only, local/staging):
+S11 "Complete verification" stays verification-only. Opening **Review and publish** (S13), and
+its **Prepare again** button, call `POST /venues/:venueId/prepared-menus/prepare` (owner-only,
+local/staging) before listing prepared menus. It reuses the existing command and producer
+(`backend/src/owner-prepare.ts`):
 
-1. **Read:** verified, active drafts of that venue (`verification_status = 'verified'`, not
-   removed, not a rejected candidate), with RES-01.2 corrections applied, and each draft's
-   owner-approved photo (`menu-assets/<venue>/<photo>/<sha256>`, hash re-checked). Unverified
-   drafts are never read.
-2. **Build:** `backend/src/owner-prepare.ts` produces Bundle v1 with the producer's rules: the
-   same canonical bytes, `menu-revision:v1` / `content-approval:v1` / `asset-approval:v1`
-   derivations, decimal price normalisation and completeness checks. A dish missing a
-   description, representable price, currency, confirmed ingredients or category becomes an
-   identity-only placeholder. A dish without an approved photo is published **text-only** for
-   now (`images: null`, allowed by Bundle v1 since Nov 17): name, price, description,
-   ingredients and allergens, with the diner's empty image box. Owner-entered ingredients and allergens are used
-   only when `confirmed`; unknown allergens stay `null`. Alt text is `Photo of <dish>`
-   (owner-written alt text is not stored yet). Dietary codes are empty. The menu id is derived
-   per venue (`owner-prepared-menu:v1`).
-3. **Store:** the exact bytes at `prepared-menus/<venue>/<menu>/<revision>.json` in the private
-   ingestion bucket, write-once; an existing key must hash to the same content.
-4. **Admit:** `app_private.admit_owner_prepared_menu(...)` (migration
+1. **Check:** every active dish of the venue (not removed, not a rejected candidate) must have
+   the owner's persisted verification, or preparation stops with `menu_not_verified`.
+2. **Approve:** each verified, still-pending draft goes through the existing
+   `approveDishDraftAtomic` with the exact draft version, the active extraction and its review
+   version, `confirmed: true`, and the persisted verification rechecked inside the command. It
+   approves onto a stable dish ID per draft (`owner-prepared-dish:v1`) with a deterministic
+   command ID per draft/review/dish version, so a retry after a partial failure replays instead
+   of duplicating. The command snapshots the approved facts onto a canonical revision: category,
+   price, an explicit ingredient clear, confirmed (manual or corrected) allergens, serving count
+   and the selected photo. A dish that cannot become a public fact is reported, not approved.
+3. **Produce:** all approved, verified dishes, including those approved by an earlier failed run,
+   are read with `loadApprovedDishSources` and built by `produceMenuBundle`, unchanged for the
+   operator path. Two owner options: an owner-approved photo bound to the revision's selected
+   photo ID (tenant/draft-bound, verified, hash re-checked; never labelled T0 and never a
+   calibrated portion source), and the agreed text-only fallback (`images: null`) when there is
+   none. Name and logo come from the saved Screen 5 profile with the exporter's
+   descriptor/hash/dimension rules (`logo-image.ts`); a selected logo whose bytes are missing or
+   changed fails preparation instead of disappearing.
+4. **Store and admit:** the exact bytes at `prepared-menus/<venue>/<menu>/<revision>.json`
+   (write-once), then `app_private.admit_owner_prepared_menu(...)` (migration
    `20261117010000_owner_prepared_menu.sql`), a `SECURITY DEFINER` function owned by the
-   `NOBYPASSRLS` role `peekaplate_menu_preparer`. It requires the current tenant and an `owner`
-   membership for the current actor, accepts only the Worker's own bundle address for exactly
-   that venue/menu/revision, inserts `menu_review_subject` + `public_menu_bundle`, accepts an
-   identical retry and rejects a conflicting one. The runtime role still cannot insert either
-   table directly; the operator `--admit` path is unchanged.
+   `NOBYPASSRLS` role `peekaplate_menu_preparer`. It requires an `owner` membership, accepts only
+   the Worker's own bundle address for that venue/menu/revision and an identical retry.
 
-Admission is not approval or publication: S13 lists the prepared menu (newest first), previews
-it and the owner still confirms and publishes. A failed preparation never undoes verification;
-the console says so and Review and publish can be retried.
+**Back/Edit:** an owner edit, removal, new photo, extracted-dish correction or un-verification of
+an approved draft reopens it (pending, not verified). Its canonical dish keeps its ID and the
+next preparation approves a new revision of that same dish; earlier revisions are unchanged.
+
+Admission is not approval or publication: S13 previews the prepared menu and the owner still
+confirms and publishes. A failed preparation keeps earlier prepared menus listed and says to
+prepare again.
 
 Public delivery: `GET /public/prepared-bundles/:venue/:menu/:revision.json` serves only an
-admitted revision of that venue; `GET /public/prepared-assets/:venue/:photo/:sha256` serves only
-an owner-approved photo whose bytes match the hash. Both are immutable (`max-age=31536000`), use
-the existing diner CORS for `/public/*`, and the S13 preview reads owner-prepared bundles from
-the bucket directly (no Worker self-fetch). Staging serves no diner CSP that would block API
-images; PR previews do not call the API.
+admitted revision of that venue; `GET /public/prepared-assets/:venue/:photo/:sha256` only an
+owner-approved photo whose bytes match the hash; `GET /public/prepared-assets/:venue/logo/:sha256.(png|jpg)`
+only a Screen 5 logo of a venue with an admitted prepared menu, with matching bytes and type.
+All are immutable (`max-age=31536000`) and use the existing diner CORS for `/public/*`. The
+admission function and these public reads still need Sai's boundary/security review before
+release. Ingredient artwork is unchanged: #165's catalogue and #215's live approved-artwork
+lookup with its local fallback.
 
 Not yet: owner-written alt text and dietary codes, photo resizing to `card-480`/`detail-1280`
-(the approved original is used for both), logo (Vivien's #215), and hosted acceptance.
+(the approved original is used for both), portions for owner photos, and hosted acceptance.
 
 ## Read API and safety
 

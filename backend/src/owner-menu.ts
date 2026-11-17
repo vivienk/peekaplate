@@ -10,6 +10,36 @@ import { CommandError } from './dish-command';
 import { type DishDraftRow, IngestionError } from './ingestion/repository';
 import { authorizeStaffVenue } from './staff-venue';
 
+/**
+ * Back/Edit after Part A preparation. Preparation approves each verified draft onto a canonical
+ * dish revision (review_status 'accepted'). An owner edit, removal, photo upload or
+ * un-verification of such a draft reopens it first: it returns to pending and not verified,
+ * while the canonical dish keeps its ID and published history. The next preparation approves a
+ * new revision of that same dish. Call inside the edit command's transaction after the draft row
+ * is locked; mutates the passed row so the caller's pending checks see the reopened state.
+ */
+export async function reopenApprovedDraft(
+  client: Client,
+  venueId: string,
+  draft: Pick<DishDraftRow, 'id' | 'review_status' | 'removed_at'> & {
+    published_dish_id?: string | null;
+    verification_status?: string;
+  },
+): Promise<void> {
+  if (draft.review_status !== 'accepted' || draft.removed_at) return;
+  const reopened = await client.query(
+    `UPDATE app_private.dish_drafts
+        SET review_status='pending', published_dish_id=NULL, reviewed_by=NULL, reviewed_at=NULL,
+            verification_status='not_verified', updated_at=now()
+      WHERE tenant_id=$1 AND id=$2 AND review_status='accepted' AND removed_at IS NULL`,
+    [venueId, draft.id],
+  );
+  if (reopened.rowCount !== 1) throw new CommandError('version_conflict', 409);
+  draft.review_status = 'pending';
+  draft.published_dish_id = null;
+  draft.verification_status = 'not_verified';
+}
+
 export async function withOwnerMenuTransaction<T>(
   client: Client,
   actorId: string,
@@ -71,6 +101,7 @@ export async function saveOwnerDishDraft(
     const draft = current.rows[0];
     if ((draft?.draft_version ?? 0) !== input.expectedVersion)
       throw new CommandError('version_conflict', 409);
+    if (draft?.origin === 'manual') await reopenApprovedDraft(client, venueId, draft);
     if (
       draft &&
       (draft.origin !== 'manual' || draft.review_status !== 'pending' || draft.removed_at)
@@ -168,12 +199,13 @@ export async function setDraftRemoval(
       )
     ).rows[0];
     if (!draft) throw new IngestionError('draft_not_found', 404);
-    if (draft.review_status !== 'pending') throw new IngestionError('draft_not_editable', 409);
     if (
       draft.draft_version !== input.expectedDraftVersion ||
       (draft.removal_version ?? 0) !== input.expectedRemovalVersion
     )
       throw new CommandError('version_conflict', 409);
+    await reopenApprovedDraft(client, venue, draft);
+    if (draft.review_status !== 'pending') throw new IngestionError('draft_not_editable', 409);
     const version = input.expectedRemovalVersion + 1;
     const saved = (
       await client.query<DishDraftRow>(
@@ -326,6 +358,7 @@ export async function storeDraftPhoto(
       [venueId, draftId],
     );
     if (!draft.rows[0]) throw new IngestionError('draft_not_found', 404);
+    await reopenApprovedDraft(client, venueId, draft.rows[0]);
     if (draft.rows[0].review_status !== 'pending' || draft.rows[0].removed_at)
       throw new IngestionError('draft_not_editable', 409);
     const key = `menu-staging/${venueId}/${draftId}/${upload.sourceHash}`;
@@ -600,9 +633,10 @@ export async function verifyOwnerDish(
     );
     const draft = draftRes.rows[0];
     if (!draft) throw new IngestionError('draft_not_found', 404);
+    if (draft.draft_version !== expectedVersion) throw new CommandError('version_conflict', 409);
+    if (!verified && !receipt.rows[0]) await reopenApprovedDraft(client, venueId, draft);
     if (draft.review_status !== 'pending' || draft.removed_at)
       throw new IngestionError('draft_not_editable', 409);
-    if (draft.draft_version !== expectedVersion) throw new CommandError('version_conflict', 409);
 
     // A historical receipt cannot verify newer content or undo a later verification decision.
     if (receipt.rows[0]) {

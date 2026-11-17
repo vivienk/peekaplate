@@ -15,7 +15,10 @@ import './owner-publish.css';
 // Confirmation 3123:12795). Presentation is the official S13 (publish/MenuPreview.tsx); the data and
 // publication logic are Sai's #197: prepared menus from the API, approval then publication with
 // stable retry IDs, and the diner link read only after publication succeeds.
-// Snapshot preparation/admission remains operator-owned. Saved draft edits are not auto-published.
+// Opening this screen (and "Prepare again") runs Part A preparation first: the owner's verified
+// dishes become a prepared snapshot through the existing approval command and producer. It is safe
+// to repeat after a failure. Preparing never publishes; publication stays this screen's explicit
+// owner step, and saved draft edits are not auto-published.
 export function OwnerPublish({
   apiBase,
   actorId,
@@ -45,6 +48,7 @@ export function OwnerPublish({
   const [error, setError] = useState('');
   const [published, setPublished] = useState(false);
   const [link, setLink] = useState('');
+  const [prepareProblem, setPrepareProblem] = useState('');
 
   const failure = (reason: unknown) => {
     if (reason instanceof OwnerMenuApiError && (reason.status === 401 || reason.status === 403)) {
@@ -55,9 +59,31 @@ export function OwnerPublish({
     } else if (reason instanceof OwnerMenuApiError && reason.status === 409) {
       setPreview(null);
       attempt.current = null;
-      setError('The menu changed. Reload prepared menus and review it again before publishing.');
+      setError('The menu changed. Prepare again and review it again before publishing.');
     } else setError('We could not complete that request. Retry, or return to your saved dishes.');
   };
+
+  // Part A preparation, then the prepared menus. A preparation failure keeps any earlier prepared
+  // menus listed and offers Prepare again; it never blocks access to them.
+  async function prepareAndList(client: OwnerMenuClient, valid: () => boolean) {
+    setPrepareProblem('');
+    try {
+      await client.prepareMenu(venueId);
+    } catch (reason) {
+      if (!valid()) return;
+      if (reason instanceof OwnerMenuApiError && (reason.status === 401 || reason.status === 403))
+        throw reason;
+      // 404: preparation is not available here (production keeps operator preparation).
+      if (!(reason instanceof OwnerMenuApiError && reason.status === 404))
+        setPrepareProblem(
+          reason instanceof OwnerMenuApiError && reason.code === 'menu_not_verified'
+            ? 'Some dishes changed and need verifying again. Return to your dishes and complete verification, then prepare again.'
+            : 'We couldn’t prepare your latest menu. Your verified dishes are saved; prepare again to retry.',
+        );
+    }
+    const next = await client.listPreparedMenus(venueId);
+    if (valid()) setMenus(next);
+  }
 
   useEffect(() => {
     void actorId;
@@ -77,9 +103,10 @@ export function OwnerPublish({
     setPublished(false);
     setError('');
     attempt.current = null;
-    void current.client
-      .listPreparedMenus(venueId)
-      .then(setMenus)
+    void prepareAndList(
+      current.client,
+      () => active.current === current && !controller.signal.aborted,
+    )
       .catch((reason) => {
         if (!controller.signal.aborted) failure(reason);
       })
@@ -167,9 +194,12 @@ export function OwnerPublish({
             Choose the prepared menu to preview. Nothing is public until you publish.
           </p>
           {error && <ErrorBanner copy={{ title: 'Something went wrong', body: error }} />}
+          {prepareProblem && (
+            <ErrorBanner copy={{ title: 'Menu not prepared yet', body: prepareProblem }} />
+          )}
           {busy ? (
             <p role="status" className="pp-menu-preview__helper">
-              Loading prepared menus…
+              Preparing your menu…
             </p>
           ) : menus.length === 0 ? (
             <p className="pp-menu-preview__helper">
@@ -195,14 +225,9 @@ export function OwnerPublish({
               variant="outlined"
               busy={busy}
               busyLabel="Loading"
-              onClick={() =>
-                void run(async (client, valid) => {
-                  const next = await client.listPreparedMenus(venueId);
-                  if (valid()) setMenus(next);
-                })
-              }
+              onClick={() => void run(prepareAndList)}
             >
-              Reload prepared menus
+              Prepare again
             </ActionButton>
           </div>
         </section>

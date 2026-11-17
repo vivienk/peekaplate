@@ -245,8 +245,12 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         result.publishedRevision.dishId,
       )?.reviewState,
     ).toBe('corrected');
-    await expect(save(id, { name: 'Changed' }, 1)).rejects.toMatchObject({
-      code: 'draft_not_editable',
+    // Back/Edit (Part A): an edit after approval reopens the draft for re-verification. The
+    // approved revision and its frozen facts are untouched until a new approval.
+    expect(await save(id, { name: 'Changed' }, 1)).toMatchObject({
+      review_status: 'pending',
+      verification_status: 'not_verified',
+      published_dish_id: null,
     });
     const events = await admin.query(
       'SELECT tenant_id AS "tenantId",stream_type AS "streamType",stream_id AS "streamId",version,schema_version AS "schemaVersion",event_type AS "eventType",payload,metadata FROM app_private.es_event WHERE tenant_id=$1 AND stream_id=$2',
@@ -302,9 +306,36 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       photo.id,
     );
     expect(put).toHaveBeenCalledOnce();
-    await expect(
-      storeDraftPhoto(runtime, actor, venue, id, image(), 'image/png', put),
-    ).rejects.toMatchObject({ code: 'draft_not_editable' });
+    // Back/Edit (Part A): a different photo after approval reopens the draft instead of failing;
+    // the approved revision keeps the photo it was approved with.
+    const other = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 4, 5, 6]);
+    const replaced = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      id,
+      {
+        bytes: other,
+        sourceHash: createHash('sha256').update(other).digest('hex'),
+        idempotencyKey: crypto.randomUUID(),
+      },
+      'image/png',
+      put,
+    );
+    expect(replaced.id).not.toBe(photo.id);
+    const reopened = await admin.query(
+      'SELECT review_status, verification_status FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2',
+      [venue, id],
+    );
+    expect(reopened.rows[0]).toEqual({
+      review_status: 'pending',
+      verification_status: 'not_verified',
+    });
+    const kept = await admin.query<{ approved_facts: { photoId: string } }>(
+      'SELECT approved_facts FROM app_private.dish_current WHERE tenant_id=$1 AND dish_id=$2',
+      [venue, approved.publishedRevision.dishId],
+    );
+    expect(kept.rows[0]?.approved_facts.photoId).toBe(photo.id);
   });
   it('retains reviewed facts through a legacy text-only edit instead of reopening draft fallback', async () => {
     const id = crypto.randomUUID();

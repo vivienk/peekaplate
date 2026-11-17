@@ -700,14 +700,16 @@ export function OwnerMenuWorkspace({
   ) : null;
   const completeVerification = () =>
     void run(async (active) => {
+      const approved = (draft: (typeof reviewDrafts)[number]) =>
+        draft.review_status === 'accepted' && draft.verification_status === 'verified';
       if (
         !isMenuReady(reviewDishes) ||
-        reviewDrafts.some((draft) => draft.review_status !== 'pending')
+        reviewDrafts.some((draft) => draft.review_status !== 'pending' && !approved(draft))
       )
         return;
       const generation = viewGeneration.current;
       setVerified(false);
-      for (const draft of reviewDrafts) {
+      for (const draft of reviewDrafts.filter((item) => !approved(item))) {
         const photoId = reviewDishes.find((dish) => dish.id === draft.id)?.photoId;
         if (photoId)
           await active.client.approveDraftPhoto(venueId, draft.id, photoId, {
@@ -742,22 +744,6 @@ export function OwnerMenuWorkspace({
       )
         throw new OwnerMenuApiError(409, 'version_conflict');
       setVerified(true);
-      // Part A: the verified dishes become the menu S13 previews; publishing stays a separate,
-      // explicit owner step. A failure here never undoes the verification.
-      try {
-        const prepared = await active.client.prepareMenu(venueId);
-        if (!current(active)) return;
-        setNotice(
-          `Your menu is ready to preview: ${prepared.completeDishes} ${
-            prepared.completeDishes === 1 ? 'dish' : 'dishes'
-          } can be shown to diners. Nothing is public until you publish.`,
-        );
-      } catch {
-        if (!current(active)) return;
-        setNotice(
-          'Your dishes are verified. We couldn’t prepare the menu preview yet; open Review and publish to try again.',
-        );
-      }
     });
 
   if (!loaded)
@@ -1242,7 +1228,9 @@ export function OwnerMenuWorkspace({
                       <Btn
                         kind="outlined"
                         size="md"
-                        disabled={busy || !['pending', 'edited'].includes(draft.review_status)}
+                        disabled={
+                          busy || !['pending', 'edited', 'accepted'].includes(draft.review_status)
+                        }
                         onClick={() => openDraft(draft)}
                         aria-label={`Edit ${effective?.name ?? draft.name ?? 'untitled dish'}`}
                       >

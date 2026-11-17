@@ -277,7 +277,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner auth/workspace reuses authored S05–S13 components, including #172 DishFormView and official #208 publication. S05 saves a tenant profile/private photo; shared setup reads drive header/content/aside without inventing verification. Manual and extracted drafts retain serving size, corrected allergens/photos and source evidence. S10 removal/Undo is persisted; candidate corrections invalidate verification. Processing success uses the selected import, not older drafts. The preview-only S05–S13 walkthrough is labelled synthetic with no provider/analytics calls. Live S09 AI drafting and complete report-page adapters remain absent. New snapshot preparation/admission remains operator-owned; hosted migration/release/acceptance is pending. Shared S09 adds an optional people-served calibration field; report-period mismatches withhold AI suggestions.",
+      "summary": "Owner auth/workspace reuses authored S05–S13 components, including #172 DishFormView and official #208 publication. S05 saves a tenant profile/private photo; shared setup reads drive header/content/aside without inventing verification. Manual and extracted drafts retain serving size, corrected allergens/photos and source evidence. S10 removal/Undo is persisted; candidate corrections invalidate verification. Processing success uses the selected import, not older drafts. The preview-only S05–S13 walkthrough is labelled synthetic with no provider/analytics calls. Live S09 AI drafting and complete report-page adapters remain absent. S13 Review and publish reruns owner preparation (existing approval command + producer; S11 stays verification-only); edits reopen approved drafts. Hosted migration/release/acceptance is pending. Shared S09 adds an optional people-served calibration field; report-period mismatches withhold AI suggestions.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -423,7 +423,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "22a291c76cc8a3519c5d81d1a82a59b98175a70a647c038554a3e12ec8d07a76"
+      "sourceFingerprint": "b59a9d5eae2e3f67c98b40f98da14761229916efda447f7fde99751da580775c"
     },
     {
       "id": "backend",
@@ -629,7 +629,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "354283f045a6588028500bc4184ce384b341fce04c6e7ba0a5b3a81dc7afedcd"
+      "sourceFingerprint": "001ea63ce96f5404d13ec795006d579cc64498170b0d5b46e6dba99e78e747f5"
     },
     {
       "id": "database",

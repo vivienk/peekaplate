@@ -118,6 +118,7 @@ import {
   prepareOwnerMenu,
   readPreparedAsset,
   readPreparedBundle,
+  readPreparedLogo,
 } from './owner-prepare';
 import { fetchPreparedMenu, listPreparedMenus, type OwnHost } from './owner-publication';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
@@ -343,6 +344,12 @@ type Dependencies = {
     hash: string,
     env: Bindings,
   ) => ReturnType<typeof readPreparedAsset>;
+  readPreparedLogo?: (
+    venueId: string,
+    hash: string,
+    extension: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedLogo>;
   issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
   readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
   submitIngestion?: (
@@ -743,7 +750,14 @@ const dependencies: Dependencies = {
   fetchPreparedMenu,
   prepareOwnerMenu: (actorId, venueId, origin, env) =>
     withDatabase(env, (client) =>
-      prepareOwnerMenu(client, actorId, venueId, origin, preparedStorage(env)),
+      prepareOwnerMenu(
+        client,
+        actorId,
+        venueId,
+        origin,
+        preparedStorage(env),
+        approveDishDraftAtomic,
+      ),
     ),
   readPreparedBundle: (venueId, menuId, revisionId, env) =>
     withDatabase(env, (client) =>
@@ -752,6 +766,10 @@ const dependencies: Dependencies = {
   readPreparedAsset: (venueId, photoId, hash, env) =>
     withDatabase(env, (client) =>
       readPreparedAsset(client, preparedStorage(env), venueId, photoId, hash),
+    ),
+  readPreparedLogo: (venueId, hash, extension, env) =>
+    withDatabase(env, (client) =>
+      readPreparedLogo(client, preparedStorage(env), venueId, hash, extension),
     ),
   async issuePublicMenu(menu, env) {
     if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
@@ -805,6 +823,12 @@ export async function approveDishDraftAtomic(
     expectedReviewVersion?: number | undefined;
     extractionId?: string | undefined;
     confirmed?: true | undefined;
+    /**
+     * Part A preparation only: approve onto this stable dish ID (a new revision when it already
+     * exists, so a reopened and re-verified draft keeps its diner identity) and require the
+     * owner's persisted S11 verification. The public approve route never sets these.
+     */
+    preparedDishId?: string | undefined;
   },
 ): Promise<{ draft: DishDraftRow; publishedRevision: DishRevisionResult }> {
   let started = false;
@@ -853,6 +877,9 @@ export async function approveDishDraftAtomic(
                   : { extractionId: options.extractionId }),
                 confirmed: options.confirmed ?? false,
               }),
+          ...(options.preparedDishId === undefined
+            ? {}
+            : { preparedDishId: options.preparedDishId, requireVerified: true }),
         }),
       )
       .digest('hex');
@@ -903,6 +930,8 @@ export async function approveDishDraftAtomic(
     if (!draft || draft.review_status !== 'pending' || draft.removed_at) {
       throw new IngestionError('draft_not_pending_or_not_found', 404);
     }
+    if (options.preparedDishId !== undefined && draft.verification_status !== 'verified')
+      throw new IngestionError('draft_not_verified', 409);
 
     const manual =
       draft.origin === 'manual' ? OwnerDishFieldsSchema.parse(draft.manual_fields) : null;
@@ -975,7 +1004,7 @@ export async function approveDishDraftAtomic(
       if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
     }
 
-    const newDishId = crypto.randomUUID();
+    const newDishId = options.preparedDishId ?? crypto.randomUUID();
     const revisionCommandId = crypto.randomUUID();
     const facts = manual
       ? {
@@ -1229,6 +1258,26 @@ export function createApp(services: Dependencies = dependencies) {
     return c.body(Uint8Array.from(bytes).buffer, 200, {
       'Content-Type': 'application/json',
       'X-Content-Type-Options': 'nosniff',
+    });
+  });
+  // Screen 5 logo of a venue with an admitted prepared menu (registered before the photo route).
+  app.get(`${PREPARED_ASSET_PATH}/:venueId/logo/:file`, async (c) => {
+    const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+    const file = /^([0-9a-f]{64})\.(png|jpg)$/.exec(c.req.param('file'));
+    if (!venue.success || !file) return c.json({ error: 'not_found' }, 404);
+    if (!services.readPreparedLogo) throw new AuthUnavailableError();
+    const logo = await services.readPreparedLogo(
+      venue.data.venueId,
+      file[1]!,
+      file[2]!,
+      c.env ?? {},
+    );
+    if (!logo) return c.json({ error: 'not_found' }, 404);
+    c.header('Cache-Control', 'public, max-age=31536000, immutable');
+    return c.body(Uint8Array.from(logo.bytes).buffer, 200, {
+      'Content-Type': logo.contentType,
+      'X-Content-Type-Options': 'nosniff',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
     });
   });
   app.get(`${PREPARED_ASSET_PATH}/:venueId/:photoId/:hash`, async (c) => {
