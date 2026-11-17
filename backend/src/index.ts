@@ -117,6 +117,7 @@ import {
   type ExportableOwnerReport,
   serializeOwnerReportCsv,
 } from './owner-report-export';
+import { registerOwnerVenueCreation } from './owner-venue-create';
 import { listOwnerVenues } from './owner-workspace';
 import {
   createPublicMenuResponse,
@@ -682,6 +683,7 @@ const dependencies: Dependencies = {
       if (!syntheticReport) throw new AuthUnavailableError();
       return await queryOwnerReport(client, actorId, venueId, now, source, {
         trafficClass: syntheticReportTrafficClass(venueId),
+        includeSummary: true,
       });
     } finally {
       await client.end();
@@ -1084,8 +1086,8 @@ export function createApp(services: Dependencies = dependencies) {
     '/staff/venues',
     cors({
       origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
-      allowMethods: ['GET', 'OPTIONS'],
-      allowHeaders: ['Authorization'],
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type'],
       maxAge: 86400,
     }),
   );
@@ -1105,6 +1107,11 @@ export function createApp(services: Dependencies = dependencies) {
     });
     if (!response.success) throw new AuthUnavailableError();
     return c.json(response.data);
+  });
+  registerOwnerVenueCreation(app, {
+    verify: services.verify,
+    database: withDatabase,
+    allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
   });
   app.get('/.well-known/jwks.json', async (c) => {
     if (!services.readMenuJwks) throw new AuthUnavailableError();

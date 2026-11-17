@@ -3066,3 +3066,204 @@ test('a dish approved by an earlier preparation can still be edited (Back/Edit)'
   await edit.click();
   await expect(page.getByRole('heading', { name: 'Edit dish' })).toBeVisible();
 });
+
+test('Overview uses validated KPI cards and clears their values across restaurant and session changes', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  state.venues = [venue, otherVenue];
+  const missing = { value: null, status: 'MISSING' };
+  const current = {
+    menu_sessions: { value: 31, status: 'NORMAL' },
+    dish_opens: { value: 0, status: 'VALID_ZERO' },
+    avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+    portion_previews_shown: missing,
+    verified_orders: missing,
+  };
+  const summary = {
+    periods: {
+      current: { start_time: '2026-10-19T07:00:00.000Z', end_time: '2026-10-20T07:00:00.000Z' },
+      baseline: { start_time: '2026-10-18T07:00:00.000Z', end_time: '2026-10-19T07:00:00.000Z' },
+    },
+    current,
+    baseline: { ...current, menu_sessions: { value: 20, status: 'NORMAL' } },
+  };
+  let secondStarted = false;
+  let releaseSecond = () => {};
+  await context.route(`${api}/api/v1/venues/*/analytics/dishes*`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const id = new URL(route.request().url()).pathname.split('/')[4];
+    if (id === otherVenue.venueId)
+      await new Promise<void>((resolve) => {
+        releaseSecond = resolve;
+        secondStarted = true;
+      });
+    await route.fulfill({
+      json: { ...UNEEZA_REPORT, venue_id: id, ...(id === venue.venueId ? { summary } : {}) },
+      headers: { 'Access-Control-Allow-Origin': origin },
+    });
+  });
+  await signIn(page, undefined, false);
+  await openAccount(page);
+  await page.getByLabel('Restaurant', { exact: true }).selectOption(venue.venueId);
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  const cards = page.locator('.owner-dashboard-content .kpis > .kpi');
+  await expect(cards).toHaveCount(5);
+  await expect(cards.nth(0).locator('.v')).toHaveText('31');
+  await expect(cards.nth(0).locator('.d')).toHaveText('Previous period: 20');
+  await expect(cards.nth(1).locator('.v')).toHaveText('0');
+  await expect(cards.nth(2).locator('.v')).toHaveText('Not enough visits yet');
+  await expect(cards.nth(3).locator('.v')).toHaveText('Unavailable');
+  await expect(cards.nth(4).locator('.v')).toHaveText('Unavailable');
+  await expect(page.getByRole('heading', { name: 'How your menu did this period' })).toBeVisible();
+  await openAccount(page);
+  await page.getByLabel('Restaurant', { exact: true }).selectOption(otherVenue.venueId);
+  await expect(cards).toHaveCount(0);
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await expect.poll(() => secondStarted).toBe(true);
+  await expect(cards.nth(0).locator('.v')).toHaveText('Unavailable');
+  releaseSecond();
+  await expect(cards.nth(0).locator('.v')).toHaveText('Unavailable');
+  await openAccount(page);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(cards).toHaveCount(0);
+});
+
+test('staging creation retries the same command, opens S05 and keeps the next actor isolated', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  state.venues = [];
+  const created = {
+    ...venue,
+    venueId: '44444444-4444-4444-8444-444444444444',
+    name: 'Synthetic self-service cafe',
+  };
+  const requests: Array<{
+    commandId: string;
+    name: string;
+    actor: string | undefined;
+    keys: string[];
+  }> = [];
+  await context.route(`${api}/staff/venues`, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    const body = route.request().postDataJSON();
+    requests.push({
+      ...body,
+      actor: claims(route.request().headers().authorization).sub,
+      keys: Object.keys(body).sort(),
+    });
+    // Model a committed request whose response was lost; retry must reuse its command.
+    state.venues = [created];
+    return route.fulfill({
+      status: requests.length === 1 ? 500 : 201,
+      json: requests.length === 1 ? { error: 'unavailable' } : { venue: created },
+      headers: { 'Access-Control-Allow-Origin': origin },
+    });
+  });
+  await signIn(page, undefined, false);
+  await page
+    .getByRole('button', { name: 'Create test restaurant (Staging testing)', exact: true })
+    .click();
+  await page.getByLabel('Test restaurant name (Staging testing)').fill(`  ${created.name}  `);
+  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Retry with the same name');
+  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await expect(page.getByLabel('Restaurant name', { exact: true })).toBeVisible();
+  expect(requests).toHaveLength(2);
+  expect(requests[0]).toEqual(requests[1]);
+  expect(requests[0]).toMatchObject({
+    name: created.name,
+    actor: ownerId,
+    keys: ['commandId', 'name'],
+  });
+  expect(state.apiCalls.some((call) => call.path === `/venues/${created.venueId}/profile`)).toBe(
+    true,
+  );
+  expect(state.apiCalls.some((call) => /publications|\/approvals$/.test(call.path))).toBe(false);
+  await page.getByLabel('Owner account', { exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await signIn(page, 'other@example.test', false);
+  await page.getByLabel('Owner account', { exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Restaurant', exact: true })).toHaveValue(
+    otherVenue.venueId,
+  );
+  await expect(page.getByRole('option', { name: created.name, exact: true })).toHaveCount(0);
+});
+
+test('staging quota failure preserves the existing restaurant and unknown access offers no creation', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  let creates = 0;
+  await context.route(`${api}/staff/venues`, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    creates++;
+    return route.fulfill({
+      status: 429,
+      json: { error: 'restaurant_limit_reached' },
+      headers: { 'Access-Control-Allow-Origin': origin },
+    });
+  });
+  await signIn(page, undefined, false);
+  await page.getByLabel('Owner account', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Create test restaurant (Staging testing)', exact: true })
+    .click();
+  await page
+    .getByLabel('Test restaurant name (Staging testing)')
+    .fill('Another synthetic restaurant');
+  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('limit has been reached');
+  await expect(page.getByRole('combobox', { name: 'Restaurant', exact: true })).toHaveValue(
+    venue.venueId,
+  );
+  expect(creates).toBe(1);
+  state.invalidActor = true;
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Restaurant workspace unavailable' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: /Create test restaurant/ })).toHaveCount(0);
+});
+
+test('a delayed creation response cannot select a restaurant after the actor signs out', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  state.venues = [];
+  let started = false;
+  let release = () => {};
+  await context.route(`${api}/staff/venues`, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    await new Promise<void>((resolve) => {
+      release = resolve;
+      started = true;
+    });
+    await route
+      .fulfill({ status: 201, json: { venue }, headers: { 'Access-Control-Allow-Origin': origin } })
+      .catch(() => {});
+  });
+  await signIn(page, undefined, false);
+  await page
+    .getByRole('button', { name: 'Create test restaurant (Staging testing)', exact: true })
+    .click();
+  await page
+    .getByLabel('Test restaurant name (Staging testing)')
+    .fill('Delayed synthetic restaurant');
+  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await expect.poll(() => started).toBe(true);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await signIn(page, 'other@example.test', false);
+  release();
+  await page.getByLabel('Owner account', { exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Restaurant', exact: true })).toHaveValue(
+    otherVenue.venueId,
+  );
+  await expect(page.getByRole('option', { name: venue.name, exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Test restaurant name (Staging testing)')).toHaveCount(0);
+});

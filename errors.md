@@ -3344,3 +3344,13 @@ CI caught a new test reading captured requests while the shared preview heading
 was still the loading heading. Wait for the authored preview phone before asserting
 the exact request identity; do not increase timeouts or change runtime behavior.
 The other 69 workspace cases passed in that run.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T17:56:42.641Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T17:58:08.991Z","exitCode":1}
+```

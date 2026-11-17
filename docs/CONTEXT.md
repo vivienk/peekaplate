@@ -74,7 +74,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "a0ce97131d02c45a74817edde2075b21d1b837eedbd90e211c399fddfda423f7"
+      "sourceFingerprint": "4f85e7648e7fc66f35e4f63836f9ca2707b36511128f65b29c3498e41f07ab13"
     },
     {
       "id": "tokens",
@@ -429,12 +429,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "40f8087c2b8c9bc2bf21e89f89e5faca8b20acf090adf601cca90c496d521ca1"
+      "sourceFingerprint": "e8368d395a575a1fdff62ff71eee79d171a3b3d9cb636ef5ff690e2959482962"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker preserves staff/JWKS and tenant authority, expected versions and transactional event/outbox commands. Owner upload, verification, preparation and publication reuse existing services. Preparation validates approved private portion bytes against current photo/revision; serving uses the exact published snapshot so draft edits cannot hide live assets. Extraction host forwards bounded authenticated CPU cutout requests to the existing container. Report references bind actor, venue, window and digest; strict configured synthetic scopes choose separate live/test views. Owner Actions and CSV use existing owner checks. Description assistance selects literal evidence only and never saves or publishes. Unknown report freshness remains unusable for AI. Ingredient assistance reuses current saved source-bound values; corrections override originals, missing evidence abstains, and no provider is called.",
+      "summary": "Worker preserves staff/JWKS, tenant authority, versions and transactional event/outbox commands. Owner upload, verification, preparation and publication reuse existing services. Private portions bind approved photo/revision bytes; serving follows the published snapshot despite draft edits. Extraction uses bounded authenticated CPU cutouts. Actor/window/digest report references and strict synthetic live/test scopes remain. Optional KPI summaries share a repeatable-read snapshot and adjacent windows, counting distinct sessions/openings and weighted final activity with constituent-cohort suppression. Preview/order totals stay unavailable and freshness unknown. Ingredient proposals retain current saved source corrections without provider calls or writes; description assistance selects literal evidence. Self-service creation uses an actor-bound database command for a new tenant, never existing-tenant grants.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -631,7 +631,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/retrieval/parser.menu.test.ts",
         "backend/src/owner-portion-preview.test.ts",
         "backend/src/owner-retention-scheduler.test.ts",
-        "backend/src/owner-ai/dish-assistance.integration.ts"
+        "backend/src/owner-ai/dish-assistance.integration.ts",
+        "backend/src/owner-report-summary.ts",
+        "backend/src/owner-report-summary.test.ts",
+        "backend/src/owner-report-summary.integration.ts",
+        "backend/src/owner-venue-create.ts",
+        "backend/src/owner-venue-create.test.ts",
+        "backend/src/owner-venue-create.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -644,12 +650,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4e84f7114895807b925f66a2ba03ef37a0b8244de0f89df94f5b0b8b4d576f44"
+      "sourceFingerprint": "bf856295261d4f0bdb05ed5c9595b204308c7e1263a63fc688bef688adaf84f0"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Canonical event/projection/outbox and owner preparation migrations remain immutable and tenant-scoped. Owner action current-state rows enforce tenant RLS and restricted runtime writes. The additional invoker/security-barrier test-observation view exposes only test-class canonical facts under existing RLS; the legacy live view is unchanged. Actual PostgreSQL tests cover report isolation, owner actions, portion preparation and preservation of existing published assets while newer drafts change. Hosted migration execution is separate from local acceptance.",
+      "summary": "Canonical event/projection/outbox and owner preparation migrations remain immutable and tenant-scoped. Owner action current-state rows enforce tenant RLS and restricted runtime writes. The additional invoker/security-barrier test-observation view exposes only test-class canonical facts under existing RLS; the legacy live view is unchanged. Actual PostgreSQL tests cover report isolation, owner actions, portion preparation and preservation of existing published assets while newer drafts change. Hosted migration execution is separate from local acceptance. The forward owner-venue-creation migration defines restricted actor-bound idempotent new-tenant creation; its grants and quota are covered separately. Real canonical PostgreSQL summary regressions cover distinct sessions/openings, weighted timing, independent windows, class isolation and protected subsets; they do not certify hosted freshness.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -688,7 +694,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261116020000_owner_flow_profile.sql",
         "tests/db/owner_flow_profile.sql",
         "migrations/20261117130000_owner_test_observations.sql",
-        "tests/db/owner-test-observations.sql"
+        "tests/db/owner-test-observations.sql",
+        "migrations/20261117170000_owner_venue_creation.sql",
+        "tests/db/owner-venue-creation.sql",
+        "backend/src/owner-report-summary.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -699,7 +708,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "d7e2d2f973344f90bf0418e71aa87754a55342bd715e7835f045fd0c716ed1c9"
+      "sourceFingerprint": "5fe424f5d7317562b8c46f2710a5b8972239382f9f7eb04525f734a7974eb224"
     },
     {
       "id": "measurement",
