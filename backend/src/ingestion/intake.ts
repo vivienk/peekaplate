@@ -61,7 +61,7 @@ export function selectUnambiguousMenuFile(links: readonly string[]): string | nu
   // catering PDF is the restaurant's main menu.
   const explicitlyNamed = candidates.filter((link) => {
     const filename = decodeURIComponent(new URL(link).pathname.split('/').pop() ?? '');
-    return /(?:^|[-_\\s])menu(?:[-_\\s.]|$)/i.test(filename);
+    return /(?:^|[-_\s])menu(?:[-_\s.]|$)/i.test(filename);
   });
   return explicitlyNamed.length === 1 ? explicitlyNamed[0] ?? null : null;
 }
