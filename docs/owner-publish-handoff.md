@@ -111,8 +111,14 @@ admission function and these public reads still need Sai's boundary/security rev
 release. Ingredient artwork is unchanged: #165's catalogue and #215's live approved-artwork
 lookup with its local fallback.
 
-Not yet: owner-written alt text and dietary codes, photo resizing to `card-480`/`detail-1280`
-(the approved original is used for both), portions for owner photos, and hosted acceptance.
+**Temporary limitation: original-size photos.** Owner-prepared dishes serve the owner's approved
+original photo for both `card` and `detail`; it is not resized to `card-480`/`detail-1280` WebP.
+For the MVP no image encoder is added to the Worker (Sai, Nov 17). Resizing will reuse the
+existing Python asset pipeline (`processing/src/peekaplate_processing/assets.py`, which already
+makes those variants); until then this stays an open limitation, not a completed step.
+
+Not yet: owner-written alt text and dietary codes (S09 has no field for them), portions for owner
+photos, and hosted acceptance.
 
 ## Read API and safety
 

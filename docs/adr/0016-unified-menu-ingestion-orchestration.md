@@ -98,7 +98,7 @@ command boundary rather than introducing a parallel persistence mechanism.
 - Are upload limits, retention, and operational-cost ownership explicitly approved?
 - Where and how is ingestion job state persisted, including retry metadata, idempotency, and validated results?
 - Who owns final approval of the deployment and operational configuration?
-- Amendment (item 9): where are owner-confirmed dietary codes and photo alt text captured (S09 has no field yet), and who approves adding an image library to resize owner photos to the `card-480` / `detail-1280` variants?
+- Amendment (item 9): where are owner-confirmed dietary codes and photo alt text captured (S09 has no field yet)? Owner photos are served at original size as a temporary limitation; resizing to the `card-480` / `detail-1280` variants will reuse the Python asset pipeline (`assets.py`), not an encoder in the Worker (Sai, 2026-11-17).
 - Has the complete controlled menu-ingestion workflow been accepted, including submission, extraction, report persistence, validated draft creation, queue acknowledgement, retries, dead-letter handling, and cross-venue isolation?
 
 ## Verification
