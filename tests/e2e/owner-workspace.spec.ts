@@ -1019,7 +1019,8 @@ test('preparation opens its exact snapshot after an older published entry withou
   await signIn(page);
   await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
-  await expect(page.locator('.pp-menu-preview__phone')).toBeVisible();
+  const draftMenu = page.getByRole('region', { name: 'Draft diner menu' });
+  await expect(draftMenu.getByRole('heading', { name: 'Synthetic Garden Soup' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Preview prepared menu/ })).toHaveCount(0);
   expect(state.previewRequests).toEqual([
     `/venues/${venue.venueId}/prepared-menus/${state.preparedMenu.menuId}/${state.preparedMenu.menuRevisionId}`,
