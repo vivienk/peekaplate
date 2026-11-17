@@ -71,9 +71,7 @@ describe('approved private 2.5D to public bundle handoff', () => {
     expect(prepared.portion.dish_id).toBe(dishId);
     expect(prepared.portion.dish_revision_id).toBe(dishRevisionId);
     expect(prepared.files).toHaveLength(2);
-    expect(prepared.portion.layers[0]?.url).toContain(
-      `/portions/${dishId}/${dishRevisionId}/`,
-    );
+    expect(prepared.portion.layers[0]?.url).toContain(`/portions/${dishId}/${dishRevisionId}/`);
     expect(prepared.portion.layers[1]?.sha256).toBe(
       hash(new TextEncoder().encode('synthetic-foreground-for-contract-test')),
     );
@@ -81,22 +79,16 @@ describe('approved private 2.5D to public bundle handoff', () => {
 
   it('rejects cross-dish or stale-revision export data', () => {
     const { exportValue, expected } = fixture();
-    expect(() =>
-      prepareApprovedPortion({ ...exportValue, dishId: id(99) }, expected),
-    ).toThrow();
+    expect(() => prepareApprovedPortion({ ...exportValue, dishId: id(99) }, expected)).toThrow();
     expect(() =>
       prepareApprovedPortion({ ...exportValue, dishRevisionId: id(99) }, expected),
     ).toThrow();
-    expect(() =>
-      prepareApprovedPortion(exportValue, { ...expected, photoId: id(98) }),
-    ).toThrow();
+    expect(() => prepareApprovedPortion(exportValue, { ...expected, photoId: id(98) })).toThrow();
   });
 
   it('rejects an unapproved, corrupted or externally relabelled cutout', () => {
     const { exportValue, expected } = fixture();
-    expect(() =>
-      prepareApprovedPortion({ ...exportValue, approval: null }, expected),
-    ).toThrow();
+    expect(() => prepareApprovedPortion({ ...exportValue, approval: null }, expected)).toThrow();
     expect(() =>
       prepareApprovedPortion(
         { ...exportValue, approval: { ...exportValue.approval, portion_sha256: 'b'.repeat(64) } },
