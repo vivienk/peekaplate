@@ -609,7 +609,7 @@ async function openAccount(page: Page) {
     await menu.locator('summary').click();
 }
 
-async function preparedPublication(context: BrowserContext) {
+async function preparedPublication(context: BrowserContext, privatePhotos = false) {
   const id = (n: number) => `55555555-5555-4555-8555-${String(n).padStart(12, '0')}`;
   const menu = {
     venueId: venue.venueId,
@@ -625,7 +625,9 @@ async function preparedPublication(context: BrowserContext) {
     publishedRevisionId: null,
   };
   const photo = {
-    url: 'https://68d424e7.peekaplate-diner-staging.pages.dev/fixtures/synthetic.webp',
+    url: privatePhotos
+      ? `${api}/public/prepared-assets/${venue.venueId}/${id(6)}/${'c'.repeat(64)}`
+      : 'https://68d424e7.peekaplate-diner-staging.pages.dev/fixtures/synthetic.webp',
     width: 480,
     height: 480,
     alt: 'Labelled synthetic test image',
@@ -665,10 +667,61 @@ async function preparedPublication(context: BrowserContext) {
     conflict: false,
     denied: false,
     linkFailure: false,
+    prepares: 0,
+    previewPhotoReads: 0,
+    previewPhotoAuth: [] as string[],
+    publicPhotoReads: 0,
+    prepareFailure: false as false | 'unavailable' | 'menu_not_verified',
   };
   const headers = { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*' };
   await context.route('**/venues/*/prepared-menus**', async (route) => {
     if (state.denied) return route.fulfill({ status: 403, json: { error: 'forbidden' }, headers });
+    if (privatePhotos && new URL(route.request().url()).pathname.includes('/assets/')) {
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({
+          status: 204,
+          headers: {
+            ...headers,
+            'Access-Control-Allow-Methods': 'GET',
+            'Access-Control-Allow-Headers': 'Authorization',
+          },
+        });
+      state.previewPhotoReads += 1;
+      state.previewPhotoAuth.push(route.request().headers().authorization ?? '');
+      return route.fulfill({
+        headers,
+        contentType: 'image/png',
+        body: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhNsAAAAASUVORK5CYII=',
+          'base64',
+        ),
+      });
+    }
+    // Part A: opening S13 (and Prepare again) prepares first; preparing never publishes.
+    if (new URL(route.request().url()).pathname.endsWith('/prepared-menus/prepare')) {
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({
+          status: 204,
+          headers: { ...headers, 'Access-Control-Allow-Methods': 'POST' },
+        });
+      state.prepares += 1;
+      return state.prepareFailure
+        ? route.fulfill({
+            status: state.prepareFailure === 'menu_not_verified' ? 409 : 503,
+            json: { error: state.prepareFailure },
+            headers,
+          })
+        : route.fulfill({
+            json: {
+              menuId: menu.menuId,
+              menuRevisionId: menu.menuRevisionId,
+              completeDishes: 1,
+              diagnostics: [],
+              status: 'already_present',
+            },
+            headers,
+          });
+    }
     const liveMenu = {
       ...menu,
       publicationVersion: state.publicationVersion,
@@ -734,15 +787,19 @@ async function preparedPublication(context: BrowserContext) {
       headers,
     });
   });
-  await context.route(photo.url, (route) =>
-    route.fulfill({
+  await context.route(photo.url, (route) => {
+    if (privatePhotos) {
+      state.publicPhotoReads += 1;
+      return route.fulfill({ status: 404, json: { error: 'not_found' }, headers });
+    }
+    return route.fulfill({
       contentType: 'image/png',
       body: Buffer.from(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhNsAAAAASUVORK5CYII=',
         'base64',
       ),
-    }),
-  );
+    });
+  });
   // After publishing, the S13 phone frames the returned diner page; answer it locally.
   await context.route('https://routing-staging.peekaplate-diner-staging.pages.dev/**', (route) =>
     route.fulfill({
@@ -752,6 +809,43 @@ async function preparedPublication(context: BrowserContext) {
   );
   return state;
 }
+
+test('private prepared photos use owner-authenticated blobs and are revoked on leaving preview', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  const state = await preparedPublication(context, true);
+  await page.addInitScript(() => {
+    const old = URL.revokeObjectURL;
+    (window as unknown as { revokedPhotos: string[] }).revokedPhotos = [];
+    URL.revokeObjectURL = (url) => {
+      (window as unknown as { revokedPhotos: string[] }).revokedPhotos.push(url);
+      old.call(URL, url);
+    };
+  });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  const image = page.getByRole('img', { name: 'Labelled synthetic test image' });
+  await expect(image).toBeVisible();
+  const blob = await image.getAttribute('src');
+  expect(blob).toMatch(/^blob:/);
+  expect(state.previewPhotoReads).toBe(1);
+  expect(state.previewPhotoAuth.every((value) => value.startsWith('Bearer '))).toBe(true);
+  expect(state.publicPhotoReads).toBe(0);
+  expect(state.approvals).toHaveLength(0);
+  expect(state.publishes).toHaveLength(0);
+  await page.getByRole('button', { name: 'Back to Edit', exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (url) => (window as unknown as { revokedPhotos: string[] }).revokedPhotos.includes(url!),
+        blob,
+      ),
+    )
+    .toBe(true);
+});
 
 for (const width of [1440, 390]) {
   test(`prepared owner menu publishes only after confirmation and exposes the returned URL at ${width}px`, async ({
@@ -853,13 +947,11 @@ test('prepared publication conflict requires a fresh preview and denied access c
   await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
   await expect(
-    page.getByText(
-      'The menu changed. Reload prepared menus and review it again before publishing.',
-    ),
+    page.getByText('The menu changed. Prepare again and review it again before publishing.'),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toHaveCount(0);
   state.denied = true;
-  await page.getByRole('button', { name: 'Reload prepared menus' }).click();
+  await page.getByRole('button', { name: 'Prepare again' }).click();
   await expect(page.getByRole('heading', { name: 'Synthetic Garden Soup' })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Menu link' })).toHaveCount(0);
 });
@@ -2491,3 +2583,127 @@ for (const partial of [false, true]) {
     expect(state.apiCalls.some(({ path }) => /retry|approve|publications/.test(path))).toBe(false);
   });
 }
+
+// Part A: S11 stays verification-only; Review and publish prepares the menu (never publishes),
+// says when preparation failed, and Prepare again retries it.
+test('completing verification does not prepare or approve anything', async ({ context, page }) => {
+  const state = await fixture(context);
+  const id = crypto.randomUUID();
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: null,
+      origin: 'manual',
+      draft_version: 1,
+      name: 'Fictional Lentil Soup',
+      category: 'Soup',
+      description: 'Slow cooked lentil soup with herbs.',
+      price_amount: '9.50',
+      price_currency: 'CAD',
+      ingredients: ['lentils'],
+      source_text: null,
+      review_warnings: [],
+      review_status: 'pending',
+      verification_status: 'not_verified',
+      manual_fields: {
+        name: 'Fictional Lentil Soup',
+        category: 'Soup',
+        description: 'Slow cooked lentil soup with herbs.',
+        priceAmount: '9.50',
+        priceCurrency: 'CAD',
+        servingSize: '1 bowl',
+        ingredients: { status: 'confirmed', items: ['lentils'] },
+        allergens: { status: 'confirmed', items: [] },
+        photoId: crypto.randomUUID(),
+      },
+    },
+  ];
+  await signIn(page, undefined, false);
+  await page.getByRole('button', { name: 'Edit: Add your menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
+  expect(
+    state.apiCalls.filter((call) =>
+      /prepare|\/drafts\/[^/]+\/approve$|approvals|publications/.test(call.path),
+    ),
+  ).toEqual([]);
+});
+
+test('Review and publish prepares the menu, shows a failure and retries with Prepare again', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  const state = await preparedPublication(context);
+  state.prepareFailure = 'unavailable';
+  await signIn(page);
+  await page.getByRole('button', { name: 'Review and publish' }).click();
+  await expect(page.getByRole('alert')).toContainText('Menu not prepared yet');
+  await expect(page.getByRole('alert')).toContainText('prepare again to retry');
+  // An earlier prepared menu stays available while preparation is retried.
+  await expect(
+    page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }),
+  ).toBeVisible();
+  await expect.poll(() => state.prepares).toBe(1);
+
+  state.prepareFailure = 'menu_not_verified';
+  await page.getByRole('button', { name: 'Prepare again' }).click();
+  await expect(page.getByRole('alert')).toContainText('need verifying again');
+  await expect.poll(() => state.prepares).toBe(2);
+
+  state.prepareFailure = false;
+  await page.getByRole('button', { name: 'Prepare again' }).click();
+  await expect(page.getByText('Menu not prepared yet')).toHaveCount(0);
+  await expect.poll(() => state.prepares).toBe(3);
+  // Preparing approved and published nothing: S13 still needs the explicit Publish.
+  expect(state.approvals).toEqual([]);
+  expect(state.publishes).toEqual([]);
+  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toBeVisible();
+  expect(state.publishes).toEqual([]);
+});
+
+test('a dish approved by an earlier preparation can still be edited (Back/Edit)', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const id = crypto.randomUUID();
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: null,
+      origin: 'manual',
+      draft_version: 2,
+      name: 'Fictional Lentil Soup',
+      category: 'Soup',
+      description: 'Slow cooked lentil soup with herbs.',
+      price_amount: '9.50',
+      price_currency: 'CAD',
+      ingredients: ['lentils'],
+      source_text: null,
+      review_warnings: [],
+      review_status: 'accepted',
+      verification_status: 'verified',
+      manual_fields: {
+        name: 'Fictional Lentil Soup',
+        category: 'Soup',
+        description: 'Slow cooked lentil soup with herbs.',
+        priceAmount: '9.50',
+        priceCurrency: 'CAD',
+        servingSize: '1 bowl',
+        ingredients: { status: 'confirmed', items: ['lentils'] },
+        allergens: { status: 'confirmed', items: [] },
+        photoId: null,
+      },
+    },
+  ];
+  await signIn(page);
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  const edit = page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true });
+  await expect(edit).toBeEnabled();
+  await edit.click();
+  await expect(page.getByRole('heading', { name: 'Edit dish' })).toBeVisible();
+});

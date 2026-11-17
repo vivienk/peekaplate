@@ -82,7 +82,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "bec6ebe7161315c7f268c90afd7f7bda229671e8eae7416d6061ad7381e6d829"
+      "sourceFingerprint": "f895386f886f84a98d0ab326c5239676de7bb9f70287703c94a05ade4131f70b"
     },
     {
       "id": "tokens",
@@ -272,12 +272,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7f194002a016437cdb7e3d63c460232ffe10705fab5953686d883965e4a9af7b"
+      "sourceFingerprint": "b1149769eeb5b718903ac9125f7e5a9962952c175124e62074bdbc1552ebd506"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner auth/workspace reuses authored S05–S13 components, including #172 DishFormView and official #208 publication. S05 saves a tenant profile/private photo; shared setup reads drive header/content/aside without inventing verification. Manual and extracted drafts retain serving size, corrected allergens/photos and source evidence. S10 removal/Undo is persisted; candidate corrections invalidate verification. Processing success uses the selected import, not older drafts. The preview-only S05–S13 walkthrough is labelled synthetic with no provider/analytics calls. Live S09 AI drafting and complete report-page adapters remain absent. New snapshot preparation/admission remains operator-owned; hosted migration/release/acceptance is pending. Shared S09 adds an optional people-served calibration field; report-period mismatches withhold AI suggestions. S01 Terms/Privacy open local dialogs; account/session APIs and tenant authority remain unchanged.",
+      "summary": "Owner auth/workspace reuses authored S05–S13 components, including #172 DishFormView and official #208 publication. S05 saves a tenant profile/private photo; shared setup reads drive header/content/aside without inventing verification. Manual and extracted drafts retain serving size, corrected allergens/photos and source evidence. S10 removal/Undo is persisted; candidate corrections invalidate verification. Processing success uses the selected import, not older drafts. The preview-only S05–S13 walkthrough is labelled synthetic with no provider/analytics calls. S09 AI and full report adapters remain absent. S13 Review and publish reruns owner preparation (existing approval command + producer; S11 stays verification-only); edits reopen approved drafts. Hosted migration/release/acceptance is pending. Shared S09 adds an optional people-served calibration field; report-period mismatches withhold AI suggestions. Local S01 Terms/Privacy dialogs preserve session APIs and tenant authority.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -429,12 +429,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "ddf25910720468072dee19e0a86632276280ba662ce0ea929235400aa919e380"
+      "sourceFingerprint": "dfa54be563c2d0709db8a34532a9c997c3a4a688eec84ce6f5fe7585d5368936"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker rechecks current staff/tenant authority for transactional commands and replay. Canonical profiles/private photos use versioned details/setup reads; owners cannot verify themselves. Draft removal is reversible; corrections retain photo/allergen/serving metadata, advance content versions and invalidate verification. Legacy omissions preserve size/count; explicit null clears. The existing bundle producer exports branding and revision/count-bound portions; trusted preparation/admission remains separate. OCR retains transactional #210 placeholders. Facts and PostHog stay separate; reports retain privacy cohorts and unknown freshness. Optional report references bind analysis to displayed evidence while ordinary reads remain available. Authored S05–S13 callers reuse these APIs; hosted release/provider activation and the console reference-header handoff remain pending.",
+      "summary": "Canonical owner/profile/draft commands retain tenant authority, versions and replay. Part A prepares owner-verified drafts through existing approval/producer/admission. Reopened drafts preserve historical canonical dish IDs; removal/Undo retains unchanged content verification and stable retries. Exact current publication controls public prepared bundles and selected photos/logos; withdrawal prevents new exposure and responses are no-store. Owner previews use authenticated snapshot-bound image blobs without changing content hashes. Empty venues remain empty. Existing profile verification, extraction/provider and hosted release gates remain separate; the Menu path profile-verification inconsistency is documented. Other report, privacy, artwork and observation boundaries remain unchanged.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -620,6 +620,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/restaurant.test.ts",
         "backend/src/bundle-producer/logo-image.ts",
         "backend/src/bundle-producer/logo-image.test.ts",
+        "backend/src/owner-prepare.ts",
+        "backend/src/owner-prepare.test.ts",
+        "backend/src/owner-prepare.integration.ts",
         "backend/src/owner-ai/report-reference.ts",
         "backend/src/owner-ai/report-reference.test.ts",
         "backend/src/restaurant-profile.test.ts",
@@ -636,7 +639,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "04d5c2fdb7345465fe033e9142875a686b7257ac65555187b6c76bd36cad4611"
+      "sourceFingerprint": "c1b3cafb395d31dedb42876d9e98d14066979b949bd46203e6990fae0d6bf1eb"
     },
     {
       "id": "database",
@@ -678,6 +681,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261113020000_ingredient_artwork.sql",
         "migrations/20261116010000_ingredient_artwork_placeholders.sql",
         "tests/db/artwork_placeholders.sql",
+        "migrations/20261117010000_owner_prepared_menu.sql",
+        "tests/db/owner_prepared_menu.sql",
         "migrations/20261116020000_owner_flow_profile.sql",
         "tests/db/owner_flow_profile.sql"
       ],
@@ -690,7 +695,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "baf8f411b6d6f2ccfd38c2082f0e99683e4eff3aa17b47af268421efcb9fdb15"
+      "sourceFingerprint": "cb99f93b664017ea5241ad73c346dc6fa47cce85cad3ba69254d1bab7d7f1d77"
     },
     {
       "id": "measurement",
@@ -1017,22 +1022,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-15",
       "modules": [
-        "processing"
-      ],
-      "summary": "PR181 adds the offline strict field scorer and proposed six-source/nine-page metadata plan. Existing inspected cases remain development; two new PDFs are only candidate holdouts. Hash-bound actual outputs retain null/zero, duplicate/unresolved and per-segment mixed-page failure evidence. Two pinned Spec findings were reproduced and fixed; 39 guarded local QA-02 controls passed before integrating merged169. No fresh real-menu prediction, frozen human reference or acceptance is inferred.",
-      "sources": [
-        "processing/src/peekaplate_processing/qa02_strict_score.py",
-        "processing/tests/test_qa02_strict_score.py",
-        "processing/eval/qa02/STRICT_SCORER.md",
-        "processing/eval/qa02/source-plan-v1.json",
-        "docs/qa02-real-menu-source-plan-v1.md",
-        "docs/qa02-strict-scorer-spec.md"
-      ],
-      "next": "Review source-only answers and scoring with Sai/Uneeza before new predictions; Vivien thresholds and call/retry authorization stay separate. PR169 merged at0946d21 with unchanged reference/helper bytes, removing its code-landing dependency. Reuse FE-06.4's job verifier and existing backend acceptance in the operator-coordinated156/171/172 run; do not claim routed-UI or release acceptance."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
         "console"
       ],
       "summary": "PR189 ranks the synthetic preview most-attention answer by first opens divided by seen visits, with a ten-visit floor. The illustrative answer does not use live owner reports.",
@@ -1152,6 +1141,27 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/review/fromDishDraft.test.ts"
       ],
       "next": "Coordinator reviews and publishes the resolved merge commit. Hosted migration/release, fresh provider extraction, physical-device scale and live AI header handoff remain separate gates; no staging activation was performed."
+    },
+    {
+      "date": "2026-11-16",
+      "modules": [
+        "backend",
+        "database",
+        "console"
+      ],
+      "summary": "PR216 corrections reuse existing producer/profile/publication: stable Remove/Undo verification retries, retained legacy canonical dish IDs, snapshot-selected logos, public bytes only while published, and authenticated preview image blobs. Screen markup/CSS/tokens remain. Empty venues get no invented content. The unshipped Part A migration adjusts two pending-link checks, retaining tenant FK/reviewer/superseded constraints. Local PASS: check 2011 units/117 scripts; DB 415 SQL assertions/170 integrations/Worker smoke; workspace 63 browser cases; console build. No hosted acceptance.",
+      "files": [
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-prepare.ts",
+        "backend/src/index.ts",
+        "backend/src/owner-prepare.integration.ts",
+        "migrations/20261117010000_owner_prepared_menu.sql",
+        "tests/db/owner_prepared_menu.sql",
+        "frontend/console/src/owner/OwnerPublish.tsx",
+        "frontend/console/src/owner-menu/api.ts",
+        "docs/owner-publish-handoff.md"
+      ],
+      "next": "Independent review before publishing; remote PR216 c44a860 documentation is reconciled with the tested runtime. Hosted migration, Queue/provider/account operations and fresh empty shared-workspace acceptance remain coordinator-owned; Dashboard versus Menu profile-verification gates remain inconsistent."
     },
     {
       "date": "2026-11-16",

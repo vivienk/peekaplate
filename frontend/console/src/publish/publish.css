@@ -331,11 +331,17 @@
   align-items: center;
   padding-block: var(--pp-space-12);
 }
-.pp-draft-menu__dish img {
+.pp-draft-menu__dish img,
+.pp-draft-menu__no-photo {
   inline-size: 7rem;
   block-size: 7rem;
   object-fit: cover;
   border-radius: var(--pp-radius-full);
+}
+/* Text-only dish (no photo yet): an empty circle, like the diner's missing-image box. */
+.pp-draft-menu__no-photo {
+  display: block;
+  background: var(--pp-color-neutral-700);
 }
 .pp-draft-menu__dish h4 {
   margin: 0;

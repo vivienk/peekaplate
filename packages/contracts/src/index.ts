@@ -235,10 +235,14 @@ export const PublicMenuCompleteDishSchema = z.strictObject({
     .array(PublicMenuDietaryCodeSchema)
     .max(3)
     .refine((values) => new Set(values).size === values.length, 'Dietary values must be unique'),
-  images: z.strictObject({
-    card: PublicMenuImageSchema,
-    detail: PublicMenuImageSchema,
-  }),
+  // null = a text-only dish: published without a photo for now (Jeffin, Nov 17). Diners see the
+  // name, price, description, ingredients and allergens; the menu card shows its empty image box.
+  images: z
+    .strictObject({
+      card: PublicMenuImageSchema,
+      detail: PublicMenuImageSchema,
+    })
+    .nullable(),
 });
 
 export const PublicMenuDishSchema = z.discriminatedUnion('complete', [

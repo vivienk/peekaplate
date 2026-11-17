@@ -4760,9 +4760,36 @@ adapter suite also failed its omitted-property regression before the fix. A
 conditional spread now omits only undefined and preserves explicit null/text.
 The five focused adapter cases pass; authored markup, styles and tokens are unchanged.
 
+### ERR-20261116-OWNER-PREPARED-BOUNDARIES
+
+Focused disposable-DB regressions reproduced accepted-draft Remove/Undo clearing
+verification, reopened drafts losing legacy canonical IDs, and an unused private
+logo returning HTTP 200. Removal now preserves unchanged content verification;
+reopening retains its association and preparation reuses that ID. The first ID
+retention edit hit the original pending-link SQL checks. Only the confirmed
+unreleased Part A forward migration adjusts those two checks; applied migrations,
+tenant FK, pending reviewer metadata and superseded exclusion remain unchanged.
+A further regression reproduced public prepared bytes before publication. Reads
+now use the existing exact current-publication join, snapshot asset membership
+and no-store; authenticated owner preview images use revocable object URLs.
+An isolated-worktree setup initially lacked installed dependencies; frozen offline
+installation reused the existing lockfile. A new test ArrayBufferLike typing and
+one historical null-association assertion were corrected without weakening
+runtime validation. A process-only diagnostic lost a dollar-prefixed variable in
+nested PowerShell double quotes; the corrected single-quoted invocation succeeded.
+This repeats the existing PowerShell quoting guidance and changed no source.
+Check passes (2011 unit cases and 117 script cases); disposable DB passes (415 SQL
+assertions in 16 files, 170 integration cases and local Worker smoke). Browser and
+build evidence is recorded in the handoff. No hosted state changed in these fixes.
+
 ### ERR-20261116-LEGAL-RECONCILE-CONTEXT
 
 The PR201 merge handoff script initially addressed context graph `modules` rather
 than its actual `nodes` key and stopped before writing. Reading the schema and
 using `nodes` resolved the documentation-only failure. Context validation,
 documentation links and typechecks pass; no runtime source was changed by repair.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T06:48:17.646Z","exitCode":1}
+```

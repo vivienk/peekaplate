@@ -59,7 +59,9 @@ export function publicBundleToWire(bundle: PublicMenuContentBundle): WireMenuBun
                 return 'Gluten-free';
             }
           }),
-          images: { card: { ...dish.images.card }, detail: { ...dish.images.detail } },
+          images: dish.images
+            ? { card: { ...dish.images.card }, detail: { ...dish.images.detail } }
+            : null,
         };
       }),
     })),
