@@ -78,11 +78,63 @@ const summaryMetrics = z.strictObject({
   portion_previews_shown: unavailableSummaryMetric,
   verified_orders: unavailableSummaryMetric,
 });
-export const OwnerReportSummarySchema = z.strictObject({
-  periods: z.strictObject({ current: summaryWindow, baseline: summaryWindow }),
-  current: summaryMetrics,
-  baseline: summaryMetrics,
-});
+export const OwnerReportSummarySchema = z
+  .strictObject({
+    periods: z.strictObject({ current: summaryWindow, baseline: summaryWindow }),
+    current: summaryMetrics,
+    baseline: summaryMetrics,
+    daily_opens: z
+      .strictObject({
+        current: z
+          .array(summaryWindow.extend({ opens: summaryCount() }))
+          .min(1)
+          .max(2),
+        baseline: z
+          .array(summaryWindow.extend({ opens: summaryCount() }))
+          .min(1)
+          .max(2),
+      })
+      .optional(),
+  })
+  .superRefine((summary, ctx) => {
+    if (!summary.daily_opens) return;
+    for (const period of ['current', 'baseline'] as const) {
+      const buckets = summary.daily_opens[period];
+      let cursor = Date.parse(summary.periods[period].start_time);
+      const end = Date.parse(summary.periods[period].end_time);
+      for (const bucket of buckets) {
+        const nextMidnight = Math.floor(cursor / 86400000) * 86400000 + 86400000;
+        if (
+          Date.parse(bucket.start_time) !== cursor ||
+          Date.parse(bucket.end_time) !== Math.min(nextMidnight, end) ||
+          cursor >= end
+        )
+          ctx.addIssue({
+            code: 'custom',
+            path: ['daily_opens', period],
+            message: 'Daily buckets must cover clipped UTC days in the report period',
+          });
+        cursor = Date.parse(bucket.end_time);
+      }
+      if (cursor !== end)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['daily_opens', period],
+          message: 'Daily buckets must cover the whole period',
+        });
+      if (
+        buckets.some((bucket) => bucket.opens.status === 'SUPPRESSED') &&
+        (buckets.some((bucket) => bucket.opens.value !== null) ||
+          Object.values(summary[period]).some((cell) => cell.value !== null))
+      )
+        ctx.addIssue({
+          code: 'custom',
+          path: ['daily_opens', period],
+          message:
+            'Protected daily buckets require complementary suppression of the series and totals',
+        });
+    }
+  });
 export type OwnerReportSummary = z.infer<typeof OwnerReportSummarySchema>;
 
 // The rates and the average: the metrics whose own cohort is checked against the floor.
@@ -268,9 +320,15 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
         });
       if (
         ['STALE', 'ERROR'].includes(report.report_metadata.report_status) &&
-        [...Object.values(summary.current), ...Object.values(summary.baseline)].some(
-          (cell) => cell.value !== null,
-        )
+        [
+          ...Object.values(summary.current),
+          ...Object.values(summary.baseline),
+          ...(summary.daily_opens
+            ? [...summary.daily_opens.current, ...summary.daily_opens.baseline].map(
+                (bucket) => bucket.opens,
+              )
+            : []),
+        ].some((cell) => cell.value !== null)
       )
         ctx.addIssue({
           code: 'custom',

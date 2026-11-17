@@ -35,6 +35,49 @@ async function run(rows = [row('current'), row('baseline')], permission = 'owner
   return { report: OwnerDishReportSchema.parse(report), query };
 }
 describe('owner report summary', () => {
+  it('returns clipped UTC daily openings and hides the entire series and totals for a small bucket', async () => {
+    const buckets = [
+      {
+        start_time: '2026-11-16T12:00:00.000Z',
+        end_time: '2026-11-17T00:00:00.000Z',
+        opens: 12,
+        sessions: 10,
+      },
+      {
+        start_time: '2026-11-17T00:00:00.000Z',
+        end_time: '2026-11-17T12:00:00.000Z',
+        opens: 13,
+        sessions: 10,
+      },
+    ];
+    const baseline = buckets.map((bucket) => ({
+      ...bucket,
+      start_time: new Date(Date.parse(bucket.start_time) - 86400000).toISOString(),
+      end_time: new Date(Date.parse(bucket.end_time) - 86400000).toISOString(),
+    }));
+    const normal = await run([
+      row('current', { daily_buckets: buckets }),
+      row('baseline', { daily_buckets: baseline }),
+    ]);
+    expect(normal.report.summary?.daily_opens?.current.map((bucket) => bucket.opens)).toEqual([
+      { value: 12, status: 'NORMAL' },
+      { value: 13, status: 'NORMAL' },
+    ]);
+    expect(normal.report.summary?.daily_opens?.current[0]?.start_time).toBe(buckets[0]!.start_time);
+    const protectedReport = await run([
+      row('current', { daily_buckets: [buckets[0], { ...buckets[1], sessions: 9 }] }),
+      row('baseline', { daily_buckets: baseline }),
+    ]);
+    expect(protectedReport.report.summary?.current.dish_opens).toEqual({
+      value: null,
+      status: 'SUPPRESSED',
+    });
+    expect(
+      protectedReport.report.summary?.daily_opens?.current.every(
+        (bucket) => bucket.opens.value === null && bucket.opens.status === 'SUPPRESSED',
+      ),
+    ).toBe(true);
+  });
   it('adds exact current/baseline windows and observed aggregates, never unsupported zeros', async () => {
     const { report, query } = await run();
     expect(report.summary?.periods).toEqual({
@@ -53,7 +96,7 @@ describe('owner report summary', () => {
     expect(sql).toContain('owner_test_observation_v1');
     expect(sql).not.toContain('owner_observation_v1');
     expect(sql).toContain('COUNT(DISTINCT session_id)');
-    expect(sql).toContain('SELECT DISTINCT period, session_id, dish_id, opening_id');
+    expect(sql).toContain('GROUP BY period, session_id, dish_id, opening_id');
     expect(query.mock.calls.map(([sql]) => sql)).toContain(
       'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY',
     );

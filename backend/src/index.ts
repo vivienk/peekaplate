@@ -213,6 +213,7 @@ export type Bindings = {
   EXTRACTION_TIMEOUT_MS?: string;
   OWNER_AI_DISH_ASSISTANCE_ENABLED?: string;
   OWNER_AI_REPORT_REFERENCE_SECRET?: string;
+  OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL?: string;
   SYNTHETIC_REPORT_VENUE_IDS?: string;
   MENU_STAGING_RETENTION_DAYS?: string;
   MENU_STAGING_REJECTED_RETENTION_DAYS?: string;
@@ -684,6 +685,12 @@ const dependencies: Dependencies = {
       return await queryOwnerReport(client, actorId, venueId, now, source, {
         trafficClass: syntheticReportTrafficClass(venueId),
         includeSummary: true,
+        ...(env.APP_ENV === 'staging' && env.OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL
+          ? {
+              syntheticSeal: env.OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL,
+              validationNow: new Date(),
+            }
+          : {}),
       });
     } finally {
       await client.end();

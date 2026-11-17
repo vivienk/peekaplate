@@ -14,8 +14,9 @@ WITH periods AS (
   JOIN app_private.owner_observation_v1 obs ON obs.tenant_id=$1
     AND obs.occurred_at>=p.starts AND obs.occurred_at<p.ends
 ), openings AS (
-  SELECT DISTINCT period, session_id, dish_id, opening_id FROM scoped
+  SELECT period, session_id, dish_id, opening_id, MIN(occurred_at) AS opened_at FROM scoped
   WHERE event_type='dish_detail_opened' AND opening_id IS NOT NULL AND dish_id IS NOT NULL
+  GROUP BY period, session_id, dish_id, opening_id
 ), timing AS (
   SELECT o.period,o.session_id,o.dish_id,o.opening_id,
     MAX(a.active_ms) AS active_ms,COALESCE(BOOL_OR(a.activity_final),false) AS has_final
@@ -32,8 +33,21 @@ WITH periods AS (
 ), opened_cohorts AS (
   SELECT period,dish_id,COUNT(DISTINCT session_id) AS opened
   FROM openings GROUP BY period,dish_id
+), daily AS (
+  SELECT p.period,GREATEST(day AT TIME ZONE 'UTC',p.starts) AS starts,
+    LEAST((day+interval '1 day') AT TIME ZONE 'UTC',p.ends) AS ends,
+    COUNT(o.opening_id) AS opens,COUNT(DISTINCT o.session_id) AS sessions
+  FROM periods p CROSS JOIN LATERAL generate_series(
+    date_trunc('day',p.starts AT TIME ZONE 'UTC'),
+    date_trunc('day',(p.ends-interval '1 microsecond') AT TIME ZONE 'UTC'),interval '1 day') day
+  LEFT JOIN openings o ON o.period=p.period
+    AND o.opened_at>=GREATEST(day AT TIME ZONE 'UTC',p.starts)
+    AND o.opened_at<LEAST((day+interval '1 day') AT TIME ZONE 'UTC',p.ends)
+  GROUP BY p.period,p.starts,p.ends,day
 )
 SELECT p.period,
+  (SELECT jsonb_agg(jsonb_build_object('start_time',starts,'end_time',ends,'opens',opens,'sessions',sessions) ORDER BY starts)
+    FROM daily WHERE period=p.period) AS daily_buckets,
   (SELECT COUNT(DISTINCT session_id) FROM scoped WHERE period=p.period AND event_type='menu_viewed') AS menu_sessions,
   (SELECT COUNT(*) FROM openings WHERE period=p.period) AS dish_opens,
   (SELECT COUNT(DISTINCT session_id) FROM openings WHERE period=p.period) AS open_sessions,
@@ -45,6 +59,27 @@ SELECT p.period,
 FROM periods p`;
 
 type Row = Record<string, unknown>;
+type DailyRow = { start_time: string; end_time: string; opens: number; sessions: number };
+function dailyRows(row: Row | undefined): DailyRow[] | undefined {
+  if (row?.daily_buckets === undefined) return undefined;
+  if (!Array.isArray(row.daily_buckets)) throw new Error('Invalid daily buckets');
+  return row.daily_buckets.map((bucket: DailyRow) => {
+    if (
+      !bucket ||
+      !Number.isSafeInteger(bucket.opens) ||
+      bucket.opens < 0 ||
+      !Number.isSafeInteger(bucket.sessions) ||
+      bucket.sessions < 0 ||
+      bucket.sessions > bucket.opens
+    )
+      throw new Error('Invalid daily cohort');
+    return {
+      ...bucket,
+      start_time: new Date(bucket.start_time).toISOString(),
+      end_time: new Date(bucket.end_time).toISOString(),
+    };
+  });
+}
 function metrics(row: Row | undefined): OwnerReportSummary['current'] {
   const missing = { value: null, status: 'MISSING' } as const;
   if (!row)
@@ -66,7 +101,10 @@ function metrics(row: Row | undefined): OwnerReportSummary['current'] {
   const timedSessions = count('timed_sessions');
   if (typeof row.has_small_dish !== 'boolean' || typeof row.has_small_timed_dish !== 'boolean')
     throw new Error('Invalid summary cohort evidence');
-  const protectedSubset = row.has_small_dish || row.has_small_timed_dish;
+  const protectedSubset =
+    row.has_small_dish ||
+    row.has_small_timed_dish ||
+    dailyRows(row)?.some((bucket) => bucket.sessions > 0 && bucket.sessions < 10);
   const value = (number: number | null, cohort: number) => {
     if (protectedSubset) return { value: null, status: 'SUPPRESSED' } as const;
     if (cohort === 0) return { value: null, status: 'NOT_MEASURABLE' } as const;
@@ -100,6 +138,23 @@ export async function readOwnerReportSummary(
       : query,
     [venueId, start, now],
   );
+  const currentRow = result.rows.find((row) => row.period === 'current');
+  const baselineRow = result.rows.find((row) => row.period === 'baseline');
+  const current = metrics(currentRow);
+  const baseline = metrics(baselineRow);
+  const daily = (row: Row | undefined, totals: OwnerReportSummary['current']) =>
+    dailyRows(row)?.map((bucket) => ({
+      start_time: bucket.start_time,
+      end_time: bucket.end_time,
+      opens:
+        totals.dish_opens.status === 'SUPPRESSED'
+          ? { value: null, status: 'SUPPRESSED' as const }
+          : bucket.sessions === 0
+            ? { value: null, status: 'NOT_MEASURABLE' as const }
+            : { value: bucket.opens, status: 'NORMAL' as const },
+    }));
+  const currentDaily = daily(currentRow, current);
+  const baselineDaily = daily(baselineRow, baseline);
   return OwnerReportSummarySchema.parse({
     periods: {
       current: { start_time: start.toISOString(), end_time: now.toISOString() },
@@ -108,7 +163,10 @@ export async function readOwnerReportSummary(
         end_time: start.toISOString(),
       },
     },
-    current: metrics(result.rows.find((row) => row.period === 'current')),
-    baseline: metrics(result.rows.find((row) => row.period === 'baseline')),
+    current,
+    baseline,
+    ...(currentDaily && baselineDaily
+      ? { daily_opens: { current: currentDaily, baseline: baselineDaily } }
+      : {}),
   });
 }

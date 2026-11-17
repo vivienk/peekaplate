@@ -3372,3 +3372,22 @@ as existing S05 tests do. Both corrections retain the original screen and API.
 
 CI run 44146794614 failed before workspace tests: the root Playwright suite could not resolve the runtime `@peekaplate/contracts/owner-report` import. Use the repository-relative contract source, matching root test execution. `pnpm exec playwright test --config playwright.workspace.config.ts --list` passes (74 tests); no browser or runtime behavior changed. An initial local listing used a nonexistent config filename; corrected to the existing `playwright.workspace.config.ts`.
 
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-17T18:37:39.923Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T18:38:35.019Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-17T18:40:23.815Z","exitCode":1}
+```
+# 2026-11-17 PR230 final chart and completeness checks
+
+Resolved: the first database attempt could not reach Docker Desktop; starting the existing daemon restored the unchanged runner. `pnpm verify test:db` passed all pgTAP files and 161 integration tests, including real summary buckets and sealed-scenario queries. Intermediate lint/context failures occurred while chart files and their fingerprints were being completed; final `pnpm check` passed 1,975 unit and 106 script tests, lint, types, context and docs. Independent review found an isolated known chart point disappeared beside a null bucket; `line-chart.test.tsx` reproduces the defect and verifies the corrected marker without displaying null as zero. Hosted reconciliation and deployment remain separate acceptance steps.
+

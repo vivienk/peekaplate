@@ -177,6 +177,17 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner KPI summary (canonical PostgreS
     const result = await report(fixture.id);
     expect(result.summary?.current.menu_sessions).toEqual({ value: 20, status: 'NORMAL' });
     expect(result.summary?.current.dish_opens).toEqual({ value: 30, status: 'NORMAL' });
+    expect(result.summary?.daily_opens?.current).toEqual([
+      {
+        start_time: '2035-02-02T00:00:00.000Z',
+        end_time: '2035-02-03T00:00:00.000Z',
+        opens: { value: 30, status: 'NORMAL' },
+      },
+    ]);
+    expect(result.summary?.daily_opens?.baseline[0]?.opens).toEqual({
+      value: 10,
+      status: 'NORMAL',
+    });
     expect(result.summary?.current.avg_interaction_time_seconds.value).toBeCloseTo(500 / 30);
     expect(result.summary?.baseline.menu_sessions).toEqual({ value: 10, status: 'NORMAL' });
     expect(result.summary?.baseline.dish_opens).toEqual({ value: 10, status: 'NORMAL' });
@@ -209,5 +220,38 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner KPI summary (canonical PostgreS
         includeSummary: true,
       }),
     ).rejects.toMatchObject({ code: 'forbidden' });
+  });
+  it('clips UTC buckets at a noon window and suppresses both buckets and totals when one has nine sessions', async () => {
+    const fixture = await venue();
+    for (let i = 0; i < 19; i++)
+      await visit(
+        fixture.id,
+        fixture.dishes.slice(0, 1),
+        current + (i < 10 ? 13 : 25) * 3600000 + i * 60000,
+        [10],
+      );
+    const result = OwnerDishReportSchema.parse(
+      await readOwnerReport(
+        runtime,
+        actor,
+        fixture.id,
+        new Date('2035-02-03T12:00:00Z'),
+        'synthetic',
+        { trafficClass: 'test', includeSummary: true },
+      ),
+    );
+    expect(result.summary?.current.dish_opens).toEqual({ value: null, status: 'SUPPRESSED' });
+    expect(result.summary?.daily_opens?.current).toEqual([
+      {
+        start_time: '2035-02-02T12:00:00.000Z',
+        end_time: '2035-02-03T00:00:00.000Z',
+        opens: { value: null, status: 'SUPPRESSED' },
+      },
+      {
+        start_time: '2035-02-03T00:00:00.000Z',
+        end_time: '2035-02-03T12:00:00.000Z',
+        opens: { value: null, status: 'SUPPRESSED' },
+      },
+    ]);
   });
 });

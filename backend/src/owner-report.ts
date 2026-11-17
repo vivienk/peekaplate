@@ -2,6 +2,7 @@
 import { toOwnerReport } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { CommandError } from './dish-command';
+import { verifySyntheticCompleteness } from './owner-ai/synthetic-completeness';
 import { readOwnerReportSummary } from './owner-report-summary';
 
 const REPORT_PERMISSIONS = ['owner'];
@@ -13,12 +14,17 @@ export async function readOwnerReport(
   venueId: string,
   now: Date,
   source: OwnerReportSource = 'production',
-  options: { trafficClass?: 'live' | 'test'; includeSummary?: boolean } = {},
+  options: {
+    trafficClass?: 'live' | 'test';
+    includeSummary?: boolean;
+    syntheticSeal?: string;
+    validationNow?: Date;
+  } = {},
 ): Promise<unknown> {
   let started = false;
   try {
     await client.query(
-      options.includeSummary
+      options.includeSummary || options.syntheticSeal
         ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
         : 'BEGIN READ ONLY',
     );
@@ -49,10 +55,24 @@ export async function readOwnerReport(
     const summary = options.includeSummary
       ? await readOwnerReportSummary(client, venueId, now, options.trafficClass ?? 'live')
       : undefined;
+    const complete =
+      source === 'synthetic' &&
+      options.trafficClass === 'test' &&
+      (await verifySyntheticCompleteness(client, {
+        ...(options.syntheticSeal ? { seal: options.syntheticSeal } : {}),
+        venueId,
+        anchor: now,
+        validationNow: options.validationNow ?? new Date(),
+      }));
+    const internal = buildInternalReport(result.rows, venueId, now, source);
     await client.query('COMMIT');
     started = false;
     return toOwnerReport({
-      ...buildInternalReport(result.rows, venueId, now, source),
+      ...internal,
+      report_metadata: {
+        ...internal.report_metadata,
+        freshness: { ...internal.report_metadata.freshness, is_stale: complete ? false : null },
+      },
       ...(summary ? { summary } : {}),
     });
   } catch (error) {
