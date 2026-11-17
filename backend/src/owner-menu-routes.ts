@@ -322,7 +322,6 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     return record ? c.json({ portionReview: record }) : c.json({ error: 'not_found' }, 404);
   });
 
-
   app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/portion/approve', async (c) => {
     const scope = await portionScope(c);
     try {
