@@ -3260,3 +3260,8 @@ through S10 before opening reports and asserts that verification did not publish
 The report fixture also exposes its actor/venue-bound reference so analysis tests
 exercise forwarding instead of the obsolete body-only request. CI must confirm
 the repaired browser paths; these fixture edits do not weaken runtime guards.
+
+The repaired workspace run passed 64 cases. Its two viewport screenshot cases
+then exposed an assertion checking the shell sidebar while S10 intentionally
+renders without that sidebar. Assert no verification request before the explicit
+action instead; the separate shell tests retain locked-navigation coverage.

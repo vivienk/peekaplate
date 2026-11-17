@@ -1351,9 +1351,7 @@ for (const width of [1440, 390]) {
       page.getByText('Draft saved. This has not approved or published your menu.'),
     ).toBeVisible();
     await capture('dish-saved');
-    await expect(
-      page.getByRole('button', { name: 'Dish performance', exact: true }),
-    ).toHaveAttribute('aria-disabled', 'true');
+    expect(state.verificationCommands).toEqual([]);
     await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
     await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
