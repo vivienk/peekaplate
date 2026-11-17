@@ -7,8 +7,8 @@ import {
   verifyReviewArtifact,
 } from '../review-artifact';
 import { upsertExtractionReviewSession } from '../review-command';
-import { getIngestionJob, IngestionError, type DishDraftRow } from './repository';
 import { structuredHtmlReviewResult } from './html-menu';
+import { type DishDraftRow, getIngestionJob, IngestionError } from './repository';
 
 export async function bootstrapMenuReview(
   client: Client,
@@ -42,9 +42,7 @@ export async function bootstrapMenuReview(
     const input = {
       commandId,
       jobId,
-      extractionResult: ReviewCandidateResultSchema.parse(
-        structuredHtmlReviewResult(job, drafts),
-      ),
+      extractionResult: ReviewCandidateResultSchema.parse(structuredHtmlReviewResult(job, drafts)),
     };
     return upsertExtractionReviewSession(client, actor, venue, input, {
       jobReportKey: job.result_storage_key,
