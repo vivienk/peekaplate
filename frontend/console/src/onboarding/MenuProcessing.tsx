@@ -154,7 +154,7 @@ export function MenuProcessing({
               <ErrorBanner
                 copy={{
                   title: `Extraction error — ${failureReason}`,
-                  body: 'We couldn’t process your menu. Try again, use another source, or enter your dishes manually.',
+                  body: 'Choose Try another source to upload a different file, paste a link or add your dishes manually.',
                 }}
               />
               {sources.length > 0 && (

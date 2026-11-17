@@ -178,8 +178,11 @@
 .s09 .tag button {
   display: inline-grid;
   place-items: center;
-  inline-size: var(--pp-space-16);
-  block-size: var(--pp-space-16);
+  /* 24 x 24 tap target (WCAG 2.5.8; Rania, #213 review). The negative block margin keeps the
+     chip's Figma height; the 12px icon is unchanged. */
+  inline-size: var(--pp-space-24);
+  block-size: var(--pp-space-24);
+  margin-block: calc(var(--pp-space-4) * -1);
   padding: 0;
   border: 0;
   background: none;

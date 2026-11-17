@@ -43,6 +43,7 @@ import { ReviewDishes } from './review/MenuReview';
 import { initialReview, isMenuReady } from './review/reviewDishes';
 import '../onboarding/onboarding.css';
 import './review/review.css';
+import { useHeadingFocus } from '../onboarding/useHeadingFocus';
 
 type Active = { client: OwnerMenuClient; controller: AbortController };
 type Editing = {
@@ -124,6 +125,7 @@ export function OwnerMenuWorkspace({
     | 'processing'
     | 'publish'
   >('overview');
+  useHeadingFocus(view);
   const viewGeneration = useRef(0);
   const setView = useCallback((next: typeof view) => {
     viewGeneration.current++;
@@ -134,8 +136,11 @@ export function OwnerMenuWorkspace({
   const [editing, setEditing] = useState<Editing | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  // S8: the dish form returns to the review list when it was opened from there.
-  const [editBack, setEditBack] = useState<'review' | null>(null);
+  // The dish form (S09) returns to where it was opened: S10 review or S06 source choice
+  // (Rania, #213 review). null = opened from the Menu list, which it returns to.
+  const [editBack, setEditBack] = useState<'review' | 'sources' | null>(null);
+  // S05 opened with Back from S06 stays in onboarding: Save continues to S06 (Rania, #213).
+  const [detailsFromSources, setDetailsFromSources] = useState(false);
   // S8: "Complete verification" shows the Menu verified pop-up; Go to dashboard leaves it.
   const [verified, setVerified] = useState(false);
   const [removed, setRemoved] = useState<{
@@ -451,6 +456,7 @@ export function OwnerMenuWorkspace({
     selection.current = null;
     setUploads([]);
     if (next === 'manual') {
+      setEditBack('sources');
       editManual();
     } else
       setView(next === 'upload' ? 'photo' : (next ?? (drafts.length > 0 ? 'review' : 'sources')));
@@ -756,7 +762,7 @@ export function OwnerMenuWorkspace({
         <RestaurantDetails
           onDirtyChange={setDetailsDirty}
           key={`${venueId}:${profile?.version ?? 0}:${navigation}`}
-          mode={details ? 'dashboard' : 'onboarding'}
+          mode={details && !detailsFromSources ? 'dashboard' : 'onboarding'}
           saved={details ?? undefined}
           savedPhotoUrl={detailsPhotoUrl}
           savedPhotoId={profile?.fields.photoId ?? null}
@@ -764,6 +770,20 @@ export function OwnerMenuWorkspace({
           saveFailed={Boolean(error)}
           onSave={(next, photo) => {
             const editingSaved = details !== null;
+            // Back from S06 then Save with nothing changed: continue to S06 without
+            // submitting the same details for verification again.
+            if (
+              detailsFromSources &&
+              details &&
+              !photo &&
+              (Object.keys(next) as (keyof typeof next)[]).every(
+                (key) => next[key] === details[key],
+              )
+            ) {
+              setDetailsFromSources(false);
+              setView('sources');
+              return;
+            }
             void run(async (active) => {
               let photoId = profile?.fields.photoId ?? null;
               if (photo) {
@@ -788,10 +808,15 @@ export function OwnerMenuWorkspace({
               setNotice(
                 'Restaurant details saved and submitted for team verification. This does not publish your menu.',
               );
-              setView(editingSaved ? 'overview' : 'sources');
+              const continueOnboarding = detailsFromSources || !editingSaved;
+              setDetailsFromSources(false);
+              setView(continueOnboarding ? 'sources' : 'overview');
             });
           }}
-          onLeave={() => setView('overview')}
+          onLeave={() => {
+            setDetailsFromSources(false);
+            setView('overview');
+          }}
         />
       </>
     ) : view === 'review' ? (
@@ -870,7 +895,13 @@ export function OwnerMenuWorkspace({
     ) : view === 'sources' ? (
       <ChooseMenuSource
         onContinue={nextSource}
-        onBack={() => setView(drafts.length > 0 ? 'review' : 'details')}
+        onBack={() => {
+          if (drafts.length > 0) setView('review');
+          else {
+            setDetailsFromSources(true);
+            setView('details');
+          }
+        }}
       />
     ) : view === 'url' ? (
       <AddMenuLink importing={busy} onImport={importUrl} onBack={() => setView('sources')} />
@@ -998,8 +1029,8 @@ export function OwnerMenuWorkspace({
           busy={busy}
           error={error}
           evidence={item && editing.session ? evidenceExcerpts(editing.session, item) : []}
-          saveLabel={editBack === 'review' ? 'Continue to review' : 'Save draft'}
-          cancelLabel={editBack === 'review' ? 'Back' : 'Cancel'}
+          saveLabel={editBack ? 'Continue to review' : 'Save draft'}
+          cancelLabel={editBack ? 'Back' : 'Cancel'}
           reviewConfirmed={reviewChecked}
           onReviewConfirmedChange={setReviewChecked}
           licenseConfirmed={licenseChecked}
@@ -1013,9 +1044,10 @@ export function OwnerMenuWorkspace({
             ) {
               setEditing(null);
               setPendingPhoto(null);
-              if (editBack === 'review') {
+              if (editBack) {
+                const back = editBack;
                 setEditBack(null);
-                setView('review');
+                setView(back);
               } else setView(drafts.length > 0 ? 'list' : 'sources');
             }
           }}
@@ -1222,7 +1254,7 @@ export function OwnerMenuWorkspace({
     </section>
   );
   if (view === 'review') return content;
-  if (view === 'edit' && section === 'menu' && editBack !== 'review') return renderShell(body);
+  if (view === 'edit' && section === 'menu' && editBack === null) return renderShell(body);
   return ['details', 'sources', 'url', 'photo', 'pdf', 'processing', 'edit', 'publish'].includes(
     view,
   ) ? (

@@ -27,6 +27,7 @@ import '../owner-dashboard/owner-dashboard.css';
 import '../owner/owner.css';
 import '../owner/owner-publish.css';
 import '../owner/review/review.css';
+import { useHeadingFocus } from './useHeadingFocus';
 
 type Screen = 's05' | 's06' | 's07-url' | 's07-upload' | 's08' | 's09' | 's10' | 's12' | 's13';
 const SCREENS: Record<Screen, string> = {
@@ -74,6 +75,11 @@ export function OwnerJourneyDemo() {
   const [detailsVerified, setDetailsVerified] = useState(false);
   const [outcome, setOutcome] = useState<'dishes' | 'no-dishes' | 'failed'>('dishes');
   const [result, setResult] = useState<'processing' | 'no-dishes' | 'failed'>('processing');
+  // S09 Back returns to where the form was opened (S06 or S10); S05 opened with Back from S06
+  // stays in onboarding (Rania, #213 review).
+  useHeadingFocus(screen);
+  const [formFrom, setFormFrom] = useState<'s06' | 's10'>('s10');
+  const [detailsFromS06, setDetailsFromS06] = useState(false);
   useEffect(() => {
     if (screen !== 's08') return;
     setResult('processing');
@@ -92,9 +98,10 @@ export function OwnerJourneyDemo() {
     return () => window.clearTimeout(timer);
   }, [screen, outcome]);
   const name = details?.name ?? SAMPLE.name;
-  const openForm = (id?: string) => {
+  const openForm = (id?: string, from: 's06' | 's10' = 's10') => {
     const draft = id ? items.find((dish) => dish.id === id) : newDraft();
     if (!draft) return;
+    setFormFrom(from);
     setEditing({ step: 'form', draft: { ...draft }, origId: id ?? null });
     setScreen('s09');
   };
@@ -200,25 +207,32 @@ export function OwnerJourneyDemo() {
       {screen === 's05' &&
         onboarding(
           <RestaurantDetails
-            mode={details ? 'dashboard' : 'onboarding'}
+            mode={details && !detailsFromS06 ? 'dashboard' : 'onboarding'}
             saved={details ?? undefined}
             onSave={(next) => {
-              const returning = Boolean(details);
+              const returning = Boolean(details) && !detailsFromS06;
+              setDetailsFromS06(false);
               setDetails(next);
               setDetailsVerified(false);
               setScreen(returning ? 's12' : 's06');
             }}
-            onLeave={() => setScreen('s12')}
+            onLeave={() => {
+              setDetailsFromS06(false);
+              setScreen('s12');
+            }}
           />,
         )}
       {screen === 's06' &&
         onboarding(
           <ChooseMenuSource
             onContinue={(source) => {
-              if (source === 'manual') openForm();
+              if (source === 'manual') openForm(undefined, 's06');
               else setScreen(source === 'url' ? 's07-url' : 's07-upload');
             }}
-            onBack={() => setScreen('s05')}
+            onBack={() => {
+              setDetailsFromS06(true);
+              setScreen('s05');
+            }}
           />,
         )}
       {screen === 's07-url' &&
@@ -273,7 +287,7 @@ export function OwnerJourneyDemo() {
               setEd={(next) => {
                 if (next.step === 'form' || next.step === 'review') setEditing(next);
               }}
-              cancel={() => setScreen('s10')}
+              cancel={() => setScreen(formFrom)}
               toReview={() => {
                 const draft = { ...editing.draft, id: editing.origId ?? crypto.randomUUID() };
                 const next = editing.origId

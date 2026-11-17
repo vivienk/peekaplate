@@ -294,7 +294,7 @@ function DetailsInput({
   );
 }
 
-// Upload photo: the 250px photo (or the placeholder) with the Outlined Medium button over it.
+// Upload logo (Vivien, #213: the restaurant photo is the logo shown in the diner header): the 250px photo (or the placeholder) with the Outlined Medium button over it.
 function PhotoPicker({
   url,
   problem,
@@ -314,13 +314,13 @@ function PhotoPicker({
         <img
           className="pp-onboard-photo__image"
           src={url ?? photoPlaceholder}
-          alt={url ? 'Restaurant photo' : ''}
+          alt={url ? 'Restaurant logo' : ''}
           width="250"
           height="250"
         />
         <div className="pp-onboard-photo__button">
           <FileButton
-            label={url ? 'Change photo' : 'Upload photo'}
+            label={url ? 'Change logo' : 'Upload logo'}
             accept={PHOTO_TYPES.join(',')}
             disabled={disabled}
             describedBy={problemId}

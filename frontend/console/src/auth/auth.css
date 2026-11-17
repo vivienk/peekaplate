@@ -354,8 +354,11 @@
 /* Owner dashboard_Button, size Large: 48 high, 20 side padding, pill, 18/28 label. */
 :is(.pp-auth, .pp-onboard) .pp-auth-btn {
   width: 100%;
+  /* Exactly 48 including the border (Rania, #213 review: one Large height across onboarding).
+     The 28px label is centred by the button's flex layout; a wrapped label still grows. */
+  box-sizing: border-box;
   min-height: var(--pp-space-48);
-  padding: var(--pp-space-12) var(--pp-space-20);
+  padding: 0 var(--pp-space-20);
   border: 0;
   border-radius: var(--pp-radius-full);
   font-size: var(--pp-font-size-h5);
