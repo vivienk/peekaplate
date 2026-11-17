@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { previewKey, privatePreviewImage, processPrivateDishPhoto, readPrivatePortion } from './owner-portion-preview';
 import {
   ApproveDraftPhotoSchema,
   CreateMenuUploadGroupSchema,
@@ -237,6 +238,70 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
       201,
     );
   });
+
+  // S09 private 2.5D review. These routes do not approve/promote/publicly expose images.
+  // A draft's active photo ID and the authenticated venue are checked for every operation.
+  const portionScope = async (c: Context<{ Bindings: Bindings }>) => {
+    const { actor, venue } = await identity(c);
+    const scope = DraftPhotoScopeSchema.safeParse(c.req.param());
+    if (!scope.success) throw new IngestionError('invalid_request', 400);
+    const { draftId, photoId } = scope.data;
+    const photo = await services.database(c.env, (client) =>
+      withOwnerMenuTransaction(client, actor, venue, async () => {
+        const row = await client.query<DraftPhoto>(
+          `SELECT p.* FROM app_private.dish_draft_photo p
+             JOIN app_private.dish_drafts d ON d.tenant_id=p.tenant_id
+               AND d.id=p.draft_id
+            WHERE p.tenant_id=$1 AND p.draft_id=$2 AND p.id=$3
+              AND d.removed_at IS NULL
+              AND d.manual_fields->>'photoId'=$3`,
+          [venue, draftId, photoId],
+        );
+        return row.rows[0];
+      }),
+    );
+    if (!photo) throw new IngestionError('photo_not_found', 404);
+    const bucket = c.env.INGESTION_REPORTS_BUCKET;
+    if (!bucket?.get) throw new AuthUnavailableError();
+    return { venue, draftId, photoId, photo, bucket,
+      key: previewKey(venue, draftId, photoId, photo.source_hash) };
+  };
+
+  app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/portion', async (c) => {
+    const scope = await portionScope(c);
+    try {
+      const record = await processPrivateDishPhoto({
+        env: c.env, bucket: scope.bucket, venueId: scope.venue,
+        draftId: scope.draftId, photoId: scope.photoId,
+        sourceKey: scope.photo.storage_key, sourceHash: scope.photo.source_hash,
+        sourceSize: scope.photo.size_bytes,
+      });
+      c.header('Cache-Control', 'no-store');
+      return c.json({ portionReview: record });
+    } catch {
+      return c.json({ error: 'portion_processing_unavailable' }, 503);
+    }
+  });
+
+  app.get('/venues/:venueId/drafts/:draftId/photos/:photoId/portion', async (c) => {
+    const scope = await portionScope(c);
+    const record = await readPrivatePortion(scope.bucket, scope.key);
+    c.header('Cache-Control', 'no-store');
+    return record ? c.json({ portionReview: record }) : c.json({ error: 'not_found' }, 404);
+  });
+
+  app.get('/venues/:venueId/drafts/:draftId/photos/:photoId/portion/image', async (c) => {
+    const scope = await portionScope(c);
+    const record = await readPrivatePortion(scope.bucket, scope.key);
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    const image = await privatePreviewImage(scope.bucket, scope.key, record);
+    if (!image) return c.json({ error: 'not_found' }, 404);
+    c.header('Content-Type', 'image/webp');
+    c.header('Cache-Control', 'private, no-store');
+    c.header('X-Content-Type-Options', 'nosniff');
+    return c.body(image.buffer as ArrayBuffer);
+  });
+
   app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/approve', async (c) => {
     const { actor, venue } = await identity(c);
     const scope = DraftPhotoScopeSchema.safeParse(c.req.param());
