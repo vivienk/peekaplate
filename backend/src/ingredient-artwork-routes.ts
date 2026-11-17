@@ -41,10 +41,12 @@ export function registerArtworkRoutes(app: Hono<{ Bindings: Bindings }>, service
     );
     return c.json({ state: states[0] ?? null });
   });
-  // Staff only: ingredient labels from this venue's extracted menus with no approved artwork.
+  // Staff only: extracted ingredient labels that still have no approved artwork.
   app.get('/venues/:venueId/ingredient-icons/pending', async (c) => {
-    const { venue } = await staff(c);
-    const pending = await services.database(c.env, (client) => listPendingArtwork(client, venue));
+    const { actor, venue } = await staff(c);
+    const pending = await services.database(c.env, (client) =>
+      listPendingArtwork(client, venue, actor),
+    );
     return c.json({ pending });
   });
   app.post('/venues/:venueId/ingredient-icons/review', async (c) => {

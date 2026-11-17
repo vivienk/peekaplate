@@ -12,6 +12,7 @@ import {
 import { registerArtworkRoutes } from './ingredient-artwork-routes';
 
 const venue = '11111111-1111-4111-8111-111111111111';
+const actor = '22222222-2222-4222-8222-222222222222';
 const job = '33333333-3333-4333-8333-333333333333';
 
 describe('ingredient artwork placeholders', () => {
@@ -54,11 +55,12 @@ describe('ingredient artwork placeholders', () => {
     expect(values).toEqual([venue, job, ['basil', 'coconut milk']]);
   });
 
-  it('lists labels without approved artwork, scoped to the venue in a read-only transaction', async () => {
+  it('lists labels without approved artwork, scoped to an authorized venue transaction', async () => {
     const calls: string[] = [];
     const client = {
       query: vi.fn(async (sql: string, values?: unknown[]) => {
         calls.push(sql);
+        if (sql.includes('staff_membership')) return { rows: [{ permission: 'owner' }] };
         if (sql.includes('ingredient_artwork_placeholder')) {
           expect(values).toEqual([venue]);
           return { rows: [{ label: 'basil', created_at: new Date('2026-11-16T01:00:00Z') }] };
@@ -66,15 +68,27 @@ describe('ingredient artwork placeholders', () => {
         return { rows: [] };
       }),
     };
-    expect(await listPendingArtwork(client as never, venue)).toEqual([
+    expect(await listPendingArtwork(client as never, venue, actor)).toEqual([
       { label: 'basil', firstSeenAt: '2026-11-16T01:00:00.000Z' },
     ]);
-    expect(calls[0]).toBe('BEGIN READ ONLY');
+    expect(calls[0]).toBe('BEGIN');
     expect(calls.some((sql) => sql.includes("set_config('app.tenant_id'"))).toBe(true);
     const read = calls.find((sql) => sql.includes('ingredient_artwork_placeholder')) ?? '';
     expect(read).toContain("c.status = 'approved'");
     expect(read).toContain('c.label IS NULL');
     expect(calls.at(-1)).toBe('COMMIT');
+  });
+
+  it('rejects a revoked membership inside the read transaction before reading labels', async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    await expect(listPendingArtwork({ query } as never, venue, actor)).rejects.toMatchObject({
+      code: 'forbidden',
+      status: 403,
+    });
+    expect(query.mock.calls.flat()).not.toContainEqual(
+      expect.stringContaining('FROM app_private.ingredient_artwork_placeholder'),
+    );
+    expect(query).toHaveBeenLastCalledWith('ROLLBACK');
   });
 
   it('records placeholders inside the draft save transaction, before it commits', async () => {
@@ -155,13 +169,15 @@ describe('pending artwork route', () => {
     );
     const db = {
       query: vi.fn(async (sql: string) =>
-        sql.includes('ingredient_artwork_placeholder')
-          ? { rows: [{ label: 'basil', created_at: '2026-11-16T01:00:00Z' }] }
-          : { rows: [] },
+        sql.includes('staff_membership')
+          ? { rows: [{ permission: 'owner' }] }
+          : sql.includes('ingredient_artwork_placeholder')
+            ? { rows: [{ label: 'basil', created_at: '2026-11-16T01:00:00Z' }] }
+            : { rows: [] },
       ),
     };
     registerArtworkRoutes(app, {
-      verify: async () => 'actor',
+      verify: async () => actor,
       authorizeVenue,
       database: async (_env, work) => work(db as never),
     });

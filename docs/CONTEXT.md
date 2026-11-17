@@ -415,7 +415,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces have versioned private draft/photo/upload flows; owner-only staging prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog; public reads and ingestion share exact configured staging-origin CORS. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are idempotent. AI trust/issuance remains gated. Artwork uses blob-locked repair before approval; OCR draft saves record per-venue ingredient placeholders (no image, no approval) listed by a staff pending route. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job including redelivery. Hosted rollout/acceptance stays separate.",
+      "summary": "Worker enforces current staff/tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces retain versioned private draft/photo/upload flows; owner-only prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog; public reads/ingestion share exact staging CORS. Synthetic reports/CSV retain half-open windows, unknown freshness, cohorts and complementary suppression; owner actions remain idempotent. AI trust/issuance is gated. Artwork uses blob-locked repair. OCR draft saves insert per-venue placeholders, without images/approval; pending reads recheck and lock membership in their transaction. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job across redelivery. Hosted rollout/acceptance stays separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -605,7 +605,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "6531aed5c7f44bafc169f582397c2db94b17114ff804b374cd9e6e6536bf19c7"
+      "sourceFingerprint": "ea5786a9c5f3d9760be002cecff80052ffcd96628263145aee4930b3ff4c9c66"
     },
     {
       "id": "database",
@@ -946,7 +946,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "5b540184571ee23de9bfc2bc4a65c22519488120cac8878a14c06a2d8cf74d76"
+      "sourceFingerprint": "b473879ba07d81f812aad20e5261a6b39733e195b0054b31368bafffad25e2e7"
     },
     {
       "id": "assets",

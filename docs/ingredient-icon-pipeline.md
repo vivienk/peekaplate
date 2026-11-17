@@ -155,9 +155,10 @@ insert placeholders (no update or delete), under forced tenant RLS.
 
 `GET /venues/:venueId/ingredient-icons/pending` (signed-in staff of that venue,
 `INGREDIENT_ARTWORK_ENABLED=true`, `no-store`) lists labels with no approved
-artwork: never approved or revoked. It is the to-do list for artwork generation
-and review; it does not start generation. Tests:
-`backend/src/ingredient-artwork-placeholders.test.ts`,
+artwork: never approved or revoked. Membership is rechecked and locked in the
+same transaction as this private read, including after the route's preflight.
+It is the to-do list for artwork generation and review; it does not start
+generation. Tests: `backend/src/ingredient-artwork-placeholders.test.ts`,
 `backend/src/ingredient-artwork-placeholders.integration.ts` and
 `tests/db/artwork_placeholders.sql`.
 

@@ -35,6 +35,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('ingredient artwork placeholders (real
   let runtime: Client;
   const venue = crypto.randomUUID();
   const other = crypto.randomUUID();
+  const actor = crypto.randomUUID();
 
   async function saveJob(tenantId: string, drafts: StructuredDishDraft[]) {
     const jobId = crypto.randomUUID();
@@ -64,6 +65,10 @@ describe.skipIf(!runtimeUrl || !adminUrl)('ingredient artwork placeholders (real
     await admin.query(
       "INSERT INTO app_private.venues (id, name) VALUES ($1, 'Placeholder Venue A'), ($2, 'Placeholder Venue B')",
       [venue, other],
+    );
+    await admin.query(
+      "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES($1,$3,'owner'),($2,$3,'editor')",
+      [venue, other, actor],
     );
   });
 
@@ -109,10 +114,21 @@ describe.skipIf(!runtimeUrl || !adminUrl)('ingredient artwork placeholders (real
        VALUES ($1, 'basil', $2, 1, 'approved', $3), ($1, 'lime', $4, 2, 'revoked', NULL)`,
       [venue, crypto.randomUUID(), 'd'.repeat(64), crypto.randomUUID()],
     );
-    const pending = await listPendingArtwork(runtime, venue);
+    const pending = await listPendingArtwork(runtime, venue, actor);
     expect(pending.map((item) => item.label)).toEqual(['coconut milk', 'lime', 'mint']);
-    expect((await listPendingArtwork(runtime, other)).map((item) => item.label)).toEqual([
+    expect((await listPendingArtwork(runtime, other, actor)).map((item) => item.label)).toEqual([
       'saffron',
     ]);
+  });
+
+  it('denies a membership revoked after route preflight', async () => {
+    await admin.query(
+      'DELETE FROM app_private.staff_membership WHERE tenant_id=$1 AND actor_id=$2',
+      [other, actor],
+    );
+    await expect(listPendingArtwork(runtime, other, actor)).rejects.toMatchObject({
+      code: 'forbidden',
+      status: 403,
+    });
   });
 });

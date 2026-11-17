@@ -7,6 +7,7 @@
 import { ArtworkLabelSchema, artworkLabel } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import type { DatabaseClient } from './ingestion/repository';
+import { authorizeStaffVenue } from './staff-venue';
 
 /** Upper bound of labels recorded from one job; anything beyond is ignored, never an error. */
 export const MAX_PLACEHOLDER_LABELS = 500;
@@ -52,10 +53,14 @@ export async function recordArtworkPlaceholders(
 export type PendingArtwork = { label: string; firstSeenAt: string };
 
 /** Labels a venue's menus use that have no approved artwork (never approved, or revoked). */
-export async function listPendingArtwork(client: Client, venue: string): Promise<PendingArtwork[]> {
-  await client.query('BEGIN READ ONLY');
+export async function listPendingArtwork(
+  client: Client,
+  venue: string,
+  actor: string,
+): Promise<PendingArtwork[]> {
+  await client.query('BEGIN');
   try {
-    await client.query("SET LOCAL statement_timeout = '5s'");
+    await authorizeStaffVenue(client, actor, venue, true);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venue]);
     const result = await client.query<{ label: string; created_at: Date | string }>(
       `SELECT p.label, p.created_at
