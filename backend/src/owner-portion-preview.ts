@@ -102,7 +102,8 @@ export async function processPrivateDishPhoto(input: {
   const key = previewKey(venueId, draftId, photoId, sourceHash);
   const existing = await readPrivatePortion(bucket, key);
   if (existing?.status === 'needs_review') return existing;
-  const dedicated = env.PORTION_SERVICE_URL !== undefined || env.PORTION_SERVICE_SECRET !== undefined;
+  const dedicated =
+    env.PORTION_SERVICE_URL !== undefined || env.PORTION_SERVICE_SECRET !== undefined;
   const serviceUrl = dedicated ? env.PORTION_SERVICE_URL : env.EXTRACTION_SERVICE_URL;
   const serviceSecret = dedicated ? env.PORTION_SERVICE_SECRET : env.EXTRACTION_SERVICE_SECRET;
   if (!serviceUrl || !serviceSecret || !bucket.get) {

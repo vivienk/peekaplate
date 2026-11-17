@@ -3157,3 +3157,80 @@ build evidence is recorded in the handoff. No hosted state changed in these fixe
 ```json
 {"kind":"resolution","references":{"runUrl":"https://github.com/vivienk/peekaplate/actions/runs/44033221178"},"cause":"The preserved main camera regression expected the earlier calibration copy; the promoted serving-bound guard correctly displayed matching serving/plate measurements not supplied. All earlier browser suites passed, and only this wording expectation failed on desktop/mobile.","prevention":"Reconcile visible wording assertions when promoting the reviewed serving-count guard alongside the preserved deliberate camera entry.","regression":"The exact expected approximation wording is updated without runtime changes. Both desktop/mobile published-camera cases passed locally in 8.1 seconds, retaining the deliberate click, one camera request and cleanup assertions."}
 ```
+
+### 2026-11-17 — Owner retest corrections
+
+The first report-source DB test failed because its legacy synthetic fixture used live-class facts. The final selector preserves that fixture unchanged and reads test facts only for the two newer approved demo venues. New real Worker/DB cases distinguish test/live/demo cohorts; the full database check passes (172 integrations plus pgTAP and smoke).
+
+The description-control test initially expected the former wording after the live control became extractive shortening. Its assertion now checks the truthful label and retains disabled-without-provider coverage. The full check passes (2,113 unit and 119 script tests). A context refresh also rejected an appended summary above the documented 1,000-character bound; summaries were condensed and context validation passes.
+### ERR-20261117-PORTION-REVIEW-SETUP
+
+The plain Python service-test command could not import the processing package;
+adding `processing/src` to the invocation's module path passed all 23 tests.
+During the PR219/develop context-only conflict resolution, a pre-write assertion
+correctly detected that new portion sources were absent from the backend node.
+The following refresh still saw unresolved markers and failed. Adding the source
+paths, resolving the summary and refreshing fingerprints repaired the context;
+no runtime behavior was changed by this repair.
+
+The final console-summary sentence exceeded the existing 1000-character guard;
+the verification runner rejected it. Condensing existing walkthrough prose kept
+the same responsibilities and restored context/documentation checks. The first
+reconciliation push preceded this final failed check; the immediate forward
+documentation correction passed both checks before its push.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T09:21:40.192Z","exitCode":1}
+```
+
+### ERR-20261117-HTML-INTAKE-REVIEW
+
+PR222 quality failed because the backend context fingerprint and PR documentation
+field were incomplete. The backend summary, source list and handoff now describe
+structured HTML intake; context refresh/check passes. Focused regressions also
+reproduced competing offers selecting the first price and fallback discarding the
+first fetched source. Singleton-offer parsing and source reuse fix those cases.
+The first failing source-reuse test left a queued mock response; resetting mocks
+between tests isolates failures. All 14 targeted parser/intake tests pass.
+
+### ERR-20261117-PORTION-RUNTIME-HANDOFF
+
+A connected-Brave reproducer showed that retrying generation with an unchanged
+saved photo never retriggered the effect. An explicit successful-save retry
+signal now requests generation again; ordinary text edits do not. The permanent
+browser regression and local RED/GREEN evidence cover the same-photo retry.
+
+Transport regressions reproduced cached failures blocking retries, an absent
+dedicated service configuration despite the existing extraction destination,
+and unbounded response-body duration/size. Successful manifests alone are cached;
+the complete dedicated pair or existing extraction pair is used, with a bounded
+stream and whole-response deadline. Seven focused transport cases pass.
+
+The first actual non-root Linux cutout request could not read the model downloaded
+as root during image build. Read-only model permissions fixed it. The rebuilt
+image produced two hash-validated layers from an opaque synthetic JPEG with
+networking disabled, removed its temporary directory, and made no provider call.
+Native Windows cannot run the Linux-only service lock path; the real container
+provided that evidence instead of treating mocked Python tests as acceptance.
+
+The new public portion route initially checked mutable draft/current-revision
+state, causing edits to hide a still-published asset. A real database regression
+reproduced the failure. Serving now uses the exact hash-verified published
+approval/photo binding, while new preparation remains current-version strict.
+Eight preparation integrations and 80 producer tests pass after the correction.
+
+Focused-main assembly preserved the main-only performance presentation, lazy
+diner camera loader and shared command-error helper instead of copying their
+older develop counterparts. A scheduler regression also reproduced skipped
+photo retention when artwork cleanup was disabled; independent cleanup calls
+retain both behaviors, including an artwork run after photo cleanup fails.
+The first context refresh still referenced a deliberately excluded local-only
+AI component; pruning absent paths and refreshing fixed it. The remaining two
+lint observations were formatting-only and were corrected before final checks.
+
+Hosted migration preflight first queried the standard Supabase history schema,
+which this project does not use. Reading the existing operator script identified
+public.schema_migrations. Both required forward versions were absent, then were
+applied with explicit operator approval and independently verified, including
+forced RLS and invoker/security-barrier view options. No account grants changed.

@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/menu, analytics, retrieval and observation contracts with receipts, canonical JSON and microsecond time helpers. Menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse and verifies delivery identity. Queue traffic_class is server-derived; observation.v2 rejects client authority/private fields. Owner reports enforce per-metric ten-session cohorts/complementary suppression and strip internal counts. Review/persistence and AI evidence remain bounded. Workspace lists the verified actor and current owner/editor memberships. owner-analysis.v1 carries bounded synthetic review/abstention without menu effects. Optional portions carry bounded hash-bound layers; ingredient-artwork supports a fallback-safe client.",
+      "summary": "Shared tenant, command, owner-draft, menu-publication and diner-observation contracts remain strict. Serving count is not physical scale. Owner actions retain bounded versioned status transitions. Description assistance is version-bound and returns an exact evidence sentence as an unverified proposal; no generated food or allergen claims. Report privacy/status contracts and published revision-bound portions are unchanged.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -61,7 +61,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/ingredient-artwork.ts",
         "packages/contracts/package.json",
         "packages/contracts/src/restaurant-profile.ts",
-        "packages/contracts/src/restaurant-profile.test.ts"
+        "packages/contracts/src/restaurant-profile.test.ts",
+        "processing/tests/fixtures/ingredient-review.json",
+        "processing/tests/fixtures/ingredient-review-unicode.json",
+        "packages/contracts/src/owner-actions.ts",
+        "packages/contracts/src/owner-actions.test.ts",
+        "packages/contracts/src/dish-assistance.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -69,7 +74,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "f324a31dd42b92985994414968b78874f8a7e27db4d80daa5ee629f59edc6ea2"
+      "sourceFingerprint": "14ab865aa209d5eaffdc39801954bee06a8cc1395106f6debc264cedfe898b9a"
     },
     {
       "id": "tokens",
@@ -253,7 +258,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged authored auth, restaurant setup, menu source/upload/processing, original dish form, review/verification and official S13 preview/publish screens. One existing authenticated client carries owner data; preparing does not publish. Snapshot-bound preview images use short-lived blob URLs and cleanup. Synthetic walkthroughs stay preview-only. Profile verification remains team-owned; dashboard and direct Menu publication paths differ and are documented. AI stays off.",
+      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -402,7 +407,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/legal/markdown.test.tsx",
         "frontend/console/src/legal/markdown.tsx",
         "frontend/console/src/legal/privacy-policy.md",
-        "frontend/console/src/legal/terms.md"
+        "frontend/console/src/legal/terms.md",
+        "docs/owner-flow-corrections.md",
+        "frontend/console/src/owner/menu-snapshot.ts",
+        "frontend/console/src/owner/menu-snapshot.test.ts",
+        "frontend/console/src/owner/owner-actions-api.ts",
+        "frontend/console/src/owner/owner-actions-api.test.ts",
+        "frontend/console/src/owner-dashboard/live-pages.test.tsx",
+        "frontend/console/src/owner-menu/dish-assistance-api.test.ts",
+        "docs/owner-flow-retest.md",
+        "frontend/console/src/owner/owner-workspace-live.test.tsx",
+        "scripts/owner-dashboard-css-isolation.test.mjs",
+        "docs/screen9-portion-publish.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -412,12 +428,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "340b71270cf38583ecc4f1ebfe99ca0104e2bbc403a45adaa8b0e87bf0124db0"
+      "sourceFingerprint": "069c484088fd0f6599c42f9646ecfd6ddfac308d387c9e85c2306e08c300fb94"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Staging owner persistence, original-photo uploads, draft corrections/removal/verification and the existing canonical approval/producer/publication path. This focused release carries #210/#217/#213 and reviewed #216 preparation; owner previews stay authenticated and anonymous prepared content requires current publication. Existing extraction/Queue/provider budgets, observation ingestion and cleanup dry-run are retained. Freshness/owner-AI activation, new order imports and unrelated report changes are excluded.",
+      "summary": "Worker preserves staff/JWKS and tenant authority, expected versions and transactional event/outbox commands. Owner upload, verification, preparation and publication reuse existing services. Preparation validates approved private portion bytes against current photo/revision; serving uses the exact published snapshot so draft edits cannot hide live assets. Extraction host forwards bounded authenticated CPU cutout requests to the existing container. Report references bind actor, venue, window and digest; strict configured synthetic scopes choose separate live/test views. Owner Actions and CSV use existing owner checks. Description assistance selects literal evidence only and never saves or publishes. Unknown report freshness remains unusable for AI.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -587,7 +603,32 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261116010000_ingredient_artwork_placeholders.sql",
         "migrations/20261117010000_owner_prepared_menu.sql",
         "tests/db/artwork_placeholders.sql",
-        "tests/db/owner_prepared_menu.sql"
+        "tests/db/owner_prepared_menu.sql",
+        "backend/src/owner-insight-actions.ts",
+        "backend/src/owner-insight-actions.test.ts",
+        "migrations/20261109120000_owner_insight_actions.sql",
+        "tests/db/owner_insight_actions.sql",
+        "backend/src/owner-report-export.ts",
+        "backend/src/owner-report-export.test.ts",
+        "docs/owner-ai-responses.md",
+        "backend/src/owner-ai/report-reference.ts",
+        "backend/src/owner-ai/report-reference.test.ts",
+        "docs/owner-backend-wiring.md",
+        "backend/src/owner-report-scope.ts",
+        "backend/src/owner-report-scope.test.ts",
+        "backend/src/owner-actions-cors.test.ts",
+        "backend/src/owner-ai/dish-assistance.ts",
+        "backend/src/owner-ai/dish-assistance.test.ts",
+        "docs/owner-flow-retest.md",
+        "backend/src/owner-portion-preview.ts",
+        "backend/src/bundle-producer/approved-portions.ts",
+        "backend/src/bundle-producer/approved-portions.test.ts",
+        "docs/screen9-portion-publish.md",
+        "backend/src/ingestion/html-menu.ts",
+        "backend/src/ingestion/html-menu.test.ts",
+        "backend/src/retrieval/parser.menu.test.ts",
+        "backend/src/owner-portion-preview.test.ts",
+        "backend/src/owner-retention-scheduler.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -600,12 +641,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "6766131f270867335ccfdc5f4a84edb85996499f2c61117aa3ade7f3169e097b"
+      "sourceFingerprint": "9d6e146baf2863c220ba49ae087078f933be1ea0c3ab12c09794e30f7f3fa23e"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Workspace migration is applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted. Immutable tenant URL settings have unique slugs and a narrow public resolver.",
+      "summary": "Canonical event/projection/outbox and owner preparation migrations remain immutable and tenant-scoped. Owner action current-state rows enforce tenant RLS and restricted runtime writes. The additional invoker/security-barrier test-observation view exposes only test-class canonical facts under existing RLS; the legacy live view is unchanged. Actual PostgreSQL tests cover report isolation, owner actions, portion preparation and preservation of existing published assets while newer drafts change. Hosted migration execution is separate from local acceptance.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -633,7 +674,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner_menu_workspace.sql",
         "migrations/20261114010000_restaurant_menu_links.sql",
         "tests/db/restaurant_links.sql",
-        "migrations/20261113010000_menu_verification_lifecycle.sql"
+        "migrations/20261113010000_menu_verification_lifecycle.sql",
+        "migrations/20261109120000_owner_insight_actions.sql",
+        "tests/db/owner_insight_actions.sql",
+        "migrations/20261113020000_ingredient_artwork.sql",
+        "migrations/20261116010000_ingredient_artwork_placeholders.sql",
+        "tests/db/artwork_placeholders.sql",
+        "migrations/20261117010000_owner_prepared_menu.sql",
+        "tests/db/owner_prepared_menu.sql",
+        "migrations/20261116020000_owner_flow_profile.sql",
+        "tests/db/owner_flow_profile.sql",
+        "migrations/20261117130000_owner_test_observations.sql",
+        "tests/db/owner-test-observations.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -644,7 +696,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "40115cbded74c178b511ecb2cd44cd13e99c0c3c973d5893f846305a640690e3"
+      "sourceFingerprint": "d7e2d2f973344f90bf0418e71aa87754a55342bd715e7835f045fd0c716ed1c9"
     },
     {
       "id": "measurement",
@@ -666,7 +718,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Deploy a reviewed exact main commit to existing staging services. The single screen-preservation correction promotes the required original artwork modules and migration, shared authored console presentation and production portal entry. Extraction host/container, Queues, provider budgets, production and .io remain separate. Hosted verification must identify deployment versions and retained synthetic fixture; local tests are not hosted evidence.",
+      "summary": "Reviewed exact main commits supply staging under ADR 0012. Focused owner-flow release promotes only required existing dependencies and fixes, preserving main-only error and performance/camera fixes. Optional protected workflow provisioning passes validated owner-AI secrets through a temporary private file; credentials never enter frontend builds. Staging rate limiting is not a total spending cap. API, console, routing diner and paired extraction/container require version recording and hosted checks. Production and the .io homepage remain outside this change.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -718,7 +770,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/prepare-app-site.mjs",
         "scripts/prepare-app-site.test.mjs",
         "docs/screen-preservation-audit.md",
-        "playwright.portion-published.config.ts"
+        "playwright.portion-published.config.ts",
+        "vitest.config.ts",
+        "playwright.workspace.config.ts",
+        "scripts/staging-secrets.mjs",
+        "scripts/staging-secrets.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -729,7 +785,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "5062cd472e29dd4e385af1d58b13de1bf22cac03208a8282e76b091fd457b784"
+      "sourceFingerprint": "15177c2893673db5824486ee5d10b02031dc1ae4a2cba38c80aef0d1053b3de1"
     },
     {
       "id": "agents",
@@ -796,7 +852,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Vision-first extraction retains source-linked needs_review drafts and the existing job-scoped provider budget. The original #51 ingredient-review handoff and #165 opt-in illustration CLI are promoted together: exact source labels, bounded generation/cache, explicit image review and optional staff-API delivery. No live image generation occurs during diner browsing; no hosted automatic generation job is implied. Food confirmation and publication gates remain distinct.",
+      "summary": "Existing Vision V4/OCR pipeline and two-attempt provider budget remain unchanged. The authenticated Python service also mounts the bounded private portion endpoint with a temporary scratch root, one cutout slot and guaranteed cleanup. Its non-root container installs the pinned cutout extra and checksum-verified U2NETP model at build time; opaque photos produce approximate 2.5D layers without provider calls. Existing food evidence, reviewed assets and fallback rules remain authoritative; serving count does not establish physical scale.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -889,7 +945,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/ingredient-icon-pipeline.md",
         "docs/ingredient-intelligence.md",
         "processing/tests/fixtures/ingredient-review.json",
-        "processing/tests/fixtures/ingredient-review-unicode.json"
+        "processing/tests/fixtures/ingredient-review-unicode.json",
+        "scripts/verify-ingestion-e2e.mjs",
+        "scripts/verify-ingestion-e2e.test.mjs",
+        "scripts/verify-ingestion-e2e.regression.test.mjs",
+        "docs/staging-e2e-acceptance-2026-11-14.md",
+        "processing/src/peekaplate_processing/portion_ingestion.py",
+        "processing/src/peekaplate_processing/plate_calibration.py",
+        "processing/tests/test_portion_ingestion.py",
+        "processing/src/peekaplate_processing/prepare_assets.py",
+        "processing/src/peekaplate_processing/portion_service.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -898,7 +963,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "b14e13f9abd0b5298ac2c0cc73135f864808d4a1e900a588d837d1c2e2b38d85"
+      "sourceFingerprint": "fd41228df151286869d202dd15b548f77068d2338481f1441a001dda0113fe9e"
     },
     {
       "id": "assets",
@@ -933,22 +998,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "backend",
-        "database",
-        "contracts"
-      ],
-      "summary": "Narrow #161 staging candidate adds independent draft/photo verification, version invalidation and byte-verified photo promotion/rejection with its immutable lifecycle migration. Retention source/tests are preserved for integration dependency closure; no scheduler/cron or unrelated imports/actions are promoted.",
-      "sources": [
-        "docs/fe064-staging-setup.md",
-        "backend/src/owner-menu.ts",
-        "backend/src/owner-menu-routes.ts",
-        "migrations/20261113010000_menu_verification_lifecycle.sql"
-      ],
-      "next": "Complete pinned release checks/reviews and final approval; inspect/apply hosted migration and resolve confirmed tester identities. Keep all Queues paused until the controlled request budget and window are agreed; #184 counter alone does not enforce provider requests."
-    },
     {
       "date": "2026-11-15",
       "modules": [
@@ -1087,6 +1136,25 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/OwnerPublish.tsx"
       ],
       "next": "Complete pinned checks/reviews, authorize migration/release and shared synthetic access, then genuine upload→review→explicit publish→diner checks; preserve earlier fixtures and leave the shared workspace empty. No paid owner-AI calls."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "backend",
+        "console",
+        "processing",
+        "database",
+        "delivery"
+      ],
+      "summary": "Focused owner retest release reuses merged screens, main-only performance/camera/error fixes and existing portion producer. Corrects USD default, S10 wrapping, verified-menu navigation, real report/action wiring, same-window AI reference and private CPU portion generation through publication. Synthetic report facts remain isolated; unknown freshness still abstains.",
+      "files": [
+        "docs/owner-flow-retest.md",
+        "docs/screen9-portion-publish.md",
+        "backend/src/owner-prepare.ts",
+        "backend/src/extraction-host.ts",
+        "frontend/console/src/owner/OwnerWorkspace.tsx"
+      ],
+      "next": "Run final focused-main checks, independent reviews and CI, then matching staging deployment and authenticated publication/diner screenshots. The two restricted report/action migrations are applied on staging. Preserve all Poulet drafts and existing demo accounts; no fresh OCR/provider run or physical-scale claim."
     }
   ]
 }
