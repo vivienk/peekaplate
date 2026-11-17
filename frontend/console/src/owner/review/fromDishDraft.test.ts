@@ -24,6 +24,18 @@ const draft: DishDraft = {
 };
 
 describe('saved candidate corrections in the review table', () => {
+  it('omits an absent manual serving size while preserving explicit unknown and text', () => {
+    const manual = { ...draft, origin: 'manual' as const };
+    expect(draftToReviewDish({ ...manual, manual_fields: {} })).not.toHaveProperty('servingSize');
+    expect(draftToReviewDish({ ...manual, manual_fields: { servingSize: null } })).toHaveProperty(
+      'servingSize',
+      null,
+    );
+    expect(
+      draftToReviewDish({ ...manual, manual_fields: { servingSize: '1 bowl' } }),
+    ).toHaveProperty('servingSize', '1 bowl');
+  });
+
   it('keeps manual count and descriptive serving size as separate saved facts', () => {
     const row = draftToReviewDish({
       ...draft,

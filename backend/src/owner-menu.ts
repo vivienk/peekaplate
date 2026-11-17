@@ -71,13 +71,11 @@ export async function saveOwnerDishDraft(
   input: SaveOwnerDishDraft,
 ): Promise<DishDraftRow> {
   return withOwnerMenuTransaction(client, actorId, venueId, async () => {
-    // Old receipts predate servingSize; an absent size still has the original command identity.
-    const { servingSize, ...legacyFields } = input.fields;
+    // Optional extension fields stay absent in legacy command hashes; explicit null is a clear.
     const payload = {
       commandType: 'owner.draft.save.v1',
       draftId,
       ...input,
-      fields: servingSize === null ? legacyFields : input.fields,
     };
     const hash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
@@ -107,7 +105,14 @@ export async function saveOwnerDishDraft(
       (draft.origin !== 'manual' || draft.review_status !== 'pending' || draft.removed_at)
     )
       throw new IngestionError('draft_not_editable', 409);
-    const fields = OwnerDishFieldsSchema.parse(input.fields);
+    const previous = OwnerDishFieldsSchema.parse(draft?.manual_fields ?? {});
+    const fields = OwnerDishFieldsSchema.parse({
+      ...input.fields,
+      servingSize:
+        input.fields.servingSize === undefined ? previous.servingSize : input.fields.servingSize,
+      servingCount:
+        input.fields.servingCount === undefined ? previous.servingCount : input.fields.servingCount,
+    });
     if (fields.photoId !== null) {
       const photo = await client.query(
         'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',

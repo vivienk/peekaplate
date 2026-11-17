@@ -29,7 +29,7 @@ export const OwnerDishFieldsSchema = z.strictObject({
   name: text.trim().min(1).max(160).nullable().default(null),
   category: text.trim().min(1).max(160).nullable().default(null),
   description: text.trim().max(4000).nullable().default(null),
-  servingSize: text.trim().min(1).max(160).nullable().default(null),
+  servingSize: text.trim().min(1).max(160).nullable().optional(),
   priceAmount: z
     .string()
     .regex(/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/)

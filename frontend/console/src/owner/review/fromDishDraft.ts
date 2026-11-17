@@ -24,7 +24,7 @@ export function draftToReviewDish(
         name: fields.name,
         category: fields.category,
         description: fields.description,
-        servingSize: fields.servingSize,
+        ...(fields.servingSize !== undefined && { servingSize: fields.servingSize }),
         ...(fields.servingCount !== undefined && { servingCount: fields.servingCount }),
         priceAmount: fields.priceAmount,
         priceCurrency: fields.priceCurrency,

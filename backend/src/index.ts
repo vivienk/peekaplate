@@ -54,6 +54,7 @@ import {
   VerifyOrderDeletionRequestSchema,
   WithdrawMenuSchema,
 } from '@peekaplate/contracts';
+import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -103,6 +104,10 @@ import {
   submitOrderDataDeletionRequest as submitOrderDataDeletionRequestService,
   verifyVenueOrderDeletion as verifyVenueOrderDeletionService,
 } from './order-ingestion/service';
+import {
+  mintOwnerReportReference,
+  OWNER_REPORT_REFERENCE_HEADER,
+} from './owner-ai/report-reference';
 import { registerOwnerAnalysisRoutes } from './owner-ai/routes';
 import {
   createOwnerInsightAction,
@@ -164,6 +169,7 @@ export type Bindings = {
   OWNER_AI_RESPONSES_ENABLED?: string;
   OWNER_AI_OPENAI_API_KEY?: string;
   OWNER_AI_OPENAI_PROJECT_ID?: string;
+  OWNER_AI_REPORT_REFERENCE_SECRET?: string;
   OWNER_AI_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   INGREDIENT_ARTWORK_ENABLED?: string;
   APP_ENV?: string;
@@ -1357,6 +1363,7 @@ export function createApp(services: Dependencies = dependencies) {
       origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Authorization'],
+      exposeHeaders: [OWNER_REPORT_REFERENCE_HEADER],
       maxAge: 86400,
     }),
   );
@@ -1393,13 +1400,22 @@ export function createApp(services: Dependencies = dependencies) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
-    const report = await services.readOwnerReport(
-      actorId,
-      approvedSyntheticVenue.data.venueId,
-      services.now?.() ?? new Date(),
-      env,
-      'synthetic',
-    );
+    const now = services.now?.() ?? new Date();
+    const venueId = approvedSyntheticVenue.data.venueId;
+    const report = await services.readOwnerReport(actorId, venueId, now, env, 'synthetic');
+    if (env.OWNER_AI_RESPONSES_ENABLED === 'true' && env.OWNER_AI_REPORT_REFERENCE_SECRET) {
+      try {
+        const reference = await mintOwnerReportReference(
+          OwnerDishReportSchema.parse(report),
+          { actorId, venueId },
+          env.OWNER_AI_REPORT_REFERENCE_SECRET,
+          now,
+        );
+        c.header(OWNER_REPORT_REFERENCE_HEADER, reference);
+      } catch {
+        // The owner can still read the authorized report when its optional AI reference is unavailable.
+      }
+    }
     return c.json(report);
   });
   app.use(

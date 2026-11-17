@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
-import { OwnerDishFieldsSchema } from '@peekaplate/contracts';
+import { OwnerDishFieldsSchema, SaveOwnerDishDraftSchema } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { loadApprovedDishSources } from './bundle-producer/repository';
@@ -102,6 +102,60 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         )
       ).rowCount,
     ).toBe(2);
+  });
+  it('preserves explicit serving facts through legacy-shaped edits and replays without conflating clears', async () => {
+    const id = crypto.randomUUID();
+    await save(id, { name: 'Original soup', servingSize: '1 bowl', servingCount: 2 });
+    const legacy = SaveOwnerDishDraftSchema.parse({
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+      fields: { name: 'Legacy edited soup' },
+    });
+    const edited = await saveOwnerDishDraft(runtime, actor, venue, id, legacy);
+    expect(edited.manual_fields).toMatchObject({
+      name: 'Legacy edited soup',
+      servingSize: '1 bowl',
+      servingCount: 2,
+    });
+    expect(await saveOwnerDishDraft(runtime, actor, venue, id, legacy)).toEqual(
+      JSON.parse(JSON.stringify(edited)),
+    );
+    const receipt = await admin.query(
+      'SELECT request_hash FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
+      [venue, actor, legacy.commandId],
+    );
+    expect(receipt.rows[0].request_hash).toBe(
+      createHash('sha256')
+        .update(JSON.stringify({ commandType: 'owner.draft.save.v1', draftId: id, ...legacy }))
+        .digest('hex'),
+    );
+    for (const clear of [{ servingSize: null }, { servingCount: null }])
+      await expect(
+        saveOwnerDishDraft(runtime, actor, venue, id, {
+          ...legacy,
+          fields: { ...legacy.fields, ...clear },
+        }),
+      ).rejects.toMatchObject({ code: 'command_conflict' });
+    const cleared = await saveOwnerDishDraft(runtime, actor, venue, id, {
+      ...legacy,
+      commandId: crypto.randomUUID(),
+      expectedVersion: 2,
+      fields: { ...legacy.fields, servingSize: null, servingCount: null },
+    });
+    expect(cleared.manual_fields).toMatchObject({ servingSize: null, servingCount: null });
+    expect(await saveOwnerDishDraft(runtime, actor, venue, id, legacy)).toEqual(
+      JSON.parse(JSON.stringify(edited)),
+    );
+    const events = await admin.query(
+      "SELECT version,schema_version,event_type,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_id=$2 AND stream_type='owner_draft' ORDER BY version",
+      [venue, id],
+    );
+    expect(events.rows).toHaveLength(3);
+    expect(replayOwnerDraft(events.rows.slice(0, 2))).toMatchObject({
+      servingSize: '1 bowl',
+      servingCount: 2,
+    });
+    expect(replayOwnerDraft(events.rows)).toMatchObject({ servingSize: null, servingCount: null });
   });
   it('denies cross-venue, viewers and revoked actors before replay', async () => {
     const id = crypto.randomUUID();
