@@ -1,3 +1,4 @@
+import { OwnerReportSummarySchema } from '@peekaplate/contracts/owner-report';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { Actions, Overview, Report } from './pages';
@@ -51,51 +52,57 @@ describe('authored dashboard pages with live inputs', () => {
     noSamples(html);
   });
 
-  it('uses the existing cards for validated totals, real zeros and explicit prior periods', () => {
-    const missing = { value: null, status: 'MISSING' as const };
-    const current = {
-      menu_sessions: { value: 20, status: 'NORMAL' as const },
-      dish_opens: { value: 0, status: 'VALID_ZERO' as const },
-      avg_interaction_time_seconds: { value: 12.75, status: 'NORMAL' as const },
-      portion_previews_shown: missing,
-      verified_orders: missing,
-    };
-    const html = renderToStaticMarkup(
-      <Overview
-        {...common}
-        live={{
-          ...identity,
-          menu: [],
-          summary: {
-            periods: {
-              current: { start_time: '2026-11-16T00:00:00Z', end_time: '2026-11-17T00:00:00Z' },
-              baseline: { start_time: '2026-11-15T00:00:00Z', end_time: '2026-11-16T00:00:00Z' },
-            },
-            current,
-            baseline: {
-              ...current,
-              menu_sessions: { value: 15, status: 'NORMAL' },
-              avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
-            },
-          },
-        }}
-      />,
-    );
-    const cards = html.split('<div class="kpi">').slice(1);
-    expect(cards).toHaveLength(5);
-    expect(cards[0]).toContain('<div class="v num">20</div>');
-    expect(cards[0]).toContain('Previous period: 15');
-    expect(cards[1]).toContain('<div class="v num">0</div>');
-    expect(cards[2]).toContain('12.75');
-    expect(cards[2]).toContain('Previous period: Not enough visits yet');
-    expect(cards[3]).toContain('Unavailable');
-    expect(cards[4]).toContain('Unavailable');
-    expect(html).toContain('2026-11-15');
-    expect(html).toContain('2026-11-17');
-    expect(html).not.toContain('last week');
-    expect(html).not.toContain('did this week');
-    noSamples(html);
-  });
+  it.each([0, 12.75])(
+    'uses the existing cards for validated totals, average %s and explicit prior periods',
+    (average) => {
+      const missing = { value: null, status: 'MISSING' as const };
+      const current = {
+        menu_sessions: { value: 20, status: 'NORMAL' as const },
+        dish_opens: { value: 42, status: 'NORMAL' as const },
+        avg_interaction_time_seconds: {
+          value: average,
+          status: average === 0 ? 'VALID_ZERO' : 'NORMAL',
+        },
+        portion_previews_shown: missing,
+        verified_orders: missing,
+      };
+      const html = renderToStaticMarkup(
+        <Overview
+          {...common}
+          live={{
+            ...identity,
+            menu: [],
+            summary: OwnerReportSummarySchema.parse({
+              periods: {
+                current: { start_time: '2026-11-16T00:00:00Z', end_time: '2026-11-17T00:00:00Z' },
+                baseline: { start_time: '2026-11-15T00:00:00Z', end_time: '2026-11-16T00:00:00Z' },
+              },
+              current,
+              baseline: {
+                ...current,
+                menu_sessions: { value: 15, status: 'NORMAL' },
+                avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+              },
+            }),
+          }}
+        />,
+      );
+      const cards = html.split('<div class="kpi">').slice(1);
+      expect(cards).toHaveLength(5);
+      expect(cards[0]).toContain('<div class="v num">20</div>');
+      expect(cards[0]).toContain('Previous period: 15');
+      expect(cards[1]).toContain('<div class="v num">42</div>');
+      expect(cards[2]).toContain(`<div class="v num">${average}<small>s</small></div>`);
+      expect(cards[2]).toContain('Previous period: Not enough visits yet');
+      expect(cards[3]).toContain('Unavailable');
+      expect(cards[4]).toContain('Unavailable');
+      expect(html).toContain('2026-11-15');
+      expect(html).toContain('2026-11-17');
+      expect(html).not.toContain('last week');
+      expect(html).not.toContain('did this week');
+      noSamples(html);
+    },
+  );
 
   it.each([
     ['SUPPRESSED', 'Not enough visits yet'],

@@ -3354,3 +3354,17 @@ The other 69 workspace cases passed in that run.
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T17:58:08.991Z","exitCode":1}
 ```
+
+## 2026-11-17 — Overview and restaurant-creation integration checks
+
+PR230 adds authenticated POST creation on the existing staff workspace route;
+the old GET-only CORS assertion was updated to include POST. The following full
+unit run hit an existing workerd SQLite I/O startup failure; the unchanged
+publication suite passed all 12 cases when rerun serially. No timeout or runtime
+guard was weakened.
+
+Hosted CI rejected the new KPI fixture because its zero opening count violated
+the summary's contributing-session floor. Use schema-validated fixture values
+and test a genuine zero average instead. The new creation case also selected
+the S05 required label including its marker; use the textbox's accessible name,
+as existing S05 tests do. Both corrections retain the original screen and API.

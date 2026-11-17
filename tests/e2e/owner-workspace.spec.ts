@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
 import type { RestaurantProfile } from '@peekaplate/contracts';
+import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
 import type { DishDraft, MenuJob } from '../../frontend/console/src/owner-menu/api';
@@ -3076,8 +3077,8 @@ test('Overview uses validated KPI cards and clears their values across restauran
   const missing = { value: null, status: 'MISSING' };
   const current = {
     menu_sessions: { value: 31, status: 'NORMAL' },
-    dish_opens: { value: 0, status: 'VALID_ZERO' },
-    avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+    dish_opens: { value: 42, status: 'NORMAL' },
+    avg_interaction_time_seconds: { value: 0, status: 'VALID_ZERO' },
     portion_previews_shown: missing,
     verified_orders: missing,
   };
@@ -3087,7 +3088,11 @@ test('Overview uses validated KPI cards and clears their values across restauran
       baseline: { start_time: '2026-10-18T07:00:00.000Z', end_time: '2026-10-19T07:00:00.000Z' },
     },
     current,
-    baseline: { ...current, menu_sessions: { value: 20, status: 'NORMAL' } },
+    baseline: {
+      ...current,
+      menu_sessions: { value: 20, status: 'NORMAL' },
+      avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+    },
   };
   let secondStarted = false;
   let releaseSecond = () => {};
@@ -3100,7 +3105,11 @@ test('Overview uses validated KPI cards and clears their values across restauran
         secondStarted = true;
       });
     await route.fulfill({
-      json: { ...UNEEZA_REPORT, venue_id: id, ...(id === venue.venueId ? { summary } : {}) },
+      json: OwnerDishReportSchema.parse({
+        ...UNEEZA_REPORT,
+        venue_id: id,
+        ...(id === venue.venueId ? { summary } : {}),
+      }),
       headers: { 'Access-Control-Allow-Origin': origin },
     });
   });
@@ -3112,8 +3121,9 @@ test('Overview uses validated KPI cards and clears their values across restauran
   await expect(cards).toHaveCount(5);
   await expect(cards.nth(0).locator('.v')).toHaveText('31');
   await expect(cards.nth(0).locator('.d')).toHaveText('Previous period: 20');
-  await expect(cards.nth(1).locator('.v')).toHaveText('0');
-  await expect(cards.nth(2).locator('.v')).toHaveText('Not enough visits yet');
+  await expect(cards.nth(1).locator('.v')).toHaveText('42');
+  await expect(cards.nth(2).locator('.v')).toHaveText('0s');
+  await expect(cards.nth(2).locator('.d')).toHaveText('Previous period: Not enough visits yet');
   await expect(cards.nth(3).locator('.v')).toHaveText('Unavailable');
   await expect(cards.nth(4).locator('.v')).toHaveText('Unavailable');
   await expect(page.getByRole('heading', { name: 'How your menu did this period' })).toBeVisible();
@@ -3171,7 +3181,7 @@ test('staging creation retries the same command, opens S05 and keeps the next ac
   await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Retry with the same name');
   await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
-  await expect(page.getByLabel('Restaurant name', { exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Restaurant name', exact: true })).toBeVisible();
   expect(requests).toHaveLength(2);
   expect(requests[0]).toEqual(requests[1]);
   expect(requests[0]).toMatchObject({
