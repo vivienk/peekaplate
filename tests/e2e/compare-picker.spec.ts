@@ -207,6 +207,9 @@ test('the picker sends no request, fires no tracking call and never logs the que
   page.on('console', (message) => logs.push(message.text()));
 
   await page.getByRole('button', { name: 'Open Avocado Toast' }).first().click();
+  // The detail loads its authored allergen/dietary SVGs. Measure from entry into the picker.
+  await page.waitForLoadState('networkidle');
+  requests.length = 0;
   await page.getByRole('button', { name: 'Compare' }).click();
   const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
   // Only the picker phase counts: the detail's own opening and its final checkpoint on leaving

@@ -10,7 +10,7 @@ for (const port of [5173, 5174]) {
       await route.fulfill({ status: 200, body: '{}' });
     });
     await page.goto(`http://127.0.0.1:${port}/?email=synthetic-private@example.test`);
-    const button = page.getByRole('button', { name: 'Allow optional analytics' });
+    const button = page.getByRole('button', { name: /allow optional analytics/i });
     await expect(button).toBeVisible();
     expect(bodies).toHaveLength(0);
     await button.click();
@@ -62,7 +62,7 @@ for (const port of [5173, 5174]) {
       Object.defineProperty(navigator, 'globalPrivacyControl', { value: true }),
     );
     await page.goto(`http://127.0.0.1:${port}`);
-    await page.getByRole('button', { name: 'Allow optional analytics' }).click();
+    await page.getByRole('button', { name: /allow optional analytics/i }).click();
     await expect(page.getByRole('status')).toContainText('off');
     expect(captures).toBe(0);
   });
