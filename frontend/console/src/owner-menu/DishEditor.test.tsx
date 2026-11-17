@@ -211,21 +211,26 @@ describe('live Screen 9 on the authored #172 presentation', () => {
     });
     expect(html).toContain('Preparing the 2.5D preview');
     expect(html).not.toContain('src="blob:generated-cutout"');
+    // Running S07 upload bar while processing: no invented percentage.
+    expect(html).toMatch(
+      /class="pp-onboard-progress s09-25d-progress pp-onboard-progress--running"/,
+    );
+    expect(html).not.toContain('aria-valuenow');
     const unavailable = render({ portionReview: { status: 'failed' } });
     expect(unavailable).toContain('original dish photo remains the View Portion fallback');
+    expect(unavailable).toContain('>Failed</span>');
+    expect(unavailable).toContain('s09-25d-progress--failed');
+    expect(unavailable).toContain('role="alert"');
+    expect(render()).not.toContain('role="progressbar"');
   });
 
-  it('adds optional people served without replacing the authored serving-size text', () => {
+  it('asks only for serving size, not a separate people-served count', () => {
     const html = render({
       value: { ...emptyManualDish(), servingSize: '1 bowl', servingCount: '2' },
     });
     expect(html).toMatch(/id="f-size"[^>]+value="1 bowl"/);
-    expect(html).toContain('People served');
-    expect(html).toMatch(/type="number"[^>]+min="1"[^>]+max="100"[^>]+step="1"/);
-    expect(html).toMatch(/id="dish-serving-count"[^>]+value="2"/);
-    const blank = render().match(/<input[^>]+id="dish-serving-count"[^>]*>/)?.[0] ?? '';
-    expect(blank).toContain('value=""');
-    expect(blank).not.toContain('required');
+    expect(html).not.toContain('People served');
+    expect(html).not.toContain('dish-serving-count');
   });
 
   it('keeps OCR evidence, actual CAD currency and unknown allergens on the authored form', () => {

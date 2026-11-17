@@ -301,9 +301,32 @@ export function DishFormView({
                 ) : (
                   <>
                     <span className="s09-chip">
-                      {portionReview?.status === 'processing' ? 'Processing' : 'Not available'}
+                      {portionReview?.status === 'processing'
+                        ? 'Processing'
+                        : portionReview?.status === 'failed'
+                          ? 'Failed'
+                          : 'Not available'}
                     </span>
-                    <p role="status">
+                    {/* The S07 upload bar (onboarding.css): generation reports no percentage, so it
+                        runs while processing and turns red, full width, when it fails. */}
+                    {(portionReview?.status === 'processing' ||
+                      portionReview?.status === 'failed') && (
+                      <div
+                        className={`pp-onboard-progress s09-25d-progress ${
+                          portionReview.status === 'failed'
+                            ? 's09-25d-progress--failed'
+                            : 'pp-onboard-progress--running'
+                        }`}
+                        role="progressbar"
+                        aria-label="2.5D preview processing"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={portionReview.status === 'failed' ? 100 : undefined}
+                      >
+                        <span className="pp-onboard-progress__fill" />
+                      </div>
+                    )}
+                    <p role={portionReview?.status === 'failed' ? 'alert' : 'status'}>
                       {portionReview?.message ??
                         (portionReview?.status === 'processing'
                           ? 'Preparing the 2.5D preview from the dish photo.'

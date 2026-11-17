@@ -1704,22 +1704,8 @@ test('manual dish and original private photo survive save and reload', async ({
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Price/ })).toHaveValue('9.50');
-  await page.getByRole('spinbutton', { name: 'People served', exact: true }).fill('2');
-  await acknowledgeDish(page);
-  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
-  await expect(
-    page.getByText('Draft saved. This has not approved or published your menu.'),
-  ).toBeVisible();
-  expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
-    servingSize: '1 bowl',
-    servingCount: 2,
-  });
-  await page.reload();
-  await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveValue(
-    '2',
-  );
+  // Serving size is the only portion input; there is no separate people-served count.
+  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveCount(0);
   await expect(page.getByRole('img', { name: 'Private draft dish' })).toBeVisible();
   const license = page.getByRole('checkbox', {
     name: 'I have the right to use this photo.',
@@ -3002,8 +2988,11 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
   await signIn(page);
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
   await expect(
-    page.getByText('The 2.5D cutout could not be generated. The original photo is retained.'),
+    page.getByText(
+      '2.5D processing failed. Please try another photo. The original photo is retained.',
+    ),
   ).toBeVisible();
+  await expect(page.getByRole('progressbar', { name: '2.5D preview processing' })).toBeVisible();
   expect(generations).toBe(1);
   await page.getByRole('button', { name: 'Save photo and generate 2.5D', exact: true }).click();
   await expect(
