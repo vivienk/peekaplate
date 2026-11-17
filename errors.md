@@ -3330,3 +3330,17 @@ runtime SQL is unchanged. The PR body also lacked an exact command in its PASS
 entries; its verification records now use the required command format. Database
 acceptance remains pending the corrected CI run rather than being inferred from
 mocked unit tests.
+
+## November 17 — S13 preparation stopped at the historical menu chooser
+
+The successful preparation response lost its menuId in the client, and the owner
+controller only listed snapshots. The source-identity regression failed before
+the fix (menuId missing) and passed afterward. Retain the returned identity and
+reuse the existing authenticated preview/photo loader for exactly that snapshot.
+Preparation failures retain explicit historical selection and retry; publish
+still requires the existing confirmation. The authored S13 component/CSS is unchanged.
+
+CI caught a new test reading captured requests while the shared preview heading
+was still the loading heading. Wait for the authored preview phone before asserting
+the exact request identity; do not increase timeouts or change runtime behavior.
+The other 69 workspace cases passed in that run.

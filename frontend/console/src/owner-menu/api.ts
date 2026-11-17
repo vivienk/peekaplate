@@ -432,11 +432,16 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
     // Part A: turn the owner's verified dishes into a prepared menu for S13 (never publishes).
     async prepareMenu(venueId: string) {
       return request(venuePath(venueId, '/prepared-menus/prepare'), { method: 'POST' }, (body) => {
+        const menuId = field(body, 'menuId');
         const menuRevisionId = field(body, 'menuRevisionId');
         const completeDishes = field(body, 'completeDishes');
-        if (typeof menuRevisionId !== 'string' || typeof completeDishes !== 'number')
+        if (
+          typeof menuId !== 'string' ||
+          typeof menuRevisionId !== 'string' ||
+          typeof completeDishes !== 'number'
+        )
           throw new Error('prepared menu');
-        return { menuRevisionId, completeDishes };
+        return { menuId, menuRevisionId, completeDishes };
       });
     },
     async previewPreparedMenu(venueId: string, menuId: string, revisionId: string) {
