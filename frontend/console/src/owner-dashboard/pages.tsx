@@ -59,7 +59,43 @@ export interface LiveDashboardInput {
   restaurantName: string;
   period?: string | undefined;
   reportContent?: ReactNode;
+  summary?: OwnerDishReport['summary'];
+  summaryFreshness?: boolean | null | undefined;
 }
+
+type OverviewSummary = NonNullable<OwnerDishReport['summary']>;
+type OverviewMetric = keyof OverviewSummary['current'];
+function overviewMetric(summary: OverviewSummary | undefined, key: OverviewMetric) {
+  const display = (
+    cell: OverviewSummary['current'][OverviewMetric] | undefined,
+    withUnit = true,
+  ) => {
+    if ((cell?.status === 'NORMAL' || cell?.status === 'VALID_ZERO') && cell.value !== null)
+      return `${key === 'avg_interaction_time_seconds' ? cell.value : cell.value.toLocaleString('en-US')}${withUnit && key === 'avg_interaction_time_seconds' ? ' s' : ''}`;
+    switch (cell?.status) {
+      case 'SUPPRESSED':
+        return 'Not enough visits yet';
+      case 'NOT_MEASURABLE':
+        return 'Not measurable';
+      case 'STALE':
+        return 'Out of date';
+      case 'EVIDENCE_CHECK_FAILED':
+        return 'Couldn’t verify';
+      default:
+        return 'Unavailable';
+    }
+  };
+  const current = summary?.current[key];
+  const observed = current?.status === 'NORMAL' || current?.status === 'VALID_ZERO';
+  return {
+    value: display(current, false),
+    ...(observed && key === 'avg_interaction_time_seconds' ? { unit: 's' } : {}),
+    foot: `Previous period: ${display(summary?.baseline[key])}`,
+    tag: <Lab k={observed ? (key === 'verified_orders' ? 'ver' : 'obs') : 'unk'} />,
+  };
+}
+const overviewWindow = (period: { start_time: string; end_time: string }) =>
+  `${period.start_time.replace('T', ' ').replace(/\.000Z$|Z$/, ' UTC')} – ${period.end_time.replace('T', ' ').replace(/\.000Z$|Z$/, ' UTC')}`;
 export interface LiveMenuRow {
   id: string;
   name: string;
@@ -165,91 +201,173 @@ export function Overview({
   live?: LiveDashboardInput & { menu: readonly LiveMenuRow[] };
 }) {
   const empty = !!live || sim.scn === 'empty';
+  const daily = live?.summary?.daily_opens;
+  const dailyLabels = daily?.current.map(
+    (bucket) => `${bucket.start_time.slice(11, 16)}–${bucket.end_time.slice(11, 16)} UTC`,
+  );
+  const dailyValue = (bucket: NonNullable<OverviewSummary['daily_opens']>['current'][number]) =>
+    bucket.opens.value ??
+    (bucket.opens.status === 'SUPPRESSED' ? 'Not enough visits yet' : 'Unavailable');
   const sorted = bySort('open');
   const planned = INSIGHTS.filter((i) => acts[i.id]?.status === 'planned').length;
   return (
     <div className="stack">
       <div className="pagehead">
         <span className="eyebrow">Overview · {live ? live.restaurantName : REST.period}</span>
-        <h1>How your menu did this week</h1>
+        <h1>{live ? 'How your menu did this period' : 'How your menu did this week'}</h1>
       </div>
-      {empty ? (
+      {empty && (
         <Note icon="info">
           {live
-            ? 'Your saved dishes are listed below. Diner measurements appear only in a validated report.'
+            ? live.summary
+              ? `Current period: ${overviewWindow(live.summary.periods.current)}. Previous period: ${overviewWindow(live.summary.periods.baseline)}. ${live.summaryFreshness === null || live.summaryFreshness === undefined ? 'Freshness not known.' : live.summaryFreshness ? 'Report is out of date.' : 'Report is up to date.'}`
+              : 'Summary unavailable. Your saved dishes are listed below; no measurements are inferred.'
             : 'No diner data yet. Your dishes are listed below with no numbers. Data appears once diners use the menu.'}
         </Note>
-      ) : (
+      )}
+      {(live || !empty) && (
         <div className="kpis">
           <Kpi
             label="Menu sessions"
-            value={SESSIONS.now}
-            foot={
-              <>
-                <Delta a={SESSIONS.now} b={SESSIONS.prev} /> vs last week
-              </>
-            }
-            tag={<Lab k="obs" />}
+            {...(live
+              ? overviewMetric(live.summary, 'menu_sessions')
+              : {
+                  value: SESSIONS.now,
+                  foot: (
+                    <>
+                      <Delta a={SESSIONS.now} b={SESSIONS.prev} /> vs last week
+                    </>
+                  ),
+                  tag: <Lab k="obs" />,
+                })}
           />
           <Kpi
             label="Dish opens"
-            value={T.open}
-            foot={
-              <>
-                <Delta a={T.open} b={PREV.open} /> vs last week
-              </>
-            }
-            tag={<Lab k="obs" />}
+            {...(live
+              ? overviewMetric(live.summary, 'dish_opens')
+              : {
+                  value: T.open,
+                  foot: (
+                    <>
+                      <Delta a={T.open} b={PREV.open} /> vs last week
+                    </>
+                  ),
+                  tag: <Lab k="obs" />,
+                })}
           />
           <Kpi
             label="Avg time interacting"
-            value={T.time}
-            unit="s"
-            foot={`${T.time - PREV.time > 0 ? '+' : ''}${T.time - PREV.time} s vs last week`}
-            tag={<Lab k="obs" />}
+            {...(live
+              ? overviewMetric(live.summary, 'avg_interaction_time_seconds')
+              : {
+                  value: T.time,
+                  unit: 's',
+                  foot: `${T.time - PREV.time > 0 ? '+' : ''}${T.time - PREV.time} s vs last week`,
+                  tag: <Lab k="obs" />,
+                })}
           />
           <Kpi
             label="2.5D previews shown"
-            value={T.p25}
-            foot={
-              <>
-                <Delta a={T.p25} b={PREV.p25} /> vs last week
-              </>
-            }
-            tag={<Lab k="obs" />}
+            {...(live
+              ? overviewMetric(live.summary, 'portion_previews_shown')
+              : {
+                  value: T.p25,
+                  foot: (
+                    <>
+                      <Delta a={T.p25} b={PREV.p25} /> vs last week
+                    </>
+                  ),
+                  tag: <Lab k="obs" />,
+                })}
           />
           <Kpi
             label="Verified orders on record"
-            value={T.ord}
-            foot={`${T.withRec} of ${DISH.length} dishes have a record`}
-            tag={<Lab k="ver" />}
+            {...(live
+              ? overviewMetric(live.summary, 'verified_orders')
+              : {
+                  value: T.ord,
+                  foot: `${T.withRec} of ${DISH.length} dishes have a record`,
+                  tag: <Lab k="ver" />,
+                })}
           />
         </div>
       )}
       <div className="grid g-main">
         <div className="stack">
-          {!empty && (
+          {(live || !empty) && (
             <ChartCard
               title="Dish opens by day"
-              tag={<Lab k="obs" />}
-              head={['Day', 'This week', 'Last week']}
-              rows={DAYS.map((d, i) => [d, DAILY_NOW[i], DAILY_PREV[i]])}
+              tag={
+                <Lab
+                  k={
+                    !live ||
+                    (daily &&
+                      [...daily.current, ...daily.baseline].some(
+                        (bucket) => bucket.opens.value !== null,
+                      ))
+                      ? 'obs'
+                      : 'unk'
+                  }
+                />
+              }
+              {...(live && {
+                sub: 'UTC days clipped to each reporting period. Unavailable measurements are gaps, not zero.',
+              })}
+              head={
+                live
+                  ? ['UTC bucket', 'Current period', 'Previous period']
+                  : ['Day', 'This week', 'Last week']
+              }
+              rows={
+                live
+                  ? (daily?.current.map((bucket, i) => [
+                      dailyLabels![i],
+                      dailyValue(bucket),
+                      daily.baseline[i] ? dailyValue(daily.baseline[i]!) : 'Unavailable',
+                    ]) ?? [])
+                  : DAYS.map((d, i) => [d, DAILY_NOW[i], DAILY_PREV[i]])
+              }
             >
-              <LineChart
-                labels={DAYS}
-                unit=""
-                desc="Dish opens by day, this week compared with last week"
-                series={[
-                  { name: 'This week', color: 'var(--c1)', values: DAILY_NOW },
-                  {
-                    name: 'Last week',
-                    color: 'var(--cg)',
-                    values: DAILY_PREV,
-                    dash: '5 4',
-                    label: false,
-                  },
-                ]}
-              />
+              {live && !daily ? (
+                <div className="empty">Daily openings unavailable.</div>
+              ) : (
+                <LineChart
+                  labels={live ? (dailyLabels ?? []) : DAYS}
+                  unit=""
+                  desc={
+                    live
+                      ? 'Dish opens by clipped UTC day, current period compared with previous period'
+                      : 'Dish opens by day, this week compared with last week'
+                  }
+                  series={
+                    live && daily
+                      ? [
+                          {
+                            name: 'Current period',
+                            color: 'var(--c1)',
+                            values: daily.current.map((bucket) => bucket.opens.value),
+                          },
+                          {
+                            name: 'Previous period',
+                            color: 'var(--cg)',
+                            values: daily.baseline.map((bucket) => bucket.opens.value),
+                            dash: '5 4',
+                            label: false,
+                          },
+                        ]
+                      : [
+                          { name: 'This week', color: 'var(--c1)', values: DAILY_NOW },
+                          {
+                            name: 'Last week',
+                            color: 'var(--cg)',
+                            values: DAILY_PREV,
+                            dash: '5 4',
+                            label: false,
+                          },
+                        ]
+                  }
+                />
+              )}
             </ChartCard>
           )}
           <section className="card ov-dishes">

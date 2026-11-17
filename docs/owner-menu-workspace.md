@@ -221,3 +221,11 @@ auth #143/#146 dashboard integration, new provider accuracy tests and production
 acceptance remain separate. This run reused retained genuine extraction output;
 it did not launch another OCR/model job. Keep normal delivery paused outside a
 controlled synthetic test window.
+
+## Self-service test restaurants
+
+POST /staff/venues accepts only commandId and name under the existing staff bearer session, on local/staging only. The server allocates the restaurant identity and atomically records membership, command receipt, event and outbox. Retry the same name and command after a lost response; changed payload conflicts. Creation is limited to five per rolling day and twenty lifetime self-created restaurants per actor. Revoked ownership is rechecked on replay. Menu verification, food/photo confirmations and explicit publication remain separate owner actions; no operator approval is added.
+
+## Live Overview metrics
+
+The existing Jeffin Overview cards consume the optional validated owner-report summary. Distinct menu sessions, actual openings and completed-opening weighted interaction time use explicit current and baseline half-open windows with privacy suppression. Unsupported portion-preview and verified-order aggregates remain unavailable. No card falls back to prototype constants, sums dish-session counts, or averages dish averages. Synthetic dataset acceptance and positive AI freshness require separate hosted evidence; local tests do not establish either.

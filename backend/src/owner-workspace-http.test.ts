@@ -87,7 +87,7 @@ describe('owner workspace HTTP boundary', () => {
       );
       expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin);
       expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
-      expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET,OPTIONS');
+      expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET,POST,OPTIONS');
     }
     const denied = await app.request(
       '/staff/venues',

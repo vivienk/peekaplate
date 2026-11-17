@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Shared tenant, command, owner-draft, menu-publication and diner-observation contracts remain strict. Serving count is not physical scale. Owner actions retain bounded versioned status transitions. Description assistance is version-bound and returns an exact evidence sentence as an unverified proposal; no generated food or allergen claims. Report privacy/status contracts and published revision-bound portions are unchanged. Ingredient assistance is a strict operation union; saved proposals carry evidence identity and remain unverified.",
+      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. Optional summary and clipped UTC daily opening buckets preserve per-cell privacy statuses; absent measurements are not zero. Food and portion evidence remain revision-bound.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -66,7 +66,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/ingredient-review-unicode.json",
         "packages/contracts/src/owner-actions.ts",
         "packages/contracts/src/owner-actions.test.ts",
-        "packages/contracts/src/dish-assistance.ts"
+        "packages/contracts/src/dish-assistance.ts",
+        "packages/contracts/src/owner-report-daily.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -74,7 +75,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "a0ce97131d02c45a74817edde2075b21d1b837eedbd90e211c399fddfda423f7"
+      "sourceFingerprint": "cb405198c439b29aee181e8c8dacdc056b2f315ea0b37e7b9e94a7fe0d919db2"
     },
     {
       "id": "tokens",
@@ -259,7 +260,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics. Ingredient proposals preserve empty/duplicate review state and reject stale results. S13 opens the exact preparation result directly in the authored preview; historical choices remain recovery-only.",
+      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. No replacement charts, fabricated orders or automatic publication.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -419,7 +420,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-flow-retest.md",
         "frontend/console/src/owner/owner-workspace-live.test.tsx",
         "scripts/owner-dashboard-css-isolation.test.mjs",
-        "docs/screen9-portion-publish.md"
+        "docs/screen9-portion-publish.md",
+        "frontend/console/src/owner-dashboard/line-chart.test.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -429,12 +431,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "40f8087c2b8c9bc2bf21e89f89e5faca8b20acf090adf601cca90c496d521ca1"
+      "sourceFingerprint": "ee958297fd213afc4efb04d718e74f3d646258a20cba5ffe1bf4262bef189370"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker preserves staff/JWKS and tenant authority, expected versions and transactional event/outbox commands. Owner upload, verification, preparation and publication reuse existing services. Preparation validates approved private portion bytes against current photo/revision; serving uses the exact published snapshot so draft edits cannot hide live assets. Extraction host forwards bounded authenticated CPU cutout requests to the existing container. Report references bind actor, venue, window and digest; strict configured synthetic scopes choose separate live/test views. Owner Actions and CSV use existing owner checks. Description assistance selects literal evidence only and never saves or publishes. Unknown report freshness remains unusable for AI. Ingredient assistance reuses current saved source-bound values; corrections override originals, missing evidence abstains, and no provider is called.",
+      "summary": "Worker preserves tenant authority, command replay and canonical observation reporting. Summary and daily openings share an authorized read-only snapshot. Protected short-lived seals verify one synthetic scenario against reconciled canonical evidence; live freshness remains unknown. Staging self-service creates only a new restaurant owned by the confirmed actor.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -631,7 +633,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/retrieval/parser.menu.test.ts",
         "backend/src/owner-portion-preview.test.ts",
         "backend/src/owner-retention-scheduler.test.ts",
-        "backend/src/owner-ai/dish-assistance.integration.ts"
+        "backend/src/owner-ai/dish-assistance.integration.ts",
+        "backend/src/owner-report-summary.ts",
+        "backend/src/owner-report-summary.test.ts",
+        "backend/src/owner-report-summary.integration.ts",
+        "backend/src/owner-venue-create.ts",
+        "backend/src/owner-venue-create.test.ts",
+        "backend/src/owner-venue-create.integration.ts",
+        "backend/src/owner-ai/synthetic-completeness.ts",
+        "backend/src/owner-ai/synthetic-completeness.test.ts",
+        "backend/src/owner-ai/synthetic-completeness.integration.ts",
+        "docs/owner-ai-synthetic-completeness.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -644,12 +656,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4e84f7114895807b925f66a2ba03ef37a0b8244de0f89df94f5b0b8b4d576f44"
+      "sourceFingerprint": "51f7f73addc39b629b504fa1520c42b1921ddbbca3d5ca42d775dba59baefd85"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Canonical event/projection/outbox and owner preparation migrations remain immutable and tenant-scoped. Owner action current-state rows enforce tenant RLS and restricted runtime writes. The additional invoker/security-barrier test-observation view exposes only test-class canonical facts under existing RLS; the legacy live view is unchanged. Actual PostgreSQL tests cover report isolation, owner actions, portion preparation and preservation of existing published assets while newer drafts change. Hosted migration execution is separate from local acceptance.",
+      "summary": "Canonical event/projection/outbox and owner preparation migrations remain immutable and tenant-scoped. Owner action current-state rows enforce tenant RLS and restricted runtime writes. The additional invoker/security-barrier test-observation view exposes only test-class canonical facts under existing RLS; the legacy live view is unchanged. Actual PostgreSQL tests cover report isolation, owner actions, portion preparation and preservation of existing published assets while newer drafts change. Hosted migration execution is separate from local acceptance. The forward owner-venue-creation migration defines restricted actor-bound idempotent new-tenant creation; its grants and quota are covered separately. Real canonical PostgreSQL summary regressions cover distinct sessions/openings, weighted timing, independent windows, class isolation and protected subsets; they do not certify hosted freshness.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -688,7 +700,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261116020000_owner_flow_profile.sql",
         "tests/db/owner_flow_profile.sql",
         "migrations/20261117130000_owner_test_observations.sql",
-        "tests/db/owner-test-observations.sql"
+        "tests/db/owner-test-observations.sql",
+        "migrations/20261117170000_owner_venue_creation.sql",
+        "tests/db/owner-venue-creation.sql",
+        "backend/src/owner-report-summary.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -699,7 +714,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "d7e2d2f973344f90bf0418e71aa87754a55342bd715e7835f045fd0c716ed1c9"
+      "sourceFingerprint": "4997ecf1fceae64ae8525839cd01486c6ca370e7147c4bd6471213bfda1e4daa"
     },
     {
       "id": "measurement",
