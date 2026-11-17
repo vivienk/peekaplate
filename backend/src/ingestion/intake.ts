@@ -60,7 +60,13 @@ export function selectUnambiguousMenuFile(links: readonly string[]): string | nu
   // Match a file's name only: /menu/catering.pdf is not evidence that the
   // catering PDF is the restaurant's main menu.
   const explicitlyNamed = candidates.filter((link) => {
-    const filename = decodeURIComponent(new URL(link).pathname.split('/').pop() ?? '');
+    const encoded = new URL(link).pathname.split('/').pop() ?? '';
+    let filename = encoded;
+    try {
+      filename = decodeURIComponent(encoded);
+    } catch {
+      // Malformed percent-encoding must not break the entire URL intake.
+    }
     return /(?:^|[-_\s])menu(?:[-_\s.]|$)/i.test(filename);
   });
   return explicitlyNamed.length === 1 ? explicitlyNamed[0] ?? null : null;
