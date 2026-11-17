@@ -79,13 +79,20 @@ Consolidation verification (local; no hosted rollout): `pnpm check` passed 1,991
 unit tests with five existing skips and all 117 script tests. `pnpm verify
 test:db` passed 396 pgTAP assertions and 162 Worker/database tests (37.44s
 integration phase), plus the disposable Worker smoke. The connected workspace
-suite passed 51/51 Chromium cases in 1.1 minutes, including manual photo/text/count
+suite passed 53/53 Chromium cases in 1.2 minutes after the latest authored design
+refinements, including the delayed-profile-save navigation regression, manual photo/text/count
 save/reload, exact snapshot publication/retry, session/tenant isolation and the
 report-period guard. Published branding/artwork/portion checks passed 5/5 in 16.9s;
 they cover gating/fallback, not physical-device scale. `pnpm verify build` passed
 both frontend builds and Worker dry-run. Production-like builds exclude the
 synthetic demo controllers. These checks do not certify fresh provider extraction
 or end-to-end hosted owner-report/AI acceptance.
+
+The latest authored #213 design refinements are retained, including logo wording,
+origin-specific Back navigation, heading focus, layout and S13 confirmation icon.
+A delayed profile save now preserves navigation if the owner already left S05;
+its browser regression failed before the two-line existing-generation guard and
+passed afterward. No new screen or token system was introduced.
 
 ## Confirmed missing backend pieces added
 
@@ -148,7 +155,7 @@ and migration; the old staging API cannot satisfy the new profile/setup reads.
   membership or persistent diner alias. Its old published bundle is immutable;
   a restaurant-name change in a new bundle requires a new prepared revision.
 
-## Pictures and verification
+## Original screen walkthrough and historical verification
 
 The 24 screenshots below use real rendered components with fictional local
 state. Browser navigation passed at 1440px and 390px in 14.3s including startup.

@@ -75,6 +75,9 @@ async function fixture(context: BrowserContext) {
     profiles: {} as Record<string, RestaurantProfile>,
     afterVerification: null as ((draft: DishDraft) => void) | null,
     profileStatus: 200,
+    delayProfileSave: false,
+    profileSaveStarted: false,
+    releaseProfileSave: () => {},
     setupStatus: 200,
     delaySetup: false,
     releaseSetup: () => {},
@@ -218,6 +221,11 @@ async function fixture(context: BrowserContext) {
             headers,
           });
         if (request.method() === 'PUT') {
+          state.profileSaveStarted = true;
+          if (state.delayProfileSave)
+            await new Promise<void>((resolve) => {
+              state.releaseProfileSave = resolve;
+            });
           const input = request.postDataJSON();
           if ((state.profiles[id]?.version ?? 0) !== input.expectedVersion)
             return route.fulfill({ status: 409, json: { error: 'version_conflict' }, headers });
@@ -1138,6 +1146,33 @@ test('profile save reloads authenticated details and never verifies an owner sub
   await expect(page.getByRole('textbox', { name: /^Street address/ })).toHaveValue(
     '100 Fictional Street',
   );
+});
+
+test('a delayed profile save preserves navigation back to the dashboard', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  state.delayProfileSave = true;
+  await signIn(page, undefined, false);
+  await page.getByRole('button', { name: 'Start: Restaurant details', exact: true }).click();
+  await page.getByRole('textbox', { name: /^Restaurant name/ }).fill('Ember & Stone');
+  await page.getByRole('textbox', { name: /^City/ }).fill('San Francisco');
+  await page.getByRole('textbox', { name: /^Street address/ }).fill('100 Fictional Street');
+  await page.getByRole('textbox', { name: /^Phone number/ }).fill('(555) 234-5678');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => state.profileSaveStarted).toBe(true);
+  await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
+  state.releaseProfileSave();
+  await expect(
+    page.getByText(
+      'Restaurant details saved and submitted for team verification. This does not publish your menu.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Welcome to PeekaPlate', exact: true }),
+  ).toBeVisible();
+  expect(state.profiles[venue.venueId]?.version).toBe(1);
 });
 
 test('a delayed restaurant photo does not reset unsaved restaurant details', async ({

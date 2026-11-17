@@ -4674,3 +4674,13 @@ The follow-up callback edit introduced two extra spaces; the aggregate formatter
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T02:37:57.083Z","exitCode":1}
 ```
+
+### ERR-20261117-OWNER-PROFILE-NAVIGATION
+
+Independent review of the latest authored screen refinements found that a delayed
+restaurant-profile save reopened source selection after the owner had already
+returned to the dashboard. The focused browser regression reproduced the missing
+dashboard heading before the fix. The save now reuses the existing view-generation
+fence: persistence and its notice complete, but an abandoned view cannot navigate.
+The same regression passed afterward (1/1, 3.9s including startup). No authored
+screen, button placement or save/authorization semantics changed.

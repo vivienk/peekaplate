@@ -770,6 +770,7 @@ export function OwnerMenuWorkspace({
           saveFailed={Boolean(error)}
           onSave={(next, photo) => {
             const editingSaved = details !== null;
+            const generation = viewGeneration.current;
             // Back from S06 then Save with nothing changed: continue to S06 without
             // submitting the same details for verification again.
             if (
@@ -808,6 +809,7 @@ export function OwnerMenuWorkspace({
               setNotice(
                 'Restaurant details saved and submitted for team verification. This does not publish your menu.',
               );
+              if (viewGeneration.current !== generation) return;
               const continueOnboarding = detailsFromSources || !editingSaved;
               setDetailsFromSources(false);
               setView(continueOnboarding ? 'sources' : 'overview');
