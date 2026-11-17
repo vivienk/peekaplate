@@ -141,6 +141,7 @@ export function OwnerMenuWorkspace({
         status: 'processing' | 'needs_review' | 'failed';
         previewUrl?: string;
         message?: string;
+        approved?: boolean;
       }
     | undefined
   >(undefined);
@@ -398,7 +399,7 @@ export function OwnerMenuWorkspace({
         const blob = await active.client.readDraftPortionImage(venueId, draftId, photoId);
         if (disposed || !current(active)) return;
         previewUrl = URL.createObjectURL(blob);
-        setPortionReview({ status: 'needs_review', previewUrl });
+        setPortionReview({ status: 'needs_review', previewUrl, approved: result.approved });
       })
       .catch(() => {
         if (!disposed && current(active)) {
@@ -1032,6 +1033,19 @@ export function OwnerMenuWorkspace({
           value={editing.form}
           photoUrl={photoUrl}
           portionReview={portionReview}
+          onApprovePortion={() => {
+            const id = editing.id;
+            const photoId = editing.form.photoId;
+            if (!photoId || pendingPhoto || portionReview?.status !== 'needs_review') return;
+            void run(async (active) => {
+              await active.client.approveDraftPortion(venueId, id, photoId);
+              if (current(active)) {
+                setPortionReview((previous) =>
+                  previous?.status === 'needs_review' ? { ...previous, approved: true } : previous,
+                );
+              }
+            });
+          }}
           existing={Boolean(editing.draft)}
           categories={drafts.map((draft) => draft.category ?? '').filter(Boolean)}
           photo={
