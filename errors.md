@@ -3240,3 +3240,9 @@ introduced during selective assembly. Restoring the exact main Perf declaration
 reuses PerfFrame for both demo and live views. The first text-boundary replacement
 also copied adjacent declarations and failed parsing; declaration-aware selection
 removed that duplicate. The authored performance and live-page regressions pass.
+
+PR223 CI exposed an older operational assertion applying the one-second health
+probe deadline to every host request, including the separate 220-second private
+portion request. Scope the health assertion to waitForReady; existing portion
+transport tests retain the processing deadline check. Runtime budgets are unchanged.
+The initial PR body also lacked required template headings; those were restored.
