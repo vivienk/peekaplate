@@ -3234,3 +3234,9 @@ which this project does not use. Reading the existing operator script identified
 public.schema_migrations. Both required forward versions were absent, then were
 applied with explicit operator approval and independently verified, including
 forced RLS and invoker/security-barrier view options. No account grants changed.
+
+The final frontend review identified duplicate demo performance-frame markup
+introduced during selective assembly. Restoring the exact main Perf declaration
+reuses PerfFrame for both demo and live views. The first text-boundary replacement
+also copied adjacent declarations and failed parsing; declaration-aware selection
+removed that duplicate. The authored performance and live-page regressions pass.

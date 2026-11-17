@@ -929,27 +929,17 @@ export function Perf({
     </th>
   );
   return (
-    <div className="stack">
-      <div className="pagehead">
-        <span className="eyebrow">Dish performance · {REST.period}</span>
-        <h1>What diners did with each dish</h1>
-        <p className="lede">
-          Views, time interacting and orders, labelled by how much we know. A dish that was viewed
-          but not ordered is not assumed to be rejected.
-        </p>
-      </div>
-      <section className="card" aria-labelledby="ad-h">
-        <div className="card-h">
-          <div>
-            <h3 id="ad-h">All dishes</h3>
-            <div className="sub" aria-live="polite">
-              {needle
-                ? `${sorted.length} of ${DISH.length} dishes`
-                : `${DISH.length} dishes · select a dish for details`}
-            </div>
-          </div>
-        </div>
-        <div className="scrollx dtable">
+    <PerfFrame
+      period={REST.period}
+      description="Views, time interacting and orders, labelled by how much we know. A dish that was viewed but not ordered is not assumed to be rejected."
+      summary={
+        needle
+          ? `${sorted.length} of ${DISH.length} dishes`
+          : `${DISH.length} dishes · select a dish for details`
+      }
+      table={
+        <>
+          {' '}
           <table className="tbl">
             <thead>
               <tr>
@@ -1000,46 +990,13 @@ export function Perf({
             </tbody>
           </table>
           {sorted.length === 0 && <div className="empty">No dishes match “{q.trim()}”.</div>}
-        </div>
-      </section>
-      <div className="tabs" role="group" aria-label="Metric" style={{ margin: 0 }}>
-        {TABS.map(([k, l]) => (
-          <button type="button" key={k} aria-pressed={tab === k} onClick={() => setTab(k)}>
-            {l}
-          </button>
-        ))}
-      </div>
-      <div className="ctlrow">
-        <div className="dsearch">
-          <Icon n="search" s={16} />
-          <label className="sr" htmlFor="dish-q">
-            Search dishes
-          </label>
-          <input
-            id="dish-q"
-            type="search"
-            placeholder="Search dishes…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setQ('');
-            }}
-            autoComplete="off"
-          />
-          {q && (
-            <button
-              type="button"
-              className="dclear"
-              aria-label="Clear search"
-              onClick={() => {
-                setQ('');
-                document.getElementById('dish-q')?.focus();
-              }}
-            >
-              <Icon n="x" s={15} />
-            </button>
-          )}
-        </div>
+        </>
+      }
+      q={q}
+      setQ={setQ}
+      tab={tab}
+      setTab={setTab}
+      action={
         <Btn
           kind="primary"
           size="md"
@@ -1055,9 +1012,9 @@ export function Perf({
         >
           Ask AI about this dish
         </Btn>
-      </div>
-      {body}
-    </div>
+      }
+      body={body}
+    />
   );
 }
 

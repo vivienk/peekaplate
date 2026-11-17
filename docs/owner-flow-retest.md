@@ -33,6 +33,29 @@ The existing protected staging workflow has an explicit `configure_owner_ai` inp
 
 Focused regressions cover currency fallback, saved verification, actor/venue isolation, real-data rendering, reference propagation/recovery, CORS, traffic-class isolation, description spans and permission/version rechecks. Record local, mocked and hosted evidence separately. A merge does not prove paid model quality, hosted extraction, destination readback or physical-size AR acceptance.
 
-Local baseline: `pnpm check` passed 2,113 unit tests and 119 script tests. Database verification passed 172 Worker/database integrations, pgTAP and Worker smoke. The subsequent credential-provisioning helper passed two additional script tests. Browser checks use the connected Brave session; the automated browser suite has not been run for this change.
+The focused main candidate passed `pnpm check`: 1,878 unit tests and 106 script tests; `pnpm verify test:db`: 314 SQL assertions, 144 Worker/database integrations and Worker smoke; and `pnpm verify build`. This is a narrower release than develop and intentionally excludes unrelated POS/comparison/evaluation work. Browser checks use the connected Brave session; the automated browser suite has not been run locally for this candidate and must pass CI.
 
 Additional local portion evidence: the real non-root Linux image processed an opaque synthetic JPEG with networking disabled in 41 seconds, returning two hash-validated layers and cleaning its scratch directory. The publication-isolation regression first reproduced an edited draft hiding the still-published portion, then passed with serving authority bound to the exact published snapshot. Connected Brave reproduced the unchanged-photo retry failure and confirmed the corrected second request and preview; these local checks do not establish hosted acceptance.
+
+## Existing implementation reused
+
+| Area | Existing work retained | Correction in this release |
+| --- | --- | --- |
+| Owner screens | #143/#146 auth, #171/#172 onboarding/editor, #206/#207/#213 wiring | USD fallback, upload preview lifecycle, S10 wrapping and saved-verification navigation |
+| Preview and publish | #208/#216 S13 and preparation | Attach approved revision-bound portion through the existing producer and published asset route |
+| Portion | #162 renderer/camera, #219/#221 private generation/review | Connect existing extraction host/container, retry same photo, preserve published assets during edits |
+| Reports and actions | Existing authored dashboard/performance layouts, #142 actions, #218 report reference | Real-data inputs, isolated test facts, reference forwarding and honest empty/unknown states |
+| URL intake | #222 structured HTML intake | Promote its already-reviewed parser, unambiguous-price and fetched-source reuse fixes |
+
+Main's shared command-error helpers, lazy camera loader and performance frame are
+preserved. Both demo and live performance use the existing `PerfFrame`; no second
+presentation frame or design-token package is added. The source-menu evidence
+panel predates this release in #156; its local synthetic fixture is not a Poulet
+extraction result.
+
+Staging schema preflight on November 17 applied the two reviewed missing forward
+migrations with explicit operator approval. Readback confirmed forced tenant RLS
+on Actions and invoker/security-barrier protection on the test view. This schema
+check does not establish the still-pending application deployment or hosted UI
+round trip. Existing accounts, memberships, Poulet drafts and publications were
+not reset.
