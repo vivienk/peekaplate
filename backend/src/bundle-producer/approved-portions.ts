@@ -101,8 +101,7 @@ export function prepareApprovedPortion(
     if (bytes.byteLength !== layer.size_bytes || sha(bytes) !== layer.sha256) {
       throw new Error('2.5D public layer bytes do not match approved hashes');
     }
-    const relativePath =
-      `portions/${expected.dishId}/${expected.dishRevisionId}/${layer.sha256}/${name}`;
+    const relativePath = `portions/${expected.dishId}/${expected.dishRevisionId}/${layer.sha256}/${name}`;
     const url = `${expected.assetBaseUrl}/${relativePath}`;
     files.push({
       relativePath,
