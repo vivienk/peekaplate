@@ -273,16 +273,12 @@ export function DishFormView({
                 )}
                 {portionReview?.status === 'needs_review' && portionReview.previewUrl ? (
                   <>
-                    <img
-                      src={portionReview.previewUrl}
-                      alt={`Review-only 2.5D preview of ${dr.name || 'this dish'}`}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        height: 'auto',
-                        objectFit: 'contain',
-                      }}
-                    />
+                    <div className="s09-photo has">
+                      <img
+                        src={portionReview.previewUrl}
+                        alt={`Review-only 2.5D preview of ${dr.name || 'this dish'}`}
+                      />
+                    </div>
                     <span className={`s09-chip${portionReview.approved ? ' good' : ''}`}>
                       {portionReview.approved ? 'Approved for publication review' : 'Needs review'}
                     </span>

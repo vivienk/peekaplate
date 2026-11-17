@@ -259,7 +259,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics.",
+      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -429,7 +429,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "864dd72e39b03c2881dea3b03f3f651afb7f447e3fb8b36a20c5009fe4dac91e"
+      "sourceFingerprint": "5881ca7fecc56c9155e0fbbfed75de18bb4467940faf2e4ff411b98615260454"
     },
     {
       "id": "backend",
@@ -643,7 +643,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "be6de7d8fc0dd01040885bd9d07f084013d4e786967ca5b3f7b6a12bee638a23"
+      "sourceFingerprint": "c6e2cd278d8f12f0e476226361a2679e3ea71871302334791e0510bef851b554"
     },
     {
       "id": "database",

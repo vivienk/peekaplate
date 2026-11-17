@@ -3298,3 +3298,11 @@ or a clean first pass; no production code or timeout was changed for it.
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T12:46:27.318Z","exitCode":1}
 ```
+
+## November 17 — S09 portion preview expanded the authored card
+
+The generated cutout used full width and intrinsic height, bypassing the authored
+120px media area. Restore the existing `s09-photo` presentation inside the
+original 2.5D card. The existing retry browser scenario now checks that the image
+remains inside that labelled card and at most 120px tall. Photo rights, source
+evidence, serving metadata, approval and backend behavior are unchanged.
