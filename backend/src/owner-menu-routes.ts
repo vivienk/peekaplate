@@ -113,8 +113,17 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     const upload = await readMenuUpload(c.req.raw);
     return c.json(
       await services.database(c.env, (client) =>
-        storeRestaurantPhoto(client, actor, venue, upload, type, (key, bytes) =>
-          bucket.put(key, bytes),
+        storeRestaurantPhoto(
+          client,
+          actor,
+          venue,
+          upload,
+          type,
+          (key, bytes) => bucket.put(key, bytes),
+          async (key) => {
+            const object = await bucket.get?.(key);
+            return object ? object.arrayBuffer() : null;
+          },
         ),
       ),
       201,
@@ -137,6 +146,8 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     )
       throw new AuthUnavailableError();
     c.header('Content-Type', photo.content_type);
+    c.header('Content-Length', String(photo.size_bytes));
+    c.header('X-Content-SHA256', photo.source_hash);
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Cache-Control', 'private, no-store');
     return c.body(bytes);

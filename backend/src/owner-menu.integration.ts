@@ -215,6 +215,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       name: 'Fictional soup',
       category: 'Soup',
       description: 'Fictional vegetables',
+      servingCount: 2,
       priceAmount: '8.50',
       priceCurrency: 'USD',
       ingredients: { status: 'confirmed', items: ['Carrot'] },
@@ -238,6 +239,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     });
     expect(result.publishedRevision.facts?.ingredients).toEqual(['Carrot']);
     expect(result.publishedRevision.facts?.allergens).toBeNull();
+    expect(result.publishedRevision.facts?.servingCount).toBe(2);
     expect(
       (await loadApprovedDishSources(runtime, venue, [result.publishedRevision.dishId])).get(
         result.publishedRevision.dishId,
@@ -737,12 +739,13 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         [venue, job.id, candidateId],
       )
     ).rows[0]!;
+    const verificationCommand = crypto.randomUUID();
     await verifyOwnerDish(
       runtime,
       actor,
       venue,
       row.id,
-      crypto.randomUUID(),
+      verificationCommand,
       true,
       row.draft_version,
     );
@@ -768,6 +771,42 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       expectedRemovalVersion: 1,
       removed: false,
     });
+    const servingCorrection = {
+      commandId: crypto.randomUUID(),
+      expectedVersion: review.review.version,
+      action: 'correct' as const,
+      corrected: { serving_count: 2 },
+    };
+    review = await saveCandidateReviewCommand(
+      runtime,
+      actor,
+      venue,
+      extractionId,
+      candidateId,
+      servingCorrection,
+    );
+    expect(review.effective.serving_count).toBe(2);
+    expect(
+      await saveCandidateReviewCommand(
+        runtime,
+        actor,
+        venue,
+        extractionId,
+        candidateId,
+        servingCorrection,
+      ),
+    ).toEqual(review);
+    expect(
+      (
+        await admin.query(
+          'SELECT draft_version,verification_status FROM app_private.dish_drafts WHERE id=$1',
+          [row.id],
+        )
+      ).rows[0],
+    ).toMatchObject({ draft_version: oldVersion + 1, verification_status: 'not_verified' });
+    await expect(
+      verifyOwnerDish(runtime, actor, venue, row.id, verificationCommand, true, oldVersion),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
     const photo = await storeDraftPhoto(
       runtime,
       actor,
@@ -817,7 +856,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         [venue, row.id],
       )
     ).rows[0];
-    expect(changed.draft_version).toBe(oldVersion + 1);
+    expect(changed.draft_version).toBe(oldVersion + 2);
     expect(changed.verification_status).toBe('not_verified');
     row = changed;
     await verifyOwnerDish(
@@ -978,10 +1017,9 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(events).toHaveLength(1);
     expect(replayOwnerDraftVerification(events, 1)).toBe('verified');
     expect(replayOwnerDraftVerification(events, 2)).toBe('not_verified');
-    expect(
-      (await verifyOwnerDish(runtime, actor, venue, row.id, command, true, 1)).draft
-        .verification_status,
-    ).toBe('verified');
+    await expect(
+      verifyOwnerDish(runtime, actor, venue, row.id, command, true, 1),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
     expect(
       (
         await admin.query('SELECT verification_status FROM app_private.dish_drafts WHERE id=$1', [

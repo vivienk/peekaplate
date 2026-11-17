@@ -138,6 +138,7 @@ export async function storeRestaurantPhoto(
   upload: { bytes: Uint8Array; sourceHash: string; idempotencyKey: string },
   contentType: string,
   put: (key: string, bytes: ArrayBuffer) => Promise<unknown>,
+  read?: (key: string) => Promise<ArrayBuffer | null>,
 ) {
   const bytes = upload.bytes;
   const png = bytes.length > 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((n, i) => bytes[i] === n);
@@ -167,8 +168,24 @@ export async function storeRestaurantPhoto(
       'SELECT request_hash,result FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
       [venue, actor, upload.idempotencyKey],
     );
+    const key = `restaurant-profile/${venue}/${upload.sourceHash}`;
+    const ensureStored = async () => {
+      const current = await read?.(key);
+      if (
+        current &&
+        current.byteLength === bytes.length &&
+        createHash('sha256').update(new Uint8Array(current)).digest('hex') === upload.sourceHash
+      )
+        return;
+      // Repair only the exact authenticated, hash-bound bytes; never change the photo ID/history.
+      await put(
+        key,
+        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+      );
+    };
     if (receipt.rows[0]) {
       if (receipt.rows[0].request_hash !== hash) throw new CommandError('command_conflict', 409);
+      await ensureStored();
       return receipt.rows[0].result as { id: string };
     }
     const existing = await client.query(
@@ -192,12 +209,8 @@ export async function storeRestaurantPhoto(
       );
       return result;
     };
+    await ensureStored();
     if (existing.rows[0]) return remember(existing.rows[0].id);
-    const key = `restaurant-profile/${venue}/${upload.sourceHash}`;
-    await put(
-      key,
-      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-    );
     const stored = await client.query(
       `INSERT INTO app_private.restaurant_profile_photo(tenant_id,id,source_hash,storage_key,content_type,size_bytes)
       VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(tenant_id,source_hash) DO NOTHING RETURNING id`,

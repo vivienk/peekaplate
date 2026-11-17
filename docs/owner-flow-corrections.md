@@ -35,12 +35,83 @@ blue synthetic control bar from product controls.
 | [#172](https://github.com/vivienk/peekaplate/pull/172) | Authored `DishForm` and `DishFormFrame` | Extracted its existing presentation into `DishFormView`; both the original demo adapter and live draft adapter render it. Serving size, original currency and private photos round-trip. No second form implementation. |
 | [#156](https://github.com/vivienk/peekaplate/pull/156) | Owner-menu transport, draft/candidate mappings, evidence | Extended the same authenticated client and save commands; no competing client. |
 | [#163](https://github.com/vivienk/peekaplate/pull/163), [#206](https://github.com/vivienk/peekaplate/pull/206) | `ReviewDishes`, readiness rules and verification dialog | Connect persisted removal/Undo and extracted-photo corrections. Keep verification separate from approval/publication. |
-| [#207](https://github.com/vivienk/peekaplate/pull/207), reviewed source `460c4462` | Processing/recovery changes | Adapted sequential job/draft reads, selected-import completion, explicit failed/empty states and guarded retry navigation. Did not merge the whole draft branch or overwrite #206's verification. |
+| [#207](https://github.com/vivienk/peekaplate/pull/207), reviewed source `460c4462` | Processing/recovery changes | Reconciled its OCR runtime and regressions: sequential reads, selected-import outcomes, failed/empty recovery, explicit same-job retries, provider-limit guidance and remaining-upload state. Current persisted profile/verification documentation supersedes its older local-only assumptions; #206 presentation remains authoritative. |
 | [#125](https://github.com/vivienk/peekaplate/pull/125), [#139](https://github.com/vivienk/peekaplate/pull/139) | `FirstDashboard`, `OwnerShell`, setup rules | Replaced hard-coded setup facts with the same server read shared by content/header/aside. Restore original layout wrappers. |
 | [#208](https://github.com/vivienk/peekaplate/pull/208) | Official `MenuPreview`, phone view and confirmation/link states | Merged first as `a4d4889a`. Reuse its controller and screen; remove the temporary S13. Restore missing dish description. |
 
 No design-token values are changed. The new preview controller contains local
 navigation/state only. It does not implement another S05–S13 visual system.
+
+## Backend consolidation on this same PR
+
+The integration retains this PR as the single owner-flow correction. Source
+increments from #210 at `40281acf`, #215 at `6bf4498f` and #209 at `7dba1a89`
+are reconciled here; their presence does not constitute separate hosted releases.
+
+- #215 now reuses this PR's profile contract, private-photo model and unchanged
+  `20261116020000` migration. Its earlier duplicate profile projection is removed.
+  Photo retries repair missing/corrupt objects only with the authenticated exact
+  hash-bound bytes. The producer reads public name/logo through that same model.
+- Preserve this PR's removal/Undo, corrected allergens/photo ownership checks and
+  descriptive serving size while adding #215's separate numeric serving count.
+  A numeric-looking serving label is not evidence of a people-served count.
+  The existing S09 presentation has an additional optional People served field;
+  its placement is a functional extension awaiting design review. No original
+  field, form, token or style is replaced. Blank count remains unknown and does
+  not qualify a dish for measured placement.
+- #210 records pending ingredient labels in the existing draft-save transaction.
+  Its read-only pending list also locks and rechecks current membership inside
+  its transaction. Placeholders contain no image and confer no artwork approval.
+  Existing #165/#178 generation/review/delivery remains the implementation.
+- #209's exact report-period guard hides recommendations for another window.
+  It does not provide trusted freshness, model credentials or S09 AI drafting.
+- The combined correction schema derives its incomplete-field limit from the
+  supported field enum, so all twelve fields can be marked incomplete without
+  dropping serving-size/photo/allergen or serving-count information.
+
+The approval-to-admission bridge reported by Teeyansh must be pinned to its
+actual repository/commit before adding runtime adapters. Until that source and
+its trusted runner are integrated, the existing producer/admission operator
+boundary below still applies. This consolidation does not invent another bridge,
+enable provider traffic or grant the API runtime privileged admission rights.
+
+Consolidation verification (local; no hosted rollout): `pnpm check` passed 1,993
+unit tests with five existing skips and all 117 script tests. `pnpm verify
+test:db` passed 396 pgTAP assertions and 162 Worker/database tests (37.44s
+integration phase), plus the disposable Worker smoke. The connected workspace
+suite passed 59/59 Chromium cases in 1.1 minutes after the latest authored design
+refinements and OCR reconciliation, including delayed-profile-save navigation, manual photo/text/count
+save/reload, exact snapshot publication/retry, session/tenant isolation and the
+report-period guard. Published branding/artwork/portion checks passed 5/5 in 16.9s;
+they cover gating/fallback, not physical-device scale. `pnpm verify build` passed
+both frontend builds and Worker dry-run. Production-like builds exclude the
+synthetic demo controllers. These checks do not certify fresh provider extraction
+or end-to-end hosted owner-report/AI acceptance.
+
+The latest authored #213 design refinements are retained, including logo wording,
+origin-specific Back navigation, heading focus, layout and S13 confirmation icon.
+A delayed profile save now preserves navigation if the owner already left S05;
+its browser regression failed before the two-line existing-generation guard and
+passed afterward. No new screen or token system was introduced.
+
+The final #207 reconciliation also restores its five OCR outcome/correction
+browser cases with the current S09 required fields and acknowledgements. A sixth
+case verifies remaining-upload guidance. All six pass (10.8s); seven focused job
+unit tests pass. The new recovery-copy and waiting-files checks failed before
+their original source increments were restored. The browser retry fixture now
+matches the existing backend's automatic-attempt-window extension; it does not
+change the separate durable provider allowance or trigger an automatic retry.
+
+[Isolated real-backend evidence and 18 screenshots](review/owner-backend-screens/README.md)
+cover S05–S12 saves/reloads, private photos, verification, 403/409 denials and real
+PDF intake to a queued SQL job at `733c3346`. The environment used the actual
+Worker, database and local R2, with a synthetic signed identity and no business
+API mocks. Every owned process/container/storage resource was cleaned up.
+Subsequent runtime changes restore #207's recovery/step text and fence pending
+S10 Remove/Undo actions. The six OCR cases and delayed-removal regression test
+those deltas; the latter passed three repeats before the full 59-case pass.
+Fresh OCR and S13 publication were not part
+of this isolated run; its evidence page names those limits explicitly.
 
 ## Confirmed missing backend pieces added
 
@@ -103,7 +174,7 @@ and migration; the old staging API cannot satisfy the new profile/setup reads.
   membership or persistent diner alias. Its old published bundle is immutable;
   a restaurant-name change in a new bundle requires a new prepared revision.
 
-## Pictures and verification
+## Original screen walkthrough and historical verification
 
 The 24 screenshots below use real rendered components with fictional local
 state. Browser navigation passed at 1440px and 390px in 14.3s including startup.

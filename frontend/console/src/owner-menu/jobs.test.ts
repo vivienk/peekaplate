@@ -55,6 +55,17 @@ describe('menuProcessingState', () => {
     });
   });
 
+  it('waits for missing job reads and preserves failures with no dishes', () => {
+    expect(menuProcessingState([]).phase).toBe('processing');
+    expect(
+      menuProcessingState([
+        job('j0', { status: 'complete' }),
+        job('j1', { status: 'failed', error_code: 'extraction_failed' }),
+      ]).phase,
+    ).toBe('failed');
+    expect(menuProcessingState([job('j0', { status: 'incomplete' })]).phase).toBe('failed');
+  });
+
   it('ignores cancelled members and reports a fully cancelled menu', () => {
     expect(
       menuProcessingState([
@@ -67,6 +78,15 @@ describe('menuProcessingState', () => {
 });
 
 describe('errorMessage', () => {
+  it('distinguishes extraction recovery from an exhausted provider allowance', () => {
+    expect(errorMessage('extraction_failed')).toBe(
+      'The source could not be fully extracted. Try another source or add dishes manually.',
+    );
+    expect(errorMessage('provider_call_budget_exhausted')).toBe(
+      'The extraction limit has been reached. Add dishes manually or contact your administrator.',
+    );
+  });
+
   it('explains known codes and never shows a raw code', () => {
     expect(errorMessage('menu_file_link_required')).toContain('direct link');
     expect(errorMessage('something_new')).not.toContain('something_new');

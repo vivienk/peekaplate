@@ -39,6 +39,7 @@ export function publicBundleToWire(bundle: PublicMenuContentBundle): WireMenuBun
           dish_revision_id: dish.dish_revision_id,
           complete: true,
           ...(dish.portion ? { portion: dish.portion } : {}),
+          ...(dish.serving_count !== undefined ? { serving_count: dish.serving_count } : {}),
           name: dish.name,
           description: dish.description,
           price: { amount: dish.price.amount, currency: dish.price.currency },

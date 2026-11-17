@@ -786,6 +786,7 @@ export function OwnerMenuWorkspace({
           saveFailed={Boolean(error)}
           onSave={(next, photo) => {
             const editingSaved = details !== null;
+            const generation = viewGeneration.current;
             // Back from S06 then Save with nothing changed: continue to S06 without
             // submitting the same details for verification again.
             if (
@@ -824,6 +825,7 @@ export function OwnerMenuWorkspace({
               setNotice(
                 'Restaurant details saved and submitted for team verification. This does not publish your menu.',
               );
+              if (viewGeneration.current !== generation) return;
               const continueOnboarding = detailsFromSources || !editingSaved;
               setDetailsFromSources(false);
               setView(continueOnboarding ? 'sources' : 'overview');
@@ -966,11 +968,13 @@ export function OwnerMenuWorkspace({
           }
           failureReason={errorMessage(processing.errorCodes[0] ?? 'extraction_failed')}
           step={
-            jobs
-              .filter((job) => processingIds.includes(job.id))
-              .some((job) => job.status === 'running')
-              ? 'Processing the uploaded source'
-              : 'Queued for processing'
+            processing.phase === 'uploading'
+              ? 'Waiting for the remaining source files'
+              : jobs
+                    .filter((job) => processingIds.includes(job.id))
+                    .some((job) => job.status === 'running')
+                ? 'Processing the uploaded source'
+                : 'Queued for processing'
           }
           onCancel={() =>
             void run(async (active) => {

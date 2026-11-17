@@ -75,6 +75,9 @@ async function fixture(context: BrowserContext) {
     profiles: {} as Record<string, RestaurantProfile>,
     afterVerification: null as ((draft: DishDraft) => void) | null,
     profileStatus: 200,
+    delayProfileSave: false,
+    profileSaveStarted: false,
+    releaseProfileSave: () => {},
     setupStatus: 200,
     delaySetup: false,
     releaseSetup: () => {},
@@ -109,6 +112,8 @@ async function fixture(context: BrowserContext) {
     analysisStatus: 200,
     delayAnalysis: false,
     releaseAnalysis: () => {},
+    // The analysis snapshot period; by default the same as the report on screen (UNEEZA_REPORT).
+    analysisWindow: { start: '2026-10-19T07:00:00Z', end: '2026-10-20T07:00:00Z' },
   };
   await context.route('https://auth-fixture.supabase.co/auth/v1/**', async (route) => {
     const request = route.request();
@@ -179,7 +184,7 @@ async function fixture(context: BrowserContext) {
           goal: body.goal,
           source: 'synthetic',
           reportSnapshot: 'a'.repeat(64),
-          timeWindow: { start: '2026-11-11T12:00:00Z', end: '2026-11-12T12:00:00Z' },
+          timeWindow: state.analysisWindow,
           status: 'review',
           metric: 'open_rate',
           value: 0.5,
@@ -216,6 +221,11 @@ async function fixture(context: BrowserContext) {
             headers,
           });
         if (request.method() === 'PUT') {
+          state.profileSaveStarted = true;
+          if (state.delayProfileSave)
+            await new Promise<void>((resolve) => {
+              state.releaseProfileSave = resolve;
+            });
           const input = request.postDataJSON();
           if ((state.profiles[id]?.version ?? 0) !== input.expectedVersion)
             return route.fulfill({ status: 409, json: { error: 'version_conflict' }, headers });
@@ -355,6 +365,10 @@ async function fixture(context: BrowserContext) {
       if (/^menus\/jobs\/[^/]+\/(retry|cancel)$/.test(path)) {
         const job = state.jobs[id]!.find((value) => value.id === path.split('/')[2])!;
         job.status = path.endsWith('/retry') ? 'queued' : 'cancelled';
+        if (path.endsWith('/retry')) {
+          job.max_attempts = Math.max(job.max_attempts, job.attempt_count + 3);
+          job.error_code = null;
+        }
         return route.fulfill({ json: { job }, headers });
       }
       if (/^extractions\/[^/]+\/candidates\/[^/]+\/review$/.test(path)) {
@@ -1138,6 +1152,33 @@ test('profile save reloads authenticated details and never verifies an owner sub
   );
 });
 
+test('a delayed profile save preserves navigation back to the dashboard', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  state.delayProfileSave = true;
+  await signIn(page, undefined, false);
+  await page.getByRole('button', { name: 'Start: Restaurant details', exact: true }).click();
+  await page.getByRole('textbox', { name: /^Restaurant name/ }).fill('Ember & Stone');
+  await page.getByRole('textbox', { name: /^City/ }).fill('San Francisco');
+  await page.getByRole('textbox', { name: /^Street address/ }).fill('100 Fictional Street');
+  await page.getByRole('textbox', { name: /^Phone number/ }).fill('(555) 234-5678');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => state.profileSaveStarted).toBe(true);
+  await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
+  state.releaseProfileSave();
+  await expect(
+    page.getByText(
+      'Restaurant details saved and submitted for team verification. This does not publish your menu.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Welcome to PeekaPlate', exact: true }),
+  ).toBeVisible();
+  expect(state.profiles[venue.venueId]?.version).toBe(1);
+});
+
 test('a delayed restaurant photo does not reset unsaved restaurant details', async ({
   context,
   page,
@@ -1304,11 +1345,28 @@ test('manual dish and original private photo survive save and reload', async ({
   expect([...state.photos.values()][0]).toEqual(original);
   expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
     allergens: { status: 'unknown', items: [] },
+    servingSize: '1 bowl',
   });
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Price/ })).toHaveValue('9.50');
+  await page.getByRole('spinbutton', { name: 'People served', exact: true }).fill('2');
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
+    servingSize: '1 bowl',
+    servingCount: 2,
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveValue(
+    '2',
+  );
   await expect(page.getByRole('img', { name: 'Private draft dish' })).toBeVisible();
   const license = page.getByRole('checkbox', {
     name: 'I have the right to use this photo.',
@@ -1922,6 +1980,50 @@ test('the AI panel shows the report period and an honest error when the review f
   await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
 });
 
+test('an analysis for a different period than the report on screen shows no suggestion', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  // Deliberately different UTC start and end from the report on screen (Oct 19 07:00 – Oct 20 07:00).
+  state.analysisWindow = { start: '2026-11-11T12:00:00Z', end: '2026-11-12T12:00:00Z' };
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
+  await expect(panel.getByText(/Nov 11\s*–\s*12, 2026/)).toBeVisible();
+  // Honest guidance: no promise that refreshing and asking again will match.
+  await expect(panel.getByText(/refresh/i)).toHaveCount(0);
+  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+  await expect(panel.getByText(/open rate/i)).toHaveCount(0);
+  await expect(panel.getByText('Review the approved dish card', { exact: false })).toHaveCount(0);
+
+  // Only the start differs: still no suggestion.
+  state.analysisWindow = { start: '2026-10-19T06:00:00Z', end: '2026-10-20T07:00:00Z' };
+  await panel.getByLabel('Review focus').selectOption('engagement');
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+
+  // The real path: report and analysis each compute a rolling window from their own request time,
+  // so an analysis requested 25 seconds later covers a shifted window. Still no suggestion, and
+  // the message names both periods with exact times because their dates read the same.
+  state.analysisWindow = { start: '2026-10-19T07:00:25Z', end: '2026-10-20T07:00:25Z' };
+  await panel.getByLabel('Review focus').selectOption('crm');
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+  await expect(panel.getByText(/Oct 19, 7:00:25\s*AM UTC/)).toBeVisible();
+  await expect(panel.getByText(/Oct 19, 7:00:00\s*AM UTC/)).toBeVisible();
+
+  // The same instants written differently (".000Z") count as the same period.
+  state.analysisWindow = { start: '2026-10-19T07:00:00.000Z', end: '2026-10-20T07:00:00.000Z' };
+  await panel.getByLabel('Review focus').selectOption('menu');
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toBeVisible();
+});
+
 test('analysis denial clears the private report and refreshes restaurant access', async ({
   context,
   page,
@@ -1950,7 +2052,9 @@ test('the panel distinguishes its server-read analysis period from the displayed
   await panel.getByRole('button', { name: 'Review report' }).click();
   await expect(panel.getByRole('heading', { name: /Suggested review/ })).toBeVisible();
   await expect(panel.getByText(/Displayed report period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
-  await expect(panel.getByText(/Analysis evidence period:.*Nov 11\s*–\s*12, 2026/)).toBeVisible();
+  // A suggestion is shown only when the analysis covers the period on screen (see the next test
+  // for a different period).
+  await expect(panel.getByText(/Analysis evidence period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
   await expect(
     panel.getByText('Synthetic analysis from a separate server-read snapshot.'),
   ).toBeVisible();
@@ -2057,8 +2161,18 @@ test('authored S10 verifies actual saved drafts without publication and preserve
   await expect(page.locator('.review-table')).toBeVisible();
   await expect(page.getByRole('main')).toHaveCount(1);
 
+  state.delayJobs = true;
+  const jobsReadsBeforeRemoval = state.jobsReads;
   await page.getByRole('button', { name: 'Remove Fictional Salad', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Remove Fictional Lentil Soup', exact: true }),
+  ).toBeDisabled();
+  await expect.poll(() => state.jobsReads).toBeGreaterThan(jobsReadsBeforeRemoval);
+  state.delayJobs = false;
+  state.releaseJobs();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Remove Fictional Salad', exact: true }),
@@ -2229,6 +2343,154 @@ test('an unready or unavailable extraction does not hide other saved work', asyn
   ).toBeVisible();
   expect(state.drafts[venue.venueId]).toHaveLength(2);
 });
+
+test('OCR processing waits for the remaining source files', async ({ context, page }) => {
+  const state = await fixture(context);
+  await page.clock.install();
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByText('Paste URL', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('Menu URL').fill('https://restaurant.example/menu.pdf');
+  await page.getByRole('button', { name: 'Import menu', exact: true }).click();
+  await expect(page.getByText('Queued for processing', { exact: true })).toBeVisible();
+  state.jobs[venue.venueId]![0]!.source_uploaded = false;
+  await page.clock.runFor(5000);
+  await expect(
+    page.getByText('Waiting for the remaining source files', { exact: true }),
+  ).toBeVisible();
+});
+
+// Adapted from PR #207; current authored S09 fields and acknowledgements remain authoritative.
+for (const outcome of ['complete', 'failed', 'incomplete'] as const) {
+  test(`OCR ${outcome} with no new dishes is not success from older drafts`, async ({
+    context,
+    page,
+  }) => {
+    const state = await fixture(context);
+    state.drafts[venue.venueId] = [
+      {
+        id: crypto.randomUUID(),
+        draft_id: crypto.randomUUID(),
+        job_id: 'older-job',
+        origin: 'extracted',
+        draft_version: 1,
+        name: 'Older dish',
+        category: null,
+        description: null,
+        price_amount: null,
+        price_currency: null,
+        ingredients: null,
+        source_text: null,
+        review_warnings: [],
+        review_status: 'pending',
+      },
+    ];
+    await page.clock.install();
+    await signIn(page);
+    await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+    await page.getByText('Paste URL', { exact: true }).click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByLabel('Menu URL').fill('https://restaurant.example/menu.pdf');
+    await page.getByRole('button', { name: 'Import menu', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Processing your menu' })).toBeVisible();
+    const job = state.jobs[venue.venueId]![0]!;
+    job.status = outcome;
+    job.attempt_count = job.max_attempts;
+    job.error_code = outcome === 'complete' ? null : 'extraction_failed';
+    await page.clock.runFor(5000);
+    await expect(
+      page.getByRole('heading', {
+        name: outcome === 'complete' ? 'No dishes found' : 'We couldn’t process your menu',
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Try another source', exact: true }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'View saved dishes', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Edit Older dish', exact: true })).toBeVisible();
+    await page.getByText('Saved sources (1)', { exact: true }).click();
+    expect(state.apiCalls.some(({ path }) => /retry|approve|publish/.test(path))).toBe(false);
+    if (outcome === 'complete') {
+      await expect(page.getByRole('button', { name: 'Retry source', exact: true })).toHaveCount(0);
+    } else {
+      const jobId = job.id;
+      await page.getByRole('button', { name: 'Retry source', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Processing your menu' })).toBeVisible();
+      expect(state.jobs[venue.venueId]).toHaveLength(1);
+      expect(job.id).toBe(jobId);
+      expect(job.max_attempts).toBe(6);
+      expect(state.apiCalls.filter(({ path }) => path.endsWith('/retry'))).toHaveLength(1);
+    }
+  });
+}
+
+for (const partial of [false, true]) {
+  test(`OCR upload opens stored candidates for correction (${partial ? 'partial' : 'complete'})`, async ({
+    context,
+    page,
+  }) => {
+    const state = await fixture(context);
+    await page.clock.install();
+    await signIn(page);
+    await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+    await page.getByText('Upload photos/PDF', { exact: true }).click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles([
+        { name: 'menu.png', mimeType: 'image/png', buffer: Buffer.from('synthetic image one') },
+        { name: 'menu-two.png', mimeType: 'image/png', buffer: Buffer.from('synthetic image two') },
+      ]);
+    await expect
+      .poll(() => state.jobs[venue.venueId]?.every((job) => job.source_uploaded))
+      .toBe(true);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Processing your menu' })).toBeVisible();
+    const jobs = state.jobs[venue.venueId]!;
+    const item = state.review.items[0]!;
+    state.drafts[venue.venueId] = [
+      {
+        id: crypto.randomUUID(),
+        draft_id: crypto.randomUUID(),
+        job_id: jobs[0]!.id,
+        candidate_id: item.candidate.candidate_id,
+        origin: 'extracted',
+        draft_version: 1,
+        name: item.effective.name,
+        category: item.effective.category ?? null,
+        description: item.effective.description ?? null,
+        price_amount: item.effective.price_amount ?? null,
+        price_currency: item.effective.price_currency ?? null,
+        ingredients: item.effective.ingredients ?? null,
+        source_text: 'Synthetic source',
+        review_warnings: [],
+        review_status: 'pending',
+      },
+    ];
+    jobs[0]!.status = 'complete';
+    jobs[0]!.draft_count = 1;
+    jobs[1]!.status = partial ? 'failed' : 'complete';
+    await page.clock.runFor(5000);
+    await expect(
+      page.getByRole('button', { name: `Review ${item.effective.name}`, exact: true }),
+    ).toBeVisible();
+    if (partial) await expect(page.getByText(/Some sources could not be read fully/)).toBeVisible();
+    await page.getByRole('button', { name: `Review ${item.effective.name}`, exact: true }).click();
+    await expect(page.getByRole('textbox', { name: /^Dish name/ })).toHaveValue(
+      item.effective.name!,
+    );
+    await page.getByRole('textbox', { name: /^Dish name/ }).fill('Owner corrected synthetic dish');
+    await completeRequiredDish(page);
+    await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+    await expect.poll(() => state.correctionIds.length).toBe(1);
+    expect(item.effective.name).toBe('Owner corrected synthetic dish');
+    await expect(page.locator('.review-table')).toContainText('Owner corrected synthetic dish');
+    expect(state.apiCalls.some(({ path }) => /retry|approve|publications/.test(path))).toBe(false);
+  });
+}
 
 // Part A: completing S10 verification prepares the menu for S13 (never publishes); a failed
 // preparation keeps the verification and says what to do next.

@@ -19,7 +19,10 @@ type Mode =
   | 'dimensions'
   | 'slow'
   | 'no-photo'
-  | 'original-missing';
+  | 'original-missing'
+  | 'branding'
+  | 'measured-serving'
+  | 'mismatched-serving';
 async function openMenu(page: Page, mode: Mode = 'valid') {
   const content = JSON.parse(
     readFileSync('packages/contracts/fixtures/public-menu-bundle.v1/bundle.json', 'utf8'),
@@ -28,6 +31,8 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
     for (const dish of category.dishes) {
       if (!dish.complete || mode === 'missing' || mode === 'no-photo') continue;
       const dishImages = dish.name === 'Roast Chicken' ? [images[0]!, blue] : images;
+      if (mode === 'measured-serving' || mode === 'mismatched-serving')
+        dish.serving_count = dish.name === 'Roast Chicken' ? 2 : 1;
       dish.portion = {
         schema_version: 1,
         dish_id: mode === 'wrong-dish' ? content.menu_id : dish.dish_id,
@@ -41,7 +46,32 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
           depth,
         })),
       };
+      if (mode === 'measured-serving' || mode === 'mismatched-serving') {
+        dish.portion.physical_size = {
+          serving_count: mode === 'mismatched-serving' ? 3 : dish.serving_count,
+          source: 'owner',
+          validation_status: 'pending',
+          foreground_sha256: hash(dishImages[1]!),
+          plate: {
+            shape: 'round',
+            width_mm: dish.serving_count === 1 ? 240 : 320,
+            depth_mm: dish.serving_count === 1 ? 240 : 320,
+            source_sha256: 'b'.repeat(64),
+            source_width_px: 64,
+            source_height_px: 64,
+            boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+            confirmed: true,
+          },
+        };
+      }
     }
+  if (mode === 'branding')
+    content.restaurant.logo = {
+      url: 'https://assets.example.test/logo.png',
+      width: 320,
+      height: 80,
+      alt: 'Saved owner logo',
+    };
   const bytes = JSON.stringify(content);
   await page.route('**/src/menu/menuScreen.ts*', async (route) => {
     const response = await route.fetch();
@@ -53,30 +83,46 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
     });
   });
   await page.route('**/public/venues/**', (route) =>
-    route.fulfill({
-      json: {
-        schemaVersion: 1,
-        venueId: content.venue_id,
-        menuId: content.menu_id,
-        menuRevisionId: content.menu_revision_id,
-        publicationId: '44444444-4444-4444-8444-444444444444',
-        publicationHash: 'a'.repeat(64),
-        availabilityVersion: 1,
-        tier: 'T0',
-        bundle: {
-          url: 'https://bundle.example.test/portion.json',
-          contentHash: hash(bytes),
-          assetManifestHash: 'b'.repeat(64),
-        },
-        menuToken: 'synthetic-only',
-        tokenExpiresAt: new Date(Date.now() + 1800000).toISOString(),
-      },
-    }),
+    route.request().url().includes('/ingredient-icons')
+      ? route.fulfill(
+          route.request().url().includes('/image?')
+            ? { contentType: 'image/png', body: blue }
+            : {
+                json: {
+                  schemaVersion: 1,
+                  icons: [{ label: 'leeks', version: 1, status: 'approved', sha256: hash(blue) }],
+                },
+              },
+        )
+      : route.fulfill({
+          json: {
+            schemaVersion: 1,
+            venueId: content.venue_id,
+            menuId: content.menu_id,
+            menuRevisionId: content.menu_revision_id,
+            publicationId: '44444444-4444-4444-8444-444444444444',
+            publicationHash: 'a'.repeat(64),
+            availabilityVersion: 1,
+            tier: 'T0',
+            bundle: {
+              url: 'https://bundle.example.test/portion.json',
+              contentHash: hash(bytes),
+              assetManifestHash: 'b'.repeat(64),
+            },
+            menuToken: 'synthetic-only',
+            tokenExpiresAt: new Date(Date.now() + 1800000).toISOString(),
+          },
+        }),
   );
   await page.route('https://bundle.example.test/portion.json', (route) =>
     route.fulfill({ contentType: 'application/json', body: bytes }),
   );
   await page.route('https://assets.example.test/**', async (route) => {
+    if (route.request().url().endsWith('/logo.png'))
+      return route.fulfill({
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="80" viewBox="0 0 320 80"><rect x="1" y="1" width="318" height="78" rx="8" fill="#f8ead5"/><text x="160" y="49" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#33291e">SYNTHETIC LOGO</text></svg>',
+      });
     const layer = /\/([01])\.png$/.exec(route.request().url());
     if (layer && mode === 'slow') await new Promise((resolve) => setTimeout(resolve, 9000));
     if (
@@ -289,7 +335,7 @@ test('local captured-dish demo loads real textures and tilts without route mocks
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
-  await expect(page.locator('.pp-logo__name')).toBeVisible();
+  await expect(page.locator('.pp-logo')).toBeVisible();
   await openPortion(page);
   await expect(page.locator('.pp-portion__status')).toContainText('shared sample cutout');
   const canvas = page.locator('.pp-portion__css');
@@ -377,7 +423,9 @@ test('live reduced-motion preference immediately centers and updates instruction
   await stage.press('ArrowRight');
   expect(hash(await page.locator('.pp-portion__css').screenshot())).toBe(still);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await expect(page.locator('.pp-portion__status')).toHaveText('Drag to tilt the plate');
+  await expect(page.locator('.pp-portion__status')).toHaveText(
+    'Approximate 2.5D preview — not actual size. Drag to tilt the plate.',
+  );
 });
 
 test('PR25 interactive cutout fallback stays tiltable without WebGL', async ({ page }) => {
@@ -1078,5 +1126,113 @@ for (const name of [
     await expect(
       page.getByRole('button', { name: 'Open Captured dish · tilt demo', exact: true }),
     ).toHaveCount(0);
+  });
+}
+
+test('published owner branding fits narrow and wide headers and restores name after image failure', async ({
+  page,
+}, testInfo) => {
+  await openMenu(page, 'branding');
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const logo = page.locator('.pp-logo__image');
+    await expect(logo).toBeVisible();
+    await expect(logo).toHaveJSProperty('naturalWidth', 320);
+    expect(await logo.evaluate((image) => getComputedStyle(image).objectFit)).toBe('contain');
+    const box = await logo.boundingBox();
+    expect(box!.width).toBeLessThanOrEqual(240);
+    expect(box!.height).toBe(72);
+    if (width === 390 || width === 1280)
+      await page.screenshot({ path: testInfo.outputPath(`published-logo-${width}.png`) });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  await expect(page.locator('.pp-logo__name, .pp-logo__emblem')).toHaveCount(0);
+  await page
+    .locator('.pp-logo__image')
+    .evaluate((image) => image.dispatchEvent(new Event('error')));
+  await expect(page.locator('.pp-logo__name')).toHaveText('Synthetic Fixture Bistro');
+});
+
+test('approved artwork follows the published ingredient label and falls back on unavailable images', async ({
+  page,
+}) => {
+  await openMenu(page, 'branding');
+  await page.locator('.pp-card__open').first().click();
+  const tile = page.locator('.pp-ingredient').filter({ hasText: /Leeks/ });
+  await expect(tile.locator('img')).toHaveAttribute('src', /ingredient-icons\/image\?label=leeks/);
+  await tile.locator('img').evaluate((image) => image.dispatchEvent(new Event('error')));
+  await expect(tile.locator('img')).not.toHaveAttribute('src', /ingredient-icons/);
+  await expect(tile.locator('.pp-ingredient__name')).toHaveText('Leeks');
+  await page.locator('.pp-detail__back').click();
+  await page.locator('.pp-card__open').nth(1).click();
+  await expect(page.locator('.pp-ingredient__name').first()).not.toHaveText('Leeks');
+  await expect(page.locator('.pp-ingredient img[src*="label=leeks"]')).toHaveCount(0);
+});
+
+for (const matched of [true, false]) {
+  test(`published serving calibration ${matched ? 'enables measured AR' : 'rejects a different serving'} and keeps 2.5D approximate`, async ({
+    page,
+  }) => {
+    await cameraFixture(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'xr', {
+        configurable: true,
+        value: {
+          isSessionSupported: async () => true,
+          requestSession: async () => {
+            (window as any).measuredArRequested = true;
+            throw new DOMException('Synthetic unsupported device', 'NotSupportedError');
+          },
+        },
+      });
+    });
+    await openMenu(page, matched ? 'measured-serving' : 'mismatched-serving');
+    for (const [name, count, cm] of [
+      ['Charred Leeks', 1, 24],
+      ['Roast Chicken', 2, 32],
+    ] as const) {
+      await page.getByRole('button', { name: `Open ${name}`, exact: true }).click();
+      await expect(page.locator('.pp-detail__servings')).toHaveText(
+        `Serves ${count} ${count === 1 ? 'person' : 'people'}`,
+      );
+      await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+      await expect(page.locator('.pp-portion__status')).toContainText(
+        'Approximate 2.5D preview — not actual size.',
+      );
+      await page.getByText('Preview controls', { exact: true }).click();
+      await page.getByRole('button', { name: 'Show original photo', exact: true }).click();
+      await page.getByRole('button', { name: 'Show review candidate', exact: true }).click();
+      await expect(page.locator('.pp-portion__status')).toContainText(
+        'Approximate 2.5D preview — not actual size.',
+      );
+      await page.getByRole('button', { name: 'View on your table', exact: true }).click();
+      const portal = page.getByRole('dialog', { name: 'Dish on your table' });
+      await portal.getByText('Adjust view', { exact: true }).click();
+      if (matched) {
+        await expect(portal.locator('.pp-ar__scale-status')).toContainText(`${cm} × ${cm} cm`);
+        await expect(portal.locator('.pp-ar__scale-status')).toContainText(
+          'camera scale is approximate',
+        );
+        await portal
+          .getByRole('button', { name: 'Place measured size on table', exact: true })
+          .click();
+        await expect
+          .poll(() => page.evaluate(() => (window as any).measuredArRequested))
+          .toBe(true);
+        await expect(portal.locator('.pp-ar__scale-status')).toContainText('Approximate preview');
+      } else {
+        await expect(
+          portal.getByRole('button', { name: 'Place measured size on table', exact: true }),
+        ).toHaveCount(0);
+        await expect(portal.locator('.pp-ar__scale-status')).toContainText(
+          'matching serving/plate measurements not supplied',
+        );
+      }
+      await portal.getByRole('button', { name: 'Back to preview', exact: true }).click();
+      await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+      await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
+    }
   });
 }

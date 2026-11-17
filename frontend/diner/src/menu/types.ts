@@ -42,6 +42,7 @@ export type CompleteDish = {
   cameraSample?: true;
   previewPortion?: PublicPortion;
   portion?: PublicPortion;
+  servingCount?: number;
   kind: 'complete';
   dishId: string;
   dishRevisionId: string;

@@ -18,6 +18,19 @@ const render = (props: Partial<DishEditorProps> = {}) =>
   );
 
 describe('live Screen 9 on the authored #172 presentation', () => {
+  it('adds optional people served without replacing the authored serving-size text', () => {
+    const html = render({
+      value: { ...emptyManualDish(), servingSize: '1 bowl', servingCount: '2' },
+    });
+    expect(html).toMatch(/id="f-size"[^>]+value="1 bowl"/);
+    expect(html).toContain('People served');
+    expect(html).toMatch(/type="number"[^>]+min="1"[^>]+max="100"[^>]+step="1"/);
+    expect(html).toMatch(/id="dish-serving-count"[^>]+value="2"/);
+    const blank = render().match(/<input[^>]+id="dish-serving-count"[^>]*>/)?.[0] ?? '';
+    expect(blank).toContain('value=""');
+    expect(blank).not.toContain('required');
+  });
+
   it('keeps OCR evidence, actual CAD currency and unknown allergens on the authored form', () => {
     const session = reviewSession();
     const item = session.items[0]!;

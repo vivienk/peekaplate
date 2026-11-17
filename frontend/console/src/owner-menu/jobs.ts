@@ -79,6 +79,10 @@ export function menuProcessingState(jobs: readonly MenuJob[]): MenuProcessingSta
 // Screen copy for the API's error codes. Unknown codes fall back to a generic message rather
 // than showing the raw code.
 const ERROR_COPY: Record<string, string> = {
+  extraction_failed:
+    'The source could not be fully extracted. Try another source or add dishes manually.',
+  provider_call_budget_exhausted:
+    'The extraction limit has been reached. Add dishes manually or contact your administrator.',
   menu_file_link_required:
     'That page is not a single menu file. Paste a direct link to the PDF or image instead.',
   pdf_page_limit: 'This PDF has more than 10 pages. Upload a shorter PDF or a few photos.',

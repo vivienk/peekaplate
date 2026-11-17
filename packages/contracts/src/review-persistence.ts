@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { OwnerDishFieldsSchema } from './owner-menu';
+import { ServingCountSchema } from './portion';
 import {
   type ReviewCandidate,
   ReviewCandidateResultSchema,
@@ -51,11 +52,13 @@ export const ReviewEditableFieldSchema = z.enum([
   'serving_size',
   'allergens',
   'photo_id',
+  'serving_count',
 ]);
 export type ReviewEditableField = z.infer<typeof ReviewEditableFieldSchema>;
 
 export const CandidateCorrectedFieldsSchema = z
   .strictObject({
+    serving_count: ServingCountSchema.nullable().optional(),
     name: postgresText.trim().min(1).max(160).optional(),
     description: postgresText.trim().min(1).max(4000).nullable().optional(),
     category: postgresText.trim().min(1).max(160).nullable().optional(),
@@ -101,7 +104,11 @@ export const ReviewCandidateCommandSchema = z
     expectedVersion: z.number().int().nonnegative().max(2_147_483_646),
     action: z.enum(['correct', 'reject', 'mark_incomplete']),
     corrected: CandidateCorrectedFieldsSchema.optional(),
-    incompleteFields: z.array(ReviewEditableFieldSchema).min(1).max(11).optional(),
+    incompleteFields: z
+      .array(ReviewEditableFieldSchema)
+      .min(1)
+      .max(ReviewEditableFieldSchema.options.length)
+      .optional(),
     reviewNote: postgresText.trim().min(1).max(1000).nullable().optional(),
   })
   .superRefine((cmd, ctx) => {
@@ -143,6 +150,7 @@ export const ReviewCandidateCommandSchema = z
 export type ReviewCandidateCommand = z.infer<typeof ReviewCandidateCommandSchema>;
 
 export const ResolvedCandidateFieldsSchema = z.strictObject({
+  serving_count: ServingCountSchema.nullable().optional(),
   name: postgresText.min(1).max(160),
   description: postgresText.max(4000).nullable(),
   category: postgresText.nullable(),
@@ -168,6 +176,7 @@ export const CandidateReviewRecordSchema = z.strictObject({
   version: z.number().int().nonnegative().max(2_147_483_647),
   reviewStatus: ReviewCandidateStatusSchema,
   corrected: z.strictObject({
+    serving_count: ServingCountSchema.nullable().optional(),
     name: postgresText.min(1).max(160).optional(),
     description: postgresText.max(4000).nullable().optional(),
     category: postgresText.nullable().optional(),
