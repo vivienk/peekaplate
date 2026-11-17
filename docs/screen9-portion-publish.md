@@ -39,25 +39,36 @@ only to originals.
 The current 2.5D preview shows the **actual generated cutout**, not a synthetic
 2.5D fixture or 3D model. Diner camera/AR placement remains in PR #162.
 
+S09 keeps the original #172/#213 form and its existing right-hand 2.5D card.
+The generated image uses the same bounded 120px photo presentation as the
+authored photo card; it must not expand at its intrinsic height. Generation,
+private review status and explicit approval stay inside this card. No separate
+editor, preview page, design token or approval path is introduced.
+
 ## Private service configuration
 
-The Worker requires server-side `PORTION_SERVICE_URL` (bare HTTPS origin)
-and `PORTION_SERVICE_SECRET` (the extraction host's service bearer token).
-The extraction host must be deployed with an absolute, writable
-`PORTION_REVIEW_ROOT` to mount the private portion endpoint. Each request uses a
-temporary directory under that root. Its host already uses
-`EXTRACTION_SERVICE_SECRET`; configure the Worker portion token to match the
-host's secret. Do not expose these values via `VITE_*`, HTML, assets, docs or logs.
+The Worker reuses the existing server-side `EXTRACTION_SERVICE_URL` and
+`EXTRACTION_SERVICE_SECRET` when neither dedicated portion setting exists.
+An explicit `PORTION_SERVICE_URL` (bare HTTPS origin) and
+`PORTION_SERVICE_SECRET` pair may override that destination; a partial pair
+fails closed. Do not expose these values via `VITE_*`, HTML, assets, docs or logs.
 
 The service is **disabled until configured and deployed**. The owner UI retains
 the photo fallback and reports service unavailability. No provider credits,
 Tripo or billable 3D calls are involved.
 
-The checked-in staging extraction Worker does not forward the portion upload
-route or pass the scratch root to the Python container. Its image installs the
-`service` extra, while automatic segmentation of an opaque photo requires the
-`cutout` extra and the U2NET model. Verify a real opaque-photo request against a
-configured host before counting staging generation as accepted.
+The existing extraction Worker forwards only the authenticated portion-upload
+route to its existing container. It passes a private scratch root; the image
+installs the locked `service` and `cutout` extras and includes the
+checksum-verified U2NETP model, readable by its non-root runtime. Each request
+removes its temporary directory. Input is bounded to 12 MB, the response to
+300 KB, and the complete request/body deadline to 220 seconds. The existing
+two-attempt paid extraction budget is unchanged; cutout generation is CPU-only.
+
+A failed generation can be retried with the same saved photo. Only successful
+review manifests are reused; ordinary field edits do not start another request.
+Verify a real opaque-photo request on the deployed host before claiming hosted
+generation acceptance.
 
 ## Approved publication handoff
 
@@ -69,7 +80,19 @@ exported photo must match the current revision's approved photo. A text-only
 revision can reuse the artwork if it retains that photo. Replacing or clearing
 the approved photo makes the old artwork ineligible for export.
 
-The existing privileged producer now accepts optional arguments:
+S13 preparation reuses `exportApprovedPrivatePortion`, the approved-portion
+validator and the existing bundle producer. It binds each approved visual to
+the verified source photo and canonical dish revision. Missing approval leaves
+the ordinary photo fallback; malformed approved artifacts block preparation.
+No second producer or public upload store is introduced.
+
+The existing prepared-menu asset route serves the hash-verified layers only
+when the exact content/asset snapshot is published. Editing a draft or preparing
+a later revision does not remove the previous publication's assets. Withdrawal,
+revoked visual approval, corrupt bytes or a mismatched tenant fail closed.
+New preparation still requires the current verified draft/photo/revision.
+
+The existing operator CLI remains available for its separate explicit handoff:
 
 ```bash
 PEEKAPLATE_OWNER_TOKEN='<private staff token>' pnpm produce:bundle \
@@ -90,7 +113,7 @@ and revision UUIDs**. It writes immutable files under
 `--out/assets/portions/<dish>/<revision>/<hash>/background.svg` and
 `dish.webp`, plus the resulting bundle and handoff JSON.
 
-**Operator hosting is still a required step:** upload the generated asset files
+**For the operator CLI path**, upload the generated asset files
 at the exact `asset_base_url/portions/...` HTTPS paths, with suitable MIME/CORS
 headers, before running the same command with `--admit`. When the portion
 mapping is used, admission checks every hosted public portion layer's exact
@@ -111,15 +134,22 @@ Required before claiming full staging readiness:
 - An actual uploaded dish photo produces both private 2.5D layers; Screen 9
   previews the correct image, and the result survives refresh.
 - The owner approves the visual; S10 independently verifies dish/photo facts.
-- A trusted operator prepares/hosts/adopts the approved portion and publishes
-  the admitted menu; the diner loads exactly the same approved layer bytes.
+- S13 prepares the approved portion, previews and publishes the admitted menu;
+  the diner loads exactly the same approved layer bytes through the existing
+  published asset route. The operator CLI has its own explicit hosting step.
 - Missing assets fall back to the original photo. Revision changes and
   cross-dish or cross-venue requests cannot reuse another image.
 - Test failing segmentation, corrupted hashes, revoked sessions, unavailable
   service, stale menu snapshots, browser Back and camera placement on a phone.
 - CI quality, unit, database and browser checks must pass before merging.
 
-**Not yet claimed:** hosted processing-service rollout, an automatically
-background-scheduled generation queue, entirely automated private-to-public
-promotion, an actual authenticated staging round trip, physical-device AR
-calibration or production release sign-off.
+Local evidence includes a real non-root Linux container request with networking
+disabled: one opaque synthetic JPEG produced two validated layers in 41 seconds,
+with no provider call and no scratch files remaining. Database regressions cover
+preparation, corruption, revocation and preservation of the previous publication
+while a draft is edited. This is local evidence, not hosted acceptance.
+
+**Not yet claimed:** the new hosted processing-service rollout and authenticated
+round trip, automatic background generation, physical-device AR calibration or
+production release sign-off. This owner path publishes approximate 2.5D; serving
+count alone never authorizes actual-size placement.

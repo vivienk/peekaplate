@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { type PublicPortion, PublicPortionSchema } from '@peekaplate/contracts';
+import { canonicalJson, type PublicPortion, PublicPortionSchema } from '@peekaplate/contracts';
 
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -16,6 +16,28 @@ export type PreparedApprovedPortion = {
   portion: PublicPortion;
   files: PreparedPortionFile[];
 };
+
+const reviewedOwnerPortions = new WeakMap<
+  PreparedApprovedPortion,
+  { photoId: string; sourceHash: string; portion: string }
+>();
+
+/** Only this validator's exact output can authorize an owner-photo portion in the producer. */
+export function matchesApprovedOwnerPortion(
+  prepared: PreparedApprovedPortion | undefined,
+  photoId: string,
+  sourceHash: string,
+  portion: PublicPortion,
+): boolean {
+  const reviewed = prepared && reviewedOwnerPortions.get(prepared);
+  return Boolean(
+    reviewed &&
+      reviewed.photoId === photoId &&
+      reviewed.sourceHash === sourceHash &&
+      reviewed.portion === canonicalJson(portion) &&
+      !portion.physical_size,
+  );
+}
 
 type ExportLayer = { name: string; sha256: string; size_bytes: number; base64: string };
 type ApprovedExport = {
@@ -49,6 +71,8 @@ export function prepareApprovedPortion(
     draftId: string;
     photoId: string;
     assetBaseUrl: string;
+    sourceHash?: string;
+    layerUrl?: (hash: string) => string;
   },
 ): PreparedApprovedPortion {
   if (!input || typeof input !== 'object') throw new Error('Invalid approved portion export');
@@ -72,6 +96,7 @@ export function prepareApprovedPortion(
   if (
     approval.schema_version !== 1 ||
     approval.status !== 'approved' ||
+    (expected.sourceHash !== undefined && approval.source_sha256 !== expected.sourceHash) ||
     !/^[a-f0-9]{64}$/.test(approval.source_sha256) ||
     sha(portionBytes) !== approval.portion_sha256 ||
     !uuid.test(approval.approved_by) ||
@@ -102,7 +127,7 @@ export function prepareApprovedPortion(
       throw new Error('2.5D public layer bytes do not match approved hashes');
     }
     const relativePath = `portions/${expected.dishId}/${expected.dishRevisionId}/${layer.sha256}/${name}`;
-    const url = `${expected.assetBaseUrl}/${relativePath}`;
+    const url = expected.layerUrl?.(layer.sha256) ?? `${expected.assetBaseUrl}/${relativePath}`;
     files.push({
       relativePath,
       url,
@@ -118,7 +143,13 @@ export function prepareApprovedPortion(
     dish_revision_id: expected.dishRevisionId,
     layers: rewrittenLayers,
   });
-  return { portion: published, files };
+  const prepared = { portion: published, files };
+  reviewedOwnerPortions.set(prepared, {
+    photoId: expected.photoId,
+    sourceHash: approval.source_sha256,
+    portion: canonicalJson(published),
+  });
+  return prepared;
 }
 
 /** Admission cannot proceed until public immutable hosting returns the exact reviewed bytes. */

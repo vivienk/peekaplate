@@ -73,6 +73,22 @@ function setup() {
     );
   return { app, env, run, verify, readReport, fetchImpl };
 }
+it('uses the same additive venue configuration as JSON reports', async () => {
+  const s = setup();
+  delete s.env.SYNTHETIC_REPORT_VENUE_ID;
+  s.env.SYNTHETIC_REPORT_VENUE_IDS = LOCAL_AI_VENUE;
+  expect((await s.run()).status).toBe(200);
+  expect(s.readReport).toHaveBeenCalledOnce();
+});
+
+it('fails closed on an invalid additive venue configuration before reading or calling a provider', async () => {
+  const s = setup();
+  s.env.SYNTHETIC_REPORT_VENUE_IDS = 'not-a-venue';
+  expect((await s.run()).status).toBe(503);
+  expect(s.readReport).not.toHaveBeenCalled();
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+});
+
 it('checks owner membership through the reader before sending a single provider request', async () => {
   const s = setup();
   expect((await s.run()).status).toBe(200);

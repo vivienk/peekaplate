@@ -182,7 +182,7 @@ export function ReviewDishes({
           <div>
             <h1>Your dishes</h1>
             <p className="review-sub">
-              {count} dish{count === 1 ? '' : 'es'} extracted
+              {count} dish{count === 1 ? '' : 'es'} in your menu
             </p>
           </div>
           <Button variant="text" className="owner-button review-add" onClick={onAddDish}>

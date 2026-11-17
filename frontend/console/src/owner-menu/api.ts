@@ -11,6 +11,9 @@ import {
   type ApproveMenuRevision,
   ApproveMenuRevisionSchema,
   CreateMenuUploadGroupSchema,
+  type DishAssistanceRequest,
+  DishAssistanceRequestSchema,
+  DishAssistanceResultSchema,
   DishRevisionSchema,
   type ExtractionReviewSessionResponse,
   ExtractionReviewSessionResponseSchema,
@@ -320,6 +323,33 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   });
 
   return {
+    async assistDish(venueId: string, draftId: string, input: DishAssistanceRequest) {
+      const payload = DishAssistanceRequestSchema.parse(input);
+      return request(
+        venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/ai/assist`),
+        json('POST', payload),
+        (body) => {
+          const value = DishAssistanceResultSchema.parse(body);
+          if (
+            value.venueId !== venueId ||
+            value.draftId !== draftId ||
+            value.requestId !== payload.requestId ||
+            value.expectedVersion !== payload.expectedVersion ||
+            value.operation !== payload.operation
+          )
+            throw new Error('assistance scope');
+          if (
+            value.operation === 'description' &&
+            payload.operation === 'description' &&
+            value.evidence?.source === 'owner_input' &&
+            payload.facts.description.slice(value.evidence.start, value.evidence.end) !==
+              value.description
+          )
+            throw new Error('assistance evidence');
+          return value;
+        },
+      );
+    },
     async setDraftRemoval(venueId: string, draftId: string, input: SetDraftRemoval) {
       return request(
         venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/removal`),

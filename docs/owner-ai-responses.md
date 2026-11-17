@@ -1,7 +1,7 @@
 # Owner dashboard Responses connection
 
 This development integration connects the owner dashboard panel to a server-side
-Responses adapter. It is not deployed and does not enable production reports.
+Responses adapter. It is off by default and does not enable production reports.
 It builds on the AI report validation and dashboard preview branches (#112/#124).
 
 ## Behavior and authority
@@ -13,7 +13,7 @@ or refresh access. Provider credentials remain server-only. Origin validation
 is a dependency-free shared helper, keeping unrelated report contracts out of
 the synthetic demo dependency path.
 
-The signed-in owner shell mounts the panel beside Dish performance only when
+The signed-in owner shell mounts the panel beside the displayed report pages only when
 `VITE_OWNER_AI_ENABLED=true`. Owners choose a dish and review focus; editors do
 not receive the panel. Session, restaurant, dish, focus or displayed-report changes
 cancel pending work. A 401 returns to sign-in; a 403 removes private report output
@@ -23,7 +23,7 @@ The Worker issues an `X-Owner-Report-Ref` response header on a successful owner
 report GET when analysis and its reference signing secret are configured. It
 binds the report's exact UTC end timestamp and content digest to the authenticated
 owner, venue and synthetic source for up to 60 seconds. The frontend handoff is
-to pass this same header on POST for the report currently on screen. The JSON
+implemented by passing this same header on POST for the report currently on screen. The JSON
 request body remains `{dishId, goal}`. The header is for this exchange only.
 
 `POST /api/v1/venues/:venueId/ai/analysis` accepts only a dish ID and one review goal
@@ -33,7 +33,8 @@ reads the pinned window in a tenant-scoped read-only transaction. The Worker
 recomputes the content digest before model evaluation and checks freshness against
 the current request clock. A missing, expired, mismatched or changed reference
 returns `409 report_reference_unavailable`; refresh the report before requesting
-analysis again. Sending the reference does not grant owner access. The browser
+analysis again. The live panel offers Reload report on this conflict and requires
+another explicit analysis request afterward. Sending the reference does not grant owner access. The browser
 cannot provide metrics, a prompt, a model, a policy or OpenAI credentials.
 The existing console origin allowlist applies to both routes. GET exposes the
 reference header and POST permits it in preflight for allowed origins.
@@ -61,6 +62,8 @@ not accepted as model-generated prose. This is a bounded review prompt, not a
 forecast, business threshold, causal claim, or automatic menu/CRM action.
 
 ## Private local trial
+
+These private launcher and mock-provider instructions apply to `develop`; the focused release omits that separate local trial tooling. Use `develop` for this trial.
 
 Requirements: Node 24.16 or later in the 24.x line, pnpm 11.25, and the frozen
 workspace dependencies. From the repository root:
@@ -91,13 +94,14 @@ changed by the launcher. Existing OpenAI budget alerts remain soft thresholds.
 
 ## Hosted activation remains separate
 
-The backend code is wired into createApp but not deployed. Hosting requires the
+The backend code is wired into createApp and disabled until configured. Hosting requires the
 restricted key in a Worker secret named `OWNER_AI_OPENAI_API_KEY` and a server-only
 `OWNER_AI_OPENAI_PROJECT_ID`. Store a separate high-entropy printable key of at
 least 48 characters in the Worker secret `OWNER_AI_REPORT_REFERENCE_SECRET`.
 Staging additionally requires `OWNER_AI_RATE_LIMITER` (a Cloudflare rate limiter
 binding). Missing analysis configuration keeps ordinary report reads available
-and leaves analysis disabled. These bindings were not provisioned by this change.
+and leaves analysis disabled. The rate-limiter binding is declared in staging
+configuration; secrets and deliberate hosted activation still require the release operator.
 Before enabling hosted analysis, use a matching console that carries the GET
 reference to the POST. Verify the handoff with the mock provider first.
 Provider rate limiting is not a monthly spending cap. Choose and verify an
@@ -112,13 +116,21 @@ gates. Do not replace them with fixture freshness or a browser-supplied token.
 
 ## Verification
 
+The separate [owner-flow retest](owner-flow-retest.md) documents optional S09
+assistance. Description shortening retains literal supplied evidence; ingredient
+proposals reuse persisted owner/extraction values without a provider call, recipe
+completion or allergen inference. Both require explicit owner review. The new
+ingredient integration has no hosted acceptance yet. AI credential provisioning
+and trusted report freshness remain blocked; this change does not relax the
+dashboard report's evidence gate or enable positive recommendations.
+
 `pnpm exec vitest run backend/src/owner-ai frontend/console/src/owner-dashboard/ai-preview`
 checks provider payload minimization, zero preservation, suppression/freshness,
 wrong tenant, denied membership, configuration gates, no retries, rate reservation,
 refusals/malformed outputs and frontend result matching.
 
 `pnpm exec playwright test --config playwright.owner-ai.config.ts` runs the actual
-local dashboard/backend route with a mock provider. It does not consume credits
+local dashboard/backend route on `develop` with a mock provider. It does not consume credits
 or establish real model quality. It covers desktop and mobile requests, CRM
 abstention and failure clearing. The prior single-request live key probe is
 separate from this integrated browser test.

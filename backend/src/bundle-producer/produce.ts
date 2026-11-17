@@ -8,6 +8,7 @@ import {
   sha256,
   verifyPublicMenuContentBytes,
 } from '@peekaplate/contracts';
+import { matchesApprovedOwnerPortion, type PreparedApprovedPortion } from './approved-portions';
 import { derivedUuid } from './ids';
 import { normalizePrice } from './price';
 import {
@@ -53,6 +54,8 @@ export type OwnerApprovedPhoto = {
 export type ProduceOptions = {
   /** Owner-approved photos by dish ID, used when a dish has no T0 asset. */
   ownerPhotos?: ReadonlyMap<string, OwnerApprovedPhoto>;
+  /** Exact validated private approval, bound to the selected photo and canonical revision. */
+  ownerPortions?: ReadonlyMap<string, PreparedApprovedPortion>;
   /**
    * What a dish without any photo becomes: an identity-only placeholder (operator default) or a
    * complete text-only dish with images: null (the agreed owner fallback).
@@ -292,11 +295,23 @@ async function buildDish(
       `Owner photo for dish ${source.dishId} is not the photo approved on its revision`,
     );
   }
-  // Owner photos are flat uploads: a portion (calibrated AR layers) needs a reviewed T0 asset.
-  if (!asset && requested.portion && (ownerPhoto || options.missingPhoto === 'text_only')) {
+  // Flat uploads cannot authorize portions; only an exact independently approved cutout can.
+  if (
+    !asset &&
+    requested.portion &&
+    !(
+      ownerPhoto &&
+      matchesApprovedOwnerPortion(
+        options.ownerPortions?.get(source.dishId),
+        ownerPhoto.photoId,
+        ownerPhoto.sha256,
+        requested.portion,
+      )
+    )
+  ) {
     throw new BundleProducerError(
       'asset_revision_mismatch',
-      'A portion requires a reviewed T0 asset, not an owner upload',
+      'A portion requires a reviewed T0 asset or exact approved owner cutout',
     );
   }
   const textOnly = !asset && !ownerPhoto && options.missingPhoto === 'text_only';
@@ -379,6 +394,7 @@ async function buildDish(
     assetEntry = {
       ...identity,
       owner_photo_id: ownerPhoto.photoId,
+      ...(requested.portion ? { portion: requested.portion } : {}),
       card: variant,
       detail: variant,
     };

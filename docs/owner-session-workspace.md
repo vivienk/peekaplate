@@ -105,3 +105,30 @@ These checks do not establish a hosted release or complete onboarding/upload/
 publish/report journey. Hosted acceptance must verify the released API/console,
 genuine staff sessions, allowed/blocked origins and revocation. The local suite
 changes no hosted permissions, accounts, provider settings or Queue state.
+
+## Staging release handoff
+
+The narrow release promotes only already merged Auth #143/#146, shell #125/#139,
+report reader #128 and bridge #179. The complete console source closure also keeps
+its existing synthetic preview entries, but normal staging output excludes those
+demo pages and forces no synthetic dashboard into the authenticated workspace.
+The merged report-window correction is included: start is inclusive and end is
+exclusive for observations and activity checkpoints. Two actual PostgreSQL cases
+fail against the previous inclusive-end query and pass with this correction.
+The existing main Worker bindings, migrations, extraction and diner sources stay
+unchanged. No provider requests or Queue activation are needed for this release.
+
+After the approved deployment, share the [owner sign-in/workspace entry](https://peekaplate-console-staging.pages.dev/owner-auth.html).
+The [confirmation callback](https://peekaplate-console-staging.pages.dev/auth-confirm.html)
+and [recovery callback](https://peekaplate-console-staging.pages.dev/auth-reset.html)
+need the newest genuine email link; opening either without one is an invalid-link
+check. Signup/confirmation creates a login, never restaurant ownership. Existing
+authorised owners/editors see their server-returned restaurant; other confirmed
+accounts see the no-access state. Do not distribute shared test passwords.
+
+The API and console provider deployment identities and genuine-session checks
+are recorded on the release PR after deployment. Local checks or a returned Pages
+URL alone do not establish hosted acceptance. The diner keeps its existing
+published-link resolver and verified menu loader; this release does not add menu
+setup, new restaurant registration, upload, correction, publication controls or
+normal tracking activation. Follow the next wiring order above.

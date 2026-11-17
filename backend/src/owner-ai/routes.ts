@@ -8,6 +8,7 @@ import type { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import type { Bindings } from '../index';
+import { configuredSyntheticReportVenues } from '../owner-report-scope';
 import {
   OWNER_REPORT_REFERENCE_HEADER,
   ownerReportSnapshot,
@@ -64,8 +65,7 @@ export function registerOwnerAnalysisRoutes(
     if (
       env.OWNER_AI_RESPONSES_ENABLED !== 'true' ||
       !['local', 'staging'].includes(env.APP_ENV ?? '') ||
-      !options.syntheticVenues.includes(scope.data.venueId) ||
-      scope.data.venueId !== env.SYNTHETIC_REPORT_VENUE_ID ||
+      !configuredSyntheticReportVenues(env, options.syntheticVenues).includes(scope.data.venueId) ||
       !env.OWNER_AI_OPENAI_API_KEY ||
       !env.OWNER_AI_OPENAI_PROJECT_ID ||
       (!referenceSecret && !preview) ||

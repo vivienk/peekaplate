@@ -93,6 +93,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   let renderer: PortionRenderer | undefined;
   let local3d: ReturnType<typeof import('./portion3d').bindLocal3d> | undefined;
   let ar: ReturnType<typeof import('./portionAR').bindPortionAR> | undefined;
+  let arEntry: HTMLButtonElement | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const motion = createPortionMotion();
   let drag: { id: number; x: number; y: number } | undefined;
@@ -100,6 +101,8 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     orientation.release();
     ar?.dispose();
     ar = undefined;
+    arEntry?.remove();
+    arEntry = undefined;
     local3d?.dispose();
     local3d = undefined;
     clearTimeout(timer);
@@ -248,7 +251,10 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       status.textContent =
         sampleNotice ??
         `${approximatePortionLabel(dish.servingCount)} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`;
-      if (dish.portion || visualSelect || fixtureCamera || uploadedPortion) {
+      const demoPortal =
+        (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+        !!(visualSelect || fixtureCamera || uploadedPortion);
+      if (demoPortal) {
         if (import.meta.env.DEV && visualSelect && uploadedPortion === undefined) {
           const module = await import('./portion3d').catch(() => null);
           if (!module) return;
@@ -260,8 +266,16 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
             compare.setAttribute('aria-pressed', 'false');
           });
         }
+      }
+      const openCamera = async (entry?: HTMLButtonElement) => {
         const arModule = await import('./portionAR').catch(() => null);
-        if (controller.signal.aborted || disposed || !arModule) return;
+        if (controller.signal.aborted || disposed) return;
+        if (!arModule) {
+          orientation.release();
+          status.textContent =
+            'Camera preview unavailable. The interactive preview is still available.';
+          return;
+        }
         ar = arModule.bindPortionAR(
           controls,
           () => stage.querySelector<HTMLImageElement>('.pp-portion__css img'),
@@ -273,11 +287,34 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
           !sampleNotice && !visualSelect && uploadedPortion === undefined
             ? { count: dish.servingCount }
             : undefined,
+          entry,
         );
-        if (!portalOffered && (cameraSample || fixtureCamera || uploadedPortion)) {
+        if (entry || !portalOffered) {
           portalOffered = true;
           ar.show();
         }
+      };
+      if (demoPortal) await openCamera();
+      else {
+        const entry = document.createElement('button');
+        arEntry = entry;
+        entry.type = 'button';
+        entry.textContent = 'View on your table';
+        entry.addEventListener('click', async () => {
+          if (ar || entry.disabled) return;
+          entry.disabled = true;
+          orientation.request();
+          try {
+            await openCamera(entry);
+          } catch {
+            orientation.release();
+            status.textContent =
+              'Camera preview unavailable. The interactive preview is still available.';
+          } finally {
+            entry.disabled = false;
+          }
+        });
+        controls.append(entry);
       }
     } catch {
       if (attempt === controller && !controller.signal.aborted) fallback();

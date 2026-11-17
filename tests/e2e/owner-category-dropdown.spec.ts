@@ -86,6 +86,7 @@ for (const keyboard of [false, true]) {
     await page.getByLabel('New category name').fill('add');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     const ids = await page
+      .getByRole('listbox')
       .getByRole('option')
       .evaluateAll((options) => options.map((option) => option.id));
     expect(new Set(ids).size).toBe(ids.length);

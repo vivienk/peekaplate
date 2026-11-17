@@ -71,7 +71,7 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Saving a dish | Backend draft-save flow tested locally and online with Supabase identity | Connecting it to the staff screen |
 | Approving and publishing | Owner-only backend commands and public-menu/token reads deployed and tested with synthetic data | Trusted real-content admission, review/publish screens and diner integration |
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
-| Diner tracking | Deployed Queue/R2 pipeline, transactional typed facts and archive recovery; genuine-token browser transport passed in staging | Real diner controls, consent/outbox/delivery, owner-report API and pilot acceptance; normal collection remains paused |
+| Diner tracking | Deployed Queue/R2 pipeline and typed facts; shared consent/outbox and reviewed menu/detail triggers. See the [PR78 staging release](diner-tracking-staging.md) for the frontend deployment boundary | Coordinated real PostHog/canonical readback, report reconciliation and pilot acceptance; normal collection remains paused |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
 | Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
 | Owner report | Synthetic staging API checks recorded; [internal period-comparison reader](comparison-reporting.md) and privacy fixtures tested locally | Live-data reporting, comparison API/dashboard wiring and release acceptance |
@@ -835,3 +835,18 @@ checks](owner-report-staging.md). Deployment evidence belongs in the narrow
 owner-report release PR; merging into develop alone does not deploy the Worker.
 
 Current release and hosted results: [PR 135](https://github.com/vivienk/peekaplate/pull/135).
+
+## Owner session/workspace release
+
+The merged owner connection is Auth #143/#146 → bridge #179 → shell #125/#139 →
+report reader #128. Use the [workspace guide](owner-session-workspace.md) for the
+exact staging entry, permission states, release evidence boundary and next UI/API
+connections. Signup alone never grants restaurant access. Existing report
+acceptance remains restricted to its labelled synthetic staging venue.
+
+## FE-06.4 controlled staging setup
+
+The [operator/tester handoff](fe064-staging-setup.md) separates the narrow #161
+release, lifecycle migration, staff identity setup and proposed two-request
+provider window. Do not treat the read-only harness counter as an upstream
+request cap or open Queues before the actual budget is pinned.

@@ -3149,6 +3149,7 @@ a documentation validation failure, with no application or provider behavior cha
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T07:43:38.201Z","exitCode":1}
 ```
 
+
 ## Owner menu workspace — November 12, 2026
 
 Local validation exposed and corrected: UUID/text parameter inference in the manual-draft INSERT; a row-lock attempt on immutable metadata without UPDATE privilege (replaced with a scoped advisory lock); stale automatic incomplete-job retries (now explicit); and a legacy text edit that could discard approved facts (now preserved, with a manual-origin fallback denied). Regressions exercise real PostgreSQL state, ownership, receipts, cancellation fences and snapshot preservation.
@@ -3168,6 +3169,12 @@ Test setup corrections: use the installed PDF loading task cleanup API, a real l
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T08:37:09.613Z","exitCode":1}
+```
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T08:40:31.440Z","exitCode":1}
 ```
 
 ## Owner menu staging acceptance — November 12, 2026
@@ -3554,6 +3561,61 @@ The initial context refresh exceeded the console summary's documented1000-charac
 ```
 
 
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T19:09:01.720Z","exitCode":1}
+```
+
+
+## Diner tracking release preparation — November 12, 2026
+
+The first preparation check passed code, types and unit/script suites but correctly rejected the stale diner context after promoting PR78 files. The diner summary and source paths now describe the promoted boundary; fingerprints are refreshed before the final check. No runtime workaround, provider request or hosted mutation was involved.
+
+## Diner first-consent dispatch — November 12, 2026
+
+The compiled staging check after PR158 reproduced an initial menu view in the canonical sender with no matching PostHog capture. The menu's consent listener was registered before the adapter's listener, so it emitted while the adapter still held the previous consent state. Synchronizing the adapter from the current shared gate immediately before capture fixes the ordering dependency. The real-adapter unit regression failed before the correction and passes afterward, including re-consent; the SDK browser case now uses the same listener order. Corrected hosted verification remains pending release approval.
+
+The first external smoke harness used the default headless user agent and the SDK correctly filtered all its events as bot traffic. Reusing the repository's Desktop Chrome profile isolated the actual first-event defect. No raw payloads, credentials or private provider traffic are stored in this record.
+
+
+## Narrow restaurant URL staging release
+
+PR174 promotion resolves context/package/error-ledger conflicts against main, keeping its unrelated release state. Routing-only paths are carried forward. Source preparation already reproduced and corrected Pages clean-URL rewrite loops and canonical redirects; this candidate must repeat local checks and hosted static routing before acceptance. No registrar or .io change is included.
+
+Automatic restaurant URLs: main release includes only the reviewed publication/link/routing slice. Local source checks pass; exact-main release checks and hosted acceptance are tracked separately. No unrelated develop features, production DNS, .io or provider changes are promoted.
+
+The additional real database allocation-failure test verifies complete publication rollback and retry. Source branch results: 320 SQL assertions and 140 Worker/database tests pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T20:27:48.761Z","exitCode":1}
+```
+
+## 2026-11-14 — narrow owner-workspace release preparation
+
+- Resolved local tooling: root `pnpm exec wrangler` could not find the package-local
+  CLI; rerunning from `backend` used the pinned Wrangler successfully. No deployment
+  happened during this failure.
+- Resolved local tooling: inline PowerShell backticks corrupted a context-reading
+  expression. Moved the helper to an external Node module and used JSON boundaries;
+  context refresh then passed. No credentials or runtime behavior were involved.
+- A preparation assertion correctly rejected copying the whole backend context
+  node, which referenced unrelated develop-only modules. Added only workspace
+  paths to the existing main backend node and kept the wider release excluded.
+
+The first release database run passed 235 SQL assertions and 110 integration
+tests, then the unchanged local demo command timed out. An isolated identical
+command and a complete rerun passed. The transient cause is unconfirmed; no
+timeout was raised or runtime workaround added. Separately, two deliberate
+negative controls reproduced the existing inclusive-end report defect; the
+merged half-open query passed both actual PostgreSQL cases.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T20:35:08.044Z","exitCode":1}
+```
+
 ## 2026-11-14 — Pages clean auth callbacks
 
 Hosted static verification found Pages returning 308 from both configured
@@ -3928,6 +3990,29 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T10:19:56.289Z","exitCode":2}
 ```
 
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T22:19:18.712Z","exitCode":1}
+```
+
+## 2026-11-14 — menu verification release closure
+
+The first narrow-release database run passed 235 SQL assertions and 97 tests,
+but the owner-menu suite could not load its existing retention-helper import.
+Promoted the unchanged helper and unit tests with the original integration
+suite; no scheduler, cron or retention settings are activated. The source
+contracts and migration remain the previously merged #161 implementation.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T09:23:48.080Z","exitCode":1}
+```
+
+## 2026-11-15 — owner wiring release context
+
+The context validator rejected an appended backend summary at 1,024 characters.
+Removed a redundant configuration-preservation clause rather than changing the
+1,000-character limit. Context refresh/check verifies the bounded summary; no
+runtime behavior, migration or hosted resource changed during this failure.
+
 ```json
 {"id":"ERR-20261115-OWNER-COMPOSITION","status":"resolved","area":"owner-console-presentation","cause":"The authenticated wiring wrapper bypassed merged dashboard/onboarding composition; broad workspace styles also hid icons and changed authored form spacing.","prevention":"Reuse the original dashboard, source picker and shared form/table presentation; scope demo styles and record every connected page at desktop/mobile widths.","sources":["frontend/console/src/owner/FirstDashboard.tsx","frontend/console/src/owner/OwnerMenuWorkspace.tsx","frontend/console/src/owner-dashboard/menu-presentation.tsx","tests/e2e/owner-workspace.spec.ts"],"regression":"Two missing-composition checks failed before correction. Workspace suite 36/36 and authored-screen suite 48/48 passed; optional approval category error also has a browser regression. Final hosted screenshot acceptance is separate."}
 ```
@@ -3941,6 +4026,7 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T10:40:53.588Z","exitCode":1}
 ```
+
 
 ```json
 {"id": "ERR-20261115-OWNER-PICKER-WIDTH", "status": "resolved", "area": "owner-console-responsive", "cause": "A long server-returned restaurant name gave the selector a 440px intrinsic width and widened a 390px hosted viewport.", "prevention": "Constrain the shared picker and select minimum/maximum inline width, including the onboarding account disclosure.", "sources": ["frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "The real hosted overflow was reproduced locally at 448px; the long-name dashboard/account-menu browser case now passes at390px. Final hosted retest follows release."}
@@ -3970,6 +4056,7 @@ Sources: `frontend/console/src/owner/OwnerMenuWorkspace.tsx`, `frontend/console/
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-16T00:31:04.061Z","exitCode":1}
 ```
+
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T17:43:19.710Z","exitCode":1}
 ```
 
@@ -4080,6 +4167,18 @@ entry with its four exact SVG filenames before refreshing fingerprints.
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-11T03:45:24.374Z","exitCode":1}
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T20:39:34.442Z","exitCode":1}
+```
+
+```json
+{"id": "ERR-20261115-DINER-RELEASE-IMPORTS", "status": "resolved", "area": "release-reconciliation", "cause": "Narrow contract export reconciliation needed the existing Biome import ordering.", "prevention": "Run the repository formatter after selective release reconciliation.", "sources": ["packages/contracts/src/index.ts"], "regression": "pnpm check passes after import ordering; prepared-menu portion regression preserves exact-byte checks."}
+```
+
+```json
+{"id":"ERR-20261115-DINER-RELEASE-CI","status":"resolved","area":"release-reconciliation","cause":"The selective release omitted the merged prepare_assets portion entrypoint; the publication retry browser mock also cleared its failure before the request completed.","prevention":"Promote entrypoints with their caller tests; synchronize failure recovery against the observed response.","sources":["processing/src/peekaplate_processing/prepare_assets.py","processing/tests/test_portion_ingestion.py","tests/e2e/owner-workspace.spec.ts"],"regression":"Full Python suite: 516 tests PASS in 44.823s with UTF-8; publication retry case: 8 repeated passes in 24.4s. Hosted CI rerun required before merge."}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -4214,6 +4313,24 @@ not a distributed queue or production owner endpoint.
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T08:39:52.812Z","exitCode":1}
+
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T22:22:25.556Z","exitCode":1}
+```
+
+```json
+{"id": "ERR-20261115-EXTRACTION-DRYRUN-OUTPUT", "status": "resolved", "area": "local-verification", "cause": "The extraction dry-run wrote generated JavaScript under an unignored .tmp directory, so Biome lint inspected build output. Runtime source was not faulty.", "prevention": "Keep dry-run output outside the source checkout or in an existing ignored build directory. Preserve the source lint policy.", "sources": ["docs/extraction-budget-release.md"], "regression": "Moved only the verified generated-output directory outside the checkout; full pnpm check rerun recorded on the release PR."}
+```
+
+```json
+{"id":"ERR-20261115-NESTED-SHELL-EXPANSION","status":"resolved","area":"local-verification","cause":"A read-only process inspection embedded in a double-quoted nested PowerShell command expanded its pipeline variable in the outer shell.","prevention":"Use a literal single-quoted command or a script file when passing pipeline variables to nested PowerShell.","sources":["AGENTS.md"],"regression":"The corrected read-only inspection completed successfully; pnpm verify build then passed. No project source or hosted state was affected."}
+```
+
+```json
+{"id":"ERR-20261115-PRESERVATION-VERIFICATION","status":"resolved","area":"local-verification","cause":"The initial processing command used pytest instead of the repository's unittest runner; the next Windows run omitted UTF-8 and failed Unicode subprocess assertions. The artwork retention test also needed formatting.","prevention":"Use the frozen service environment with python -m unittest and PYTHONUTF8=1 on Windows; format changed tests before the combined gate.","sources":["processing/tests/test_source_entry_recovery.py","backend/src/ingredient-artwork-retention.test.ts"],"regression":"Frozen Python suite passes 573 tests in 46.998s; focused Biome passes. No runtime workaround or dependency change was needed."}
+```
+
+```json
+{"id":"ERR-20261115-AUTHORED-SCREEN-TESTS","status":"resolved","area":"browser-verification","cause":"Concurrent Playwright runs shared the default artifact directory; a retained menu-heading assertion also described the replaced fallback screen rather than authored S10.","prevention":"Use isolated output directories while iterating, run final browser configs sequentially, and check expectations against the imported authored screen.","sources":["tests/e2e/owner-workspace.spec.ts","playwright.portion-published.config.ts"],"regression":"Authored S10 32px title passes; isolated portion and performance browser regressions pass with screenshots. Final combined run is recorded in the correction PR."}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -4276,11 +4393,15 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T05:11:34.462Z","exitCode":1}
+
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T23:34:35.987Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T06:13:48.741Z","exitCode":1}
+
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:38:25.709Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -4293,6 +4414,20 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T06:16:06.292Z","exitCode":1}
+
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:46:24.662Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261115-PRESERVATION-FINAL-GATE","status":"resolved","area":"browser-and-context-verification","cause":"The dedicated production portion spec was discovered by the default browser config without its base URL; simulated time raced asynchronous IndexedDB delivery; the restored performance frame skipped a heading level; and the audit document changed after its context refresh.","prevention":"Keep dedicated specs in their own config; poll observable delivery while advancing the fake clock; retain authored sizing on semantic headings; refresh context last and verify committed blobs.","sources":["playwright.config.ts","tests/e2e/menu-triggers-live.spec.ts","frontend/console/src/owner-dashboard/pages.tsx","frontend/console/src/owner-dashboard/performance.css","tests/e2e/owner-workspace.spec.ts","docs/screen-preservation-audit.md"],"regression":"Tracking file passed 27 repeated cases; workspace passed 43 cases including axe heading-order and 16px styling; dedicated production portion passed 2 cases. Final repository and Linux CI results are recorded on PR #205."}
+```
+
+```json
+{"id":"ERR-20261115-SDK-LOCAL-CONTENTION","status":"observed","area":"local-browser-verification","cause":"An eight-worker run timed out during the existing 360-step SDK retry/withdrawal test before its final assertion. No unexpected delivery assertion failed, but the discarded trace prevents a definitive timing diagnosis.","prevention":"Use bounded browser concurrency and preserve failed traces before another config clears the artifact directory. Do not weaken the withdrawal assertion.","sources":["tests/e2e/posthog-adapter.spec.ts"],"regression":"The unchanged SDK file passed 5/5 with two workers in 18.6s; the withdrawal case passed in 7.9s. This is focused recovery evidence, not an uninterrupted full-suite pass."}
+```
+
+```json
+{"id":"ERR-20261115-PERFORMANCE-HEADING-STYLE","status":"resolved","area":"screen-preservation","cause":"Changing the card heading selector to an ID removed the same authored typography from chart and unavailable-tab h3 headings.","prevention":"Retain shared selectors when adapting semantics; assert both the adapted heading and its unchanged siblings.","sources":["frontend/console/src/owner-dashboard/performance.css","tests/e2e/owner-workspace.spec.ts"],"regression":"New chart-heading assertion fails at 18.72px without the restored selector. Both performance/accessibility cases pass with the original 16px styling in 4.5s."}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -4411,6 +4546,8 @@ Closing a preview opened from Saved reset the accessible back label to Menu whil
 
 ```json
 {"id":"ERR-20261115-PUBLISH-TEST-SLUG","status":"resolved","area":"publication-tests","cause":"The new database test expected hyphens, but the existing automatic restaurant link allocator uses underscores. Runtime behavior was correct.","prevention":"Assert the existing allocator's contract, not the Figma sample spelling.","sources":["backend/src/owner-publication.integration.ts","backend/src/restaurant-link.ts"],"regression":"The publication/link integration assertion now expects synthetic_preview_cafe; rerun evidence is recorded on the PR."}
+
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:54:00.059Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -4459,6 +4596,14 @@ The empty focused search kept its dark-surface placeholder colour on a light sur
 ## PR162 portable browser artifacts — November 15, 2026
 
 CI run `43757839050` passed application/Python/build/database checks but three landscape cases failed with ENOENT writing screenshots under `/private/tmp`. The local machine already had that directory, masking the portability issue. Landscape and opt-in upload captures now use `testInfo.outputPath` so each test gets a runner-owned artifact directory. The three affected cases pass in 13.1s without changing their assertions or application code. PR documentation also failed because the required contract labels were missing; the description was corrected without weakening its check.
+
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T00:46:28.817Z","exitCode":2}
+```
+
+```json
+{"id":"ERR-20261115-REVIEW-RELEASE-DEPENDENCY","status":"resolved","area":"narrow-release-composition","cause":"Promoting the authored review controller from develop omitted its existing RestaurantDetails and details imports; typechecking and the first browser startup exposed the missing dependency.","prevention":"Trace transitive imports when promoting a frontend slice to main; complete typechecking before starting dependent browser tests. Reuse the authored dependency rather than create a substitute.","sources":["frontend/console/src/owner/OwnerMenuWorkspace.tsx","frontend/console/src/onboarding/RestaurantDetails.tsx","frontend/console/src/onboarding/details.ts","frontend/console/src/onboarding/details.test.tsx"],"regression":"Original S05 source and tests promoted unchanged. pnpm check passes; workspace 45 cases and review preview 9 cases pass. No profile-save API or hosted acceptance is claimed."}
+```
+
 # ERR-20261115-DATA01-CORS — routing diner observation preflight
 
 Hosted preflight from the configured routing-staging diner returned 204 without
@@ -4794,6 +4939,25 @@ documentation links and typechecks pass; no runtime source was changed by repair
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T06:48:17.646Z","exitCode":1}
 ```
 
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T06:27:32.274Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test","timestamp":"2026-11-17T06:27:32.274Z"},"cause":"The focused main assembly restored the authored onboarding preview entry without its two existing sample-image imports. Normal live builds passed; the preview-only script check correctly failed.","prevention":"Carry the exact existing demo asset dependencies with a restored preview entry; do not invent replacement images or ship synthetic demo entries in the normal build.","regression":"Restoring the unchanged merged demo-assets made the focused preview guard pass, then the complete release pnpm check passed 1727 unit and 100 script cases. No deployed state or account changed."}
+```
+
+```json
+{"kind":"resolution","references":{"runUrl":"https://github.com/vivienk/peekaplate/actions/runs/44033221178"},"cause":"The preserved main camera regression expected the earlier calibration copy; the promoted serving-bound guard correctly displayed matching serving/plate measurements not supplied. All earlier browser suites passed, and only this wording expectation failed on desktop/mobile.","prevention":"Reconcile visible wording assertions when promoting the reviewed serving-count guard alongside the preserved deliberate camera entry.","regression":"The exact expected approximation wording is updated without runtime changes. Both desktop/mobile published-camera cases passed locally in 8.1 seconds, retaining the deliberate click, one camera request and cleanup assertions."}
+```
+
+### 2026-11-17 — Owner retest corrections
+
+The first report-source DB test failed because its legacy synthetic fixture used live-class facts. The final selector preserves that fixture unchanged and reads test facts only for the two newer approved demo venues. New real Worker/DB cases distinguish test/live/demo cohorts; the full database check passes (172 integrations plus pgTAP and smoke).
+
+The description-control test initially expected the former wording after the live control became extractive shortening. Its assertion now checks the truthful label and retains disabled-without-provider coverage. The full check passes (2,113 unit and 119 script tests). A context refresh also rejected an appended summary above the documented 1,000-character bound; summaries were condensed and context validation passes.
 ### ERR-20261117-PORTION-REVIEW-SETUP
 
 The plain Python service-test command could not import the processing package;
@@ -4824,3 +4988,140 @@ reproduced competing offers selecting the first price and fallback discarding th
 first fetched source. Singleton-offer parsing and source reuse fix those cases.
 The first failing source-reuse test left a queued mock response; resetting mocks
 between tests isolates failures. All 14 targeted parser/intake tests pass.
+
+
+### ERR-20261117-PORTION-RUNTIME-HANDOFF
+
+A connected-Brave reproducer showed that retrying generation with an unchanged
+saved photo never retriggered the effect. An explicit successful-save retry
+signal now requests generation again; ordinary text edits do not. The permanent
+browser regression and local RED/GREEN evidence cover the same-photo retry.
+
+Transport regressions reproduced cached failures blocking retries, an absent
+dedicated service configuration despite the existing extraction destination,
+and unbounded response-body duration/size. Successful manifests alone are cached;
+the complete dedicated pair or existing extraction pair is used, with a bounded
+stream and whole-response deadline. Seven focused transport cases pass.
+
+The first actual non-root Linux cutout request could not read the model downloaded
+as root during image build. Read-only model permissions fixed it. The rebuilt
+image produced two hash-validated layers from an opaque synthetic JPEG with
+networking disabled, removed its temporary directory, and made no provider call.
+Native Windows cannot run the Linux-only service lock path; the real container
+provided that evidence instead of treating mocked Python tests as acceptance.
+
+The new public portion route initially checked mutable draft/current-revision
+state, causing edits to hide a still-published asset. A real database regression
+reproduced the failure. Serving now uses the exact hash-verified published
+approval/photo binding, while new preparation remains current-version strict.
+Eight preparation integrations and 80 producer tests pass after the correction.
+
+Focused-main assembly preserved the main-only performance presentation, lazy
+diner camera loader and shared command-error helper instead of copying their
+older develop counterparts. A scheduler regression also reproduced skipped
+photo retention when artwork cleanup was disabled; independent cleanup calls
+retain both behaviors, including an artwork run after photo cleanup fails.
+The first context refresh still referenced a deliberately excluded local-only
+AI component; pruning absent paths and refreshing fixed it. The remaining two
+lint observations were formatting-only and were corrected before final checks.
+
+Hosted migration preflight first queried the standard Supabase history schema,
+which this project does not use. Reading the existing operator script identified
+public.schema_migrations. Both required forward versions were absent, then were
+applied with explicit operator approval and independently verified, including
+forced RLS and invoker/security-barrier view options. No account grants changed.
+
+The final frontend review identified duplicate demo performance-frame markup
+introduced during selective assembly. Restoring the exact main Perf declaration
+reuses PerfFrame for both demo and live views. The first text-boundary replacement
+also copied adjacent declarations and failed parsing; declaration-aware selection
+removed that duplicate. The authored performance and live-page regressions pass.
+
+PR223 CI exposed an older operational assertion applying the one-second health
+probe deadline to every host request, including the separate 220-second private
+portion request. Scope the health assertion to waitForReady; existing portion
+transport tests retain the processing deadline check. Runtime budgets are unchanged.
+The initial PR body also lacked required template headings; those were restored.
+
+PR223 browser CI passed318 cases but exposed three stale test expectations: the
+S10 count copy still said extracted, and the category-ID checks included unrelated
+native options from the demo AI selector. Update the exact copy and scope IDs to
+the category listbox; preserve its pointer, keyboard and accessibility assertions.
+
+The next CI stage passed the primary 321 browser cases but failed 16 workspace
+cases whose report fixtures still had empty menus. The saved-verification gate
+correctly kept navigation locked. Report/AI cases now opt into verified saved
+dishes, while negative setup cases remain empty. The screenshot journey verifies
+through S10 before opening reports and asserts that verification did not publish.
+The report fixture also exposes its actor/venue-bound reference so analysis tests
+exercise forwarding instead of the obsolete body-only request. CI must confirm
+the repaired browser paths; these fixture edits do not weaken runtime guards.
+
+The repaired workspace run passed 64 cases. Its two viewport screenshot cases
+then exposed an assertion checking the shell sidebar while S10 intentionally
+renders without that sidebar. Assert no verification request before the explicit
+action instead; the separate shell tests retain locked-navigation coverage.
+
+## November 17 — hosted portion request rejected before transport
+
+S09 persisted the dish/photo but its hosted portion POST returned503. R2 source
+size/hash matched the database and the configured destination matched the existing
+extraction Worker. Temporary allowlisted diagnostics isolated a redirect TypeError.
+Installed workerd reproduced `redirect: 'error'` rejecting before any outbound call;
+`manual` exposes the response without following it. The API and extraction-host
+portion requests now use manual redirect handling and preserve non-OK rejection.
+Actual-function workerd regressions cover successful dispatch and redirected
+responses. No secret, raw log, provider call or diagnostic endpoint is retained.
+
+## November 17 — published SVG portion fell back to photo
+
+Hosted generation, approval and S13 publication succeeded, but the diner repeated
+the successful SVG background download and displayed its photo fallback. The
+verified-layer reader discarded Content-Type; the renderer restored SVG MIME only
+for development fixture URLs. Published hash URLs therefore produced undecodable
+untyped SVG blobs. The shared reader now returns verified blobs with supported
+image MIME, including the existing local upload SVG path. Unit regressions failed
+before this fix and passed afterward. The published browser fixture now uses an
+SVG background and opaque hash URLs, with unknown asset requests returning 404.
+
+The first full local check encountered an unrelated workerd SQLite
+`SQLITE_IOERR_TRUNCATE` during owner-publication startup and timed out one test;
+1,882 tests passed. The unchanged 12-test publication file then passed alone in
+3.33 seconds. This is recorded as a local runtime I/O failure, not a MIME defect
+or a clean first pass; no production code or timeout was changed for it.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T12:46:27.318Z","exitCode":1}
+```
+
+## November 17 — S09 portion preview expanded the authored card
+
+The generated cutout used full width and intrinsic height, bypassing the authored
+120px media area. Restore the existing `s09-photo` presentation inside the
+original 2.5D card. The existing retry browser scenario now checks that the image
+remains inside that labelled card and at most 120px tall. Photo rights, source
+evidence, serving metadata, approval and backend behavior are unchanged.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-17T16:40:16.627Z","exitCode":1}
+```
+
+## November 17 — develop/release reconciliation checks
+
+The first lint check found line-ending/import-order formatting in the reconciled
+backend entrypoint and contract exports. Targeted Biome formatting corrected it;
+no behavior change. The focused 22-file backend run passed 447/448 tests; the
+remaining workerd publication test failed at startup with SQLITE_BUSY_RECOVERY
+and a timeout. The unchanged publication file passed 12/12 when run serially.
+This is recorded as local runtime contention, not a fixed application defect.
+
+## November 17 — empty ingredient proposals changed dish review state
+
+The existing ingredient suggestion callback marked the dish AI-assisted and reset
+review even when no new ingredients were returned. Two focused tests reproduced
+the empty/duplicate result defect. Preserve the dish unchanged and report no
+additional suggestions through the existing status line. Both regressions and
+27 related tests pass. The initial optional draft-version type error in the new
+callback was corrected using the existing version-zero fallback; typecheck passes.

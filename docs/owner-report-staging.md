@@ -26,9 +26,14 @@ acceptance checks.
 
 ## Deliberate staging limits
 
-The sole reportable venue is the labelled synthetic fixture
-`00000000-0000-4000-8000-000000000123`, selected by the server's allowlist and
-`SYNTHETIC_REPORT_VENUE_ID`. A query parameter cannot enable another venue.
+The server permits only explicitly configured synthetic venues, using
+`SYNTHETIC_REPORT_VENUE_ID` or the strict `SYNTHETIC_REPORT_VENUE_IDS` list.
+The legacy fixture `00000000-0000-4000-8000-000000000123` retains its original
+live-class canonical input. The approved publication demo
+`1ea97f31-bce5-4b8a-99f0-588afed9102e` and Poulet test workspace
+`f31ec4b4-59f3-49da-9b9d-408abebef143` read only test-class canonical facts.
+No other UUID is accepted, and malformed configuration fails closed. A query
+parameter cannot enable a venue or choose its traffic class.
 The operator must verify that this venue contains only synthetic test evidence.
 `source=synthetic` labels a report; it does not anonymize real events.
 
@@ -77,8 +82,10 @@ Deploy an exact reviewed main commit to the existing staging API Worker only,
 following ADR 0012. Preserve resource bindings and existing secrets. Use
 `wrangler deploy --env staging --keep-vars` for the documented operator route;
 compare non-secret bindings and secret names before/after. Both observation and
-menu queues must retain their paused state. This release needs no new migration,
-resource, subscription or extraction-service deployment.
+menu queues must retain their approved state. The test-class extension needs
+reviewed forward migration `20261117130000_owner_test_observations.sql` and its
+restricted view grant. It does not rewrite the live view or stored events, and
+adds no subscription or extraction-service deployment.
 
 Local evidence includes signed-JWKS auth tests, exact-origin CORS tests, owner
 report/contract tests, and disposable PostgreSQL/Worker checks for owner access,
@@ -88,3 +95,13 @@ membership denial and unchanged provider bindings. Record the exact main SHA,
 Worker version, measured checks and any gaps in the release PR before announcing
 hosted readiness. The [release PR 135 deployment comment](https://github.com/vivienk/peekaplate/pull/135) is the current hosted evidence;
 local checks alone do not establish it.
+
+
+## Workspace release alignment
+
+The merged owner-workspace release also promotes the agreed report interval
+`[start_time, end_time)`: observations and activity checkpoints exactly at the
+upper boundary belong to the next interval. Actual PostgreSQL exposure and
+checkpoint cases reproduce the old inclusive-end behavior and verify the
+correction. This does not enable production reports or certify data freshness.
+See the [workspace guide](owner-session-workspace.md) for entry and access states.

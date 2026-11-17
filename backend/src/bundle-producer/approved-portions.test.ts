@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { prepareApprovedPortion, verifyHostedPortionFiles } from './approved-portions';
+import {
+  matchesApprovedOwnerPortion,
+  prepareApprovedPortion,
+  verifyHostedPortionFiles,
+} from './approved-portions';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const venueId = id(1);
@@ -65,6 +69,31 @@ function fixture() {
 }
 
 describe('approved private 2.5D to public bundle handoff', () => {
+  it('binds owner producer authority to exact validated output and source photo hash', () => {
+    const { exportValue, expected } = fixture();
+    const prepared = prepareApprovedPortion(exportValue, {
+      ...expected,
+      sourceHash: 'a'.repeat(64),
+    });
+    expect(matchesApprovedOwnerPortion(prepared, photoId, 'a'.repeat(64), prepared.portion)).toBe(
+      true,
+    );
+    expect(
+      matchesApprovedOwnerPortion({ ...prepared }, photoId, 'a'.repeat(64), prepared.portion),
+    ).toBe(false);
+    expect(matchesApprovedOwnerPortion(prepared, photoId, 'b'.repeat(64), prepared.portion)).toBe(
+      false,
+    );
+    expect(
+      matchesApprovedOwnerPortion(prepared, photoId, 'a'.repeat(64), {
+        ...prepared.portion,
+        dish_revision_id: id(99),
+      }),
+    ).toBe(false);
+    expect(() =>
+      prepareApprovedPortion(exportValue, { ...expected, sourceHash: 'b'.repeat(64) }),
+    ).toThrow();
+  });
   it('rebinds only an owner-approved private photo to the exact published dish revision', () => {
     const { exportValue, expected } = fixture();
     const prepared = prepareApprovedPortion(exportValue, expected);

@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { type ArtworkCommand, ArtworkCommandSchema } from '@peekaplate/contracts';
-import { describe, expect, it, vi } from 'vitest';
+import { Client } from 'pg';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AuthenticationError } from './auth';
+import { CommandError } from './command-error';
+import worker, { createApp, createWorker, scheduled } from './index';
 import { readArtwork, replayArtwork, reviewArtwork, reviewedPng } from './ingredient-artwork';
 import { cleanupOrphanedIngredientArtwork } from './ingredient-artwork-retention';
 
@@ -24,6 +28,185 @@ export const artworkInput = (): ArtworkCommand => ({
 });
 const venue = '11111111-1111-4111-8111-111111111111';
 const actor = '22222222-2222-4222-8222-222222222222';
+
+describe('createApp ingredient artwork wiring', () => {
+  afterEach(() => vi.restoreAllMocks());
+  const env = {
+    APP_ENV: 'local',
+    LOCAL_DATABASE_URL: 'postgres://synthetic.invalid/fixture',
+    INGREDIENT_ARTWORK_ENABLED: 'true',
+  };
+  const headers = { Authorization: 'Bearer synthetic-staff', Origin: 'http://127.0.0.1:5174' };
+  const path = `/venues/${venue}/ingredient-icons?label=coconut`;
+  const publicPath = `/public/venues/${venue}/ingredient-icons?label=coconut`;
+  function appFixture() {
+    vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined as never);
+    vi.spyOn(Client.prototype, 'end').mockResolvedValue(undefined as never);
+    const query = vi.spyOn(Client.prototype, 'query').mockResolvedValue({ rows: [] } as never);
+    const verify = vi.fn(async () => actor);
+    const authorizeVenue = vi.fn(async (_actor: string, _venue: string, _env: unknown) => {});
+    return {
+      app: createApp({ verify, authorizeVenue, execute: vi.fn() }),
+      verify,
+      authorizeVenue,
+      query,
+    };
+  }
+
+  it('uses the runtime scheduled adapter with an execution context rather than a client factory', async () => {
+    const { query } = appFixture();
+    const context = { waitUntil: vi.fn(), passThroughOnException: vi.fn() };
+    expect(worker.scheduled).toBe(scheduled);
+    expect(createWorker().scheduled).toBe(scheduled);
+    await expect(
+      Reflect.apply(scheduled, undefined, [
+        { cron: 'synthetic' },
+        { ...env, INGREDIENT_ARTWORK_ENABLED: 'false' },
+        context,
+      ]),
+    ).resolves.toBeUndefined();
+    expect(query).not.toHaveBeenCalled();
+    const list = vi.fn(async () => ({ objects: [], truncated: false }));
+    await expect(
+      Reflect.apply(scheduled, undefined, [
+        { cron: 'synthetic' },
+        { ...env, INGREDIENT_ARTWORK_BUCKET: { list, delete: vi.fn(), put: vi.fn() } },
+        context,
+      ]),
+    ).resolves.toBeUndefined();
+    expect(list).toHaveBeenCalled();
+    expect(Client.prototype.connect).toHaveBeenCalledTimes(1);
+    expect(Client.prototype.end).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers disabled routes without reaching identity or database', async () => {
+    const { app, verify, query } = appFixture();
+    for (const url of [path, publicPath]) {
+      const response = await app.request(
+        url,
+        { headers },
+        { ...env, INGREDIENT_ARTWORK_ENABLED: 'false' },
+      );
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: 'not_found' });
+    }
+    expect(verify).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('requires identity and current venue membership before querying private catalogue', async () => {
+    const { app, verify, authorizeVenue, query } = appFixture();
+    expect((await app.request(path, {}, env)).status).toBe(401);
+    verify.mockRejectedValueOnce(new AuthenticationError());
+    expect((await app.request(path, { headers }, env)).status).toBe(401);
+    expect(authorizeVenue).not.toHaveBeenCalled();
+    authorizeVenue.mockRejectedValueOnce(new CommandError('forbidden', 403));
+    expect((await app.request(path, { headers }, env)).status).toBe(403);
+    expect(authorizeVenue).toHaveBeenCalledWith(actor, venue, env);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('allows an authorized private catalogue read through bound database and exact-origin CORS', async () => {
+    const { app, authorizeVenue, query } = appFixture();
+    const response = await app.request(path, { headers }, env);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ state: null });
+    expect(authorizeVenue).toHaveBeenCalledWith(actor, venue, env);
+    expect(query).toHaveBeenCalledWith("SELECT set_config('app.tenant_id', $1, true)", [venue]);
+    expect(query.mock.calls.at(-1)?.[0]).toBe('COMMIT');
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe(headers.Origin);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const denied = await app.request(
+      path,
+      { headers: { ...headers, Origin: 'https://untrusted.invalid' } },
+      env,
+    );
+    expect(denied.headers.get('Access-Control-Allow-Origin')).toBeNull();
+  });
+
+  it('serves a bounded public catalogue without staff auth using diner CORS', async () => {
+    const { app, verify, authorizeVenue, query } = appFixture();
+    const response = await app.request(
+      publicPath,
+      { headers: { Origin: 'http://127.0.0.1:5173' } },
+      env,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ schemaVersion: 1, icons: [] });
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://127.0.0.1:5173');
+    expect(verify).not.toHaveBeenCalled();
+    expect(authorizeVenue).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('label=ANY($2::text[])'), [
+      venue,
+      ['coconut'],
+    ]);
+    query.mockClear();
+    const oversized = `/public/venues/${venue}/ingredient-icons?${Array.from({ length: 101 }, () => 'label=coconut').join('&')}`;
+    expect((await app.request(oversized, {}, env)).status).toBe(400);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('uses artwork-specific body limits and private review preflight before staff work', async () => {
+    const { app, verify, query } = appFixture();
+    const reviewPath = `/venues/${venue}/ingredient-icons/review`;
+    const preflight = await app.request(
+      reviewPath,
+      {
+        method: 'OPTIONS',
+        headers: {
+          Origin: headers.Origin,
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'Authorization,Content-Type',
+        },
+      },
+      env,
+    );
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe(headers.Origin);
+    expect(preflight.headers.get('Access-Control-Allow-Methods')).toContain('POST');
+    expect(preflight.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+    const response = await app.request(
+      reviewPath,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: 'x'.repeat(1_350_001),
+      },
+      env,
+    );
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: 'body_too_large' });
+    expect(verify).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('binds approved public catalogue and image reads to the configured bucket without exposing revoked artwork', async () => {
+    const { app, verify, query } = appFixture();
+    const sha256 = createHash('sha256').update(artPng).digest('hex');
+    const approved = { label: 'coconut', version: 1, status: 'approved', sha256 };
+    query.mockResolvedValue({
+      rows: [approved, { label: 'onion', version: 2, status: 'revoked', sha256: null }],
+    } as never);
+    const catalogue = await app.request(`${publicPath}&label=onion`, {}, env);
+    expect(await catalogue.json()).toEqual({ schemaVersion: 1, icons: [approved] });
+    const get = vi.fn(async () => ({
+      size: artPng.length,
+      arrayBuffer: async () => Uint8Array.from(artPng).buffer,
+    }));
+    const response = await app.request(
+      `/public/venues/${venue}/ingredient-icons/image?label=coconut&sha256=${sha256}`,
+      {},
+      { ...env, INGREDIENT_ARTWORK_BUCKET: { get, put: vi.fn() } },
+    );
+    expect(response.status).toBe(200);
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(artPng);
+    expect(get).toHaveBeenCalledWith(`ingredient-artwork/${venue}/${sha256}.png`);
+    expect(response.headers.get('Content-Type')).toBe('image/png');
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(verify).not.toHaveBeenCalled();
+    expect(query.mock.calls.filter(([sql]) => String(sql).includes('label=ANY'))).toHaveLength(3);
+  });
+});
 
 function client(
   options: { permission?: string; receipt?: unknown; version?: number; fail?: string } = {},

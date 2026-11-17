@@ -104,6 +104,40 @@ class ServiceTests(unittest.TestCase):
         self.storage.assert_not_called()
         self.runner.assert_not_called()
 
+    def test_mounted_portion_route_processes_transparent_pixels_without_providers(self):
+        photo = io.BytesIO()
+        with Image.new("RGBA", (80, 60), (0, 0, 0, 0)) as image:
+            image.paste((255, 165, 0, 255), (20, 15, 60, 45))
+            image.save(photo, format="PNG")
+        path = "/v1/portion-uploads/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222"
+        with tempfile.TemporaryDirectory() as scratch:
+            with patch.dict("os.environ", {"PORTION_REVIEW_ROOT": scratch}):
+                client = TestClient(create_app(self.settings, source_reader=self.storage, runner=self.runner))
+            with patch("peekaplate_processing.cutout.automatic_mask") as cutout:
+                self.assertEqual(client.post(path, content=photo.getvalue()).status_code, 401)
+                self.assertEqual(client.post(path, content=b"x" * 12_000_001, headers=self.headers).status_code, 413)
+                response = client.post(path, content=photo.getvalue(), headers=self.headers)
+                cutout.assert_not_called()
+            self.assertEqual(response.status_code, 200)
+            result = response.json()
+            self.assertEqual(result["review_status"], "needs_review")
+            self.assertFalse(result["publication_eligible"])
+            self.assertNotIn("physical_size", result["portion"])
+            self.assertLessEqual(sum(layer["size_bytes"] for layer in result["portion"]["layers"]), 180_000)
+            for layer in result["portion"]["layers"]:
+                data = base64.b64decode(result["layers"][layer["url"]])
+                self.assertEqual(len(data), layer["size_bytes"])
+                self.assertEqual(hashlib.sha256(data).hexdigest(), layer["sha256"])
+                if layer["depth"] > 0:
+                    with Image.open(io.BytesIO(data)) as cutout_image:
+                        # WebP delivery is lossy; the captured subject's color and alpha remain.
+                        pixel = cutout_image.convert("RGBA").getpixel((40, 30))
+                        self.assertEqual(pixel[3], 255)
+                        self.assertTrue(all(abs(actual - expected) <= 5 for actual, expected in zip(pixel[:3], (255, 165, 0))))
+            self.assertEqual(list(Path(scratch).iterdir()), [])
+        self.storage.assert_not_called()
+        self.runner.assert_not_called()
+
     def test_headers_cannot_disagree_with_body(self):
         self.headers["X-Tenant-ID"] = "00000000-0000-4000-8000-000000000003"
         self.assertEqual(self.send().status_code, 403)

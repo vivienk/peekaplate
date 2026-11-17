@@ -33,6 +33,7 @@ export function DishFormView({
   suggestIngredients,
   suggestAllergens,
   draftDescription,
+  descriptionActionLabel = 'Draft with AI',
   currency = 'USD',
   allowZeroPrice = false,
   busy = false,
@@ -58,6 +59,7 @@ export function DishFormView({
   suggestIngredients?: (name: string) => Promise<string[]>;
   suggestAllergens?: (name: string, ingredients: string[]) => Promise<string[]>;
   draftDescription?: (name: string, ingredients: string[]) => Promise<string>;
+  descriptionActionLabel?: string;
   currency?: string;
   allowZeroPrice?: boolean;
   busy?: boolean;
@@ -259,22 +261,24 @@ export function DishFormView({
               <section className="card s09-sidecard s09-sidecard--25d" aria-labelledby="s09-25d">
                 <h2 id="s09-25d">2.5D preview</h2>
                 {onGeneratePortion && !portionReview?.approved && (
-                  <button type="button" disabled={busy || !dr.upload} onClick={onGeneratePortion}>
+                  <Btn
+                    kind="outlined"
+                    size="md"
+                    type="button"
+                    disabled={busy || !dr.upload}
+                    onClick={onGeneratePortion}
+                  >
                     Save photo and generate 2.5D
-                  </button>
+                  </Btn>
                 )}
                 {portionReview?.status === 'needs_review' && portionReview.previewUrl ? (
                   <>
-                    <img
-                      src={portionReview.previewUrl}
-                      alt={`Review-only 2.5D preview of ${dr.name || 'this dish'}`}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        height: 'auto',
-                        objectFit: 'contain',
-                      }}
-                    />
+                    <div className="s09-photo has">
+                      <img
+                        src={portionReview.previewUrl}
+                        alt={`Review-only 2.5D preview of ${dr.name || 'this dish'}`}
+                      />
+                    </div>
                     <span className={`s09-chip${portionReview.approved ? ' good' : ''}`}>
                       {portionReview.approved ? 'Approved for publication review' : 'Needs review'}
                     </span>
@@ -283,9 +287,15 @@ export function DishFormView({
                       approved portion assets.
                     </p>
                     {!portionReview.approved && onApprovePortion && (
-                      <button type="button" onClick={onApprovePortion} disabled={busy}>
+                      <Btn
+                        kind="outlined"
+                        size="md"
+                        type="button"
+                        onClick={onApprovePortion}
+                        disabled={busy}
+                      >
                         Approve 2.5D preview
-                      </button>
+                      </Btn>
                     )}
                   </>
                 ) : (
@@ -390,7 +400,7 @@ export function DishFormView({
                     );
                 }}
               >
-                Draft with AI
+                {descriptionActionLabel}
               </Btn>
               <span className="s09-hint">
                 {draftDescription
@@ -455,6 +465,12 @@ export function DishFormView({
                     .then((items) => {
                       if (!stillCurrent()) return;
                       const s = items.filter((x) => !dr.ing.includes(x));
+                      if (!s.length) {
+                        setSuggestionError(
+                          'No additional ingredients were suggested. Your dish has not changed.',
+                        );
+                        return;
+                      }
                       setAi({ ing: [...dr.ing, ...s], aiIng: [...dr.aiIng, ...s] });
                     })
                     .catch(

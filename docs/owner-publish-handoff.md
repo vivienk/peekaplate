@@ -1,5 +1,10 @@
 # Prepared menu → owner publication → diner
 
+Current composition (November 17): authored S05–S13, server preparation, private
+portion review and published portion links are connected. The dated slices below
+retain their original verification evidence. The new ingredient-proposal change
+has no hosted acceptance yet; see [owner-flow retest](owner-flow-retest.md).
+
 The S13 handoff. Sai's #197 added the data and publication flow below with a temporary
 screen; the official S13 presentation (S6-FE-14, `frontend/console/src/publish/MenuPreview.tsx`)
 now replaces that screen and keeps this flow unchanged. It follows Figma `3123:12796` /
@@ -19,15 +24,16 @@ change retains their title/body tokens. Account controls reuse the onboarding
 disclosure; at desktop widths the middle scrolls while both side panels remain
 available. Mobile retains the authored stacked layout.
 
-- #163 remains a separate S10 verification-only implementation; its title does
-  not mean it implements S13 publication.
-- #162 remains the draft 2.5D camera/portion integration. The merged diner detail
-  still disables View Portion. Its preview is separate from this hosted flow.
-- #145/#147 are pending diner icon/photo updates; #196 is a Compare design update.
+- S10 verification is integrated separately from S13 publication; its success
+  does not publish a menu.
+- #162, #147 and #196 are merged: portion/camera behavior, sample dish photography
+  and Compare design changes. Their narrow staging promotion is documented in
+  [merged diner staging](merged-diner-staging.md); a merge alone is not hosted evidence.
+- #145 remains a separate icon branch; other screen work is not silently included.
 - #173 changes confirmed-404 withdrawal behavior. Until it is merged and deployed,
   REL-02 must distinguish fresh-load denial from the older retained-menu behavior.
 
-These pending branches are not silently included in the staging release.
+The pending withdrawal branch is not included in this staging release.
 
 ## Owner journey
 
@@ -55,7 +61,8 @@ URL in the Figma sample is not fabricated. Staging uses the existing
 The existing [bundle producer](s4-res-bundle-producer.md) prepares content from
 approved dish revisions, restaurant-confirmed composition and verified T0
 assets. Its operator uploads immutable assets/bundle bytes and admits the handoff.
-The browser and normal Worker runtime still cannot insert admission rows.
+The browser cannot admit a menu. The owner preparation route uses the restricted
+server admission function described below; it does not grant general table writes.
 
 This screen completes publication of **already prepared** menus. It does not
 automate arbitrary upload → approved T0 assets → admission; owner-verified dishes are prepared by the path in "Automatic preparation from Review and publish (Part A)" below. A restaurant with no
@@ -119,7 +126,7 @@ lookup with its local fallback.
 Reopening an approved draft keeps its canonical dish association, including older random
 IDs; only fresh Part A drafts derive a new stable ID. Content edits invalidate verification.
 Remove/Undo preserves unchanged content verification and its stable retry receipt. The
-unreleased Part A forward migration permits that pending historical association while
+Part A forward migration permits that pending historical association while
 retaining the tenant foreign key, superseded exclusion and pending reviewer-metadata checks.
 
 A fresh owner venue with no profile, drafts or prepared bundles remains empty and reports
@@ -134,8 +141,11 @@ For the MVP no image encoder is added to the Worker (Sai, Nov 17). Resizing will
 existing Python asset pipeline (`processing/src/peekaplate_processing/assets.py`, which already
 makes those variants); until then this stays an open limitation, not a completed step.
 
-Not yet: owner-written alt text and dietary codes (S09 has no field for them), portions for owner
-photos, and hosted acceptance.
+Owner-approved 2.5D layers can accompany the exact approved dish revision through
+the existing preparation path. Physical calibration is not inferred from the
+photo. Owner-written alt text and dietary codes remain unsupported S09 inputs.
+Hosted evidence is recorded by release in [owner-flow retest](owner-flow-retest.md);
+it does not establish acceptance of subsequent ingredient-proposal changes.
 
 ## Read API and safety
 
@@ -144,8 +154,9 @@ photos, and hosted acceptance.
 - `GET /venues/:venueId/prepared-menus/:menuId/:revisionId` previews that exact
   revision, never a fallback/latest revision. Both routes are local/staging-only,
   require current owner membership and return `Cache-Control: no-store`.
-- The authorization transaction ends before fetching public bundle bytes. Only
-  the existing staging diner Pages asset host is accepted; credentials, URL
+- The authorization transaction ends before reading bundle bytes. The existing
+  staging diner Pages host and the exact Worker-owned prepared-bundle path are
+  accepted through their respective validators; credentials, URL
   query/fragment, alternate ports and redirects are rejected. Fetches have a
   ten-second deadline and a two-megabyte streamed limit. Image origins are also
   checked before rendering. Staff tokens are never forwarded to asset hosting.
@@ -166,7 +177,7 @@ The prepared fetch also runs in local workerd. Hosted testing exposed that
 `redirect: 'error'` works in Node but is rejected by Workers; `manual` preserves
 the no-follow boundary, and every non-success response (including redirects)
 is rejected before its body is consumed. The runtime regression uses no network.
-The corrected feature passes `pnpm check` (1,851 unit and 106 script tests).
+That Part A correction passed `pnpm check` (1,851 unit and 106 script tests).
 
 These local checks do not establish hosted acceptance. Record the exact release,
 genuine staff-session publication, diner rendering and cleanup/retained test link

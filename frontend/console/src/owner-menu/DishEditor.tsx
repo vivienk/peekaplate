@@ -5,7 +5,7 @@ import { type ReactNode, useState } from 'react';
 import { TextField } from '../foundations/TextField';
 import { DishFormView } from '../owner-dashboard/DishFormView';
 import type { MenuItem } from '../owner-dashboard/data';
-import { allergenOutcome, type DishForm, STAFF_ALLERGY_LINE } from './dishForm';
+import { allergenOutcome, type DishForm, pilotPriceCurrency, STAFF_ALLERGY_LINE } from './dishForm';
 import type { EvidenceExcerpt } from './evidence';
 import './dishEditor.css';
 
@@ -37,6 +37,9 @@ export type DishEditorProps = {
   onReviewConfirmedChange?: (confirmed: boolean) => void;
   licenseConfirmed?: boolean;
   onLicenseConfirmedChange?: (confirmed: boolean) => void;
+  suggestIngredients?: (name: string) => Promise<string[]>;
+  suggestAllergens?: (name: string, ingredients: string[]) => Promise<string[]>;
+  draftDescription?: (name: string, ingredients: string[]) => Promise<string>;
 };
 
 export function DishEditor({
@@ -58,6 +61,9 @@ export function DishEditor({
   onReviewConfirmedChange,
   licenseConfirmed = false,
   onLicenseConfirmedChange,
+  suggestIngredients,
+  suggestAllergens,
+  draftDescription,
 }: DishEditorProps) {
   const [fieldError, setFieldError] = useState('');
   const countText = value.servingCount?.trim() ?? '';
@@ -65,7 +71,6 @@ export function DishEditor({
     countText && !/^(?:[1-9]\d?|100)$/.test(countText)
       ? 'Enter a whole number from 1 to 100, or leave blank if unknown.'
       : '';
-  const [repairCurrency] = useState(() => !value.priceCurrency);
   const menu: MenuItem = {
     id: existing ? (value.source?.candidateId ?? 'saved-draft') : null,
     name: value.name,
@@ -75,11 +80,11 @@ export function DishEditor({
     desc: value.description,
     ing: value.ingredients.items,
     alg: value.allergens.items,
-    aiIng: [],
-    aiAlg: [],
+    aiIng: value.aiIng ?? [],
+    aiAlg: value.aiAlg ?? [],
     upload: photoUrl ?? (value.photoId ? 'private-photo' : null),
     rights: licenseConfirmed,
-    aiUsed: value.origin === 'extracted',
+    aiUsed: value.aiUsed || value.origin === 'extracted',
     aiReviewed: reviewConfirmed,
     has25: false,
     status: 'draft',
@@ -89,6 +94,7 @@ export function DishEditor({
   return (
     <div className="owner-menu-design">
       <DishFormView
+        descriptionActionLabel="Shorten description with AI"
         ed={{ step: 'form', draft: menu, origId: menu.id }}
         orig={menu.id ? menu : null}
         setEd={(next) => {
@@ -102,9 +108,13 @@ export function DishEditor({
             return;
           }
           setFieldError('');
-          if (dish.aiReviewed !== reviewConfirmed) {
-            if (dish.aiReviewed && value.ingredients.items.length)
-              onChange({ ...value, ingredients: { ...value.ingredients, status: 'confirmed' } });
+          if (dish.aiReviewed !== reviewConfirmed && dish.aiReviewed) {
+            if (value.ingredients.items.length)
+              onChange({
+                ...value,
+                aiIng: [],
+                ingredients: { ...value.ingredients, status: 'confirmed' },
+              });
             onReviewConfirmedChange?.(dish.aiReviewed);
             return;
           }
@@ -112,6 +122,8 @@ export function DishEditor({
             onLicenseConfirmedChange?.(dish.rights);
             return;
           }
+          const aiIng = dish.aiIng.filter((item) => dish.ing.includes(item));
+          const aiAlg = dish.aiAlg.filter((item) => dish.alg.includes(item));
           onChange({
             ...value,
             name: dish.name,
@@ -119,16 +131,25 @@ export function DishEditor({
             description: dish.desc,
             priceAmount: String(dish.price),
             servingSize: dish.size,
-            ingredients:
-              JSON.stringify(dish.ing) === JSON.stringify(value.ingredients.items)
+            aiIng,
+            aiAlg,
+            aiUsed: dish.aiUsed,
+            ingredients: aiIng.length
+              ? { status: 'proposed', items: dish.ing }
+              : JSON.stringify(dish.ing) === JSON.stringify(value.ingredients.items)
                 ? value.ingredients
                 : { status: dish.ing.length ? 'confirmed' : 'unknown', items: dish.ing },
-            allergens:
-              JSON.stringify(dish.alg) === JSON.stringify(value.allergens.items)
+            allergens: aiAlg.length
+              ? { status: 'proposed', items: parsed.data }
+              : JSON.stringify(dish.alg) === JSON.stringify(value.allergens.items)
                 ? value.allergens
                 : { status: dish.alg.length ? 'confirmed' : 'unknown', items: parsed.data },
           });
+          if (dish.aiReviewed !== reviewConfirmed) onReviewConfirmedChange?.(dish.aiReviewed);
         }}
+        {...(suggestIngredients && { suggestIngredients })}
+        {...(suggestAllergens && { suggestAllergens })}
+        {...(draftDescription && { draftDescription })}
         categories={categories}
         {...(portionReview ? { portionReview } : {})}
         {...(onApprovePortion ? { onApprovePortion } : {})}
@@ -150,7 +171,7 @@ export function DishEditor({
         imageFor={() => photoUrl ?? (value.photoId ? 'private-photo' : null)}
         onSelectPhoto={() => {}}
         photo={photo}
-        currency={value.priceCurrency || 'currency not set'}
+        currency={pilotPriceCurrency(value.priceCurrency)}
         allowZeroPrice
         requireReviewBox={Boolean(onReviewConfirmedChange)}
         busy={busy}
@@ -158,22 +179,10 @@ export function DishEditor({
         sourceNote={
           <>
             {value.source?.priceText && <p>Printed on the menu: {value.source.priceText}</p>}
-            {!value.priceCurrency && (
+            {value.source?.currencyDefaulted && (
               <p role="status">
-                The source has no currency. Enter the printed three-letter currency; do not infer it
-                from a price symbol.
+                Currency was not read from the menu. Prices use the USD pilot default.
               </p>
-            )}
-            {repairCurrency && (
-              <TextField
-                id="dish-currency"
-                label="Currency code"
-                maxLength={3}
-                value={value.priceCurrency}
-                onChange={(event) =>
-                  onChange({ ...value, priceCurrency: event.target.value.toUpperCase() })
-                }
-              />
             )}
             <p className="pp-field__hint">
               Diners will see: {allergy.label}. {STAFF_ALLERGY_LINE}

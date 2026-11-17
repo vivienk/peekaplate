@@ -105,6 +105,8 @@ import {
   submitOrderDataDeletionRequest as submitOrderDataDeletionRequestService,
   verifyVenueOrderDeletion as verifyVenueOrderDeletionService,
 } from './order-ingestion/service';
+
+import { registerDishAssistanceRoutes } from './owner-ai/dish-assistance';
 import {
   mintOwnerReportReference,
   OWNER_REPORT_REFERENCE_HEADER,
@@ -163,9 +165,13 @@ import { verifyTeamCollaborator } from './team-auth';
 
 export { authorizeStaffVenue } from './staff-venue';
 
-export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = [
-  '00000000-0000-4000-8000-000000000123',
-];
+import {
+  configuredSyntheticReportVenues,
+  SYNTHETIC_REPORT_VENUE_ALLOWLIST,
+  syntheticReportTrafficClass,
+} from './owner-report-scope';
+
+export { SYNTHETIC_REPORT_VENUE_ALLOWLIST } from './owner-report-scope';
 
 export type Bindings = {
   OWNER_AI_RESPONSES_ENABLED?: string;
@@ -267,6 +273,8 @@ export type Bindings = {
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
   EXTRACTION_TIMEOUT_MS?: string;
+  OWNER_AI_DISH_ASSISTANCE_ENABLED?: string;
+  SYNTHETIC_REPORT_VENUE_IDS?: string;
 };
 
 type Dependencies = {
@@ -743,7 +751,14 @@ const dependencies: Dependencies = {
     const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await client.connect();
-      return await queryOwnerReport(client, actorId, venueId, now, source);
+      const syntheticReport =
+        source === 'synthetic' &&
+        ['local', 'staging'].includes(env.APP_ENV ?? '') &&
+        configuredSyntheticReportVenues(env).includes(venueId.toLowerCase());
+      if (!syntheticReport) throw new AuthUnavailableError();
+      return await queryOwnerReport(client, actorId, venueId, now, source, {
+        trafficClass: syntheticReportTrafficClass(venueId),
+      });
     } finally {
       await client.end();
     }
@@ -866,21 +881,8 @@ export async function approveDishDraftAtomic(
   try {
     await client.query('BEGIN');
     started = true;
-    await client.query("SET LOCAL statement_timeout = '5s'");
-    await client.query("SET LOCAL lock_timeout = '3s'");
-    await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
+    await authorizeStaffVenue(client, actorId, venueId, true);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
-
-    const membership = await client.query<{ permission: string }>(
-      `SELECT permission
-       FROM app_private.staff_membership
-       WHERE tenant_id = $1 AND actor_id = $2
-       FOR SHARE`,
-      [venueId, actorId],
-    );
-    if (!['owner', 'editor'].includes(membership.rows[0]?.permission ?? '')) {
-      throw new CommandError('forbidden', 403);
-    }
 
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `command:${venueId}:${actorId}:${options.commandId}`,
@@ -1241,10 +1243,26 @@ export function createApp(services: Dependencies = dependencies) {
       maxAge: 86400,
     })(c, next);
   });
+  app.use(
+    '/venues/:venueId/owner-insight-actions',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
   registerOwnerMenuRoutes(app, {
     verify: services.verify,
     authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
     database: withDatabase,
+  });
+  registerDishAssistanceRoutes(app, {
+    verify: services.verify,
+    authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
+    database: withDatabase,
+    allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
+    approvedVenues: SYNTHETIC_REPORT_VENUE_ALLOWLIST,
   });
   app.use(
     '/public/*',
@@ -1407,24 +1425,12 @@ export function createApp(services: Dependencies = dependencies) {
     ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
-    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
-      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
-    });
-    if (!approvedSyntheticVenue.success) {
-      return c.json({ error: 'service_unavailable' }, 503);
-    }
-    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
-      approvedSyntheticVenue.data.venueId.toLowerCase(),
-    );
-    if (
-      !isSyntheticVenue ||
-      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
-    ) {
+    if (!configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
     const now = services.now?.() ?? new Date();
-    const venueId = approvedSyntheticVenue.data.venueId;
+    const venueId = scope.data.venueId.toLowerCase();
     const report = await services.readOwnerReport(actorId, venueId, now, env, 'synthetic');
     if (env.OWNER_AI_RESPONSES_ENABLED === 'true' && env.OWNER_AI_REPORT_REFERENCE_SECRET) {
       try {
@@ -1467,25 +1473,13 @@ export function createApp(services: Dependencies = dependencies) {
     ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
-    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
-      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
-    });
-    if (!approvedSyntheticVenue.success) {
-      return c.json({ error: 'service_unavailable' }, 503);
-    }
-    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
-      approvedSyntheticVenue.data.venueId.toLowerCase(),
-    );
-    if (
-      !isSyntheticVenue ||
-      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
-    ) {
+    if (!configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
     const report = await services.readOwnerReport(
       actorId,
-      approvedSyntheticVenue.data.venueId,
+      scope.data.venueId.toLowerCase(),
       services.now?.() ?? new Date(),
       env,
       'synthetic',
@@ -2525,7 +2519,7 @@ export function createWorker(
       await observationQueue(batch, env);
     }
   };
-  return Object.assign(app, { queue, scheduled: handleScheduled });
+  return Object.assign(app, { queue, scheduled });
 }
 
 export {
@@ -2601,6 +2595,11 @@ export const handleScheduled = async (
 
   const hasOrderStorage = hasListAndDelete(orderStorage);
   const hasStagingStorage = hasStagingMethods(stagingStorage);
+  const stagingEnabled = [
+    env.MENU_STAGING_RETENTION_DAYS,
+    env.MENU_STAGING_REJECTED_RETENTION_DAYS,
+    env.MENU_STAGING_ORPHAN_GRACE_DAYS,
+  ].some((value) => value !== undefined);
   const hasArtworkStorage =
     env.INGREDIENT_ARTWORK_ENABLED === 'true' && hasListAndDelete(artworkStorage);
 
@@ -2694,48 +2693,35 @@ export const handleScheduled = async (
       }
     }
 
-    // Configurable staging menu photo cleanup (Category 1 promoted, Category 2 rejected, Category 3 orphan)
-    const stagingRetentionDays = env.MENU_STAGING_RETENTION_DAYS
-      ? Number.parseInt(env.MENU_STAGING_RETENTION_DAYS, 10)
-      : undefined;
-    const stagingRejectedDays = env.MENU_STAGING_REJECTED_RETENTION_DAYS
-      ? Number.parseInt(env.MENU_STAGING_REJECTED_RETENTION_DAYS, 10)
-      : undefined;
-    const stagingOrphanDays = env.MENU_STAGING_ORPHAN_GRACE_DAYS
-      ? Number.parseInt(env.MENU_STAGING_ORPHAN_GRACE_DAYS, 10)
-      : undefined;
-    const stagingDryRun = env.MENU_STAGING_CLEANUP_DRY_RUN === 'true';
-
-    if (
-      hasStagingMethods(stagingStorage) &&
-      (stagingRetentionDays !== undefined ||
-        stagingRejectedDays !== undefined ||
-        stagingOrphanDays !== undefined)
-    ) {
+    if (stagingEnabled && hasStagingStorage) {
       try {
         const { cleanupStagedMenuPhotos } = await import('./owner-menu-retention');
-        const stagingResult = await cleanupStagedMenuPhotos({
-          storage: stagingStorage,
+        await cleanupStagedMenuPhotos({
+          storage: {
+            put: stagingStorage.put.bind(stagingStorage),
+            get: stagingStorage.get.bind(stagingStorage),
+            list: stagingStorage.list.bind(stagingStorage),
+            delete: stagingStorage.delete.bind(stagingStorage),
+          },
           client,
           retentionConfig: {
-            promotedRetentionDays: stagingRetentionDays,
-            rejectedRetentionDays: stagingRejectedDays ?? 0,
-            orphanGraceDays: stagingOrphanDays ?? 0,
+            promotedRetentionDays: parseNonNegativeIntEnv(
+              env.MENU_STAGING_RETENTION_DAYS,
+              'invalid_staging_retention',
+            ),
+            rejectedRetentionDays:
+              parseNonNegativeIntEnv(
+                env.MENU_STAGING_REJECTED_RETENTION_DAYS,
+                'invalid_staging_retention',
+              ) ?? 0,
+            orphanGraceDays:
+              parseNonNegativeIntEnv(
+                env.MENU_STAGING_ORPHAN_GRACE_DAYS,
+                'invalid_staging_retention',
+              ) ?? 0,
           },
-          dryRun: stagingDryRun,
+          dryRun: env.MENU_STAGING_CLEANUP_DRY_RUN === 'true',
         });
-        if (
-          stagingResult.promotedDeleted > 0 ||
-          stagingResult.rejectedDeleted > 0 ||
-          stagingResult.orphansDeleted > 0
-        ) {
-          console.log(
-            JSON.stringify({
-              event: 'menu_staging_cleanup',
-              ...stagingResult,
-            }),
-          );
-        }
       } catch {
         console.error(JSON.stringify({ event: 'menu_staging_cleanup_error' }));
       }
@@ -2773,7 +2759,7 @@ export const handleScheduled = async (
   }
 };
 
-export const scheduled = handleScheduled;
+export const scheduled = (event: unknown, env: Bindings) => handleScheduled(event, env);
 
 const defaultApp = createApp();
 const defaultObservationQueue = createObservationQueueHandler();

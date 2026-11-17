@@ -69,6 +69,34 @@ async function request(dishes: { dish_id: string; portion?: unknown }[]) {
 }
 
 describe('existing producer with owner-approved photos and the text-only fallback (Part A)', () => {
+  it('rejects a caller-supplied portion association that never passed private approval validation', async () => {
+    const input = await request([
+      {
+        dish_id: soupId,
+        portion: {
+          schema_version: 1,
+          dish_id: soupId,
+          dish_revision_id: soupRevision,
+          width: 128,
+          height: 128,
+          layers: [0, 1].map((depth) => ({
+            url: `https://assets.example.test/${depth}`,
+            sha256: hash,
+            size_bytes: 10,
+            depth,
+          })),
+        },
+      },
+    ]);
+    const portion = input.categories[0]!.dishes[0]!.portion!;
+    await expect(
+      produceMenuBundle(input, new Map([[soupId, source()]]), new Map(), {
+        ownerPhotos: new Map([[soupId, photo()]]),
+        missingPhoto: 'text_only',
+        ownerPortions: new Map([[soupId, { portion, files: [] }]]),
+      }),
+    ).rejects.toMatchObject({ code: 'asset_revision_mismatch' });
+  });
   it('uses the photo approved on the revision, and text-only for a dish without one', async () => {
     const produced = await produceMenuBundle(
       await request([{ dish_id: soupId }, { dish_id: saladId }]),

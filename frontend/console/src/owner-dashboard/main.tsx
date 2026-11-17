@@ -13,6 +13,7 @@ import './owner-dashboard.css';
 // fictional sample data only.
 const root = document.getElementById('root');
 if (!root) throw new Error('Owner dashboard root element is missing');
+document.body.classList.add('owner-dashboard-demo');
 
 async function start() {
   let connection: OwnerAnalysisConnection | undefined;

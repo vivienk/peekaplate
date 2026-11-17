@@ -61,7 +61,10 @@ function claims(authorization: string | undefined): { sub?: string; version?: nu
   }
 }
 
-async function fixture(context: BrowserContext) {
+const reportReference = (actor: string, venueId: string) =>
+  `synthetic-report-reference.${actor}.${venueId}`;
+
+async function fixture(context: BrowserContext, reportReady = false) {
   const state = {
     venues: [venue],
     reportStatus: 200,
@@ -108,13 +111,58 @@ async function fixture(context: BrowserContext) {
     delayReport: false,
     releaseReport: () => {},
     apiCalls: [] as Array<{ path: string; actor: string; version: number }>,
-    analyses: [] as Array<{ venueId: string; actor: string; body: unknown }>,
+    analyses: [] as Array<{ venueId: string; actor: string; body: unknown; reference?: string }>,
     analysisStatus: 200,
     delayAnalysis: false,
     releaseAnalysis: () => {},
     // The analysis snapshot period; by default the same as the report on screen (UNEEZA_REPORT).
     analysisWindow: { start: '2026-10-19T07:00:00Z', end: '2026-10-20T07:00:00Z' },
   };
+  // Reporting journeys start with saved, verified dishes. Empty/unverified setup tests keep
+  // the default fixture; verification does not imply approval or publication.
+  if (reportReady) {
+    for (const restaurant of [venue, otherVenue]) {
+      const id = crypto.randomUUID();
+      const photoId = crypto.randomUUID();
+      state.photos.set(
+        photoId,
+        Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+          'base64',
+        ),
+      );
+      state.drafts[restaurant.venueId] = [
+        {
+          id,
+          draft_id: id,
+          job_id: null,
+          origin: 'manual',
+          draft_version: 1,
+          name: 'Fictional Lentil Soup',
+          category: 'Soup',
+          description: 'Slow cooked lentil soup with herbs.',
+          price_amount: '9.50',
+          price_currency: 'USD',
+          ingredients: ['lentils'],
+          source_text: null,
+          review_warnings: [],
+          review_status: 'pending',
+          verification_status: 'verified',
+          manual_fields: {
+            name: 'Fictional Lentil Soup',
+            category: 'Soup',
+            description: 'Slow cooked lentil soup with herbs.',
+            priceAmount: '9.50',
+            priceCurrency: 'USD',
+            servingSize: '1 bowl',
+            ingredients: { status: 'confirmed', items: ['lentils'] },
+            allergens: { status: 'confirmed', items: [] },
+            photoId,
+          },
+        },
+      ];
+    }
+  }
   await context.route('https://auth-fixture.supabase.co/auth/v1/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.split('/').at(-1);
@@ -165,7 +213,12 @@ async function fixture(context: BrowserContext) {
     const analysis = url.pathname.match(/^\/api\/v1\/venues\/([0-9a-f-]{36})\/ai\/analysis$/);
     if (analysis && request.method() === 'POST') {
       const body = request.postDataJSON();
-      state.analyses.push({ venueId: analysis[1] ?? '', actor, body });
+      state.analyses.push({
+        venueId: analysis[1] ?? '',
+        actor,
+        body,
+        reference: request.headers()['x-owner-report-ref'],
+      });
       if (state.analysisStatus !== 200)
         return route.fulfill({
           status: state.analysisStatus,
@@ -537,7 +590,11 @@ async function fixture(context: BrowserContext) {
           state.reportStatus === 200
             ? { ...UNEEZA_REPORT, venue_id: url.pathname.split('/')[4] }
             : { error: 'synthetic_denial' },
-        headers: { 'Access-Control-Allow-Origin': origin },
+        headers: {
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Expose-Headers': 'X-Owner-Report-Ref',
+          'X-Owner-Report-Ref': reportReference(actor, url.pathname.split('/')[4]!),
+        },
       });
     }
   });
@@ -1015,7 +1072,7 @@ test('menu typography and locked-page copy keep the authored live boundary', asy
     '28px',
   );
   await expect(page.locator('.owner-nav-hint')).toHaveText(
-    'Some screens are not connected in this workspace yet.',
+    'Verify every saved dish to open the dashboard. Publication remains a separate step.',
   );
   state.venues = [{ ...venue, permission: 'editor' }];
   await openAccount(page);
@@ -1025,6 +1082,114 @@ test('menu typography and locked-page copy keep the authored live boundary', asy
     'true',
   );
   await expect(page.locator('.owner-nav-hint')).not.toContainText('after you publish');
+});
+
+test('live image source previews decode and release their blobs on replace, remove and sign-out', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  await page.addInitScript(() => {
+    const original = URL.revokeObjectURL.bind(URL);
+    (window as unknown as { revokedSourceUrls: string[] }).revokedSourceUrls = [];
+    URL.revokeObjectURL = (url) => {
+      (window as unknown as { revokedSourceUrls: string[] }).revokedSourceUrls.push(url);
+      original(url);
+    };
+  });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByText('Upload photos/PDF', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const image = {
+    name: 'source.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  };
+  const upload = async (name: string) => {
+    await page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles({ ...image, name });
+    const preview = page.getByRole('img', { name: `Preview of ${name}`, exact: true });
+    await expect(preview).toBeVisible();
+    await expect
+      .poll(() => preview.evaluate((element) => (element as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    return (await preview.getAttribute('src'))!;
+  };
+  const revoked = (url: string) =>
+    page.evaluate(
+      (value) =>
+        (window as unknown as { revokedSourceUrls: string[] }).revokedSourceUrls.includes(value),
+      url,
+    );
+  const first = await upload('source.png');
+  expect(first).toMatch(/^blob:/);
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Replace source.png', exact: true }).click(),
+  ]);
+  await chooser.setFiles({ ...image, name: 'replacement.png' });
+  const replacement = page.getByRole('img', { name: 'Preview of replacement.png', exact: true });
+  await expect(replacement).toBeVisible();
+  await expect.poll(() => revoked(first)).toBe(true);
+  const second = (await replacement.getAttribute('src'))!;
+  await page.getByRole('button', { name: 'Remove replacement.png', exact: true }).click();
+  await expect(replacement).toHaveCount(0);
+  await expect.poll(() => revoked(second)).toBe(true);
+  const last = await upload('final.png');
+  await openAccount(page);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect.poll(() => revoked(last)).toBe(true);
+});
+
+test('leaving an image selection ignores delayed group creation', async ({ context, page }) => {
+  const state = await fixture(context);
+  let started = false;
+  let release = () => {};
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let finished = false;
+  await page.route('**/upload-groups', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    started = true;
+    await waiting;
+    await route.fallback();
+    finished = true;
+  });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByText('Upload photos/PDF', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  try {
+    await page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles({
+        name: 'pending.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from('synthetic pending source'),
+      });
+    await expect.poll(() => started).toBe(true);
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Choose how to add your menu', exact: true }),
+    ).toBeVisible();
+  } finally {
+    release();
+  }
+  await expect.poll(() => finished).toBe(true);
+  await expect.poll(() => state.jobs[venue.venueId]?.length).toBe(1);
+  expect(state.jobs[venue.venueId]?.[0]?.source_uploaded).toBe(false);
+  await expect(page.locator('.pp-onboard-preview__image')).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Choose how to add your menu', exact: true }),
+  ).toBeVisible();
 });
 
 test('a browser file with no MIME keeps original bytes and a declared PDF upload', async ({
@@ -1164,6 +1329,14 @@ for (const width of [1440, 390]) {
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await expect(page.getByText('Queued for processing', { exact: true })).toBeVisible();
     await capture('menu-processing');
+    // The synthetic worker finishes without extracted dishes; the owner adds a manual dish next.
+    // Pending extraction must never be used to unlock reporting.
+    state.jobs[venue.venueId] = state.jobs[venue.venueId]!.map((job) => ({
+      ...job,
+      status: 'complete',
+      started_at: '2026-11-15T00:00:01Z',
+      finished_at: '2026-11-15T00:00:02Z',
+    }));
     await page.getByRole('button', { name: 'View saved dishes', exact: true }).click();
     await page.getByRole('button', { name: 'Add dish', exact: true }).click();
     await capture('dish-empty');
@@ -1178,9 +1351,13 @@ for (const width of [1440, 390]) {
       page.getByText('Draft saved. This has not approved or published your menu.'),
     ).toBeVisible();
     await capture('dish-saved');
-    await page.getByRole('button', { name: 'Save and Exit', exact: true }).click();
+    expect(state.verificationCommands).toEqual([]);
+    await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
+    await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await capture('menu-saved');
+    expect(state.apiCalls.some((call) => /publications|\/approvals$/.test(call.path))).toBe(false);
     await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
     await expect(page.getByRole('table')).toBeVisible();
     await capture('owner-report');
@@ -1739,7 +1916,7 @@ test('real SDK sign-in opens the server restaurant shell and authenticated repor
   context,
   page,
 }, testInfo) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
   await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
@@ -1750,7 +1927,7 @@ test('real SDK sign-in opens the server restaurant shell and authenticated repor
   await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'AI Insight Report', exact: true }),
-  ).toHaveAttribute('aria-disabled', 'true');
+  ).not.toHaveAttribute('aria-disabled', 'true');
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   await expect(
     page.getByText('Synthetic test data from the report API. Not real diners.'),
@@ -1784,7 +1961,7 @@ test('multiple restaurants require selection and a switch removes the old report
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.venues = [venue, otherVenue];
   await signIn(page, undefined, false);
   await expect(page.getByRole('heading', { name: 'Choose a restaurant' })).toBeVisible();
@@ -1802,7 +1979,7 @@ test('editor access does not enable owner-only reports or publication', async ({
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.venues = [{ ...venue, permission: 'editor' }];
   await signIn(page, undefined, false);
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
@@ -1832,7 +2009,7 @@ test('report revocation refreshes membership and clears private state', async ({
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-shell')).toBeVisible();
   state.reportStatus = 403;
@@ -1846,7 +2023,7 @@ test('an expired identity removes the shell before an API request can use it', a
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-shell')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reload saved work', exact: true })).toBeVisible();
@@ -1877,7 +2054,7 @@ test('a different account signing in in another tab replaces old state and a lat
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
   state.delayReport = true;
@@ -1993,7 +2170,7 @@ test('the AI panel opens beside the live report and uses only the signed-in owne
   context,
   page,
 }, testInfo) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
   await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
@@ -2007,7 +2184,12 @@ test('the AI panel opens beside the live report and uses only the signed-in owne
   await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
   const soup = UNEEZA_REPORT.dishes.find((d) => d.name === 'Soup');
   expect(state.analyses).toEqual([
-    { venueId: venue.venueId, actor: ownerId, body: { dishId: soup?.dish_id, goal: 'menu' } },
+    {
+      venueId: venue.venueId,
+      actor: ownerId,
+      body: { dishId: soup?.dish_id, goal: 'menu' },
+      reference: reportReference(ownerId, venue.venueId),
+    },
   ]);
   const axe = await new AxeBuilder({ page }).exclude('.owner-brand__name').analyze();
   expect(axe.violations).toEqual([]);
@@ -2020,7 +2202,7 @@ test('switching restaurant clears the AI result and asks only for the new restau
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.venues = [venue, otherVenue];
   await signIn(page, undefined, false);
   await openAccount(page);
@@ -2040,7 +2222,7 @@ test('switching restaurant clears the AI result and asks only for the new restau
 });
 
 test('editor access shows no AI panel', async ({ context, page }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.venues = [{ ...venue, permission: 'editor' }];
   await signIn(page);
   await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
@@ -2052,7 +2234,7 @@ test('the AI panel shows the report period and an honest error when the review f
   context,
   page,
 }) => {
-  await fixture(context);
+  await fixture(context, true);
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
@@ -2076,7 +2258,7 @@ test('an analysis for a different period than the report on screen shows no sugg
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   // Deliberately different UTC start and end from the report on screen (Oct 19 07:00 – Oct 20 07:00).
   state.analysisWindow = { start: '2026-11-11T12:00:00Z', end: '2026-11-12T12:00:00Z' };
   await signIn(page);
@@ -2120,7 +2302,7 @@ test('analysis denial clears the private report and refreshes restaurant access'
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
@@ -2137,7 +2319,7 @@ test('the panel distinguishes its server-read analysis period from the displayed
   context,
   page,
 }) => {
-  await fixture(context);
+  await fixture(context, true);
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
@@ -2157,7 +2339,7 @@ test('a pending analysis cannot restore private output after sign-out and anothe
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.delayAnalysis = true;
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
@@ -2182,7 +2364,7 @@ test('the live owner AI panel stays usable on mobile with accessible controls', 
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await fixture(context);
+  await fixture(context, true);
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
@@ -2662,6 +2844,100 @@ test('Review and publish prepares the menu, shows a failure and retries with Pre
   await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toBeVisible();
   expect(state.publishes).toEqual([]);
+});
+
+test('retries failed 2.5D generation for an unchanged saved photo without duplicate requests', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const id = crypto.randomUUID();
+  const photoId = crypto.randomUUID();
+  const image = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  state.photos.set(photoId, image);
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: null,
+      origin: 'manual',
+      draft_version: 2,
+      name: 'Fictional Lentil Soup',
+      category: 'Soup',
+      description: 'Slow cooked lentil soup with herbs.',
+      price_amount: '9.50',
+      price_currency: 'CAD',
+      ingredients: ['lentils'],
+      source_text: null,
+      review_warnings: [],
+      review_status: 'pending',
+      verification_status: 'not_verified',
+      manual_fields: {
+        name: 'Fictional Lentil Soup',
+        category: 'Soup',
+        description: 'Slow cooked lentil soup with herbs.',
+        priceAmount: '9.50',
+        priceCurrency: 'CAD',
+        servingSize: '1 bowl',
+        ingredients: { status: 'confirmed', items: ['lentils'] },
+        allergens: { status: 'confirmed', items: [] },
+        photoId,
+      },
+    },
+  ];
+  let generations = 0;
+  const headers = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+  await context.route(
+    `${api}/venues/${venue.venueId}/drafts/${id}/photos/${photoId}/portion**`,
+    async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+      if (new URL(route.request().url()).pathname.endsWith('/image'))
+        return route.fulfill({ body: image, contentType: 'image/webp', headers });
+      generations++;
+      return route.fulfill({
+        json: {
+          portionReview: {
+            status: generations === 1 ? 'failed' : 'needs_review',
+            dish_id: id,
+            draft_revision_id: photoId,
+            approved: false,
+          },
+        },
+        headers,
+      });
+    },
+  );
+  await signIn(page);
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(
+    page.getByText('The 2.5D cutout could not be generated. The original photo is retained.'),
+  ).toBeVisible();
+  expect(generations).toBe(1);
+  await page.getByRole('button', { name: 'Save photo and generate 2.5D', exact: true }).click();
+  await expect(
+    page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup' }),
+  ).toBeVisible();
+  const portionCard = page.getByRole('region', { name: '2.5D preview', exact: true });
+  const portionImage = portionCard.getByRole('img', {
+    name: 'Review-only 2.5D preview of Fictional Lentil Soup',
+  });
+  await expect(portionImage).toBeVisible();
+  const imageBounds = await portionImage.boundingBox();
+  expect(imageBounds?.height).toBeGreaterThan(0);
+  expect(imageBounds?.height).toBeLessThanOrEqual(120);
+  expect(generations).toBe(2);
+  await page.getByRole('textbox', { name: /^Dish name/ }).fill('Fictional Lentil Soup updated');
+  await expect(
+    page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup updated' }),
+  ).toBeVisible();
+  expect(generations).toBe(2);
 });
 
 test('a dish approved by an earlier preparation can still be edited (Back/Edit)', async ({
