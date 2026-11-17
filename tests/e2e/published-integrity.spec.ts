@@ -116,7 +116,14 @@ test('invalid replacement never displays replacement claims', async ({ page }) =
   state.replacement = true;
   state.kind = 'tampered';
   await page.clock.fastForward(25 * 60_000 + 1000);
-  await expect.poll(() => state.reads).toBeGreaterThan(1);
+  // The retry is armed only after the first invalid response has been processed.
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(30_000);
+      return state.reads ?? 0;
+    })
+    .toBeGreaterThan(2);
+  await expect(page.getByRole('button', { name: 'Open Charred Leeks' }).first()).toBeVisible();
   await expect(page.getByText('Replacement roasted leeks', { exact: true })).toHaveCount(0);
   await expect(page.getByText('$23.75', { exact: true })).toHaveCount(0);
 });
