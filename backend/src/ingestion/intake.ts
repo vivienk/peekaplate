@@ -49,7 +49,7 @@ export async function validateMenuPdf(upload: MenuUpload) {
 export function selectUnambiguousMenuFile(links: readonly string[]): string | null {
   const candidates = [...new Set(links)].filter((link) => {
     try {
-      return /\\.(pdf|png|jpe?g)$/i.test(new URL(link).pathname);
+      return /\.(pdf|png|jpe?g)$/i.test(new URL(link).pathname);
     } catch {
       return false;
     }
