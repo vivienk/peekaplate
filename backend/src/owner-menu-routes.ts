@@ -20,6 +20,7 @@ import type { Context, Hono } from 'hono';
 import type { Client } from 'pg';
 import { AuthUnavailableError } from './auth';
 import type { Bindings } from './index';
+import { persistStructuredHtmlMenu, retrieveStructuredHtmlMenu } from './ingestion/html-menu';
 import {
   acceptUploadGroupFile,
   cancelUploadGroup,
@@ -30,7 +31,6 @@ import {
   readUploadGroup,
   validateMenuPdf,
 } from './ingestion/intake';
-import { persistStructuredHtmlMenu, retrieveStructuredHtmlMenu } from './ingestion/html-menu';
 import { type DishDraftRow, IngestionError } from './ingestion/repository';
 import { bootstrapMenuReview } from './ingestion/review-bootstrap';
 import { readMenuUpload } from './ingestion/upload';
