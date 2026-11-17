@@ -245,7 +245,7 @@ export function extractStructuredMenuItems(root: unknown): StructuredMenuItem[] 
           ? String(rawPrice).trim()
           : '';
         const currency = offerObject?.priceCurrency;
-        const validPrice = /^\\d{1,7}(?:\\.\\d{1,2})?$/.test(price);
+        const validPrice = /^\d{1,7}(?:\.\d{1,2})?$/.test(price);
         const validCurrency = typeof currency === 'string' && /^[A-Z]{3}$/.test(currency);
         items.push({
           name,
