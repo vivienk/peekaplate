@@ -7,7 +7,7 @@ export async function readLayer(layer: PublicPortion['layers'][number], signal: 
     (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
     layer.url.startsWith('https://portion-fixtures.invalid/');
   const url = uploaded
-    ? `data:image/webp;base64,${(await import('./portionUpload')).uploadedLayer(layer.url)}`
+    ? `data:${layer.url.endsWith('/background.svg') ? 'image/svg+xml' : 'image/webp'};base64,${(await import('./portionUpload')).uploadedLayer(layer.url)}`
     : fixture
       ? (await import('./fixturePortions')).fixtureLayerUrl(layer.url)
       : (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
@@ -19,7 +19,12 @@ export async function readLayer(layer: PublicPortion['layers'][number], signal: 
     (uploaded || fixture || layer.url.startsWith('https://portion-demo.invalid/')) &&
     /^data:image\/[^;]+;base64,/.test(url);
   const response = bundled
-    ? new Response(Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0)))
+    ? new Response(
+        Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0)),
+        {
+          headers: { 'Content-Type': url.slice(5, url.indexOf(';')) },
+        },
+      )
     : await fetch(url, {
         signal,
         cache: 'no-cache',
@@ -47,7 +52,12 @@ export async function readLayer(layer: PublicPortion['layers'][number], signal: 
   ).join('');
   if (hash !== layer.sha256) throw new Error('Layer hash mismatch');
   signal.throwIfAborted();
-  return bytes;
+  // Published asset URLs are opaque hashes. Preserve a supported response MIME rather
+  // than guessing from the URL; SVG blobs require it for browser image decoding.
+  const type = response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() ?? '';
+  return new Blob([bytes], {
+    type: ['image/svg+xml', 'image/png', 'image/webp', 'image/jpeg'].includes(type) ? type : '',
+  });
 }
 
 // PR25 permits one delayed retry before retaining the photo. Cancellation must stop the delay too.

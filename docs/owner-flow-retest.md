@@ -80,3 +80,28 @@ No screen, design-token package, processing service or publication path is added
 The temporary diagnostic was removed from staging after identifying the cause.
 Hosted generation, approval and publication must be retested on the corrected
 exact-main release before claiming that portion flow has passed.
+
+## Hosted publication and SVG decoding
+
+On the corrected staging release, the existing authenticated flow generated and
+approved the labelled fixture cutout, saved and verified its dish, prepared a new
+menu, and published it through S13 at the unchanged restaurant URL. The 46 Poulet
+drafts remained intact. This did not rerun OCR or make paid model requests.
+
+The diner then exposed a second integration defect: the published SVG background
+returned 200 with correct bytes, but the renderer preserved SVG MIME only for
+development fixture URLs. Opaque production asset URLs became untyped blobs and
+failed image decoding. The shared verified-layer reader now retains supported
+image MIME after its exact size/hash checks. The original renderer, dimension
+checks, cleanup, retries and photo fallback remain. Its browser regression uses
+an SVG background behind an opaque hash URL instead of two PNG fixtures.
+
+The Menu list no longer claims every portion is disconnected. Its neutral
+"Review in dish" label points to the existing editor, where current generation
+and approval are authoritative; the list does not invent a persisted status.
+
+The connected Brave browser has Global Privacy Control enabled. Both destinations
+remained off after the optional-analytics action, as intended. That establishes
+privacy enforcement, not a positive PostHog/canonical delivery result. Independent
+GitHub environment approval still gates credential provisioning; owner AI remains
+off, and unknown report freshness must still abstain.
