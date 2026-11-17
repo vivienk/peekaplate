@@ -498,7 +498,7 @@ export default {
         const headers = new Headers(request.headers);
         headers.delete('Content-Length');
         const response = await env.EXTRACTOR.getByName('staging-extractor').fetch(
-          new Request(url, { method: 'POST', headers, body: photo, signal, redirect: 'error' }),
+          new Request(url, { method: 'POST', headers, body: photo, signal, redirect: 'manual' }),
         );
         const bytes = await readPortionBytes(response.body, maxPortionResponseBytes, signal);
         if (!bytes || !response.headers.get('content-type')?.startsWith('application/json'))

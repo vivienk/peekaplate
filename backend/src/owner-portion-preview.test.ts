@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
+import { fileURLToPath, URL } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { unstable_dev } from 'wrangler';
 import type { Bindings } from './index';
 import { previewKey, processPrivateDishPhoto } from './owner-portion-preview';
 
@@ -52,6 +54,39 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('private portion service transport', () => {
+  it('uses Worker-supported redirects through both production portion hops and rejects redirects', async () => {
+    const worker = await unstable_dev(
+      fileURLToPath(new URL('./owner-portion-preview.workerd-harness.ts', import.meta.url)),
+      {
+        config: fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)),
+        local: true,
+        ip: '127.0.0.1',
+        port: 0,
+        inspectorPort: 0,
+        logLevel: 'error',
+        experimental: {
+          disableExperimentalWarning: true,
+          forceLocal: true,
+          watch: false,
+          disableDevRegistry: true,
+        },
+      },
+    );
+    try {
+      const response = await worker.fetch('http://fixture.test/');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        status: 'failed',
+        requests: 1,
+        containerRequests: 1,
+      });
+      const redirected = await worker.fetch('http://fixture.test/?redirect=1');
+      expect(redirected.status).toBe(502);
+      expect(await redirected.json()).toEqual({ requests: 1, containerRequests: 1 });
+    } finally {
+      await worker.stop();
+    }
+  }, 30_000);
   it('reuses the authenticated extraction host when no separate service is configured', async () => {
     const fetcher = vi.fn(async () => Response.json(noCutout));
     vi.stubGlobal('fetch', fetcher);
@@ -65,7 +100,7 @@ describe('private portion service transport', () => {
     expect(url.href).toBe(`https://extract.example.test/v1/portion-uploads/${id(2)}/${id(3)}`);
     expect(options).toMatchObject({
       method: 'POST',
-      redirect: 'error',
+      redirect: 'manual',
       headers: { Authorization: 'Bearer test-only-service' },
     });
   });

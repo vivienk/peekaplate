@@ -133,7 +133,7 @@ export async function processPrivateDishPhoto(input: {
         'Content-Type': 'application/octet-stream',
       },
       body: photo,
-      redirect: 'error',
+      redirect: 'manual',
       signal: controller.signal,
     });
     if (!response.ok || !response.body) {
