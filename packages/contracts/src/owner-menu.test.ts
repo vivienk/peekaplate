@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   ApproveDraftPhotoSchema,
   DishVerificationStatusSchema,
   OwnerDishFieldsSchema,
   PhotoVerificationStatusSchema,
+  type SaveOwnerDishDraft,
   SaveOwnerDishDraftSchema,
   VerifyDishDraftSchema,
 } from './owner-menu';
@@ -11,8 +12,23 @@ import {
 describe('owner working drafts', () => {
   it('preserves the authored serving-size field without inventing it for old drafts', () => {
     expect(OwnerDishFieldsSchema.parse({ servingSize: '1 bowl' }).servingSize).toBe('1 bowl');
-    expect(OwnerDishFieldsSchema.parse({}).servingSize).toBeNull();
+    expect(OwnerDishFieldsSchema.parse({}).servingSize).toBeUndefined();
     expect(OwnerDishFieldsSchema.safeParse({ servingSize: '\u0000' }).success).toBe(false);
+  });
+  it('keeps legacy serving fields absent while preserving explicit clears in save requests', () => {
+    expectTypeOf<{}>().toExtend<
+      Pick<SaveOwnerDishDraft['fields'], 'servingSize' | 'servingCount'>
+    >();
+    const command = { commandId: crypto.randomUUID(), expectedVersion: 1, fields: {} };
+    const legacy = SaveOwnerDishDraftSchema.parse(command);
+    expect(legacy.fields).not.toHaveProperty('servingSize');
+    expect(legacy.fields).not.toHaveProperty('servingCount');
+    expect(
+      SaveOwnerDishDraftSchema.parse({
+        ...command,
+        fields: { servingSize: null, servingCount: null },
+      }).fields,
+    ).toMatchObject({ servingSize: null, servingCount: null });
   });
   it('permits incomplete saved work but never invents confirmed ingredients or allergens', () => {
     const fields = OwnerDishFieldsSchema.parse({});

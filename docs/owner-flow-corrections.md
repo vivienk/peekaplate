@@ -115,6 +115,12 @@ of this isolated run; its evidence page names those limits explicitly.
 
 ## Confirmed missing backend pieces added
 
+The canonical backend pieces below are already merged through PR217. This
+reconciliation keeps its optional serving-field compatibility and replay tests,
+plus PR218's default-off report references. One review-data adapter omits only an
+undefined serving size; explicit null and text remain intact. Authored screens,
+styles and tokens are unchanged. Hosted AI still needs the console header handoff.
+
 - Profile read/save/setup endpoints reuse the existing staff/venue transaction
   and transport. Profile and private-photo metadata force tenant RLS. Browser
   fields cannot supply verification status or tenant authority. Changed details

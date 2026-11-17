@@ -4707,3 +4707,55 @@ The corrected case passed three repeats in 11.3s. The first edit accidentally
 put the effect guard in the adjacent verification dialog; browser execution
 caught the undefined variable, and the edit was corrected before commit. Screen
 markup, placement, command identity and persistence remain unchanged.
+## ERR-20261117-ARTWORK-PENDING-AUTHORITY
+
+The backend-only PR210 review reproduced a private-read authorization gap:
+the pending-artwork reader accepted a membership that could be revoked after
+route preflight. The focused regression resolved instead of rejecting before
+the fix. The reader now reuses existing staff authorization with a membership
+row lock inside the same transaction as the tenant-scoped read; the route passes
+the verified actor. Unit denial/rollback and real-database revocation regressions
+pass. Full database verification passes 14 SQL files and 156 integration tests
+(37.39s), plus the local Worker smoke; disposable resources were cleaned up.
+No profile/frontend code, admission grant or hosted migration is included.
+
+Context refresh initially rejected the expanded backend summary's length.
+Shortened that index summary without changing scope, refreshed its fingerprint,
+then passed the full check (1,962 unit and 117 script tests, lint/types/context/docs).
+
+## ERR-20261116-BACKEND-SPLIT-COMPATIBILITY
+
+Separating the existing backend from held PR213 exposed a compatibility issue
+with develop's unchanged manual-draft caller: omitted serving fields were required
+by the inferred request type and normalized away saved serving metadata. A
+focused real-database regression reproduced size/count loss. The shared request
+now accepts legacy omission; the existing locked save transaction preserves
+omitted extensions while explicit null clears them. Request hashes keep legacy
+omission distinct from clearing, and event snapshots preserve replayed values.
+Focused verification passed 16 unit tests, 23 real-database owner-menu cases
+(6.84s), console typecheck and formatter checks. A receipt assertion was corrected
+to compare its JSON wire snapshot with PostgreSQL dates; no runtime check was
+weakened. Full standalone checks are recorded on the wiring PR.
+
+
+### ERR-20261117-OWNER-MERGE-CONTEXT
+
+The PR213/develop reconciliation first exceeded the context node summary limit
+while combining the existing backend and report-reference descriptions. Context
+refresh rejected the oversized summary before checks. The summary was condensed
+within the existing 1000-character limit; module paths, both handoffs and runtime
+behavior were retained. This was documentation normalization, not a runtime failure.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-17T05:17:56.435Z","exitCode":2}
+```
+
+### ERR-20261117-OWNER-MERGE-OPTIONAL-SIZE
+
+Merging PR217 compatibility into PR213 reproduced TS2375 in the review adapter:
+the optional serving-size contract could produce an explicitly undefined property,
+which ReviewDish rejects under exactOptionalPropertyTypes. The focused existing
+adapter suite also failed its omitted-property regression before the fix. A
+conditional spread now omits only undefined and preserves explicit null/text.
+The five focused adapter cases pass; authored markup, styles and tokens are unchanged.
