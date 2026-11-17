@@ -18,7 +18,9 @@ export type DishEditorProps = {
     status: 'processing' | 'needs_review' | 'failed';
     previewUrl?: string;
     message?: string;
+    approved?: boolean;
   };
+  onApprovePortion?: () => void;
   existing?: boolean;
   categories?: string[];
   onChange: (next: DishForm) => void;
@@ -41,6 +43,7 @@ export function DishEditor({
   photo,
   photoUrl,
   portionReview,
+  onApprovePortion,
   existing = false,
   categories = [],
   onChange,
@@ -126,6 +129,7 @@ export function DishEditor({
         }}
         categories={categories}
         portionReview={portionReview}
+        onApprovePortion={onApprovePortion}
         servingCountControl={
           <TextField
             id="dish-serving-count"
