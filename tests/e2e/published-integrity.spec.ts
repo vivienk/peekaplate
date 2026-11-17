@@ -6,12 +6,22 @@ import { expect, type Page, test } from '@playwright/test';
 const content = JSON.parse(
   readFileSync('packages/contracts/fixtures/public-menu-bundle.v1/bundle.json', 'utf8'),
 );
+const replacement = structuredClone(content);
+replacement.menu_revision_id = '55555555-5555-4555-8555-555555555555';
+replacement.categories[0].dishes[0].name = 'Replacement roasted leeks';
+replacement.categories[0].dishes[0].price.amount = '23.75';
+const replacementBytes = JSON.stringify(replacement);
+const replacementDigest = createHash('sha256').update(replacementBytes).digest('hex');
+const replacementPublication = '66666666-6666-4666-8666-666666666666';
 const bytes = JSON.stringify(content);
 const digest = createHash('sha256').update(bytes).digest('hex');
 const publication = '44444444-4444-4444-8444-444444444444';
 const routePath = `/venues/${content.venue_id}/menus/${content.menu_id}`;
 
-async function open(page: Page, state: { kind: 'valid' | 'tampered' | 'withdrawn' }) {
+async function open(
+  page: Page,
+  state: { kind: 'valid' | 'tampered' | 'withdrawn'; replacement?: boolean; reads?: number },
+) {
   await page.clock.install();
   await page.route('**/src/menu/menuScreen.ts*', async (route) => {
     const response = await route.fetch();
@@ -22,6 +32,7 @@ async function open(page: Page, state: { kind: 'valid' | 'tampered' | 'withdrawn
   });
   // HTTPS is required by the shared delivery contract.
   await page.route('**/public/venues/**', async (route) => {
+    state.reads = (state.reads ?? 0) + 1;
     if (state.kind === 'withdrawn')
       return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
     return route.fulfill({
@@ -30,14 +41,14 @@ async function open(page: Page, state: { kind: 'valid' | 'tampered' | 'withdrawn
         schemaVersion: 1,
         venueId: content.venue_id,
         menuId: content.menu_id,
-        menuRevisionId: content.menu_revision_id,
-        publicationId: publication,
+        menuRevisionId: state.replacement ? replacement.menu_revision_id : content.menu_revision_id,
+        publicationId: state.replacement ? replacementPublication : publication,
         publicationHash: 'a'.repeat(64),
         availabilityVersion: 1,
         tier: 'T0',
         bundle: {
           url: 'https://bundle.example.test/bundle.json',
-          contentHash: digest,
+          contentHash: state.replacement ? replacementDigest : digest,
           assetManifestHash: 'b'.repeat(64),
         },
         menuToken: 'synthetic-not-signed',
@@ -48,7 +59,12 @@ async function open(page: Page, state: { kind: 'valid' | 'tampered' | 'withdrawn
   await page.route('https://bundle.example.test/bundle.json', (route) =>
     route.fulfill({
       contentType: 'application/json',
-      body: state.kind === 'tampered' ? `${bytes}\n` : bytes,
+      body:
+        state.kind === 'tampered'
+          ? `${state.replacement ? replacementBytes : bytes}\n`
+          : state.replacement
+            ? replacementBytes
+            : bytes,
     }),
   );
   await page.route('https://assets.example.test/**', (route) => route.abort());
@@ -73,6 +89,45 @@ test('tampered bytes never render dish content', async ({ page }) => {
 test('a fresh withdrawn menu is unavailable', async ({ page }) => {
   await open(page, { kind: 'withdrawn' });
   await expect(page.getByText('This menu is unavailable right now.')).toBeVisible();
+});
+
+test('verified replacement swaps the complete menu without mixing revisions', async ({ page }) => {
+  const state: { kind: 'valid' | 'tampered' | 'withdrawn'; replacement?: boolean } = {
+    kind: 'valid',
+  };
+  await open(page, state);
+  await expect(page.getByRole('button', { name: 'Open Charred Leeks' }).first()).toBeVisible();
+  await expect(page.getByText('$14.00', { exact: true }).first()).toBeVisible();
+  state.replacement = true;
+  await page.clock.fastForward(25 * 60_000 + 1000);
+  await expect(
+    page.getByRole('button', { name: 'Open Replacement roasted leeks' }).first(),
+  ).toBeVisible();
+  await expect(page.getByText('$23.75', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('$14.00', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(content.categories[0].dishes[0].name, { exact: true })).toHaveCount(
+    0,
+  );
+});
+
+test('invalid replacement never displays replacement claims', async ({ page }) => {
+  const state: { kind: 'valid' | 'tampered' | 'withdrawn'; replacement?: boolean; reads?: number } =
+    { kind: 'valid' };
+  await open(page, state);
+  await expect(page.getByRole('button', { name: 'Open Charred Leeks' }).first()).toBeVisible();
+  state.replacement = true;
+  state.kind = 'tampered';
+  await page.clock.fastForward(25 * 60_000 + 1000);
+  // The retry is armed only after the first invalid response has been processed.
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(30_000);
+      return state.reads ?? 0;
+    })
+    .toBeGreaterThan(2);
+  await expect(page.getByRole('button', { name: 'Open Charred Leeks' }).first()).toBeVisible();
+  await expect(page.getByText('Replacement roasted leeks', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('$23.75', { exact: true })).toHaveCount(0);
 });
 
 test('active withdrawal preserves browsing but stops both destinations', async ({ page }) => {

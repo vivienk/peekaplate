@@ -9,8 +9,8 @@ remote signature checks and revoked-owner retry denial passed with synthetic dat
 See [operations](operations.md#res02-hosted-acceptance) and the
 [sanitized evidence](res02-staging-acceptance.json). The synthetic publication is
 withdrawn and its temporary bundle host is removed. This does not complete the
-real-content producer, DIN-03 UI, deployed CORS, production hash-input decision
-or original-publication token renewal described below.
+real-content producer, DIN-03 UI or deployed CORS described below. Later work
+implemented exact-byte hashing and refresh; see the current contracts below.
 
 
 Status: local implementation slice for S3-RES-02. This is not a staging or production deployment record.
@@ -38,14 +38,14 @@ The immutable bundle is UTF-8 JSON served with `Content-Type: application/json`.
 | Root | `schema_version: 1`; UUID strings `venue_id`, `menu_id`, `menu_revision_id`; `restaurant`; ordered `categories` |
 | `restaurant` | trimmed `name`; `logo`, which is either an image object or `null` |
 | Category | UUID `category_id`; trimmed `name`; ordered `dishes` |
-| Complete dish | UUID `dish_id` and `dish_revision_id`; `complete: true`; trimmed `name`; `description`; decimal-string `price.amount`; three-letter uppercase `price.currency`; ordered `ingredients`; reviewed `allergens` state and unique approved `dietary` codes; required T0 `images.card` and `images.detail` |
+| Complete dish | UUID `dish_id` and `dish_revision_id`; `complete: true`; trimmed `name`; `description`; decimal-string `price.amount`; three-letter uppercase `price.currency`; ordered `ingredients`; reviewed `allergens` state and unique approved `dietary` codes; `images` as card/detail descriptors or `null` for text-only |
 | Incomplete dish | only UUID `dish_id`, UUID `dish_revision_id` and `complete: false` |
 | Ingredient | UUID `ingredient_id`; trimmed `name`; `description` string or `null` |
 | Image | immutable HTTPS `url`; positive integer `width` and `height`; non-empty `alt` text |
 
 `PublicMenuDeliverySchema` validates the fetched content together with `PublicMenuResponseSchema` and rejects any mismatch in venue, menu or menu-revision identity. The bundle is created before publication and is revision-scoped, so it does not contain the later-generated publication ID. The response `publicationId` remains the sole publication identity and maps to `publication_revision_id` in `observation.v2`; dish events copy `dish_id` and `dish_revision_id` from the selected bundle item.
 
-`PublicMenuDeliverySchema` performs shape and identity validation only; it does not prove hash integrity. Before parsing or display, the DIN-03 adapter must verify the producer-defined hash input against `response.bundle.contentHash`. The producer and consumer must agree whether that input is exact UTF-8 bytes or a canonical serialization; until that rule is recorded and tested, a schema-valid fetch is not approved-content evidence.
+`PublicMenuDeliverySchema` performs shape and identity validation only; it does not prove hash integrity. The producer serializes the schema-validated bundle once as canonical JSON, without a trailing newline, and hashes those exact UTF-8 bytes. Before decoding or parsing, the diner verifies the fetched bytes against `response.bundle.contentHash`, then validates delivery identity. See the [producer contract](s4-res-bundle-producer.md#3-integrity-ids-and-handoff) and [diner connection](diner-connection.md#flow).
 
 Allergen and dietary values are explicit restaurant assertions, never inferred. The version 1 closed code lists are:
 
@@ -60,7 +60,7 @@ New bundles use separate `nuts` and `peanut` codes. A search alias may match bot
 
 `allergens` is required on a complete dish but has an explicit review state: `null` means the declaration is unavailable or has not been reviewed, `[]` means the reviewed declaration contains no values from this closed list, and a non-empty array contains the reviewed declared codes. Neither `null` nor `[]` is a guarantee that a dish is allergen-free, and the diner must not present either state as such. Dietary codes remain explicit restaurant assertions rather than inferred medical or safety claims.
 
-Version 1 still contains no 2.5D field, and an unapproved spatial format is rejected as an unknown field. T0 card and detail images remain mandatory.
+Version 1 supports the explicitly approved portion extension. A text-only dish may have `images: null`; an operator-selected T0 asset uses card and detail descriptors. Owner-selected photo handling is documented in the [owner handoff](owner-publish-handoff.md#automatic-preparation-from-review-and-publish-part-a).
 
 Only the revision referenced by the current approved publication may be displayed. A content-incomplete dish carries no partial name, price, ingredient, dietary, allergen or asset claims. A withdrawn dish is omitted from the next publication bundle. Draft, rejected, reviewer and source-evidence fields never enter the public bundle. Bundle and image URLs are public, immutable HTTPS objects; changing any content requires a new revision and hashes rather than overwriting an existing URL.
 

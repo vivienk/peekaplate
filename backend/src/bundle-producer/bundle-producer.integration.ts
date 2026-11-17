@@ -1,7 +1,17 @@
+import { createHash } from 'node:crypto';
+import { type ApprovedDishFacts, ApprovedDishFactsSchema } from '@peekaplate/contracts';
+import { exportJWK, generateKeyPair } from 'jose';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DatabaseClient } from '../ingestion/repository';
-import { BundleProducerError, produceMenuBundle, type VerifiedT0Asset } from './produce';
+import { createPublicMenuResponse, readPublicMenu } from '../public-menu';
+import { approveMenuRevision, publishMenu, withdrawMenu } from '../publication-command';
+import {
+  BundleProducerError,
+  type ProducedMenuBundle,
+  produceMenuBundle,
+  type VerifiedT0Asset,
+} from './produce';
 import {
   admitMenuBundleHandoff,
   loadApprovedDishSources,
@@ -20,13 +30,25 @@ const venue = crypto.randomUUID();
 const otherVenue = crypto.randomUUID();
 const reviewer = crypto.randomUUID();
 
-async function seedDish(tenant: string, name = 'Charred Leeks', description = 'Grilled leeks.') {
+async function seedDish(
+  tenant: string,
+  name = 'Charred Leeks',
+  description = 'Grilled leeks.',
+  facts?: ApprovedDishFacts,
+) {
   const dishId = crypto.randomUUID();
   const revisionId = crypto.randomUUID();
   await admin.query(
-    `INSERT INTO app_private.dish_current (tenant_id, dish_id, version, revision_id, name, description)
-     VALUES ($1, $2, 1, $3, $4, $5)`,
-    [tenant, dishId, revisionId, name, description],
+    `INSERT INTO app_private.dish_current (tenant_id, dish_id, version, revision_id, name, description, approved_facts)
+     VALUES ($1, $2, 1, $3, $4, $5, $6::jsonb)`,
+    [
+      tenant,
+      dishId,
+      revisionId,
+      name,
+      description,
+      facts ? JSON.stringify(ApprovedDishFactsSchema.parse(facts)) : null,
+    ],
   );
   return { dishId, revisionId };
 }
@@ -198,6 +220,70 @@ afterAll(async () => {
 });
 
 describe('S4-RES bundle producer database sources', () => {
+  it('uses immutable approved facts after later draft and candidate changes', async () => {
+    for (const allergens of [null, [], ['sesame']] as ApprovedDishFacts['allergens'][]) {
+      const facts = ApprovedDishFactsSchema.parse({
+        category: 'Starters',
+        priceAmount: '15.25',
+        priceCurrency: 'USD',
+        ingredients: ['Reviewed leeks'],
+        allergens,
+        photoId: null,
+      });
+      const { dishId, revisionId } = await seedDish(
+        venue,
+        'Charred Leeks',
+        'Grilled leeks.',
+        facts,
+      );
+      const jobId = await seedJob(venue);
+      const candidateId = `candidate-${crypto.randomUUID()}`;
+      await seedDraft(venue, jobId, {
+        reviewStatus: 'accepted',
+        publishedDishId: dishId,
+        candidateId,
+      });
+      await seedCandidateReview(venue, jobId, candidateId, 'corrected', {
+        price_amount: '29.99',
+        ingredients: ['Unapproved ingredients'],
+      });
+      const assetId = 't0_00000000000000000000000000000001';
+      const request = bundleRequest([{ dishId, assetId }]);
+      request.categories[0]!.dishes[0]!.allergens = allergens === null ? ['wheat'] : null;
+      const assets = new Map([[assetId, manifestFor(dishId, revisionId, 1)]]);
+      const before = await produceMenuBundle(
+        request,
+        await loadApprovedDishSources(runtime, venue, [dishId]),
+        assets,
+      );
+      const dish = before.bundle.categories[0]!.dishes[0]!;
+      expect(dish).toMatchObject({
+        complete: true,
+        price: { amount: '15.25', currency: 'USD' },
+        allergens,
+      });
+      expect(JSON.stringify(dish)).toContain('Reviewed leeks');
+      await admin.query(
+        `UPDATE app_private.dish_drafts SET price_amount = 99, ingredients = '["Changed draft"]'::jsonb WHERE tenant_id = $1 AND published_dish_id = $2`,
+        [venue, dishId],
+      );
+      await admin.query(
+        `UPDATE app_private.candidate_review_current SET corrected_fields = '{"price_amount":"88","ingredients":["Changed candidate"]}'::jsonb WHERE tenant_id = $1 AND candidate_id = $2`,
+        [venue, candidateId],
+      );
+      for (const client of [runtime, admin]) {
+        const after = await produceMenuBundle(
+          request,
+          await loadApprovedDishSources(client, venue, [dishId]),
+          assets,
+        );
+        expect(after.bytes).toEqual(before.bytes);
+        expect(after.contentHash).toBe(before.contentHash);
+        expect(after.menuRevisionId).toBe(before.menuRevisionId);
+      }
+    }
+  });
+
   it('loads dish and draft from one snapshot during concurrent changes', async () => {
     const { dishId } = await seedDish(venue);
     const jobId = await seedJob(venue);
@@ -388,5 +474,268 @@ describe('S4-RES privileged handoff admission', () => {
     const error = await admitMenuBundleHandoff(runtime, attempt).catch((caught: unknown) => caught);
     expect(error).toMatchObject({ code: '42501' });
     expect(await handoffRows(attempt.menuId)).toEqual({ subjects: 0, bundles: 0 });
+  });
+});
+
+describe('S6-RES-04 synthetic publication handoff', () => {
+  it('delivers produced T0 revisions through approval publication replacement and withdrawal', async () => {
+    const owner = crypto.randomUUID();
+    const foreignOwner = crypto.randomUUID();
+    await admin.query(
+      `INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission)
+       VALUES ($1, $2, 'owner'), ($3, $4, 'owner')`,
+      [venue, owner, otherVenue, foreignOwner],
+    );
+    const facts = ApprovedDishFactsSchema.parse({
+      category: 'Starters',
+      priceAmount: '15.25',
+      priceCurrency: 'USD',
+      ingredients: ['Reviewed leeks'],
+      allergens: null,
+      photoId: null,
+    });
+    const { dishId, revisionId } = await seedDish(venue, 'Charred Leeks', 'Grilled leeks.', facts);
+    const jobId = await seedJob(venue);
+    const candidateId = `private-candidate-${crypto.randomUUID()}`;
+    await seedDraft(venue, jobId, {
+      reviewStatus: 'accepted',
+      publishedDishId: dishId,
+      candidateId,
+    });
+    await seedCandidateReview(venue, jobId, candidateId, 'corrected', { price_amount: '99' });
+    const assetId = 't0_00000000000000000000000000000001';
+    const request = bundleRequest([{ dishId, assetId }]);
+    request.categories[0]!.dishes[0]!.dietary = ['vegetarian'];
+    const makeBundle = async (revision: string) =>
+      produceMenuBundle(
+        request,
+        await loadApprovedDishSources(runtime, venue, [dishId]),
+        new Map([[assetId, manifestFor(dishId, revision, 1)]]),
+      );
+    const admit = async (produced: ProducedMenuBundle) =>
+      admitMenuBundleHandoff(admin, {
+        tenantId: venue,
+        menuId: request.menu_id,
+        menuRevisionId: produced.menuRevisionId,
+        contentApprovalId: produced.contentApprovalId,
+        contentHash: produced.contentHash,
+        assetApprovalId: produced.assetApprovalId,
+        assetManifestHash: produced.assetManifestHash,
+        bundleUrl: produced.bundleUrl,
+      });
+    const approve = async (produced: ProducedMenuBundle, expectedVersion: number) =>
+      approveMenuRevision(runtime, owner, venue, {
+        menuId: request.menu_id,
+        commandId: crypto.randomUUID(),
+        expectedVersion,
+        menuRevisionId: produced.menuRevisionId,
+        contentApprovalId: produced.contentApprovalId,
+        assetApprovalId: produced.assetApprovalId,
+      });
+    const keys = await generateKeyPair('ES256', { extractable: true });
+    const config = {
+      issuer: 'https://api.example.test',
+      signingJwk: JSON.stringify({
+        ...(await exportJWK(keys.privateKey)),
+        kid: 'synthetic',
+        alg: 'ES256',
+        use: 'sig',
+      }),
+      trafficClass: 'test' as const,
+    };
+    const a = await makeBundle(revisionId);
+    expect(await readPublicMenu(runtime, venue, request.menu_id)).toBeUndefined();
+    expect(await admit(a)).toBe('inserted');
+    expect(await readPublicMenu(runtime, venue, request.menu_id)).toBeUndefined();
+    const approvalA = await approve(a, 0);
+    expect(await readPublicMenu(runtime, venue, request.menu_id)).toBeUndefined();
+    const publicationA = await publishMenu(runtime, owner, venue, {
+      menuId: request.menu_id,
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      approvalId: approvalA.approvalId,
+    });
+    const retainedA = new Uint8Array(a.bytes);
+    const hostedBytes = new Map([[a.bundleUrl, new Uint8Array(a.bytes)]]);
+    let servedBytes: Uint8Array | undefined;
+    let pointerOverride: { menuRevisionId?: string; contentHash?: string } = {};
+    let bundleFetches = 0;
+    const deliveries: string[] = [];
+    // Load the browser adapter at runtime without adding DOM globals to the Worker typecheck.
+    const dinerAdapterPath = '../../../frontend/diner/src/menu/published';
+    const { createPublishedMenuSource } = await import(dinerAdapterPath);
+    const fetcher = async (input: string | URL | Request) => {
+      if (String(input).startsWith('https://api.example.test/')) {
+        const pointer = await readPublicMenu(runtime, venue, request.menu_id);
+        if (!pointer) return new Response(null, { status: 404 });
+        const response = await createPublicMenuResponse(pointer, config);
+        return Response.json({
+          ...response,
+          menuRevisionId: pointerOverride.menuRevisionId ?? response.menuRevisionId,
+          bundle: {
+            ...response.bundle,
+            contentHash: pointerOverride.contentHash ?? response.bundle.contentHash,
+          },
+        });
+      }
+      bundleFetches++;
+      const bytes = servedBytes ?? hostedBytes.get(String(input));
+      return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 });
+    };
+    const source = createPublishedMenuSource({
+      apiBase: 'https://api.example.test',
+      venueId: venue,
+      menuId: request.menu_id,
+      onDelivery: (delivery: { publicationId: string }) => deliveries.push(delivery.publicationId),
+      fetcher,
+    });
+    const loadedA = await source.load();
+    expect(loadedA.status).toBe('ready');
+    if (loadedA.status !== 'ready') throw new Error('Expected published menu A');
+    expect(loadedA.menu).toMatchObject({
+      venueId: venue,
+      menuId: request.menu_id,
+      menuRevisionId: a.menuRevisionId,
+      publicationRevisionId: publicationA.publicationId,
+      categories: [
+        {
+          dishes: [
+            {
+              name: 'Charred Leeks',
+              price: { amount: '15.25', currency: 'USD' },
+              ingredients: [{ name: 'Reviewed leeks' }],
+              allergens: [],
+              dietary: ['Vegetarian'],
+              images: {
+                card: {
+                  url: `https://assets.example.test/t0/${assetId}/card-480.webp`,
+                  width: 480,
+                  height: 360,
+                  alt: 'Synthetic dish photo',
+                },
+                detail: {
+                  url: `https://assets.example.test/t0/${assetId}/detail-1280.webp`,
+                  width: 1280,
+                  height: 960,
+                  alt: 'Synthetic dish photo',
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(a.bundle.categories[0]?.dishes[0]).toMatchObject({ allergens: null });
+    expect(JSON.stringify(loadedA.menu)).not.toMatch(/private source text|private reviewer note/);
+    expect(deliveries).toEqual([publicationA.publicationId]);
+    expect(new TextDecoder().decode(a.bytes)).not.toMatch(
+      /private source text|private reviewer note/,
+    );
+    const nextRevision = crypto.randomUUID();
+    await admin.query(
+      `UPDATE app_private.dish_current SET version = version + 1, revision_id = $3, name = 'Roasted Leeks', approved_facts = $4::jsonb
+       WHERE tenant_id = $1 AND dish_id = $2`,
+      [
+        venue,
+        dishId,
+        nextRevision,
+        JSON.stringify({
+          ...facts,
+          priceAmount: '18.75',
+          ingredients: ['New leeks'],
+          allergens: ['sesame'],
+        }),
+      ],
+    );
+    const b = await makeBundle(nextRevision);
+    hostedBytes.set(b.bundleUrl, new Uint8Array(b.bytes));
+    expect(b.menuRevisionId).not.toBe(a.menuRevisionId);
+    expect(b.bundleUrl).not.toBe(a.bundleUrl);
+    expect(b.contentHash).not.toBe(a.contentHash);
+    expect(await admit(b)).toBe('inserted');
+    const approvalB = await approve(b, approvalA.version);
+    const publicationB = await publishMenu(runtime, owner, venue, {
+      menuId: request.menu_id,
+      commandId: crypto.randomUUID(),
+      expectedVersion: publicationA.version,
+      approvalId: approvalB.approvalId,
+    });
+    expect(publicationB.publicationId).not.toBe(publicationA.publicationId);
+    servedBytes = a.bytes;
+    deliveries.length = 0;
+    expect(await source.load()).toEqual({ status: 'error' });
+    expect(deliveries).toEqual([]);
+    servedBytes = new TextEncoder().encode(`${new TextDecoder().decode(b.bytes)} `);
+    expect(await source.load()).toEqual({ status: 'error' });
+    expect(deliveries).toEqual([]);
+    const wrong = { ...b.bundle, menu_revision_id: crypto.randomUUID() };
+    servedBytes = new TextEncoder().encode(JSON.stringify(wrong));
+    pointerOverride = { contentHash: createHash('sha256').update(servedBytes).digest('hex') };
+    expect(await source.load()).toEqual({ status: 'error' });
+    expect(deliveries).toEqual([]);
+    servedBytes = undefined;
+    pointerOverride = {};
+    const loadedB = await source.load();
+    expect(loadedB.status).toBe('ready');
+    if (loadedB.status !== 'ready') throw new Error('Expected published menu B');
+    expect(loadedB.menu).toMatchObject({
+      menuRevisionId: b.menuRevisionId,
+      publicationRevisionId: publicationB.publicationId,
+      categories: [
+        {
+          dishes: [
+            {
+              name: 'Roasted Leeks',
+              price: { amount: '18.75', currency: 'USD' },
+              ingredients: [{ name: 'New leeks' }],
+              allergens: ['Sesame'],
+              dietary: ['Vegetarian'],
+            },
+          ],
+        },
+      ],
+    });
+    expect(deliveries).toEqual([publicationB.publicationId]);
+    expect(new Uint8Array(await (await fetcher(a.bundleUrl)).arrayBuffer())).toEqual(retainedA);
+    const pointerBeforeDenial = await readPublicMenu(runtime, venue, request.menu_id);
+    const forbiddenApproval = {
+      menuId: request.menu_id,
+      commandId: crypto.randomUUID(),
+      expectedVersion: approvalB.version,
+      menuRevisionId: b.menuRevisionId,
+      contentApprovalId: b.contentApprovalId,
+      assetApprovalId: b.assetApprovalId,
+    };
+    await expect(
+      approveMenuRevision(runtime, foreignOwner, venue, forbiddenApproval),
+    ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+    await expect(
+      publishMenu(runtime, foreignOwner, venue, {
+        menuId: request.menu_id,
+        commandId: crypto.randomUUID(),
+        expectedVersion: publicationB.version,
+        approvalId: approvalB.approvalId,
+      }),
+    ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+    await expect(
+      withdrawMenu(runtime, foreignOwner, venue, {
+        menuId: request.menu_id,
+        commandId: crypto.randomUUID(),
+        expectedVersion: publicationB.version,
+      }),
+    ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+    expect(await readPublicMenu(runtime, venue, request.menu_id)).toEqual(pointerBeforeDenial);
+    expect(await readPublicMenu(runtime, otherVenue, request.menu_id)).toBeUndefined();
+    await withdrawMenu(runtime, owner, venue, {
+      menuId: request.menu_id,
+      commandId: crypto.randomUUID(),
+      expectedVersion: publicationB.version,
+    });
+    expect(await readPublicMenu(runtime, venue, request.menu_id)).toBeUndefined();
+    const fetchedBeforeWithdrawal = bundleFetches;
+    deliveries.length = 0;
+    expect(await source.load()).toEqual({ status: 'unavailable' });
+    expect(bundleFetches).toBe(fetchedBeforeWithdrawal);
+    expect(deliveries).toEqual([]);
   });
 });
