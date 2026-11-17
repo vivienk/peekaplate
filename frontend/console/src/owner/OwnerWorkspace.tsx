@@ -639,6 +639,14 @@ const FOCUS_OPTIONS: { value: OwnerAnalysisRequest['goal']; label: string }[] = 
   { value: 'engagement', label: 'Dish engagement' },
   { value: 'crm', label: 'Customer retention (CRM)' },
 ];
+
+export function matchReportQuestion(question: string): OwnerAnalysisRequest['goal'] | null {
+  const words = question.toLowerCase();
+  if (/\b(open|engagement|attention|interaction|view)\b/.test(words)) return 'engagement';
+  if (/\b(save|bookmark|menu|presentation|describe|description)\b/.test(words)) return 'menu';
+  if (/\b(customer|retention|crm)\b/.test(words)) return 'crm';
+  return null;
+}
 const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -718,6 +726,8 @@ function LiveAiPanel({
   const dishes = report.dishes;
   const [picked, setPicked] = useState('');
   const [goal, setGoal] = useState<OwnerAnalysisRequest['goal']>('menu');
+  const [question, setQuestion] = useState('');
+  const [questionError, setQuestionError] = useState<string | null>(null);
   const [reply, setReply] = useState<Reply | null>(null);
   const pending = useRef<AbortController | null>(null);
   const dishId = dishes.some((dish) => dish.dish_id === picked)
@@ -742,21 +752,34 @@ function LiveAiPanel({
   async function ask(event: FormEvent) {
     event.preventDefault();
     if (!dishId || !reportReference || pending.current) return;
+    const requestGoal = matchReportQuestion(question);
+    if (!requestGoal) {
+      setQuestionError('Ask about menu presentation, engagement, saves, or customer retention.');
+      return;
+    }
+    setQuestionError(null);
+    setGoal(requestGoal);
     const controller = new AbortController();
     pending.current = controller;
     const dishName = dishes.find((dish) => dish.dish_id === dishId)?.name ?? '';
-    setReply({ kind: 'loading', scope });
+    const requestScope = `${venueId}:${dishId}:${requestGoal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}:${reportReference}`;
+    setReply({ kind: 'loading', scope: requestScope });
     try {
-      const result = await analyze({ dishId, goal }, controller.signal, reportReference);
-      if (!controller.signal.aborted) setReply({ kind: 'result', scope, result, dishName });
+      const result = await analyze(
+        { dishId, goal: requestGoal },
+        controller.signal,
+        reportReference,
+      );
+      if (!controller.signal.aborted)
+        setReply({ kind: 'result', scope: requestScope, result, dishName });
     } catch (error) {
       if (!controller.signal.aborted) {
         if (error instanceof OwnerAnalysisAccessError) {
           setReply(null);
           onAccessFailure(error.status === 401 ? 'signed_out' : 'denied');
         } else if (error instanceof OwnerAnalysisReferenceError) {
-          setReply({ kind: 'reference_error', scope });
-        } else setReply({ kind: 'error', scope });
+          setReply({ kind: 'reference_error', scope: requestScope });
+        } else setReply({ kind: 'error', scope: requestScope });
       }
     } finally {
       if (pending.current === controller) pending.current = null;
@@ -884,6 +907,22 @@ function LiveAiPanel({
           )}
       </div>
       <form className="owner-ai__composer owner-ai__composer--pickers" onSubmit={ask}>
+        <label className="owner-visually-hidden" htmlFor={`${ids}-question`}>
+          Ask a report question
+        </label>
+        <input
+          id={`${ids}-question`}
+          className="owner-ai__input"
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder="Ask about engagement, saves, or menu presentation"
+          disabled={dishes.length === 0}
+        />
+        {questionError && (
+          <p className="owner-ai__error" role="alert">
+            {questionError}
+          </p>
+        )}
         <label className="owner-visually-hidden" htmlFor={`${ids}-dish`}>
           Dish
         </label>
@@ -916,10 +955,17 @@ function LiveAiPanel({
               </option>
             ))}
           </select>
+          <span className="owner-muted" aria-live="polite">
+            {
+              FOCUS_OPTIONS.find(
+                (option) => option.value === (matchReportQuestion(question) ?? goal),
+              )?.label
+            }
+          </span>
           <button
             type="submit"
             className="owner-ai__send"
-            disabled={busy || dishes.length === 0 || !reportReference}
+            disabled={busy || dishes.length === 0 || !reportReference || !question.trim()}
             aria-label="Review report"
           >
             <Icon name="send" size={18} />
