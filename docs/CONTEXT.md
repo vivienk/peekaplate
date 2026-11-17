@@ -82,7 +82,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5a62ac9464441a45f56c2741b44903dab56d491a9ce2f4d50b7ec487c72be8dd"
+      "sourceFingerprint": "f895386f886f84a98d0ab326c5239676de7bb9f70287703c94a05ade4131f70b"
     },
     {
       "id": "tokens",
@@ -423,7 +423,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f3d011b16df72b4b6ae1e421e7d112c8741079cf65670576ad7a1310e2efd82d"
+      "sourceFingerprint": "be528261ed7e2b2dd2f19aa609e7444f44fd088651072056271086297933366d"
     },
     {
       "id": "backend",
@@ -633,7 +633,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d5b12b8d49e4e81b2eaf63b0a29cc32c8dd2aa5150c386e6697492b2f9bff1d3"
+      "sourceFingerprint": "c1b3cafb395d31dedb42876d9e98d14066979b949bd46203e6990fae0d6bf1eb"
     },
     {
       "id": "database",
@@ -689,7 +689,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "d351622504725777d7f3b95b362a721059d18a65f6fa260b61074df95b2c9062"
+      "sourceFingerprint": "cb99f93b664017ea5241ad73c346dc6fa47cce85cad3ba69254d1bab7d7f1d77"
     },
     {
       "id": "measurement",
@@ -1171,7 +1171,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-menu/api.ts",
         "docs/owner-publish-handoff.md"
       ],
-      "next": "Independent review and coordinator reconciliation with remote PR216 c44a860 (advanced from the tested base 10d420) before publishing. Hosted migration, Queue/provider/account operations and fresh empty shared-workspace acceptance remain coordinator-owned; Dashboard versus Menu profile-verification gates remain inconsistent."
+      "next": "Independent review before publishing; remote PR216 c44a860 documentation is reconciled with the tested runtime. Hosted migration, Queue/provider/account operations and fresh empty shared-workspace acceptance remain coordinator-owned; Dashboard versus Menu profile-verification gates remain inconsistent."
     }
   ]
 }

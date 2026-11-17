@@ -75,7 +75,8 @@ local/staging) before listing prepared menus. It reuses the existing command and
 2. **Approve:** each verified, still-pending draft goes through the existing
    `approveDishDraftAtomic` with the exact draft version, the active extraction and its review
    version, `confirmed: true`, and the persisted verification rechecked inside the command. It
-   approves onto a stable dish ID per draft (`owner-prepared-dish:v1`) with a deterministic
+   reuses the historical canonical dish ID, or derives a stable ID for a fresh draft
+   (`owner-prepared-dish:v1`), with a deterministic
    command ID per draft/review/dish version, so a retry after a partial failure replays instead
    of duplicating. The command snapshots the approved facts onto a canonical revision: category,
    price, an explicit ingredient clear, confirmed (manual or corrected) allergens, serving count
@@ -94,9 +95,10 @@ local/staging) before listing prepared menus. It reuses the existing command and
    `NOBYPASSRLS` role `peekaplate_menu_preparer`. It requires an `owner` membership, accepts only
    the Worker's own bundle address for that venue/menu/revision and an identical retry.
 
-**Back/Edit:** an owner edit, removal, new photo, extracted-dish correction or un-verification of
-an approved draft reopens it (pending, not verified). Its canonical dish keeps its ID and the
-next preparation approves a new revision of that same dish; earlier revisions are unchanged.
+**Back/Edit:** an owner edit, new photo, extracted-dish correction or un-verification of
+an approved draft reopens it (pending, not verified). Removal reopens it but preserves unchanged
+content verification for Undo. Its canonical dish keeps its ID and the next preparation approves
+a new revision of that same dish; earlier revisions are unchanged.
 
 Admission is not approval or publication: S13 previews the prepared menu and the owner still
 confirms and publishes. A failed preparation keeps earlier prepared menus listed and says to
@@ -126,8 +128,14 @@ Dashboard publishing still waits for trusted profile verification; the existing 
 does not impose that same profile gate. This reconciliation preserves that product behavior
 and does not let an owner self-verify restaurant details.
 
-Not yet: owner-written alt text and dietary codes, photo resizing to `card-480`/`detail-1280`
-(the approved original is used for both), portions for owner photos, and hosted acceptance.
+**Temporary limitation: original-size photos.** Owner-prepared dishes serve the owner's approved
+original photo for both `card` and `detail`; it is not resized to `card-480`/`detail-1280` WebP.
+For the MVP no image encoder is added to the Worker (Sai, Nov 17). Resizing will reuse the
+existing Python asset pipeline (`processing/src/peekaplate_processing/assets.py`, which already
+makes those variants); until then this stays an open limitation, not a completed step.
+
+Not yet: owner-written alt text and dietary codes (S09 has no field for them), portions for owner
+photos, and hosted acceptance.
 
 ## Read API and safety
 
