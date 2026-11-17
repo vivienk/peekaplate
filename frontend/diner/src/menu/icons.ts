@@ -69,6 +69,12 @@ export function dietaryIcon(value: string): string | null {
   return known ? (dietaryIcons.get(iconKey(known)) ?? null) : null;
 }
 
+// For now ingredients show as text only (Jeffin, Nov 17): no icons or hosted artwork unless a
+// build sets VITE_INGREDIENT_ICONS=on. The icon catalogue and artwork pipeline stay intact.
+export function ingredientIconsEnabled(): boolean {
+  return import.meta.env.VITE_INGREDIENT_ICONS === 'on';
+}
+
 // Exact name match only (case and spacing ignored): a guess could show the wrong food.
 export function ingredientIcon(name: string): string | null {
   return (

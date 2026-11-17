@@ -82,7 +82,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "2a3a5773d0acf32922990161df6dda7532a91948ebb73f4e798c211781d7fa2b"
+      "sourceFingerprint": "6f12559a8d05af16a3baa79033efef4f2d145bd396f9d3936510deaed06a6b62"
     },
     {
       "id": "tokens",
@@ -272,7 +272,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7f194002a016437cdb7e3d63c460232ffe10705fab5953686d883965e4a9af7b"
+      "sourceFingerprint": "8f523786402f318125af19c4adc4597e736fa17f6bc4fc74a4f6e41b0e3361a7"
     },
     {
       "id": "console",
@@ -423,7 +423,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "8bafa6db86f035bbe1908dade90d76c19b0aaf49efd7f86394a8d8dac2a665b2"
+      "sourceFingerprint": "14a6111baa99c7cea82fc4f7c3749cf8e16a41195d7a38d39874fb81d7da8c5a"
     },
     {
       "id": "backend",
@@ -629,7 +629,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "1aafb6f9caf559c4f63d7d3b1e0c7a6e03c8c4d32ab32cd63b6e483844daa2aa"
+      "sourceFingerprint": "354283f045a6588028500bc4184ce384b341fce04c6e7ba0a5b3a81dc7afedcd"
     },
     {
       "id": "database",
@@ -777,7 +777,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "7d3b3ff875fe60937b7143b3882b9e46c46d54fec3a44c8e0a51bb2cf4b2ab0c"
+      "sourceFingerprint": "79fc6c64c9ccd885972dcbd9a053c1744a67c1fcdfe0398a417b5ff538dcf61b"
     },
     {
       "id": "agents",
@@ -972,7 +972,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "b473879ba07d81f812aad20e5261a6b39733e195b0054b31368bafffad25e2e7"
+      "sourceFingerprint": "1d613c0e42531fd59a9139d575c5a1d89f2c22f4b05c3ebdac15c1df06d18dc7"
     },
     {
       "id": "assets",

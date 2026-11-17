@@ -59,7 +59,6 @@ export type PrepareDiagnostic = {
     | 'price_not_representable'
     | 'currency_missing'
     | 'ingredients_missing'
-    | 'photo_missing'
     | 'category_missing';
 };
 
@@ -169,21 +168,20 @@ export async function buildPreparedBundle(input: {
     if (!currency) gaps.push('currency_missing');
     const ingredients = cleanIngredients(dish.ingredients);
     if (!ingredients) gaps.push('ingredients_missing');
-    if (!dish.photo) gaps.push('photo_missing');
+    // A dish without an approved photo is published text-only for now (images: null).
     diagnostics.push(...gaps.map((code) => ({ draftId: dish.draftId, code })));
 
     const name = dish.name.trim();
     const list = byCategory.get(category ?? 'Menu') ?? [];
-    if (gaps.length > 0 || !price.ok || !currency || !ingredients || !dish.photo) {
+    if (gaps.length > 0 || !price.ok || !currency || !ingredients) {
       list.push({ dish_id: dishId, dish_revision_id: dishRevisionId, complete: false });
     } else {
-      const url = assetUrl(input.origin, input.venueId, dish.photo.id, dish.photo.sha256);
-      const image = {
-        url,
-        width: dish.photo.width,
-        height: dish.photo.height,
-        alt: `Photo of ${name}`.slice(0, 500),
-      };
+      const photo = dish.photo;
+      const url = photo ? assetUrl(input.origin, input.venueId, photo.id, photo.sha256) : null;
+      const image =
+        photo && url
+          ? { url, width: photo.width, height: photo.height, alt: `Photo of ${name}`.slice(0, 500) }
+          : null;
       const allergens =
         dish.allergens === null
           ? null
@@ -215,25 +213,26 @@ export async function buildPreparedBundle(input: {
         ),
         allergens,
         dietary: [],
-        images: { card: image, detail: image },
+        images: image ? { card: image, detail: image } : null,
       });
-      assets.push({
-        dish_id: dishId,
-        dish_revision_id: dishRevisionId,
-        asset_id: dish.photo.id,
-        card: {
-          url,
-          digest: dish.photo.sha256,
-          width: dish.photo.width,
-          height: dish.photo.height,
-        },
-        detail: {
-          url,
-          digest: dish.photo.sha256,
-          width: dish.photo.width,
-          height: dish.photo.height,
-        },
-      });
+      if (photo && url)
+        assets.push({
+          dish_id: dishId,
+          dish_revision_id: dishRevisionId,
+          asset_id: photo.id,
+          card: {
+            url,
+            digest: photo.sha256,
+            width: photo.width,
+            height: photo.height,
+          },
+          detail: {
+            url,
+            digest: photo.sha256,
+            width: photo.width,
+            height: photo.height,
+          },
+        });
       completeDishes += 1;
     }
     byCategory.set(category ?? 'Menu', list);

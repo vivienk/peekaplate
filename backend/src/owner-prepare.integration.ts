@@ -125,8 +125,9 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
     });
 
     const first = await prepareOwnerMenu(runtime, owner, venue, origin, storage);
-    expect(first).toMatchObject({ status: 'inserted', completeDishes: 1 });
-    expect(first.diagnostics.map((value) => value.code)).toEqual(['photo_missing']);
+    // The salad has no approved photo, so it is published text-only.
+    expect(first).toMatchObject({ status: 'inserted', completeDishes: 2 });
+    expect(first.diagnostics).toEqual([]);
     const again = await prepareOwnerMenu(runtime, owner, venue, origin, storage);
     expect(again).toMatchObject({
       status: 'already_present',
@@ -148,7 +149,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
     const names = content.categories.flatMap((category) =>
       category.dishes.flatMap((dish) => (dish.complete ? [dish.name] : [])),
     );
-    expect(names).toEqual(['Fictional Lentil Soup']);
+    expect(names.sort()).toEqual(['Fictional Lentil Soup', 'Fictional Side Salad']);
     expect(JSON.stringify(content)).not.toContain('Unverified');
 
     // Public reads: only this venue's admitted bundle and approved photo.
@@ -158,8 +159,8 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
     expect(
       await readPreparedBundle(runtime, storage, other, first.menuId, first.menuRevisionId),
     ).toBeNull();
-    const dish = content.categories[0]?.dishes.find((value) => value.complete);
-    if (!dish?.complete) throw new Error('expected a complete dish');
+    const dish = content.categories[0]?.dishes.find((value) => value.complete && value.images);
+    if (!dish?.complete || !dish.images) throw new Error('expected a dish with a photo');
     const [, , , , photoId, hash] = new URL(dish.images.card.url).pathname.split('/');
     const asset = await readPreparedAsset(runtime, storage, venue, photoId!, hash!);
     expect(asset?.contentType).toBe('image/png');

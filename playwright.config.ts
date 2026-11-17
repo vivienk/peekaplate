@@ -14,6 +14,8 @@ export default defineConfig({
       command: 'pnpm --filter @peekaplate/diner dev',
       url: 'http://127.0.0.1:5173',
       reuseExistingServer: false,
+      // Ingredients are text-only by default; the artwork tests keep the icon path covered.
+      env: { VITE_INGREDIENT_ICONS: 'on' },
     },
     {
       command: 'pnpm --filter @peekaplate/console dev',

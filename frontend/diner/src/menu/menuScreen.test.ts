@@ -312,6 +312,7 @@ describe('menu screen observer lifecycle', () => {
   });
 
   it('aborts liveArtwork polling and clears its 30s timer when mountMenuScreen remounts from dish detail', async () => {
+    vi.stubEnv('VITE_INGREDIENT_ICONS', 'on'); // icon behaviour itself (off by default)
     vi.stubEnv('VITE_PUBLIC_API_URL', 'https://api.example.test');
     vi.stubGlobal('addEventListener', vi.fn());
     vi.stubGlobal('removeEventListener', vi.fn());
@@ -441,6 +442,7 @@ describe('menu screen observer lifecycle', () => {
   });
 
   it('prevents an in-flight deferred fetch from mutating either container after mountMenuScreen remounts', async () => {
+    vi.stubEnv('VITE_INGREDIENT_ICONS', 'on'); // icon behaviour itself (off by default)
     vi.stubEnv('VITE_PUBLIC_API_URL', 'https://api.example.test');
     vi.stubGlobal('addEventListener', vi.fn());
     vi.stubGlobal('removeEventListener', vi.fn());

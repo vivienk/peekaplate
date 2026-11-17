@@ -87,10 +87,10 @@ describe('owner-prepared bundle (Part A)', () => {
       dietary: [],
     });
     if (!first?.complete) throw new Error('expected a complete dish');
-    expect(first.images.card.url).toBe(
+    expect(first.images?.card.url).toBe(
       `${origin}/public/prepared-assets/${venue}/33333333-3333-4333-8333-333333333331/${'a'.repeat(64)}`,
     );
-    expect(first.images.card).toMatchObject({
+    expect(first.images?.card).toMatchObject({
       width: 800,
       height: 600,
       alt: 'Photo of Fictional Lentil Soup',
@@ -136,11 +136,25 @@ describe('owner-prepared bundle (Part A)', () => {
         'category_missing',
         'description_missing',
         'ingredients_missing',
-        'photo_missing',
         'price_not_representable',
       ].sort(),
     );
     expect(built.completeDishes).toBe(1);
+  });
+
+  it('publishes a verified dish without an approved photo as text-only (images: null)', async () => {
+    const built = await buildPreparedBundle({
+      venueId: venue,
+      restaurantName: 'Cafe',
+      origin,
+      dishes: [dish({ photo: null })],
+    });
+    const [first] = built.bundle.categories[0]?.dishes ?? [];
+    expect(first).toMatchObject({ complete: true, name: 'Fictional Lentil Soup', images: null });
+    expect(built.completeDishes).toBe(1);
+    expect(built.diagnostics).toEqual([]);
+    const content = await verifyPublicMenuContentBytes(built.bytes, built.contentHash);
+    expect(content.categories[0]?.dishes[0]).toMatchObject({ images: null });
   });
 
   it('keeps unknown allergens unknown (null), never an allergen-free claim', async () => {

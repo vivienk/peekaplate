@@ -141,7 +141,7 @@ function checkContent(
   if (content.restaurant.logo) stagingAsset(content.restaurant.logo.url, own);
   for (const category of content.categories)
     for (const dish of category.dishes) {
-      if (dish.complete) {
+      if (dish.complete && dish.images) {
         stagingAsset(dish.images.card.url, own);
         stagingAsset(dish.images.detail.url, own);
       }

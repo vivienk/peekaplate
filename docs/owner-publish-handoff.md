@@ -77,8 +77,10 @@ verified" result, the console calls `POST /venues/:venueId/prepared-menus/prepar
 2. **Build:** `backend/src/owner-prepare.ts` produces Bundle v1 with the producer's rules: the
    same canonical bytes, `menu-revision:v1` / `content-approval:v1` / `asset-approval:v1`
    derivations, decimal price normalisation and completeness checks. A dish missing a
-   description, representable price, currency, confirmed ingredients, category or approved
-   photo becomes an identity-only placeholder. Owner-entered ingredients and allergens are used
+   description, representable price, currency, confirmed ingredients or category becomes an
+   identity-only placeholder. A dish without an approved photo is published **text-only** for
+   now (`images: null`, allowed by Bundle v1 since Nov 17): name, price, description,
+   ingredients and allergens, with the diner's empty image box. Owner-entered ingredients and allergens are used
    only when `confirmed`; unknown allergens stay `null`. Alt text is `Photo of <dish>`
    (owner-written alt text is not stored yet). Dietary codes are empty. The menu id is derived
    per venue (`owner-prepared-menu:v1`).

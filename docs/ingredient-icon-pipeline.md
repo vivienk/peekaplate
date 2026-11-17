@@ -136,6 +136,14 @@ plural/seed aliases. Other explicit ingredient phrases now receive deterministic
 artwork identities without adding food-classification rules. Chicken is not mapped to grilled chicken,
 rice is not mapped to sushi rice, and egg is not mapped to poached egg.
 
+## Text-only ingredients for now (Nov 17)
+
+The diner shows ingredients as plain text: no Figma icons and no hosted artwork, unless a build
+sets `VITE_INGREDIENT_ICONS=on` (`ingredientIconsEnabled()` in `frontend/diner/src/menu/icons.ts`).
+The catalogue, the live artwork controller and the review pipeline are unchanged and still
+tested (the browser test server turns the switch on). Placeholders keep being recorded, so
+artwork can be switched back on once enough has been approved.
+
 ## Ingredient placeholders from the OCR pipeline
 
 When the OCR pipeline saves a menu's drafts (`persistExtractedDrafts`), every
