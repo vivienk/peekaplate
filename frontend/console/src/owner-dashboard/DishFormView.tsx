@@ -269,18 +269,18 @@ export function DishFormView({
                       src={portionReview.previewUrl}
                       alt={`Review-only 2.5D preview of ${dr.name || 'this dish'}`}
                       style={{
-                          display: 'block',
-                          width: '100%',
-                          height: 'auto',
-                          objectFit: 'contain',
-                        }}
+                        display: 'block',
+                        width: '100%',
+                        height: 'auto',
+                        objectFit: 'contain',
+                      }}
                     />
                     <span className={`s09-chip${portionReview.approved ? ' good' : ''}`}>
                       {portionReview.approved ? 'Approved for publication review' : 'Needs review'}
                     </span>
                     <p>
-                        This generated image remains private until the menu is published with the
-                        approved portion assets.
+                      This generated image remains private until the menu is published with the
+                      approved portion assets.
                       </p>
                     {!portionReview.approved && onApprovePortion && (
                       <button type="button" onClick={onApprovePortion} disabled={busy}>
