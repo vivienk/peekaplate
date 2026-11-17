@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
-import { OwnerDishFieldsSchema, SaveOwnerDishDraftSchema } from '@peekaplate/contracts';
+import {
+  OwnerDishFieldsSchema,
+  type PlateCalibration,
+  SaveOwnerDishDraftSchema,
+} from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { loadApprovedDishSources } from './bundle-producer/repository';
@@ -337,6 +341,87 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     const first = await createDishRevision(runtime, actor, venue, input);
     expect(await createDishRevision(runtime, actor, venue, input)).toEqual(first);
     expect(first.facts).toBeUndefined();
+  });
+  it('freezes source-bound physical dimensions in approved manual facts and clears stale preserved measurements', async () => {
+    const draftId = crypto.randomUUID();
+    const fields = {
+      name: 'Measured synthetic soup',
+      category: 'Soups',
+      priceAmount: '9',
+      priceCurrency: 'USD',
+    };
+    await save(draftId, fields);
+    const photo = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draftId,
+      image(),
+      'image/png',
+      async () => {},
+    );
+    const calibration: PlateCalibration = {
+      shape: 'round',
+      width_mm: 240,
+      depth_mm: 240,
+      source_sha256: photo.source_hash,
+      source_width_px: 800,
+      source_height_px: 600,
+      boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+      confirmed: true,
+    };
+    await expect(
+      save(
+        draftId,
+        {
+          ...fields,
+          photoId: photo.id,
+          servingSize: '24',
+          portionCalibration: { ...calibration, source_sha256: 'b'.repeat(64) },
+        },
+        1,
+      ),
+    ).rejects.toMatchObject({ code: 'portion_calibration_mismatch' });
+    await save(
+      draftId,
+      { ...fields, photoId: photo.id, servingSize: '24', portionCalibration: calibration },
+      1,
+    );
+    const approve = () =>
+      approveDishDraftAtomic(runtime, actor, venue, draftId, {
+        commandId: crypto.randomUUID(),
+        expectedDraftVersion: 2,
+        confirmed: true,
+      });
+    await admin.query(
+      "UPDATE app_private.dish_drafts SET manual_fields=jsonb_set(manual_fields,'{portionCalibration,source_sha256}',$3::jsonb) WHERE tenant_id=$1 AND id=$2",
+      [venue, draftId, JSON.stringify('b'.repeat(64))],
+    );
+    await expect(approve()).rejects.toMatchObject({ code: 'portion_calibration_mismatch' });
+    await admin.query(
+      "UPDATE app_private.dish_drafts SET manual_fields=jsonb_set(manual_fields,'{portionCalibration,source_sha256}',$3::jsonb) WHERE tenant_id=$1 AND id=$2",
+      [venue, draftId, JSON.stringify(photo.source_hash)],
+    );
+    const approved = await approve();
+    expect(approved.publishedRevision.facts).toMatchObject({
+      servingSize: '24',
+      portionCalibration: calibration,
+      photoId: photo.id,
+    });
+    expect(approved.publishedRevision.facts).not.toHaveProperty('servingCount');
+    expect(
+      (await loadApprovedDishSources(runtime, venue, [approved.publishedRevision.dishId])).get(
+        approved.publishedRevision.dishId,
+      ),
+    ).toMatchObject({ servingSize: '24', portionCalibration: calibration });
+    expect(
+      (await save(draftId, { ...fields, photoId: photo.id, servingSize: '28' }, 2)).manual_fields,
+    ).toMatchObject({ servingSize: '28', portionCalibration: null });
+    expect(
+      (await loadApprovedDishSources(runtime, venue, [approved.publishedRevision.dishId])).get(
+        approved.publishedRevision.dishId,
+      ),
+    ).toMatchObject({ servingSize: '24', portionCalibration: calibration });
   });
   it('replays an identical photo upload after approval without rewriting storage', async () => {
     const id = crypto.randomUUID();
@@ -1084,18 +1169,30 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         corrected: { photo_id: foreignPhoto.id },
       }),
     ).rejects.toMatchObject({ code: 'not_found' });
+    const portionCalibration: PlateCalibration = {
+      shape: 'round',
+      width_mm: 240,
+      depth_mm: 240,
+      source_sha256: photo.source_hash,
+      source_width_px: 800,
+      source_height_px: 600,
+      boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+      confirmed: true,
+    };
     review = await saveCandidateReviewCommand(runtime, actor, venue, extractionId, candidateId, {
       commandId: crypto.randomUUID(),
       expectedVersion: review.review.version,
       action: 'correct',
       corrected: {
-        serving_size: '1 bowl',
+        serving_size: '24',
+        portion_calibration: portionCalibration,
         photo_id: photo.id,
         allergens: { status: 'confirmed', items: ['milk'] },
       },
     });
     expect(review.effective).toMatchObject({
-      serving_size: '1 bowl',
+      serving_size: '24',
+      portion_calibration: portionCalibration,
       photo_id: photo.id,
       allergens: { status: 'confirmed', items: ['milk'] },
     });
@@ -1187,6 +1284,8 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(approved.publishedRevision.facts?.priceAmount).toBe('9.00');
     expect(approved.publishedRevision.facts?.photoId).toBe(photo.id);
     expect(approved.publishedRevision.facts?.allergens).toEqual(['milk']);
+    expect(approved.publishedRevision.facts?.portionCalibration).toEqual(portionCalibration);
+    expect(approved.publishedRevision.facts?.servingSize).toBe('24');
     await saveCandidateReviewCommand(runtime, actor, venue, extractionId, candidateId, {
       commandId: crypto.randomUUID(),
       expectedVersion: review.review.version,

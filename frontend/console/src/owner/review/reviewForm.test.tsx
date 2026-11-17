@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyManualDish } from '../../owner-menu/dishForm';
+import { confirmedCalibration } from '../../owner-menu/portionCalibration.test-helpers';
 import { dishStatus, type ReviewDish } from './reviewDishes';
 import { dishToForm, formToDish } from './reviewForm';
 
@@ -18,6 +19,18 @@ const dish = (over: Partial<ReviewDish> = {}): ReviewDish => ({
 });
 
 describe('S10 row to S09 form values', () => {
+  it('round-trips explicit photo calibration without inventing it for legacy serving labels', () => {
+    const previous = dish({ servingSize: '28 cm', portionCalibration: confirmedCalibration });
+    const form = dishToForm(previous);
+    expect(form.portionCalibration).toEqual(confirmedCalibration);
+    expect(formToDish(form, previous.id, previous)).toEqual(previous);
+    expect(formToDish({ ...form, portionCalibration: null }, previous.id, previous)).toHaveProperty(
+      'portionCalibration',
+      null,
+    );
+    expect(dishToForm(dish())).not.toHaveProperty('portionCalibration');
+  });
+
   it('round-trips people served separately from the descriptive serving size', () => {
     const previous = dish({ servingSize: '1 bowl', servingCount: 2 });
     const form = dishToForm(previous);

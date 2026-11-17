@@ -5,14 +5,25 @@ import { type ReactNode, useState } from 'react';
 import { TextField } from '../foundations/TextField';
 import { DishFormView } from '../owner-dashboard/DishFormView';
 import type { MenuItem } from '../owner-dashboard/data';
-import { allergenOutcome, type DishForm, pilotPriceCurrency, STAFF_ALLERGY_LINE } from './dishForm';
+import {
+  allergenOutcome,
+  type DishForm,
+  invalidateChangedCalibration,
+  pilotPriceCurrency,
+  STAFF_ALLERGY_LINE,
+} from './dishForm';
 import type { EvidenceExcerpt } from './evidence';
+import { PortionCalibrationEditor } from './PortionCalibrationEditor';
+import type { CalibrationPhoto } from './portionCalibration';
 import './dishEditor.css';
 
 export type DishEditorProps = {
   value: DishForm;
   photo?: ReactNode;
   photoUrl?: string | null;
+  calibrationPhoto?: CalibrationPhoto;
+  photoPending?: boolean;
+  calibrationPhotoUnavailable?: boolean;
   /** Private generated portion preview; never grants publication authority. */
   portionReview?: {
     status: 'processing' | 'needs_review' | 'failed';
@@ -46,6 +57,9 @@ export function DishEditor({
   value,
   photo,
   photoUrl,
+  calibrationPhoto,
+  photoPending = false,
+  calibrationPhotoUnavailable = false,
   portionReview,
   onApprovePortion,
   onGeneratePortion,
@@ -66,6 +80,9 @@ export function DishEditor({
   draftDescription,
 }: DishEditorProps) {
   const [fieldError, setFieldError] = useState('');
+  const change = (next: DishForm) => onChange(invalidateChangedCalibration(value, next));
+  const measuredPhoto =
+    !photoPending && calibrationPhoto?.photoId === value.photoId ? calibrationPhoto : undefined;
   const countText = value.servingCount?.trim() ?? '';
   const countError =
     countText && !/^(?:[1-9]\d?|100)$/.test(countText)
@@ -110,7 +127,7 @@ export function DishEditor({
           setFieldError('');
           if (dish.aiReviewed !== reviewConfirmed && dish.aiReviewed) {
             if (value.ingredients.items.length)
-              onChange({
+              change({
                 ...value,
                 aiIng: [],
                 ingredients: { ...value.ingredients, status: 'confirmed' },
@@ -124,7 +141,7 @@ export function DishEditor({
           }
           const aiIng = dish.aiIng.filter((item) => dish.ing.includes(item));
           const aiAlg = dish.aiAlg.filter((item) => dish.alg.includes(item));
-          onChange({
+          change({
             ...value,
             name: dish.name,
             category: dish.cat,
@@ -154,6 +171,9 @@ export function DishEditor({
         {...(portionReview ? { portionReview } : {})}
         {...(onApprovePortion ? { onApprovePortion } : {})}
         {...(onGeneratePortion ? { onGeneratePortion } : {})}
+        servingSizeLabel="Serving Size (cm)"
+        servingSizeHint="Measured plate diameter, or width × depth. Use 3–100 cm, with up to one decimal place."
+        servingSizePlaceholder="28 or 30 × 20"
         servingCountControl={
           <TextField
             id="dish-serving-count"
@@ -164,8 +184,22 @@ export function DishEditor({
             step={1}
             value={value.servingCount ?? ''}
             error={countError}
-            hint="Optional. Actual-size AR also needs confirmed plate measurements for this count; this number never scales the dish."
-            onChange={(event) => onChange({ ...value, servingCount: event.target.value })}
+            hint="Optional. How many people this dish serves. Physical size comes from the measurements above."
+            onChange={(event) => change({ ...value, servingCount: event.target.value })}
+          />
+        }
+        portionCalibrationControl={
+          <PortionCalibrationEditor
+            key={
+              measuredPhoto ? `${measuredPhoto.photoId}:${measuredPhoto.source_sha256}` : 'no-photo'
+            }
+            servingSize={value.servingSize}
+            value={value.portionCalibration}
+            photo={measuredPhoto}
+            photoPending={photoPending}
+            photoUnavailable={calibrationPhotoUnavailable}
+            busy={busy}
+            onChange={(portionCalibration) => change({ ...value, portionCalibration })}
           />
         }
         imageFor={() => photoUrl ?? (value.photoId ? 'private-photo' : null)}

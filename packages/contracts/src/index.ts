@@ -8,7 +8,10 @@ export {
   PlateCalibrationSchema,
   type PublicPortion,
   PublicPortionSchema,
+  parseServingDimensions,
   ServingCountSchema,
+  type ServingDimensions,
+  servingDimensionsMatch,
 } from './portion';
 
 import { z } from 'zod';

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
-import type { RestaurantProfile } from '@peekaplate/contracts';
+import type { OwnerDishFields, RestaurantProfile } from '@peekaplate/contracts';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
 import type { DishDraft, MenuJob } from '../../frontend/console/src/owner-menu/api';
@@ -3023,6 +3023,129 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
     page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup updated' }),
   ).toBeVisible();
   expect(generations).toBe(2);
+});
+
+test('Screen 9 physical serving size binds the saved photo and clears confirmation on edits', async ({
+  context,
+  page,
+}, testInfo) => {
+  const state = await fixture(context, true);
+  const draft = state.drafts[venue.venueId]![0]!;
+  const fields = draft.manual_fields as OwnerDishFields;
+  const photoId = fields.photoId!;
+  fields.servingSize = '28';
+  const original = Buffer.from(
+    await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 640;
+      const drawing = canvas.getContext('2d')!;
+      drawing.fillStyle = '#eee9de';
+      drawing.fillRect(0, 0, 640, 640);
+      drawing.beginPath();
+      drawing.arc(320, 320, 256, 0, Math.PI * 2);
+      drawing.fillStyle = '#fffdf7';
+      drawing.fill();
+      drawing.strokeStyle = '#8c8170';
+      drawing.lineWidth = 4;
+      drawing.stroke();
+      drawing.fillStyle = '#5b5143';
+      drawing.font = '24px sans-serif';
+      drawing.textAlign = 'center';
+      drawing.fillText('SYNTHETIC PLATE', 320, 330);
+      return canvas.toDataURL('image/png').split(',')[1]!;
+    }),
+    'base64',
+  );
+  state.photos.set(photoId, original);
+  const headers = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+  await context.route(
+    `${api}/venues/${venue.venueId}/drafts/${draft.id}/photos/${photoId}/portion**`,
+    (route) =>
+      route.request().method() === 'OPTIONS'
+        ? route.fulfill({ status: 204, headers })
+        : route.fulfill({
+            json: {
+              portionReview: {
+                status: 'failed',
+                dish_id: draft.id,
+                draft_revision_id: photoId,
+                approved: false,
+              },
+            },
+            headers,
+          }),
+  );
+  await signIn(page);
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  const size = page.getByRole('textbox', { name: /^Serving Size \(cm\)/ });
+  const confirm = page.getByRole('checkbox', {
+    name: 'I measured this plate and matched its boundary to this photo.',
+    exact: true,
+  });
+  await expect(size).toHaveValue('28');
+  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveValue(
+    '',
+  );
+  await expect(confirm).toBeEnabled();
+  await expect(confirm).not.toBeChecked();
+  await confirm.check();
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  expect(state.drafts[venue.venueId]![0]!.manual_fields).toMatchObject({
+    servingSize: '28',
+    servingCount: null,
+    portionCalibration: {
+      shape: 'round',
+      width_mm: 280,
+      depth_mm: 280,
+      source_sha256: createHash('sha256').update(original).digest('hex'),
+      source_width_px: 640,
+      source_height_px: 640,
+      boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+      confirmed: true,
+    },
+  });
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(confirm).toBeChecked();
+  await page.screenshot({ path: testInfo.outputPath('serving-size-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
+  await page.screenshot({ path: testInfo.outputPath('serving-size-mobile.png'), fullPage: true });
+
+  await page.getByRole('spinbutton', { name: 'People served', exact: true }).fill('2');
+  await expect(confirm).not.toBeChecked();
+  await confirm.check();
+  await size.fill('30 × 20 cm');
+  await expect(confirm).not.toBeChecked();
+  await expect(confirm).toBeEnabled();
+  await confirm.check();
+  const left = page.getByRole('spinbutton', { name: 'Plate boundary left (%)', exact: true });
+  await left.fill('95');
+  await expect(confirm).not.toBeChecked();
+  await expect(confirm).toBeDisabled();
+  await expect(page.getByText(/Keep the whole boundary inside the photo/)).toBeVisible();
+  await left.fill('10');
+  await confirm.check();
+  await page.getByLabel('Dish photo', { exact: true }).setInputFiles({
+    name: 'replacement-synthetic.png',
+    mimeType: 'image/png',
+    buffer: original,
+  });
+  await expect(confirm).not.toBeChecked();
+  await expect(confirm).toBeDisabled();
+  await expect(
+    page.getByText('Save the new photo before confirming its measurements.'),
+  ).toBeVisible();
 });
 
 test('a dish approved by an earlier preparation can still be edited (Back/Edit)', async ({

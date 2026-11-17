@@ -42,6 +42,10 @@ export function DishFormView({
   evidence,
   photo,
   servingCountControl,
+  servingSizeLabel = 'Serving Size',
+  servingSizeHint,
+  servingSizePlaceholder,
+  portionCalibrationControl,
   portionReview,
   onApprovePortion,
   onGeneratePortion,
@@ -68,6 +72,10 @@ export function DishFormView({
   evidence?: ReactNode;
   photo?: ReactNode;
   servingCountControl?: ReactNode;
+  servingSizeLabel?: string;
+  servingSizeHint?: string;
+  servingSizePlaceholder?: string;
+  portionCalibrationControl?: ReactNode;
   /** Private owner-only preview, never public publication evidence. */
   portionReview?: {
     status: 'processing' | 'needs_review' | 'failed';
@@ -355,7 +363,9 @@ export function DishFormView({
             />
             <TextField
               id="f-size"
-              label="Serving Size"
+              label={servingSizeLabel}
+              {...(servingSizeHint ? { hint: servingSizeHint } : {})}
+              {...(servingSizePlaceholder ? { placeholder: servingSizePlaceholder } : {})}
               required
               value={dr.size}
               {...errOf('f-size')}
@@ -363,6 +373,7 @@ export function DishFormView({
             />
           </div>
           {servingCountControl}
+          {portionCalibrationControl}
           <div className="s09-desc">
             <div className="pp-field">
               <label className="pp-field__label" htmlFor="f-desc">

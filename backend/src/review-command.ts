@@ -16,6 +16,7 @@ import {
   ResolvedCandidateFieldsSchema,
   ReviewCandidateItemResponseSchema,
   ReviewCandidateResultSchema,
+  servingDimensionsMatch,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import type { DishDraftRow } from './ingestion/repository';
@@ -88,6 +89,7 @@ export class ReviewCommandError extends Error {
       | 'command_conflict'
       | 'extraction_conflict'
       | 'invalid_candidate'
+      | 'portion_calibration_mismatch'
       | 'artifact_required'
       | 'artifact_not_found'
       | 'artifact_mismatch'
@@ -128,6 +130,9 @@ export function resolveEffectiveFields(
   corrected: CandidateReviewRecord['corrected'],
 ): ResolvedCandidateFields {
   return ResolvedCandidateFieldsSchema.parse({
+    ...(corrected.portion_calibration !== undefined
+      ? { portion_calibration: corrected.portion_calibration }
+      : {}),
     ...(corrected.serving_count !== undefined ? { serving_count: corrected.serving_count } : {}),
     name: corrected.name !== undefined ? corrected.name : candidate.original.name,
     description:
@@ -703,6 +708,16 @@ export async function saveCandidateReviewCommand(
             value !== undefined && !incompleteFields.includes(key as ReviewEditableField),
         ),
       );
+      if (
+        input.corrected?.portion_calibration === undefined &&
+        priorCorrected.portion_calibration != null &&
+        !incompleteFields.includes('portion_calibration') &&
+        (correctedFields.photo_id !== priorCorrected.photo_id ||
+          correctedFields.serving_size !== priorCorrected.serving_size)
+      ) {
+        // An omitted measurement may survive unrelated edits, never a changed photo or size.
+        correctedFields.portion_calibration = null;
+      }
       editedFields = (Object.keys(correctedFields) as ReviewEditableField[]).sort();
     }
 
@@ -722,6 +737,26 @@ export async function saveCandidateReviewCommand(
       reviewedAt,
       publishable: false,
     });
+
+    const measured = reviewRecord.corrected.portion_calibration;
+    if (measured) {
+      const selectedPhoto = reviewRecord.corrected.photo_id;
+      if (
+        !selectedPhoto ||
+        !sessionResult.rows[0].job_id ||
+        !servingDimensionsMatch(reviewRecord.corrected.serving_size, measured)
+      )
+        throw new ReviewCommandError('portion_calibration_mismatch', 409);
+      const photo = await client.query<{ source_hash: string }>(
+        `SELECT p.source_hash FROM app_private.dish_draft_photo p JOIN app_private.dish_drafts d
+         ON d.tenant_id=p.tenant_id AND d.id=p.draft_id
+         WHERE p.tenant_id=$1 AND p.id=$2 AND d.job_id=$3
+           AND COALESCE(d.candidate_id,d.draft_id)=$4 AND d.review_status='pending' AND d.removed_at IS NULL`,
+        [venueId, selectedPhoto, sessionResult.rows[0].job_id, candidateId],
+      );
+      if (photo.rowCount !== 1 || photo.rows[0]?.source_hash !== measured.source_sha256)
+        throw new ReviewCommandError('portion_calibration_mismatch', 409);
+    }
 
     const effective = resolveEffectiveFields(candidate, reviewRecord.corrected);
     const itemResponse: ReviewCandidateItemResponse = {

@@ -5258,3 +5258,37 @@ analysis route imported a command error with TypeScript constructor parameter
 properties. The launcher uses Node's strip-only loader. Import the same shared
 error directly and use explicit class fields so the launcher can load it. The
 launcher test verifies startup and propagation of the frontend's exit status.
+
+
+## 2026-11-17 — Screen 9 serving size did not reach physical portion placement
+
+The owner serving text survived draft saves but did not carry physical measurements
+into approved facts or the published portion. People served reached the diner only
+as a count. Five contract/diner regressions, six owner form regressions and eight
+backend regressions failed before the new measurement path was implemented.
+The focused checks now preserve confirmed photo-bound dimensions across manual
+and extracted edits, approval and immutable publication; unknown people count is
+not an invented number or a physical scale multiplier.
+
+The exact source-photo check needs EXIF-oriented dimensions. A rotation reproducer
+returned raw 80 by 40 dimensions where the rendered source was 40 by 80. A bounded
+JPEG/PNG metadata reader fixes that calibration-only path; ordinary photo reads
+remain unchanged. Ambiguous orientation evidence cannot authorize physical size.
+Published asset rereads use the immutable snapshot calibration, never the current
+draft, so later size edits do not hide an earlier publication.
+
+Local browser execution was blocked before test assertions: the pinned Chromium
+was absent, its download was incomplete, and the installed Chromium could not
+create a required socket under the host permissions. No sandbox settings were
+changed to bypass that restriction. Browser assertions and screenshots remain
+for the normal CI/browser environment. Docker/Postgres executables were also
+unavailable locally; new database integration assertions require the CI lane.
+
+The initial context refresh rejected a backend summary longer than the existing
+1,000-character bound. The summary was shortened and the renamed editor path
+corrected before refreshing fingerprints and running the combined checks.
+
+Combined local verification passed: `pnpm check` completed 2,431 unit tests
+(with five skipped) and 122 script tests, lint, types, context and docs.
+`pnpm verify build` also passed, including the staging Worker dry-run.
+Browser/database execution and real-device scale remain separate evidence.

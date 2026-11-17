@@ -55,6 +55,25 @@ describe('S3-RES-01.2 review-command unit tests', () => {
   });
 
   describe('resolveEffectiveFields', () => {
+    it('preserves the owner photo calibration independently of people served', () => {
+      const soup = fixtureV2.candidates[0] as ReviewCandidate;
+      const portion_calibration = {
+        shape: 'round' as const,
+        width_mm: 240,
+        depth_mm: 240,
+        source_sha256: 'a'.repeat(64),
+        source_width_px: 800,
+        source_height_px: 600,
+        boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        confirmed: true as const,
+      };
+      expect(resolveEffectiveFields(soup, { portion_calibration }).portion_calibration).toEqual(
+        portion_calibration,
+      );
+      expect(
+        resolveEffectiveFields(soup, { portion_calibration: null }).portion_calibration,
+      ).toBeNull();
+    });
     it('overlays corrected fields while preserving untouched original fields', () => {
       const soup = fixtureV2.candidates[0] as ReviewCandidate;
       const originalCopy = structuredClone(soup.original);
@@ -484,7 +503,11 @@ type FakeCandidateDatabase = {
  * In-memory stand-in for the queries saveCandidateReviewCommand issues: one registered v2
  * session, the candidate projection, the event stream and command receipts.
  */
-function fakeCandidateDatabase(venueId: string, extractionId: string): FakeCandidateDatabase {
+function fakeCandidateDatabase(
+  venueId: string,
+  extractionId: string,
+  photo?: { id: string; sourceHash: string },
+): FakeCandidateDatabase {
   const commands = new Map<string, { request_hash: string; result: unknown }>();
   const current = new Map<string, Record<string, unknown>>();
   const events: CandidateReviewEvent[] = [];
@@ -497,7 +520,7 @@ function fakeCandidateDatabase(venueId: string, extractionId: string): FakeCandi
     extraction_status: fixtureV2.status,
     source_id: fixtureV2.source.source_id,
     source_sha256: fixtureV2.source.sha256,
-    job_id: null,
+    job_id: photo ? 'b11ac10b-58cc-4372-a567-0e02b2c3d479' : null,
     private_artifact_key: null,
     private_artifact_sha256: null,
     payload: fixtureV2,
@@ -510,6 +533,24 @@ function fakeCandidateDatabase(venueId: string, extractionId: string): FakeCandi
       if (/^(BEGIN|COMMIT|ROLLBACK|SET LOCAL)/.test(text) || text.includes('set_config'))
         return { rows: [] };
       if (text.includes('pg_advisory_xact_lock')) return { rows: [] };
+      if (text.includes('FROM app_private.dish_draft_photo')) {
+        const rows =
+          photo && photo.id === params[1] ? [{ id: photo.id, source_hash: photo.sourceHash }] : [];
+        return { rows, rowCount: rows.length };
+      }
+      if (text.includes('FROM app_private.dish_drafts'))
+        return {
+          rows: photo
+            ? [
+                {
+                  id: 'd11ac10b-58cc-4372-a567-0e02b2c3d479',
+                  removed_at: null,
+                  review_status: 'pending',
+                },
+              ]
+            : [],
+        };
+      if (text.startsWith('UPDATE app_private.dish_drafts')) return { rows: [], rowCount: 1 };
       if (text.includes('FROM app_private.staff_membership'))
         return { rows: [{ permission: 'owner' }] };
       if (text.startsWith('SELECT request_hash, result FROM app_private.es_command')) {
@@ -598,6 +639,93 @@ describe('saveCandidateReviewCommand (PR #73 findings B and C)', () => {
   const save = (db: FakeCandidateDatabase, input: ReviewCandidateCommand) =>
     saveCandidateReviewCommand(db.client, actorId, venueId, extractionId, candidateId, input);
   const id = (n: number) => `c11ac10b-58cc-4372-a567-0e02b2c3d4${String(n).padStart(2, '0')}`;
+
+  const portionCalibration = {
+    shape: 'round' as const,
+    width_mm: 240,
+    depth_mm: 240,
+    source_sha256: 'a'.repeat(64),
+    source_width_px: 800,
+    source_height_px: 600,
+    boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+    confirmed: true as const,
+  };
+
+  it('keeps extracted-dish calibration through unrelated corrections, receipt retry and event replay', async () => {
+    const photo = { id: id(90), sourceHash: portionCalibration.source_sha256 };
+    const db = fakeCandidateDatabase(venueId, extractionId, photo);
+    const command: ReviewCandidateCommand = {
+      commandId: id(40),
+      expectedVersion: 0,
+      action: 'correct',
+      corrected: {
+        photo_id: photo.id,
+        serving_size: '24',
+        portion_calibration: portionCalibration,
+      },
+    };
+    const measured = await save(db, command);
+    expect(measured.effective.portion_calibration).toEqual(portionCalibration);
+    expect(await save(db, command)).toEqual(measured);
+    const changed = await save(db, {
+      commandId: id(41),
+      expectedVersion: 1,
+      action: 'correct',
+      corrected: { name: 'Owner title' },
+    });
+    expect(changed.effective.portion_calibration).toEqual(portionCalibration);
+    expect(replayCandidateReview(db.events)).toEqual(changed.review);
+    expect(changed.review.editedFields).toContain('portion_calibration');
+  });
+
+  it.each([{ serving_size: '28' }, { photo_id: null }])(
+    'clears extracted measurement evidence after a photo or size edit: %j',
+    async (corrected) => {
+      const photo = { id: id(90), sourceHash: portionCalibration.source_sha256 };
+      const db = fakeCandidateDatabase(venueId, extractionId, photo);
+      await save(db, {
+        commandId: id(42),
+        expectedVersion: 0,
+        action: 'correct',
+        corrected: {
+          photo_id: photo.id,
+          serving_size: '24',
+          portion_calibration: portionCalibration,
+        },
+      });
+      const changed = await save(db, {
+        commandId: id(43),
+        expectedVersion: 1,
+        action: 'correct',
+        corrected,
+      });
+      expect(changed.effective.portion_calibration).toBeNull();
+    },
+  );
+
+  it.each([
+    { servingSize: '24', sourceHash: 'b'.repeat(64) },
+    { servingSize: '28', sourceHash: portionCalibration.source_sha256 },
+  ])(
+    'rejects extracted measurement evidence for a different source or size',
+    async ({ servingSize, sourceHash }) => {
+      const photo = { id: id(90), sourceHash };
+      const db = fakeCandidateDatabase(venueId, extractionId, photo);
+      await expect(
+        save(db, {
+          commandId: id(44),
+          expectedVersion: 0,
+          action: 'correct',
+          corrected: {
+            photo_id: photo.id,
+            serving_size: servingSize,
+            portion_calibration: portionCalibration,
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'portion_calibration_mismatch', status: 409 });
+      expect(db.events).toHaveLength(0);
+    },
+  );
 
   async function withRetainedNote() {
     const db = fakeCandidateDatabase(venueId, extractionId);

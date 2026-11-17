@@ -1,10 +1,12 @@
 import {
   canonicalJson,
+  type PlateCalibration,
   type PublicMenuAllergenCode,
   type PublicMenuContentBundle,
   PublicMenuContentBundleSchema,
   type PublicMenuDish,
   type PublicPortion,
+  servingDimensionsMatch,
   sha256,
   verifyPublicMenuContentBytes,
 } from '@peekaplate/contracts';
@@ -21,6 +23,8 @@ import {
 
 /** Approved facts for one dish, already resolved from `dish_current`, drafts and RES-01.2. */
 export type ApprovedDishSource = {
+  portionCalibration?: PlateCalibration | null;
+  servingSize?: string | null;
   servingCount?: number | null;
   dishId: string;
   dishRevisionId: string;
@@ -39,7 +43,7 @@ export type ApprovedDishSource = {
 /**
  * An owner-uploaded, owner-approved dish photo for Part A preparation. It is the exact stored
  * upload (hash-checked by the caller), bound to one approved dish revision and its selected
- * photo ID. It is not a processed T0 asset and never a calibrated AR source.
+ * photo ID. The photo alone authorizes neither a portion nor physical dimensions.
  */
 export type OwnerApprovedPhoto = {
   dishId: string;
@@ -334,12 +338,24 @@ async function buildDish(
   }
   if (
     requested.portion?.physical_size &&
-    (source.servingCount == null ||
-      requested.portion.physical_size.serving_count !== source.servingCount)
+    requested.portion.physical_size.serving_count !== (source.servingCount ?? undefined)
   ) {
     throw new BundleProducerError(
       'asset_revision_mismatch',
       'Plate calibration must match the approved serving count',
+    );
+  }
+  if (
+    !asset &&
+    requested.portion?.physical_size &&
+    (!source.portionCalibration ||
+      !servingDimensionsMatch(source.servingSize, source.portionCalibration) ||
+      canonicalJson(requested.portion.physical_size.plate) !==
+        canonicalJson(source.portionCalibration))
+  ) {
+    throw new BundleProducerError(
+      'asset_revision_mismatch',
+      'Physical dimensions must match the measurement approved on this dish revision',
     );
   }
   if (

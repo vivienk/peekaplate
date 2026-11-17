@@ -45,6 +45,49 @@ authored photo card; it must not expand at its intrinsic height. Generation,
 private review status and explicit approval stay inside this card. No separate
 editor, preview page, design token or approval path is introduced.
 
+## Serving Size supplies physical dimensions
+
+The live S09 **Serving Size (cm)** field supplies the dimensions used by the
+published portion viewer: `28` or `28 cm` means a round 28 cm plate diameter;
+`30 x 20` or `30 × 20 cm` means a rectangular 30 by 20 cm footprint. Each
+dimension is 3–100 cm, with at most one decimal place. **People served** is a
+separate optional count and never multiplies the dimensions. Existing text such
+as `1 bowl` remains saved text until the owner supplies and confirms measurements.
+
+After saving the original photo, the owner marks the outer plate boundary on
+that photo and confirms the measurement. The boundary excludes margins,
+utensils and garnish. The control derives its dimensions from Serving Size;
+there is no second width/diameter value to keep in sync. Changing the serving
+input, people count, boundary or selected photo clears the local confirmation.
+A replacement photo must finish saving before it can be calibrated. Failed
+photo loading or an invalid boundary cannot create measurement evidence.
+
+Manual drafts persist `portionCalibration`; extracted corrections persist
+`portion_calibration`. Both use the shared `PlateCalibrationSchema` and retain
+the original-photo hash and oriented pixel dimensions. Saving and verifying
+these facts follows the existing versioned draft and dish-review transactions.
+No database migration or new processing call is required for a size-only edit.
+
+S13 attaches physical size only from the approved dish revision. It verifies the
+exact selected photo hash, checks JPEG/PNG dimensions including EXIF orientation,
+and binds the calibration to the approved foreground hash. Unsupported or
+ambiguous orientation evidence cannot authorize physical placement. The private
+cutout and its artwork approval remain unchanged; processor-supplied physical
+metadata cannot substitute for the independently approved measurement.
+
+Published asset reads use the measurement in the immutable published snapshot,
+not the current editable draft. Re-editing the serving size therefore cannot
+remove an earlier publication's layers. After re-verification and explicit
+publication, the new revision carries its new measurement.
+
+The diner displays the saved dimensions in View Portion and the camera portal.
+On a device supporting tracked table AR, matching measurements set the plate
+footprint in metres and disable arbitrary visual resizing in measured mode.
+Both an absent people count and an absent calibration count are allowed;
+present counts must agree. Ordinary camera placement and the upright 2.5D
+appearance remain approximate. A physical-device check is still required before
+claiming real-world scale acceptance.
+
 ## Private service configuration
 
 The Worker reuses the existing server-side `EXTRACTION_SERVICE_URL` and
@@ -139,6 +182,12 @@ Required before claiming full staging readiness:
   published asset route. The operator CLI has its own explicit hosting step.
 - Missing assets fall back to the original photo. Revision changes and
   cross-dish or cross-venue requests cannot reuse another image.
+- Confirm round and rectangular Serving Size inputs against the saved original,
+  reopen the draft, verify and publish it, and inspect the same dimensions in
+  the diner. Check both a supplied and an unknown people count.
+- Size/photo changes clear confirmation; forged hashes, dimensions or boundaries
+  cannot become physical metadata. An existing published menu must keep its
+  approved assets while the next size is edited.
 - Test failing segmentation, corrupted hashes, revoked sessions, unavailable
   service, stale menu snapshots, browser Back and camera placement on a phone.
 - CI quality, unit, database and browser checks must pass before merging.
@@ -151,5 +200,6 @@ while a draft is edited. This is local evidence, not hosted acceptance.
 
 **Not yet claimed:** the new hosted processing-service rollout and authenticated
 round trip, automatic background generation, physical-device AR calibration or
-production release sign-off. This owner path publishes approximate 2.5D; serving
-count alone never authorizes actual-size placement.
+production release sign-off. This owner path publishes approximate 2.5D and may
+carry approved photo-bound dimensions for tracked placement; serving count alone
+never authorizes actual-size placement.

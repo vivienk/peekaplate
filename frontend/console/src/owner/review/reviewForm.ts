@@ -1,7 +1,7 @@
 // Connects S10 (Menu Review) to the S09 Add/Edit dish form (owner-menu/DishEditor, FE-06.2). Both
 // sides use the same draft fields (OwnerDishFields), so nothing is converted or invented here:
 // blank text becomes missing (null), and an unknown, proposed or confirmed status is kept as it is.
-// Explicit people-served counts and descriptive serving labels remain separate facts.
+// People served, serving-size text, and explicit photo calibration remain separate facts.
 import { ServingCountSchema } from '@peekaplate/contracts';
 import type { AllergenCode, DishForm } from '../../owner-menu/dishForm';
 import type { ReviewDish } from './reviewDishes';
@@ -32,6 +32,9 @@ export function dishToForm(dish: ReviewDish): DishForm {
     priceCurrency: dish.priceCurrency ?? '',
     ...(dish.servingCount !== undefined
       ? { servingCount: dish.servingCount === null ? '' : String(dish.servingCount) }
+      : {}),
+    ...(dish.portionCalibration !== undefined
+      ? { portionCalibration: dish.portionCalibration }
       : {}),
     ingredients: { status: dish.ingredients.status, items: [...dish.ingredients.items] },
     allergens: {
@@ -65,5 +68,8 @@ export function formToDish(form: DishForm, id: string, previous?: ReviewDish): R
     const count = orNull(form.servingCount);
     dish.servingCount = count === null ? null : ServingCountSchema.parse(Number(count));
   } else if (previous?.servingCount !== undefined) dish.servingCount = previous.servingCount;
+  if (form.portionCalibration !== undefined) dish.portionCalibration = form.portionCalibration;
+  else if (previous?.portionCalibration !== undefined)
+    dish.portionCalibration = previous.portionCalibration;
   return dish;
 }

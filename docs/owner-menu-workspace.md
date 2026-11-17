@@ -121,6 +121,15 @@ fields back with the returned `draft_version`. Stale versions and conflicting
 command reuse return 409. Save/event/projection/receipt/outbox commit together.
 Manual drafts have no fabricated extraction job or source span.
 
+The live Screen 9 Serving Size field accepts physical centimetres (diameter or
+width × depth). Optional `portionCalibration` stores a confirmed plate boundary,
+original-photo hash and oriented pixel dimensions independently of optional
+`servingCount`. Existing descriptive `servingSize` strings remain compatible;
+text alone never creates measured scale. Extracted dishes use the corresponding
+`portion_calibration` review correction. The calibration must match the saved
+serving input and selected photo before approval/publication. See the
+[full serving-size handoff](screen9-portion-publish.md#serving-size-supplies-physical-dimensions).
+
 After creating the draft, POST raw JPEG/PNG bytes to
 `/venues/:venueId/drafts/:draftId/photos` with `Content-Type` and
 `Idempotency-Key`. The response supplies `photo.id`; save it in the next draft

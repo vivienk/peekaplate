@@ -137,6 +137,10 @@ export async function loadApprovedDishSources(
             approvedAllergens: facts.allergens,
             approvedCategory: facts.category,
             approvedPhotoId: facts.photoId,
+            ...(facts.portionCalibration !== undefined
+              ? { portionCalibration: facts.portionCalibration }
+              : {}),
+            ...(facts.servingSize !== undefined ? { servingSize: facts.servingSize } : {}),
             ...(facts.servingCount != null ? { servingCount: facts.servingCount } : {}),
             reviewState: facts.category === null ? 'incomplete' : 'corrected',
           });

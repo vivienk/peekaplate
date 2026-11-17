@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { DishFormView } from '../owner-dashboard/DishFormView';
@@ -6,6 +6,7 @@ import { DishEditor, type DishEditorProps } from './DishEditor';
 import { dishFromReviewItem, emptyManualDish } from './dishForm';
 import { evidenceExcerpts } from './evidence';
 import { EXTRACTION_ID, reviewSession } from './fixtures.test-helpers';
+import { calibrationPhotoId, confirmedCalibration } from './portionCalibration.test-helpers';
 
 const captured = vi.hoisted(() => ({
   props: null as ComponentProps<typeof DishFormView> | null,
@@ -45,6 +46,92 @@ const render = (props: Partial<DishEditorProps> = {}) =>
   );
 
 describe('live Screen 9 on the authored #172 presentation', () => {
+  it('confirms only the matching saved original and does not require a people count', () => {
+    const value = {
+      ...emptyManualDish(),
+      servingSize: '28',
+      photoId: calibrationPhotoId,
+      portionCalibration: confirmedCalibration,
+    };
+    const calibrationPhoto = {
+      photoId: calibrationPhotoId,
+      url: 'blob:reopened-original',
+      source_sha256: confirmedCalibration.source_sha256,
+      source_width_px: confirmedCalibration.source_width_px,
+      source_height_px: confirmedCalibration.source_height_px,
+    };
+    const confirmation = (html: string) =>
+      html.match(/<input[^>]+id="dish-portion-confirm"[^>]*>/)?.[0] ?? '';
+    const saved = confirmation(render({ value, calibrationPhoto }));
+    expect(saved).toContain('checked=""');
+    expect(saved).not.toContain('disabled');
+    const unknown = confirmation(
+      render({ value: { ...value, portionCalibration: undefined }, calibrationPhoto }),
+    );
+    expect(unknown).not.toContain('checked');
+    expect(unknown).not.toContain('disabled');
+    const pending = confirmation(render({ value, calibrationPhoto, photoPending: true }));
+    expect(pending).not.toContain('checked');
+    expect(pending).toContain('disabled');
+    const other = confirmation(
+      render({ value, calibrationPhoto: { ...calibrationPhoto, source_sha256: 'b'.repeat(64) } }),
+    );
+    expect(other).not.toContain('checked');
+    const legacy = confirmation(
+      render({ value: { ...value, servingSize: '1 bowl' }, calibrationPhoto }),
+    );
+    expect(legacy).not.toContain('checked');
+    expect(legacy).toContain('disabled');
+  });
+
+  it('uses the existing serving field for centimetres while leaving legacy text unmeasured', () => {
+    const html = render({ value: { ...emptyManualDish(), servingSize: '1 bowl' } });
+    expect(html).toContain('Serving Size (cm)');
+    expect(html).toMatch(/id="f-size"[^>]+value="1 bowl"/);
+    expect(html).toContain('Approximate until you confirm the measurements on the saved photo.');
+    expect(html).not.toMatch(/type="checkbox"[^>]+checked=""/);
+  });
+
+  it('clears measurement confirmation when the existing serving-size input changes', () => {
+    const onChange = vi.fn();
+    render({
+      value: {
+        ...emptyManualDish(),
+        servingSize: '28',
+        photoId: calibrationPhotoId,
+        portionCalibration: confirmedCalibration,
+      },
+      onChange,
+    });
+    const props = captured.props!;
+    if (props.ed.step !== 'form') throw new Error('expected authored form');
+    props.setEd({ ...props.ed, draft: { ...props.ed.draft, size: '30' } });
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ servingSize: '30', portionCalibration: null }),
+    );
+  });
+
+  it('clears measurement confirmation when optional people served changes', () => {
+    const onChange = vi.fn();
+    render({
+      value: {
+        ...emptyManualDish(),
+        servingSize: '28',
+        servingCount: '2',
+        photoId: calibrationPhotoId,
+        portionCalibration: confirmedCalibration,
+      },
+      onChange,
+    });
+    const field = captured.props!.servingCountControl as ReactElement<
+      ComponentProps<typeof import('../foundations/TextField').TextField>
+    >;
+    field.props.onChange?.({ target: { value: '3' } } as never);
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ servingCount: '3', portionCalibration: null }),
+    );
+  });
+
   it.each([{ items: [] }, { items: ['Carrot'] }])(
     'leaves review unchanged when ingredients add nothing: %j',
     async ({ items }) => {

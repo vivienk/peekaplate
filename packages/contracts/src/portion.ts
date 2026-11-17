@@ -31,6 +31,42 @@ export const PlateCalibrationSchema = z
   });
 export type PlateCalibration = z.infer<typeof PlateCalibrationSchema>;
 
+export type ServingDimensions = Pick<PlateCalibration, 'shape' | 'width_mm' | 'depth_mm'>;
+
+// Screen 9 labels this input in cm. Text is never measurement evidence by itself:
+// actual-size placement also requires the confirmed boundary on the exact photo.
+export function parseServingDimensions(
+  value: string | null | undefined,
+): ServingDimensions | undefined {
+  if (typeof value !== 'string' || value.length > 160) return undefined;
+  const match = /^(\d{1,3}(?:\.\d)?)\s*(?:cm)?(?:\s*[x×]\s*(\d{1,3}(?:\.\d)?)\s*(?:cm)?)?$/i.exec(
+    value.trim(),
+  );
+  if (!match) return undefined;
+  const width = Math.round(Number(match[1]) * 10);
+  const depth = match[2] === undefined ? width : Math.round(Number(match[2]) * 10);
+  if (width < 30 || width > 1000 || depth < 30 || depth > 1000) return undefined;
+  return {
+    shape: match[2] === undefined ? 'round' : 'rectangular',
+    width_mm: width,
+    depth_mm: depth,
+  };
+}
+
+export function servingDimensionsMatch(
+  value: string | null | undefined,
+  calibration: ServingDimensions | null | undefined,
+): boolean {
+  const dimensions = parseServingDimensions(value);
+  return Boolean(
+    dimensions &&
+      calibration &&
+      dimensions.shape === calibration.shape &&
+      dimensions.width_mm === calibration.width_mm &&
+      dimensions.depth_mm === calibration.depth_mm,
+  );
+}
+
 // Public, reviewed T1 layers only. Processing manifests (needs_review) are not this contract.
 // Inclusion in the approved immutable menu is the publication boundary, not a browser flag.
 export const PublicPortionSchema = z

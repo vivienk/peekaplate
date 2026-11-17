@@ -29,6 +29,7 @@ export type DishForm = {
   priceAmount: string;
   priceCurrency: string;
   servingCount?: string;
+  portionCalibration?: OwnerDishFields['portionCalibration'];
   ingredients: { status: ValueStatus; items: string[] };
   allergens: { status: ValueStatus; items: AllergenCode[] };
   photoId: string | null;
@@ -49,6 +50,15 @@ export type DishForm = {
     rejected: boolean;
   } | null;
 };
+
+// A confirmation describes one serving and one source photo, never future edits of either.
+export function invalidateChangedCalibration(previous: DishForm, next: DishForm): DishForm {
+  return previous.servingSize !== next.servingSize ||
+    previous.servingCount !== next.servingCount ||
+    previous.photoId !== next.photoId
+    ? { ...next, portionCalibration: null }
+    : next;
+}
 
 export const STAFF_ALLERGY_LINE = 'For allergy questions, please ask the restaurant staff.';
 
@@ -97,6 +107,9 @@ export function dishFromReviewItem(
     priceAmount: text(effective.price_amount),
     priceCurrency: pilotPriceCurrency(effective.price_currency),
     servingCount: effective.serving_count == null ? '' : String(effective.serving_count),
+    ...(effective.portion_calibration !== undefined
+      ? { portionCalibration: effective.portion_calibration }
+      : {}),
     ingredients:
       ingredients && ingredients.length > 0
         ? { status: 'proposed', items: [...ingredients] }
@@ -135,6 +148,9 @@ export function dishFromManualDraft(draft: DishDraft): DishForm {
     priceAmount: text(fields.priceAmount),
     priceCurrency: pilotPriceCurrency(fields.priceCurrency),
     servingCount: fields.servingCount == null ? '' : String(fields.servingCount),
+    ...(fields.portionCalibration !== undefined
+      ? { portionCalibration: fields.portionCalibration }
+      : {}),
     ingredients: { status: fields.ingredients.status, items: [...fields.ingredients.items] },
     allergens: { status: fields.allergens.status, items: [...fields.allergens.items] },
     photoId: fields.photoId,
@@ -173,6 +189,9 @@ export function manualSaveCommand(
       ...(form.servingCount !== undefined
         ? { servingCount: servingCountValue(form.servingCount) }
         : {}),
+      ...(form.portionCalibration !== undefined
+        ? { portionCalibration: form.portionCalibration }
+        : {}),
     },
   };
 }
@@ -180,7 +199,7 @@ export function manualSaveCommand(
 function servingCountValue(value: string): number | null {
   if (!value.trim()) return null;
   if (!/^(?:[1-9]\d?|100)$/.test(value.trim()))
-    throw new Error('Serving size must be a whole number from 1 to 100.');
+    throw new Error('People served must be a whole number from 1 to 100.');
   return Number(value);
 }
 
@@ -219,6 +238,12 @@ export function reviewCorrection(
   )
     corrected.allergens = allergens;
   if (form.photoId !== (effective.photo_id ?? null)) corrected.photo_id = form.photoId;
+  if (
+    form.portionCalibration !== undefined &&
+    JSON.stringify(form.portionCalibration) !==
+      JSON.stringify(effective.portion_calibration ?? null)
+  )
+    corrected.portion_calibration = form.portionCalibration;
   return Object.keys(corrected).length === 0 ? null : corrected;
 }
 

@@ -26,6 +26,9 @@ export function draftToReviewDish(
         description: fields.description,
         ...(fields.servingSize !== undefined && { servingSize: fields.servingSize }),
         ...(fields.servingCount !== undefined && { servingCount: fields.servingCount }),
+        ...(fields.portionCalibration !== undefined && {
+          portionCalibration: fields.portionCalibration,
+        }),
         priceAmount: fields.priceAmount,
         priceCurrency: pilotPriceCurrency(fields.priceCurrency),
         ingredients: fields.ingredients,

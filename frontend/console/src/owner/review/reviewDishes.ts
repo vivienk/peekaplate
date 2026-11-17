@@ -6,7 +6,7 @@
 // plus the dish id, so the real draft data can be passed in without conversion once the API is wired.
 // Unknown or only-proposed facts are never shown as recorded.
 
-import { OwnerDishFieldsSchema } from '@peekaplate/contracts/owner-menu';
+import { type OwnerDishFields, OwnerDishFieldsSchema } from '@peekaplate/contracts/owner-menu';
 
 export type FactStatus = 'unknown' | 'proposed' | 'confirmed';
 
@@ -26,12 +26,13 @@ export interface ReviewDish {
   allergens: DishFacts;
   photoId: string | null;
   /**
-   * Descriptive serving size (S09 requires it; S10 shows "Serving Size Missing"):
+   * Serving-size input, including older descriptive labels. Only confirmed calibration measures it.
    * undefined means the source does not provide it, so it is not checked; null or blank is missing.
    */
   servingSize?: string | null;
   /** Explicit number of people served; unknown never follows from the descriptive serving label. */
   servingCount?: number | null;
+  portionCalibration?: OwnerDishFields['portionCalibration'];
   /** Currency of priceAmount (three letters), when the source provides it. */
   priceCurrency?: string | null;
   /**

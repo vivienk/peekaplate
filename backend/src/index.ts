@@ -45,6 +45,7 @@ import {
   type SubmitMenuIngestionRequest,
   SubmitMenuIngestionRequestSchema,
   type SubmitOrderDeletionResponse,
+  servingDimensionsMatch,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
   type UpdateOwnerInsightActionRequest,
@@ -1038,18 +1039,31 @@ export async function approveDishDraftAtomic(
       throw new IngestionError('draft_incomplete', 409);
     }
     const approvedPhotoId = manual?.photoId ?? corrected.photo_id ?? null;
+    const portionCalibration = manual ? manual.portionCalibration : corrected.portion_calibration;
+    const servingSize = manual ? manual.servingSize : corrected.serving_size;
+    if (
+      portionCalibration &&
+      (!approvedPhotoId || !servingDimensionsMatch(servingSize, portionCalibration))
+    )
+      throw new IngestionError('portion_calibration_mismatch', 409);
     if (approvedPhotoId) {
-      const photo = await client.query(
-        'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
+      const photo = await client.query<{ id: string; source_hash: string }>(
+        'SELECT id,source_hash FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
         [venueId, draftId, approvedPhotoId],
       );
       if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
+      if (portionCalibration && photo.rows[0]?.source_hash !== portionCalibration.source_sha256)
+        throw new IngestionError('portion_calibration_mismatch', 409);
     }
 
     const newDishId = options.preparedDishId ?? crypto.randomUUID();
     const revisionCommandId = crypto.randomUUID();
     const facts = manual
       ? {
+          ...(manual.portionCalibration !== undefined
+            ? { portionCalibration: manual.portionCalibration }
+            : {}),
+          ...(manual.servingSize !== undefined ? { servingSize: manual.servingSize } : {}),
           ...(manual.servingCount !== undefined ? { servingCount: manual.servingCount } : {}),
           category: manual.category,
           priceAmount: manual.priceAmount,
@@ -1060,6 +1074,12 @@ export async function approveDishDraftAtomic(
         }
       : reviewed
         ? {
+            ...(corrected.portion_calibration !== undefined
+              ? { portionCalibration: corrected.portion_calibration }
+              : {}),
+            ...(corrected.serving_size !== undefined
+              ? { servingSize: corrected.serving_size }
+              : {}),
             ...(resolved.serving_count !== undefined
               ? { servingCount: resolved.serving_count }
               : {}),
