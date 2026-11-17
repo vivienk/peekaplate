@@ -434,7 +434,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Canonical owner/profile/draft commands retain tenant authority, versions and replay. Part A prepares owner-verified drafts through existing approval/producer/admission. Reopened drafts preserve historical canonical dish IDs; removal/Undo retains unchanged content verification and stable retries. Exact current publication controls public prepared bundles and selected photos/logos; withdrawal prevents new exposure and responses are no-store. Owner previews use authenticated snapshot-bound image blobs without changing content hashes. Empty venues remain empty. Existing profile verification, extraction/provider and hosted release gates remain separate; the Menu path profile-verification inconsistency is documented. Private 2.5D export binds the canonical approved photo/revision; configured retention reclaims rejected or orphaned artifacts. Operator hosting/admission and hosted processor acceptance remain separate.",
+      "summary": "Canonical owner/profile/draft commands retain tenant authority, versions and replay. Part A prepares owner-verified drafts through existing approval/producer/admission; edits reopen the same canonical dish. Removal/Undo preserves unchanged verification and stable retries. Exact current publication controls public prepared bundles and selected photos/logos; reads are no-store. Owner previews use authenticated snapshot-bound blobs. Empty venues remain empty. Private 2.5D export binds the canonical approved photo/revision; retention reclaims rejected/orphaned artifacts. Structured HTML MenuItem intake persists pending drafts and reconstructs review originals server-side. Competing offers remain unpriced; file fallback reuses the fetched source and safe-fetch limits. Operator hosting/admission, profile verification, hosted processor/provider and release acceptance remain separate; the Menu profile-verification inconsistency is documented.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -630,7 +630,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-portion-preview.ts",
         "backend/src/bundle-producer/approved-portions.ts",
         "backend/src/bundle-producer/approved-portions.test.ts",
-        "docs/screen9-portion-publish.md"
+        "docs/screen9-portion-publish.md",
+        "backend/src/ingestion/html-menu.ts",
+        "backend/src/ingestion/html-menu.test.ts",
+        "backend/src/retrieval/parser.menu.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -643,7 +646,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4419e2089dc6adb0d7754e2909704234f7595aa0c72c79974e9e3c4d7a21c9e4"
+      "sourceFingerprint": "891fd8e3d13c9afe7e0b523c15218cc5d434d5a994ac5e3c9df41d1743db4f0f"
     },
     {
       "id": "database",
@@ -1027,22 +1030,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-15",
       "modules": [
-        "diner",
-        "processing",
-        "contracts"
-      ],
-      "summary": "PR162 reconciles portion preview with current Compare, Saved, route resolution, tracking and live artwork. Closing preview restores the caller back label; disposal joins the existing screen lifecycle. Offline service tests pass; physical-device scale and hosted acceptance remain pending.",
-      "files": [
-        "frontend/diner/src/menu/portionPreview.ts",
-        "frontend/diner/src/menu/dishDetail.ts",
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/portion.spec.ts"
-      ],
-      "next": "Run integrated browser and repository checks before merge; do not claim real-device accuracy or activate paid providers."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
         "diner"
       ],
       "summary": "PR196 preserves the authored Compare/navigation/search design changes and fixes focused placeholder contrast with a token colour. A browser regression reproduces 2.36:1 before correction and passes afterward; 66 related Chromium checks pass.",
@@ -1188,6 +1175,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/screen9-portion-publish.md"
       ],
       "next": "Finish current-head checks and human review before merge. Hosted processor integration, device acceptance and physical calibration remain unverified."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "backend"
+      ],
+      "summary": "PR222 creates pending structured website dishes and server-built evidence-bound review sessions without providers or publication. Review fixes reject competing offers and reuse the first fetched source for file fallback. Reconciled merged PR219 through documentation/ledger conflicts only; owner routes merge without manual runtime changes.",
+      "files": [
+        "backend/src/ingestion/html-menu.ts",
+        "backend/src/ingestion/intake.ts",
+        "backend/src/retrieval/parser.ts",
+        "backend/src/owner-menu-routes.ts"
+      ],
+      "next": "Require reconciled-head CI and review before merge; hosted Screen 8 to Screen 9 acceptance remains unverified."
     }
   ]
 }
