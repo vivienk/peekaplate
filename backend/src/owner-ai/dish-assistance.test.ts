@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Client } from 'pg';
 import { expect, it, vi } from 'vitest';
+import extraction from '../../../processing/tests/fixtures/review-candidates/representative-candidates-v2.json';
 import { CommandError } from '../dish-command';
 import type { Bindings } from '../index';
 import { registerDishAssistanceRoutes } from './dish-assistance';
@@ -33,12 +34,20 @@ function setup() {
     removed: null as string | null,
     missing: false,
     description: input.facts.description,
+    ingredients: [] as string[],
+    origin: 'manual',
+    payload: structuredClone(extraction),
+    corrected: {} as Record<string, unknown>,
+    reviewStatus: 'pending',
+    sourceHash: extraction.source.sha256,
+    ingredientReads: 0,
+    afterIngredientRead: () => {},
   };
   const query = vi.fn(async (sql: string) => {
     if (sql.includes('staff_membership'))
       return { rows: [{ permission: state.permission }], rowCount: 1 };
-    if (sql.includes('dish_drafts'))
-      return {
+    if (sql.includes('dish_drafts')) {
+      const result = {
         rows: state.missing
           ? []
           : [
@@ -47,10 +56,28 @@ function setup() {
                 removed_at: state.removed,
                 review_status: 'pending',
                 description: state.description,
+                origin: state.origin,
+                manual_fields: { ingredients: { status: 'confirmed', items: state.ingredients } },
+                job_id: '44444444-4444-4444-8444-444444444444',
+                candidate_id: state.payload.candidates[0]!.candidate_id,
+                source_id: state.payload.source.source_id,
+                payload: state.payload,
+                source_sha256: state.sourceHash,
+                job_source_hash: state.payload.source.sha256,
+                corrected_fields: state.corrected,
+                candidate_status: state.reviewStatus,
+                incomplete_fields: [],
+                review_version: 1,
               },
             ],
         rowCount: state.missing ? 0 : 1,
       };
+      if (sql.includes('extraction_review_session')) {
+        state.ingredientReads++;
+        state.afterIngredientRead();
+      }
+      return result;
+    }
     return { rows: [], rowCount: 0 };
   });
   const fetchImpl = vi.fn<typeof fetch>(async () => Response.json(provider()));
@@ -119,6 +146,127 @@ it('reads current membership and tenant-scoped draft before one constrained prov
   });
   expect(s.query.mock.calls.some(([sql]) => /INSERT|UPDATE|DELETE/.test(sql))).toBe(false);
 });
+const ingredientInput = { ...input, operation: 'ingredients', facts: {} };
+it('returns saved owner ingredients as unverified proposals without provider credentials or calls', async () => {
+  const s = setup();
+  s.env.OWNER_AI_OPENAI_API_KEY = '';
+  s.env.OWNER_AI_OPENAI_PROJECT_ID = '';
+  s.state.ingredients = ['Rice', 'Tomato'];
+  const response = await s.run(ingredientInput);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    operation: 'ingredients',
+    status: 'review',
+    ingredients: ['Rice', 'Tomato'],
+    evidence: { source: 'saved_manual_draft' },
+    provenance: 'unverified',
+    approvalRequired: true,
+    publishable: false,
+  });
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+  expect(s.limit).not.toHaveBeenCalled();
+});
+it('abstains for a manual name-only draft instead of inventing a recipe', async () => {
+  const s = setup();
+  expect(await (await s.run(ingredientInput)).json()).toMatchObject({
+    status: 'abstained',
+    ingredients: [],
+    evidence: null,
+  });
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+});
+it('resurfaces only saved extraction proposals with their source identity', async () => {
+  const s = setup();
+  s.state.origin = 'extracted';
+  const candidate = s.state.payload.candidates[0]!;
+  Object.assign(candidate.original, { ingredients: ['Rice', 'Tomato'] });
+  candidate.missing_fields = candidate.missing_fields.filter((field) => field !== 'ingredients');
+  const response = await s.run(ingredientInput);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    ingredients: ['Rice', 'Tomato'],
+    evidence: {
+      source: 'saved_extraction',
+      sourceSha256: extraction.source.sha256,
+      extractionId: extraction.extraction_id,
+      candidateId: candidate.candidate_id,
+      reviewVersion: 1,
+    },
+    provenance: 'unverified',
+    publishable: false,
+  });
+  expect(s.query).toHaveBeenCalledWith(expect.stringContaining('s.source_sha256=j.source_hash'), [
+    venue,
+    id,
+  ]);
+  expect(s.query).toHaveBeenCalledWith(
+    expect.stringContaining('s.extraction_id=j.active_review_extraction_id'),
+    [venue, id],
+  );
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+  expect(s.query.mock.calls.some(([sql]) => /INSERT|UPDATE|DELETE/.test(sql))).toBe(false);
+});
+it('uses current owner corrections and never restores a removed original ingredient', async () => {
+  const s = setup();
+  s.state.origin = 'extracted';
+  s.state.corrected = { ingredients: ['Rice'] };
+  expect(await (await s.run(ingredientInput)).json()).toMatchObject({
+    status: 'review',
+    ingredients: ['Rice'],
+    evidence: { source: 'saved_owner_correction', sourceSha256: extraction.source.sha256 },
+  });
+  s.state.corrected = { ingredients: [] };
+  expect(await (await s.run(ingredientInput)).json()).toMatchObject({
+    status: 'abstained',
+    ingredients: [],
+  });
+});
+it('fails closed on a different extraction source or a rejected candidate', async () => {
+  const s = setup();
+  s.state.origin = 'extracted';
+  s.state.corrected = { ingredients: ['Rice'] };
+  s.state.sourceHash = 'a'.repeat(64);
+  expect(await (await s.run(ingredientInput)).json()).toMatchObject({
+    status: 'abstained',
+    ingredients: [],
+  });
+  s.state.sourceHash = extraction.source.sha256;
+  s.state.reviewStatus = 'rejected';
+  expect(await (await s.run(ingredientInput)).json()).toMatchObject({
+    status: 'abstained',
+    ingredients: [],
+  });
+});
+it('rejects stale ingredient responses and unauthorized tenant access without spending', async () => {
+  const s = setup();
+  s.state.ingredients = ['Rice'];
+  s.state.afterIngredientRead = () => {
+    s.state.version = 2;
+  };
+  expect((await s.run(ingredientInput)).status).toBe(409);
+  s.authorizeVenue.mockRejectedValue(new CommandError('forbidden', 403));
+  expect((await s.run(ingredientInput)).status).toBe(403);
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+});
+it('rejects a changed saved ingredient snapshot even if its draft version was not advanced', async () => {
+  const s = setup();
+  s.state.ingredients = ['Rice'];
+  s.state.afterIngredientRead = () => {
+    s.state.ingredients = ['Tomato'];
+  };
+  expect((await s.run(ingredientInput)).status).toBe(409);
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+});
+it.each(['viewer', 'revoked'])(
+  'rejects %s ingredient access without reading proposals or spending',
+  async (permission) => {
+    const s = setup();
+    s.state.permission = permission;
+    expect((await s.run(ingredientInput)).status).toBe(403);
+    expect(s.state.ingredientReads).toBe(0);
+    expect(s.fetchImpl).not.toHaveBeenCalled();
+  },
+);
 it.each(['viewer', 'revoked'])('denies %s membership before provider', async (permission) => {
   const s = setup();
   s.state.permission = permission;
@@ -176,7 +324,7 @@ it('abstains without description evidence and spends nothing', async () => {
   expect(s.limit).not.toHaveBeenCalled();
 });
 it.each(['ingredients', 'allergens'])(
-  'rejects unsupported %s assistance without spending',
+  'rejects unsupported %s request shapes without spending',
   async (operation) => {
     const s = setup();
     const response = await s.run({

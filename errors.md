@@ -3306,3 +3306,27 @@ The generated cutout used full width and intrinsic height, bypassing the authore
 original 2.5D card. The existing retry browser scenario now checks that the image
 remains inside that labelled card and at most 120px tall. Photo rights, source
 evidence, serving metadata, approval and backend behavior are unchanged.
+
+## November 17 — empty ingredient suggestions changed review state
+
+Two focused regressions showed the existing ingredient callback marked a dish
+AI-assisted and reset review for empty or duplicate-only proposals. Preserve the
+dish unchanged and report no additional suggestions through its existing status
+line. The two regressions and 27 related tests pass. A transient optional-version
+type error was corrected with the existing version-zero fallback.
+
+The separate develop/main reconciliation passed 2,177 unit and 122 script tests.
+Its first focused workerd run hit SQLITE_BUSY_RECOVERY at publication startup;
+the unchanged publication file passed 12/12 serially. This is local runtime
+contention, not an application fix. Reconciled line-ending/export-order lint
+failures were formatted, then lint/typecheck/build passed.
+
+## November 17 — ingredient fixture PostgreSQL parameter typing
+
+PR227 CI run 44130472518 reached the real database and rejected the new fixture's
+shared UUID/text parameter with `inconsistent types deduced for parameter $1`.
+Both fixture inserts now cast the identity to UUID before its text projection;
+runtime SQL is unchanged. The PR body also lacked an exact command in its PASS
+entries; its verification records now use the required command format. Database
+acceptance remains pending the corrected CI run rather than being inferred from
+mocked unit tests.

@@ -116,9 +116,13 @@ gates. Do not replace them with fixture freshness or a browser-supplied token.
 
 ## Verification
 
-The separate [owner-flow retest](owner-flow-retest.md) documents the optional,
-review-only description-shortening endpoint and the remaining ingredient-assistance
-and trusted-freshness gaps. It does not relax this report's evidence gate.
+The separate [owner-flow retest](owner-flow-retest.md) documents optional S09
+assistance. Description shortening retains literal supplied evidence; ingredient
+proposals reuse persisted owner/extraction values without a provider call, recipe
+completion or allergen inference. Both require explicit owner review. The new
+ingredient integration has no hosted acceptance yet. AI credential provisioning
+and trusted report freshness remain blocked; this change does not relax the
+dashboard report's evidence gate or enable positive recommendations.
 
 `pnpm exec vitest run backend/src/owner-ai frontend/console/src/owner-dashboard/ai-preview`
 checks provider payload minimization, zero preservation, suppression/freshness,

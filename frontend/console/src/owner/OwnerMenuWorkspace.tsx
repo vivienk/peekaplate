@@ -149,6 +149,8 @@ export function OwnerMenuWorkspace({
   const [processingIds, setProcessingIds] = useState<string[]>([]);
   const [uploads, setUploads] = useState<MenuUpload[]>([]);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const latestEditing = useRef(editing);
+  latestEditing.current = editing;
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [portionReview, setPortionReview] = useState<
@@ -1080,6 +1082,7 @@ export function OwnerMenuWorkspace({
           {...(dishAssistanceEnabled && {
             draftDescription: async () => {
               const active = runtime.current;
+              const generation = viewGeneration.current;
               if (!active || !current(active)) throw new Error('Workspace unavailable');
               const result = await active.client.assistDish(venueId, editing.id, {
                 operation: 'description',
@@ -1087,10 +1090,38 @@ export function OwnerMenuWorkspace({
                 requestId: newCommandId(),
                 facts: { description: editing.form.description },
               });
-              if (!current(active) || result.status !== 'review' || !result.description)
+              if (
+                !current(active) ||
+                generation !== viewGeneration.current ||
+                latestEditing.current !== editing ||
+                result.operation !== 'description' ||
+                result.status !== 'review' ||
+                !result.description
+              )
                 throw new Error('No supported description suggestion');
               return result.description;
             },
+            ...(editing.draft && {
+              suggestIngredients: async () => {
+                const active = runtime.current;
+                const generation = viewGeneration.current;
+                if (!active || !current(active)) throw new Error('Workspace unavailable');
+                const result = await active.client.assistDish(venueId, editing.id, {
+                  operation: 'ingredients',
+                  expectedVersion: editing.draft!.draft_version ?? 0,
+                  requestId: newCommandId(),
+                  facts: {},
+                });
+                if (
+                  !current(active) ||
+                  generation !== viewGeneration.current ||
+                  latestEditing.current !== editing ||
+                  result.operation !== 'ingredients'
+                )
+                  throw new Error('Ingredient suggestion is no longer current');
+                return result.ingredients;
+              },
+            }),
           })}
           photoUrl={photoUrl}
           {...(portionReview ? { portionReview } : {})}

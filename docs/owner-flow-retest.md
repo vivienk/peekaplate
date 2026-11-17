@@ -19,13 +19,13 @@ PostHog remains the internal pilot analytics destination. Existing consent-gated
 
 The reserved report fixture retains its live-class synthetic history. The approved publication and Poulet demo venues use test-class canonical facts through the new RLS-protected view. No union or relabelling occurs. JSON, CSV and AI rereads select the same class; see [report access](owner-report-staging.md).
 
-Optional S09 description assistance shortens an existing owner/saved description by selecting a complete literal sentence. It does not generate recipes, ingredients, allergen claims or preparation facts. Output remains an unverified proposal requiring acceptance and review. Ingredient/allergen suggestion transport remains missing; those buttons stay unavailable. The existing Python ingredient-intelligence classifier retains its separate evidence-bound handoff.
+Optional S09 description assistance shortens an existing owner/saved description by selecting a complete literal sentence. Ingredient assistance now reuses persisted manual ingredients or source-bound extraction proposals and current owner corrections; it makes no provider call and does not complete a recipe from its name. Empty evidence abstains, and removed ingredients are not resurrected from older originals. Both operations return unverified proposals requiring explicit review. Allergen suggestion transport remains unavailable. The existing Python ingredient-intelligence classifier retains its separate evidence-bound handoff; this integration does not duplicate or bypass it.
 
 Dashboard AI preserves unknown-freshness abstention. A recent event or HTTP success is not proof of complete report coverage. Positive hosted recommendations still require an approved completeness/freshness source.
 
 ## Release and evidence
 
-Apply `20261117130000_owner_test_observations.sql` through the reviewed staging process. The existing runtime receives SELECT on the test-only view; live facts and policies are unchanged.
+The initial release required `20261117130000_owner_test_observations.sql` through the reviewed staging process; its application/readback is recorded below. The existing runtime receives SELECT on the test-only view; live facts and policies are unchanged.
 
 Both Worker AI flags default off. The staging native rate limiter allows 10 requests/minute. Activation requires securely provisioned OpenAI key/project and a separate report-reference signing secret. Console flags are `VITE_OWNER_AI_ENABLED` and `VITE_OWNER_AI_DISH_ASSISTANCE_ENABLED`; neither contains credentials. Rate limiting is not a total spending cap.
 
@@ -33,7 +33,7 @@ The existing protected staging workflow has an explicit `configure_owner_ai` inp
 
 Focused regressions cover currency fallback, saved verification, actor/venue isolation, real-data rendering, reference propagation/recovery, CORS, traffic-class isolation, description spans and permission/version rechecks. Record local, mocked and hosted evidence separately. A merge does not prove paid model quality, hosted extraction, destination readback or physical-size AR acceptance.
 
-The focused main candidate passed `pnpm check`: 1,878 unit tests and 106 script tests; `pnpm verify test:db`: 314 SQL assertions, 144 Worker/database integrations and Worker smoke; and `pnpm verify build`. This is a narrower release than develop and intentionally excludes unrelated POS/comparison/evaluation work. Browser checks use the connected Brave session; the automated browser suite has not been run locally for this candidate and must pass CI.
+The historical focused main candidate (PR #223) passed `pnpm check`: 1,878 unit tests and 106 script tests; `pnpm verify test:db`: 314 SQL assertions, 144 Worker/database integrations and Worker smoke; and `pnpm verify build`. That candidate was narrower than develop and excluded unrelated POS/comparison/evaluation work. Its browser checks used the connected Brave session; automated browser execution was left to CI. These counts describe that earlier candidate, not the subsequent baseline reconciliation or ingredient change.
 
 Additional local portion evidence: the real non-root Linux image processed an opaque synthetic JPEG with networking disabled in 41 seconds, returning two hash-validated layers and cleaning its scratch directory. The publication-isolation regression first reproduced an edited draft hiding the still-published portion, then passed with serving authority bound to the exact published snapshot. Connected Brave reproduced the unchanged-photo retry failure and confirmed the corrected second request and preview; these local checks do not establish hosted acceptance.
 
@@ -78,8 +78,8 @@ browser clients retain their supported redirect policy.
 The two S09 portion actions also reuse the existing authored `Btn` component.
 No screen, design-token package, processing service or publication path is added.
 The temporary diagnostic was removed from staging after identifying the cause.
-Hosted generation, approval and publication must be retested on the corrected
-exact-main release before claiming that portion flow has passed.
+At that point hosted generation, approval and publication still required a
+retest on the corrected exact-main release; the next section records that run.
 
 ## Hosted publication and SVG decoding
 
@@ -105,3 +105,18 @@ remained off after the optional-analytics action, as intended. That establishes
 privacy enforcement, not a positive PostHog/canonical delivery result. Independent
 GitHub environment approval still gates credential provisioning; owner AI remains
 off, and unknown report freshness must still abstain.
+
+## Ingredient proposal continuation
+
+The existing S09 ingredient button now has a server-authorized operation on the
+existing dish-assistance route. It reads saved manual fields or current,
+source-bound extraction/review values, including explicit owner clears. A changed
+draft version, source snapshot or membership invalidates the response. Proposals
+remain private and unverified; saving, verification and publication stay separate.
+There is no new classifier, OCR run, recipe completion or ingredient-provider call.
+
+Focused route/schema and frontend checks are local regression evidence. This
+continuation has no hosted acceptance yet. It does not provision AI credentials,
+establish trusted report completeness/freshness, certify allergens or imply paid
+model quality. Record its exact release and authenticated screen result before
+claiming that new operation has passed on staging.
