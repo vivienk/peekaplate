@@ -1,3 +1,4 @@
+import type { RestaurantSetup } from '@peekaplate/contracts';
 import {
   OWNER_ANALYSIS_ACTIONS,
   OWNER_ANALYSIS_LIMITATION,
@@ -54,7 +55,15 @@ export function OwnerWorkspace({
   const [selectedId, setSelectedId] = useState('');
   const [page, setPage] = useState<OwnerPage>('setup');
   const [navigation, setNavigation] = useState(0);
+  const [detailsRequested, setDetailsRequested] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [setupRead, setSetupRead] = useState<{ actor: string; value: RestaurantSetup } | null>(
+    null,
+  );
+  const updateSetup = useCallback(
+    (value: RestaurantSetup | null) => setSetupRead(value ? { actor: owner.id, value } : null),
+    [owner.id],
+  );
   const canLeave = () =>
     !dirty || window.confirm('Leave these unsaved changes? Your saved draft stays available.');
   const pickerId = useId();
@@ -81,6 +90,7 @@ export function OwnerWorkspace({
   }, [apiBase, owner.id, getAccessToken, attempt, onSessionExpired]);
 
   const refresh = useCallback(() => {
+    setDetailsRequested(false);
     setState({ kind: 'loading' });
     setPage('setup');
     setAttempt((value) => value + 1);
@@ -96,6 +106,16 @@ export function OwnerWorkspace({
   const selected =
     venues.find((venue) => venue.venueId === selectedId) ??
     (venues.length === 1 ? venues[0] : undefined);
+  const workspaceSetup =
+    setupRead?.actor === owner.id && setupRead.value.venueId === selected?.venueId
+      ? setupRead.value
+      : {
+          venueId: selected?.venueId ?? '',
+          restaurantName: selected?.name ?? '',
+          detailsStatus: 'unknown' as const,
+          menuAdded: null,
+          published: null,
+        };
   const pages = useMemo(
     () =>
       new Set<OwnerPage>(
@@ -171,6 +191,7 @@ export function OwnerWorkspace({
         onChange={(event) => {
           if (!canLeave()) return;
           setSelectedId(event.target.value);
+          setDetailsRequested(false);
           setPage('setup');
         }}
       >
@@ -205,23 +226,42 @@ export function OwnerWorkspace({
         onAccessFailure={accessFailure}
       />
     ) : (
-      <FirstDashboardAside
-        setup={{
-          venueId: selected.venueId,
-          restaurantName: selected.name,
-          detailsStatus: 'unknown',
-          menuAdded: null,
-          published: null,
-        }}
-        ariaLabel="Analysis availability"
-      />
+      <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />
     );
 
+  const accountActions = (
+    <>
+      {picker}
+      <Button
+        variant="text"
+        onClick={() => {
+          if (!canLeave()) return;
+          setDetailsRequested(true);
+          setPage('setup');
+          setNavigation((value) => value + 1);
+        }}
+      >
+        Restaurant details
+      </Button>
+      <Button
+        variant="text"
+        onClick={() => {
+          if (canLeave()) refresh();
+        }}
+      >
+        Refresh access
+      </Button>
+      {signOut}
+      <small className="owner-workspace-design-note">
+        (Account placement awaiting design review)
+      </small>
+    </>
+  );
   const renderShell = (content: ReactNode) => (
     <div className="owner-root owner-workspace">
       <OwnerShell
         venueId={selected.venueId}
-        restaurantName={selected.name}
+        restaurantName={workspaceSetup.restaurantName}
         current={page}
         available={pages}
         lockedHint="Some screens are not connected in this workspace yet."
@@ -230,6 +270,7 @@ export function OwnerWorkspace({
         }
         onNavigate={(next) => {
           if (pages.has(next) && canLeave()) {
+            setDetailsRequested(false);
             setPage(next);
             setNavigation((value) => value + 1);
           }
@@ -237,27 +278,8 @@ export function OwnerWorkspace({
         aside={aside}
         topbar={
           <div className="owner-workspace-toolbar">
-            <FirstDashboardTopbar
-              setup={{
-                venueId: selected.venueId,
-                restaurantName: selected.name,
-                detailsStatus: 'unknown',
-                menuAdded: null,
-                published: null,
-              }}
-            />
-            <OwnerAccountMenu>
-              {picker}
-              <Button
-                variant="text"
-                onClick={() => {
-                  if (canLeave()) refresh();
-                }}
-              >
-                Refresh access
-              </Button>
-              {signOut}
-            </OwnerAccountMenu>
+            <FirstDashboardTopbar setup={workspaceSetup} />
+            <OwnerAccountMenu>{accountActions}</OwnerAccountMenu>
           </div>
         }
       >
@@ -285,16 +307,13 @@ export function OwnerWorkspace({
       canPublish={selected.permission === 'owner'}
       section={page === 'menu' ? 'menu' : 'overview'}
       navigation={navigation}
+      detailsRequested={detailsRequested}
       getAccessToken={getAccessToken}
       onAccessFailure={accessFailure}
       onDirtyChange={setDirty}
+      onSetupChange={updateSetup}
       renderShell={renderShell}
-      accountActions={
-        <>
-          {picker}
-          {signOut}
-        </>
-      }
+      accountActions={accountActions}
     />
   );
 }
@@ -323,6 +342,42 @@ function reportPeriod(window: { start_time: string; end_time: string }): string 
   return PERIOD_FORMAT.formatRange(start, end);
 }
 const percent = (value: number | null) => `${((value ?? 0) * 100).toFixed(1)}%`;
+const EXACT_FORMAT = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit',
+  timeZone: 'UTC',
+  timeZoneName: 'short',
+});
+// Two periods named for the owner: by date, or with exact UTC times when the dates read the same
+// (a rolling window shifted by seconds would otherwise look identical).
+export function periodPair(
+  report: { start_time: string; end_time: string },
+  analysis: { start: string; end: string },
+): { report: string; analysis: string } {
+  const analysisWindow = { start_time: analysis.start, end_time: analysis.end };
+  const byDate = { report: reportPeriod(report), analysis: reportPeriod(analysisWindow) };
+  if (byDate.report !== byDate.analysis) return byDate;
+  const exact = (window: { start_time: string; end_time: string }) =>
+    `${EXACT_FORMAT.format(new Date(window.start_time))} – ${EXACT_FORMAT.format(new Date(window.end_time))}`;
+  return { report: exact(report), analysis: exact(analysisWindow) };
+}
+// The analysis reads its own server snapshot. Its suggestion is shown only when that snapshot
+// covers exactly the report period on screen (compared as instants, so "…07:00:00Z" and
+// "…07:00:00.000Z" match); otherwise it would read as advice about numbers the owner isn't seeing.
+export function samePeriod(
+  report: { start_time: string; end_time: string },
+  analysis: { start: string; end: string },
+): boolean {
+  const at = (value: string) => Date.parse(value);
+  return (
+    Number.isFinite(at(report.start_time)) &&
+    at(report.start_time) === at(analysis.start) &&
+    at(report.end_time) === at(analysis.end)
+  );
+}
 
 type Reply =
   | { kind: 'loading'; scope: string }
@@ -438,38 +493,64 @@ function LiveAiPanel({
             The report could not be reviewed. Check your session or try again later.
           </p>
         )}
-        {shown?.kind === 'result' && (
-          <div className="owner-ai__answer">
-            {shown.result.status === 'review' && shown.result.metric !== null ? (
-              <>
-                <h3>Suggested review: {shown.dishName}</h3>
-                <p>{OWNER_ANALYSIS_ACTIONS[shown.result.metric]}</p>
-                <p className="owner-muted">
-                  {shown.result.metric.replaceAll('_', ' ')}: {percent(shown.result.value)}
-                </p>
-              </>
-            ) : (
-              <>
-                <h3>No recommendation for {shown.dishName}</h3>
-                <p>
-                  {shown.result.reason === 'unsupported_goal'
-                    ? 'This report has no customer-retention or CRM evidence.'
-                    : 'There is not enough verified evidence to suggest a next step.'}
-                </p>
-              </>
-            )}
-            <p className="owner-muted">
-              Analysis evidence period:{' '}
-              {reportPeriod({
-                start_time: shown.result.timeWindow.start,
-                end_time: shown.result.timeWindow.end,
-              })}
-            </p>
-            <p className="owner-muted">Synthetic analysis from a separate server-read snapshot.</p>
-            <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
-            <p className="owner-muted">No menu changes or customer messages are sent.</p>
-          </div>
-        )}
+        {shown?.kind === 'result' &&
+          !samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
+            <div className="owner-ai__answer" data-ai-period="mismatch">
+              <h3>Different report period</h3>
+              {(() => {
+                const periods = periodPair(
+                  report.report_metadata.date_window,
+                  shown.result.timeWindow,
+                );
+                return (
+                  <p>
+                    This analysis was calculated for {periods.analysis}, which is not exactly the
+                    report period shown here ({periods.report}). Its suggestion is not shown, so it
+                    can’t be mistaken for advice about these numbers.
+                  </p>
+                );
+              })()}
+              <p className="owner-muted">
+                Suggestions appear only when the analysis and the report on screen cover the same
+                period. No menu changes or customer messages are sent.
+              </p>
+            </div>
+          )}
+        {shown?.kind === 'result' &&
+          samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
+            <div className="owner-ai__answer">
+              {shown.result.status === 'review' && shown.result.metric !== null ? (
+                <>
+                  <h3>Suggested review: {shown.dishName}</h3>
+                  <p>{OWNER_ANALYSIS_ACTIONS[shown.result.metric]}</p>
+                  <p className="owner-muted">
+                    {shown.result.metric.replaceAll('_', ' ')}: {percent(shown.result.value)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3>No recommendation for {shown.dishName}</h3>
+                  <p>
+                    {shown.result.reason === 'unsupported_goal'
+                      ? 'This report has no customer-retention or CRM evidence.'
+                      : 'There is not enough verified evidence to suggest a next step.'}
+                  </p>
+                </>
+              )}
+              <p className="owner-muted">
+                Analysis evidence period:{' '}
+                {reportPeriod({
+                  start_time: shown.result.timeWindow.start,
+                  end_time: shown.result.timeWindow.end,
+                })}
+              </p>
+              <p className="owner-muted">
+                Synthetic analysis from a separate server-read snapshot.
+              </p>
+              <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
+              <p className="owner-muted">No menu changes or customer messages are sent.</p>
+            </div>
+          )}
       </div>
       <form className="owner-ai__composer owner-ai__composer--pickers" onSubmit={ask}>
         <label className="owner-visually-hidden" htmlFor={`${ids}-dish`}>

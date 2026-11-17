@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 // The synthetic console demos are built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS), never for
 // staging or production. Agreed with Sai and Jeffin.
 const DEMOS = [
+  { page: 'owner-onboarding.html', asset: /ownerOnboarding/, label: /Synthetic demo/ },
   { page: 'review-dishes.html', asset: /reviewDishes|menuReviewDemo/, label: /Synthetic demo/ },
   {
     page: 'first-dashboard.html',
@@ -19,6 +20,10 @@ const DEMOS = [
   { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
   // S4-FE-04: the owner sign-in demo answers with a synthetic service, so it never reaches staging.
   { page: 'owner-sign-in.html', asset: /ownerSignIn/, label: /Synthetic demo/ },
+  // S13: the menu preview demo answers the publish request itself, so it never reaches staging. It
+  // has no demo bar (Jeffin, 16 Nov), so it is identified by its screen title instead of a
+  // "Synthetic demo" label; it stays preview-only, noindex and free of analytics like the others.
+  { page: 'owner-menu-preview.html', asset: /ownerMenuPreview/, label: /Preview your menu/ },
 ];
 // Normal builds carry the provider-backed sign-in pages instead; preview builds do not.
 const LIVE_AUTH = ['owner-auth.html', 'auth-confirm.html', 'auth-reset.html'];
@@ -42,6 +47,35 @@ async function build(t, previewDemos) {
   );
   return dir;
 }
+
+// What analytics code looks like in a built script: the PostHog SDK (its package name and its
+// $pageview event), our adapter's config names, or a PostHog ingestion host. A document that only
+// names PostHog, such as the owner Privacy Policy, matches none of these. Agreed with Sai (15 Nov).
+const ANALYTICS_CODE = [
+  /posthog-js/,
+  /\$pageview/,
+  /VITE_POSTHOG_/,
+  /\b(?:us|eu)(?:-assets)?\.i\.posthog\.com/,
+];
+const analyticsCode = (source) =>
+  ANALYTICS_CODE.filter((marker) => marker.test(source)).map(String);
+const posthogSdk = fileURLToPath(
+  new URL(
+    '../packages/analytics/node_modules/posthog-js/dist/module.slim.no-external.js',
+    import.meta.url,
+  ),
+);
+
+test('the analytics check flags the PostHog SDK and wiring, not a policy that names PostHog', async () => {
+  const policy = await readFile(
+    new URL('../frontend/console/src/legal/privacy-policy.md', import.meta.url),
+    'utf8',
+  );
+  assert.match(policy, /PostHog/);
+  assert.deepEqual(analyticsCode(policy), []);
+  assert.notDeepEqual(analyticsCode(await readFile(posthogSdk, 'utf8')), []);
+  assert.notDeepEqual(analyticsCode("host === 'https://us.i.posthog.com'"), []);
+});
 
 // Every script a page loads, following its module preloads.
 async function pageScripts(dir, page) {
@@ -76,8 +110,13 @@ test('a preview build adds the demo pages, labelled synthetic, noindex and witho
     const scripts = (await pageScripts(dir, demo.page)).join('\n');
     assert.match(scripts, demo.label);
     if (demo.page === 'first-dashboard.html') assert.match(scripts, /Illustrative sample data/);
-    assert.doesNotMatch(scripts, /posthog/i);
+    // The sign-in demo carries the owner Privacy Policy, which names PostHog as a provider.
+    if (demo.page === 'owner-sign-in.html') assert.match(scripts, /PostHog \(US\)/);
+    assert.deepEqual(analyticsCode(scripts), [], demo.page);
   }
+  // The same check still catches a page that turns analytics on: the console app mounts the
+  // analytics consent and adapter.
+  assert.notDeepEqual(analyticsCode((await pageScripts(dir, 'index.html')).join('\n')), []);
 });
 
 test('only the preview workflow turns the demo flag on', async () => {

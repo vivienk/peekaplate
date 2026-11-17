@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
-import { OwnerDishFieldsSchema } from '@peekaplate/contracts';
+import { OwnerDishFieldsSchema, SaveOwnerDishDraftSchema } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { loadApprovedDishSources } from './bundle-producer/repository';
@@ -22,6 +22,7 @@ import {
   replayOwnerDraft,
   replayOwnerDraftVerification,
   saveOwnerDishDraft,
+  setDraftRemoval,
   storeDraftPhoto,
   verifyOwnerDish,
 } from './owner-menu';
@@ -102,6 +103,60 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       ).rowCount,
     ).toBe(2);
   });
+  it('preserves explicit serving facts through legacy-shaped edits and replays without conflating clears', async () => {
+    const id = crypto.randomUUID();
+    await save(id, { name: 'Original soup', servingSize: '1 bowl', servingCount: 2 });
+    const legacy = SaveOwnerDishDraftSchema.parse({
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+      fields: { name: 'Legacy edited soup' },
+    });
+    const edited = await saveOwnerDishDraft(runtime, actor, venue, id, legacy);
+    expect(edited.manual_fields).toMatchObject({
+      name: 'Legacy edited soup',
+      servingSize: '1 bowl',
+      servingCount: 2,
+    });
+    expect(await saveOwnerDishDraft(runtime, actor, venue, id, legacy)).toEqual(
+      JSON.parse(JSON.stringify(edited)),
+    );
+    const receipt = await admin.query(
+      'SELECT request_hash FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
+      [venue, actor, legacy.commandId],
+    );
+    expect(receipt.rows[0].request_hash).toBe(
+      createHash('sha256')
+        .update(JSON.stringify({ commandType: 'owner.draft.save.v1', draftId: id, ...legacy }))
+        .digest('hex'),
+    );
+    for (const clear of [{ servingSize: null }, { servingCount: null }])
+      await expect(
+        saveOwnerDishDraft(runtime, actor, venue, id, {
+          ...legacy,
+          fields: { ...legacy.fields, ...clear },
+        }),
+      ).rejects.toMatchObject({ code: 'command_conflict' });
+    const cleared = await saveOwnerDishDraft(runtime, actor, venue, id, {
+      ...legacy,
+      commandId: crypto.randomUUID(),
+      expectedVersion: 2,
+      fields: { ...legacy.fields, servingSize: null, servingCount: null },
+    });
+    expect(cleared.manual_fields).toMatchObject({ servingSize: null, servingCount: null });
+    expect(await saveOwnerDishDraft(runtime, actor, venue, id, legacy)).toEqual(
+      JSON.parse(JSON.stringify(edited)),
+    );
+    const events = await admin.query(
+      "SELECT version,schema_version,event_type,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_id=$2 AND stream_type='owner_draft' ORDER BY version",
+      [venue, id],
+    );
+    expect(events.rows).toHaveLength(3);
+    expect(replayOwnerDraft(events.rows.slice(0, 2))).toMatchObject({
+      servingSize: '1 bowl',
+      servingCount: 2,
+    });
+    expect(replayOwnerDraft(events.rows)).toMatchObject({ servingSize: null, servingCount: null });
+  });
   it('denies cross-venue, viewers and revoked actors before replay', async () => {
     const id = crypto.randomUUID();
     const commandId = crypto.randomUUID();
@@ -125,6 +180,61 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       [venue, actor],
     );
   });
+  it('removes and restores the same private draft with separate replayable versions', async () => {
+    const id = crypto.randomUUID();
+    await save(id, { name: 'Fictional soup', servingSize: '1 bowl' });
+    await verifyOwnerDish(runtime, actor, venue, id, crypto.randomUUID(), true, 1);
+    const input = {
+      commandId: crypto.randomUUID(),
+      expectedDraftVersion: 1,
+      expectedRemovalVersion: 0,
+      removed: true,
+    };
+    const removed = await setDraftRemoval(runtime, actor, venue, id, input);
+    expect(removed.removed_at).not.toBeNull();
+    expect(removed.draft_version).toBe(1);
+    expect((await setDraftRemoval(runtime, actor, venue, id, input)).removal_version).toBe(1);
+    await expect(save(id, { name: 'Overwritten' }, 1)).rejects.toMatchObject({
+      code: 'draft_not_editable',
+    });
+    await expect(
+      verifyOwnerDish(runtime, actor, venue, id, crypto.randomUUID(), true, 1),
+    ).rejects.toMatchObject({ code: 'draft_not_editable' });
+    await expect(
+      setDraftRemoval(runtime, actor, venue, id, {
+        ...input,
+        commandId: crypto.randomUUID(),
+        removed: false,
+      }),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
+    await expect(setDraftRemoval(runtime, viewer, venue, id, input)).rejects.toMatchObject({
+      code: 'forbidden',
+    });
+    const restored = await setDraftRemoval(runtime, actor, venue, id, {
+      ...input,
+      commandId: crypto.randomUUID(),
+      expectedRemovalVersion: 1,
+      removed: false,
+    });
+    expect(restored.removed_at).toBeNull();
+    expect(restored.manual_fields).toEqual(removed.manual_fields);
+    expect(restored.verification_status).toBe('verified');
+    await save(id, { name: 'Still editable', servingSize: '1 bowl' }, 1);
+    const events = await admin.query(
+      "SELECT version,schema_version,event_type,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_id=$2 AND stream_type='owner_draft' ORDER BY version",
+      [venue, id],
+    );
+    expect(replayOwnerDraft(events.rows)?.servingSize).toBe('1 bowl');
+    const lifecycle = await admin.query(
+      "SELECT version,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_id=$2 AND stream_type='owner_draft_removal' ORDER BY version",
+      [venue, id],
+    );
+    expect(lifecycle.rows.map((row) => [row.version, row.payload.removed])).toEqual([
+      [1, true],
+      [2, false],
+    ]);
+  });
+
   it('keeps photo ownership private and refuses a photo from another draft', async () => {
     const id = crypto.randomUUID();
     const otherId = crypto.randomUUID();
@@ -159,6 +269,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       name: 'Fictional soup',
       category: 'Soup',
       description: 'Fictional vegetables',
+      servingCount: 2,
       priceAmount: '8.50',
       priceCurrency: 'USD',
       ingredients: { status: 'confirmed', items: ['Carrot'] },
@@ -182,13 +293,18 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     });
     expect(result.publishedRevision.facts?.ingredients).toEqual(['Carrot']);
     expect(result.publishedRevision.facts?.allergens).toBeNull();
+    expect(result.publishedRevision.facts?.servingCount).toBe(2);
     expect(
       (await loadApprovedDishSources(runtime, venue, [result.publishedRevision.dishId])).get(
         result.publishedRevision.dishId,
       )?.reviewState,
     ).toBe('corrected');
-    await expect(save(id, { name: 'Changed' }, 1)).rejects.toMatchObject({
-      code: 'draft_not_editable',
+    // Back/Edit (Part A): an edit after approval reopens the draft for re-verification. The
+    // approved revision and its frozen facts are untouched until a new approval.
+    expect(await save(id, { name: 'Changed' }, 1)).toMatchObject({
+      review_status: 'pending',
+      verification_status: 'not_verified',
+      published_dish_id: result.publishedRevision.dishId,
     });
     const events = await admin.query(
       'SELECT tenant_id AS "tenantId",stream_type AS "streamType",stream_id AS "streamId",version,schema_version AS "schemaVersion",event_type AS "eventType",payload,metadata FROM app_private.es_event WHERE tenant_id=$1 AND stream_id=$2',
@@ -244,9 +360,36 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       photo.id,
     );
     expect(put).toHaveBeenCalledOnce();
-    await expect(
-      storeDraftPhoto(runtime, actor, venue, id, image(), 'image/png', put),
-    ).rejects.toMatchObject({ code: 'draft_not_editable' });
+    // Back/Edit (Part A): a different photo after approval reopens the draft instead of failing;
+    // the approved revision keeps the photo it was approved with.
+    const other = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 4, 5, 6]);
+    const replaced = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      id,
+      {
+        bytes: other,
+        sourceHash: createHash('sha256').update(other).digest('hex'),
+        idempotencyKey: crypto.randomUUID(),
+      },
+      'image/png',
+      put,
+    );
+    expect(replaced.id).not.toBe(photo.id);
+    const reopened = await admin.query(
+      'SELECT review_status, verification_status FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2',
+      [venue, id],
+    );
+    expect(reopened.rows[0]).toEqual({
+      review_status: 'pending',
+      verification_status: 'not_verified',
+    });
+    const kept = await admin.query<{ approved_facts: { photoId: string } }>(
+      'SELECT approved_facts FROM app_private.dish_current WHERE tenant_id=$1 AND dish_id=$2',
+      [venue, approved.publishedRevision.dishId],
+    );
+    expect(kept.rows[0]?.approved_facts.photoId).toBe(photo.id);
   });
   it('retains reviewed facts through a legacy text-only edit instead of reopening draft fallback', async () => {
     const id = crypto.randomUUID();
@@ -657,7 +800,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect((await request()).status).toBe(200);
     const extractionId = session.extractionResult.extraction_id;
     const candidateId = session.items[0]!.candidate.candidate_id;
-    const review = await saveCandidateReviewCommand(
+    let review = await saveCandidateReviewCommand(
       runtime,
       actor,
       venue,
@@ -675,12 +818,141 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         },
       },
     );
-    const row = (
+    let row = (
       await admin.query<{ id: string; draft_version: number }>(
         'SELECT id,draft_version FROM app_private.dish_drafts WHERE tenant_id=$1 AND job_id=$2 AND candidate_id=$3',
         [venue, job.id, candidateId],
       )
     ).rows[0]!;
+    const verificationCommand = crypto.randomUUID();
+    await verifyOwnerDish(
+      runtime,
+      actor,
+      venue,
+      row.id,
+      verificationCommand,
+      true,
+      row.draft_version,
+    );
+    const oldVersion = row.draft_version;
+    const removedInput = {
+      commandId: crypto.randomUUID(),
+      expectedDraftVersion: oldVersion,
+      expectedRemovalVersion: 0,
+      removed: true,
+    };
+    await setDraftRemoval(runtime, actor, venue, row.id, removedInput);
+    await expect(
+      saveCandidateReviewCommand(runtime, actor, venue, extractionId, candidateId, {
+        commandId: crypto.randomUUID(),
+        expectedVersion: review.review.version,
+        action: 'correct',
+        corrected: { serving_size: 'A hidden edit' },
+      }),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
+    await setDraftRemoval(runtime, actor, venue, row.id, {
+      ...removedInput,
+      commandId: crypto.randomUUID(),
+      expectedRemovalVersion: 1,
+      removed: false,
+    });
+    const servingCorrection = {
+      commandId: crypto.randomUUID(),
+      expectedVersion: review.review.version,
+      action: 'correct' as const,
+      corrected: { serving_count: 2 },
+    };
+    review = await saveCandidateReviewCommand(
+      runtime,
+      actor,
+      venue,
+      extractionId,
+      candidateId,
+      servingCorrection,
+    );
+    expect(review.effective.serving_count).toBe(2);
+    expect(
+      await saveCandidateReviewCommand(
+        runtime,
+        actor,
+        venue,
+        extractionId,
+        candidateId,
+        servingCorrection,
+      ),
+    ).toEqual(review);
+    expect(
+      (
+        await admin.query(
+          'SELECT draft_version,verification_status FROM app_private.dish_drafts WHERE id=$1',
+          [row.id],
+        )
+      ).rows[0],
+    ).toMatchObject({ draft_version: oldVersion + 1, verification_status: 'not_verified' });
+    await expect(
+      verifyOwnerDish(runtime, actor, venue, row.id, verificationCommand, true, oldVersion),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
+    const photo = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      row.id,
+      image(),
+      'image/png',
+      async () => {},
+    );
+    const foreignId = crypto.randomUUID();
+    await save(foreignId);
+    const foreignPhoto = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      foreignId,
+      image(),
+      'image/png',
+      async () => {},
+    );
+    await expect(
+      saveCandidateReviewCommand(runtime, actor, venue, extractionId, candidateId, {
+        commandId: crypto.randomUUID(),
+        expectedVersion: review.review.version,
+        action: 'correct',
+        corrected: { photo_id: foreignPhoto.id },
+      }),
+    ).rejects.toMatchObject({ code: 'not_found' });
+    review = await saveCandidateReviewCommand(runtime, actor, venue, extractionId, candidateId, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: review.review.version,
+      action: 'correct',
+      corrected: {
+        serving_size: '1 bowl',
+        photo_id: photo.id,
+        allergens: { status: 'confirmed', items: ['milk'] },
+      },
+    });
+    expect(review.effective).toMatchObject({
+      serving_size: '1 bowl',
+      photo_id: photo.id,
+      allergens: { status: 'confirmed', items: ['milk'] },
+    });
+    const changed = (
+      await admin.query(
+        'SELECT id,draft_version,verification_status FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2',
+        [venue, row.id],
+      )
+    ).rows[0];
+    expect(changed.draft_version).toBe(oldVersion + 2);
+    expect(changed.verification_status).toBe('not_verified');
+    row = changed;
+    await verifyOwnerDish(
+      runtime,
+      actor,
+      venue,
+      row.id,
+      crypto.randomUUID(),
+      true,
+      row.draft_version,
+    );
     const reportKey = (
       await admin.query(
         'SELECT result_storage_key FROM app_private.menu_ingestion_jobs WHERE id=$1',
@@ -725,6 +997,8 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     });
     expect(approved.publishedRevision.name).toBe('Owner verified fictional soup');
     expect(approved.publishedRevision.facts?.priceAmount).toBe('9.00');
+    expect(approved.publishedRevision.facts?.photoId).toBe(photo.id);
+    expect(approved.publishedRevision.facts?.allergens).toEqual(['milk']);
     await saveCandidateReviewCommand(runtime, actor, venue, extractionId, candidateId, {
       commandId: crypto.randomUUID(),
       expectedVersion: review.review.version,
@@ -828,10 +1102,9 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(events).toHaveLength(1);
     expect(replayOwnerDraftVerification(events, 1)).toBe('verified');
     expect(replayOwnerDraftVerification(events, 2)).toBe('not_verified');
-    expect(
-      (await verifyOwnerDish(runtime, actor, venue, row.id, command, true, 1)).draft
-        .verification_status,
-    ).toBe('verified');
+    await expect(
+      verifyOwnerDish(runtime, actor, venue, row.id, command, true, 1),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
     expect(
       (
         await admin.query('SELECT verification_status FROM app_private.dish_drafts WHERE id=$1', [

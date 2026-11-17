@@ -59,7 +59,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-analysis.ts",
         "packages/contracts/src/portion.ts",
         "packages/contracts/src/ingredient-artwork.ts",
-        "packages/contracts/package.json"
+        "packages/contracts/package.json",
+        "packages/contracts/src/restaurant-profile.ts",
+        "packages/contracts/src/restaurant-profile.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -67,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "6295c5c2f8ba6bef188f49d9417dd46a0faf6379a9195d683af2560842e3700c"
+      "sourceFingerprint": "f324a31dd42b92985994414968b78874f8a7e27db4d80daa5ee629f59edc6ea2"
     },
     {
       "id": "tokens",
@@ -105,7 +107,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Auth-free diner reads exact-byte verified published menus using existing Menu/Search/Detail/Save/Compare screens. Published portion view exposes the original camera portal only after explicit action; original-photo fallback, lazy WebGL, teardown and uncalibrated-size copy remain. Existing approved ingredient-artwork client refreshes exact labels and restores Figma/text fallback on absence or revocation. Physical-phone/provider and hosted acceptance are recorded separately.",
+      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Release preserves deliberate camera entry while binding measurements to serving count; approximate fallbacks remain labelled. No portion assets are invented for newly prepared owner photos. Consent-gated PostHog/canonical tracking remains the existing implementation; withdrawn publication denies new prepared-content reads.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -210,7 +212,34 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/compare/resultScreen.ts",
         "docs/merged-diner-staging.md",
         "playwright.portion-published.config.ts",
-        "tests/e2e/portion-published.spec.ts"
+        "tests/e2e/portion-published.spec.ts",
+        "frontend/diner/src/assets/icons/generated-ingredients/catalogue.json",
+        "frontend/diner/src/menu/liveArtwork.ts",
+        "frontend/diner/src/compare/pickerScreen.test.ts",
+        "frontend/diner/src/compare/resultScreen.test.ts",
+        "frontend/diner/src/menu/portion3d.ts",
+        "frontend/diner/src/menu/portionRenderer.ts",
+        "frontend/diner/src/menu/portionDemo.ts",
+        "frontend/diner/src/menu/fixture-assets/portion-demo/demo.json",
+        "frontend/diner/src/menu/fixture-assets/portion-demo/review-images.json",
+        "frontend/diner/src/menu/portionMotion.ts",
+        "frontend/diner/src/menu/portionMotion.test.ts",
+        "frontend/diner/src/menu/preview-assets/back.svg",
+        "frontend/diner/src/menu/preview-assets/hand-touch.svg",
+        "frontend/diner/src/menu/preview-assets/loading.svg",
+        "frontend/diner/src/menu/preview-assets/image-not-found.svg",
+        "frontend/diner/src/menu/portion.test.ts",
+        "frontend/diner/src/menu/fixturePortions.ts",
+        "frontend/diner/src/menu/fixture-assets/portion-fixtures.json",
+        "frontend/diner/src/menu/fixture-assets/PORTIONS.md",
+        "frontend/diner/src/menu/fixture-assets/portion-ingestion-input.json",
+        "frontend/diner/src/menu/portionPlacement.ts",
+        "frontend/diner/src/menu/portionPlacement.test.ts",
+        "frontend/diner/src/menu/portionOrientation.ts",
+        "frontend/diner/src/menu/portionOrientation.test.ts",
+        "frontend/diner/src/assets/icons/ingredients/unknown.svg",
+        "frontend/diner/src/menu/portionSize.ts",
+        "frontend/diner/src/menu/portionScale.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -219,12 +248,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "66cdee1e1156f15268754c620fc687ba24023a78d2eacfc8de7b068e06077f91"
+      "sourceFingerprint": "0c1bce2d585d26c144449b5bcf89487fee35a667da834c48381c174d5d53487c"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner auth/workspace preserves authored shell, setup and source selection. #206 supplies the single S08/S10 review controller, effective saved corrections, recovery-safe hydration and explicit attestations; verification uses existing draft/photo APIs without publication. Existing S05 details remain explicitly local-only. Demo and live performance share one authored frame/CSS with actual API metrics, suppression and unknown freshness. S13 alone is intentionally temporary. Profile persistence, extracted-photo verification, Overview/Actions/live AI and unsupported metrics remain incomplete.",
+      "summary": "Merged authored auth, restaurant setup, menu source/upload/processing, original dish form, review/verification and official S13 preview/publish screens. One existing authenticated client carries owner data; preparing does not publish. Snapshot-bound preview images use short-lived blob URLs and cleanup. Synthetic walkthroughs stay preview-only. Profile verification remains team-owned; dashboard and direct Menu publication paths differ and are documented. AI stays off.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -348,7 +377,32 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/onboarding/details.ts",
         "frontend/console/src/onboarding/details.test.tsx",
         "frontend/console/review-dishes.html",
-        "tests/e2e/menu-review.spec.ts"
+        "tests/e2e/menu-review.spec.ts",
+        "frontend/console/owner-onboarding.html",
+        "frontend/console/src/onboarding/demo.tsx",
+        "tests/e2e/owner-onboarding-screens.spec.ts",
+        "frontend/console/src/owner-dashboard/data.ts",
+        "frontend/console/src/owner-dashboard/DishFormView.tsx",
+        "frontend/console/src/publish/DraftMenu.tsx",
+        "frontend/console/src/onboarding/OwnerJourneyDemo.tsx",
+        "tests/e2e/owner-journey.spec.ts",
+        "frontend/console/src/owner/ai-period.test.ts",
+        "frontend/console/src/onboarding/useHeadingFocus.ts",
+        "frontend/console/owner-menu-preview.html",
+        "frontend/console/src/owner-dashboard/menu.tsx",
+        "frontend/console/src/publish/MenuPreview.test.tsx",
+        "frontend/console/src/publish/MenuPreview.tsx",
+        "frontend/console/src/publish/demo.tsx",
+        "frontend/console/src/publish/diner-url.test.ts",
+        "frontend/console/src/publish/diner-url.ts",
+        "frontend/console/src/publish/publish.css",
+        "tests/e2e/owner-menu-preview.spec.ts",
+        "frontend/console/src/legal/LegalDialog.tsx",
+        "frontend/console/src/legal/legal.css",
+        "frontend/console/src/legal/markdown.test.tsx",
+        "frontend/console/src/legal/markdown.tsx",
+        "frontend/console/src/legal/privacy-policy.md",
+        "frontend/console/src/legal/terms.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -358,12 +412,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "be377a4bec990bfa8bed6300c8036ab2616bcecaf0651a819a15c599aad82246"
+      "sourceFingerprint": "340b71270cf38583ecc4f1ebfe99ca0104e2bbc403a45adaa8b0e87bf0124db0"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker owns verified tenant commands, publication, observations, ingestion and owner reports. Public reads and observation ingestion share exact configured staging-origin CORS. Command paths share the existing transactional owner/editor membership check. Existing #165 ingredient-artwork review/read/revocation uses the private R2 prefix, hash-bound approved bytes, tenant projection and dry-run cleanup. Publication remains owner-only; artwork approval changes no food facts. Matching extraction budget host/container deployment and controlled provider acceptance remain separately coordinated.",
+      "summary": "Staging owner persistence, original-photo uploads, draft corrections/removal/verification and the existing canonical approval/producer/publication path. This focused release carries #210/#217/#213 and reviewed #216 preparation; owner previews stay authenticated and anonymous prepared content requires current publication. Existing extraction/Queue/provider budgets, observation ingestion and cleanup dry-run are retained. Freshness/owner-AI activation, new order imports and unrelated report changes are excluded.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -514,7 +568,26 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingredient-artwork.test.ts",
         "backend/src/ingredient-artwork-retention.test.ts",
         "backend/src/ingredient-artwork.integration.ts",
-        "migrations/20261113020000_ingredient_artwork.sql"
+        "migrations/20261113020000_ingredient_artwork.sql",
+        "backend/src/restaurant-profile.ts",
+        "backend/src/restaurant-profile.integration.ts",
+        "migrations/20261116020000_owner_flow_profile.sql",
+        "tests/db/owner_flow_profile.sql",
+        "backend/src/ingredient-artwork-placeholders.ts",
+        "backend/src/ingredient-artwork-placeholders.test.ts",
+        "backend/src/ingredient-artwork-placeholders.integration.ts",
+        "backend/src/bundle-producer/restaurant.ts",
+        "backend/src/bundle-producer/restaurant.test.ts",
+        "backend/src/bundle-producer/logo-image.ts",
+        "backend/src/bundle-producer/logo-image.test.ts",
+        "backend/src/owner-prepare.ts",
+        "backend/src/owner-prepare.test.ts",
+        "backend/src/owner-prepare.integration.ts",
+        "backend/src/restaurant-profile.test.ts",
+        "migrations/20261116010000_ingredient_artwork_placeholders.sql",
+        "migrations/20261117010000_owner_prepared_menu.sql",
+        "tests/db/artwork_placeholders.sql",
+        "tests/db/owner_prepared_menu.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -527,7 +600,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "11ab88b5a4d173909986c5e62f5774359f574ea4d46b4d702f61f47588362bb8"
+      "sourceFingerprint": "6766131f270867335ccfdc5f4a84edb85996499f2c61117aa3ade7f3169e097b"
     },
     {
       "id": "database",
@@ -571,7 +644,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "fddecfbbd520d63d37b42c6ad95127370471437e687f3b9b97ccd079681a7b9d"
+      "sourceFingerprint": "40115cbded74c178b511ecb2cd44cd13e99c0c3c973d5893f846305a640690e3"
     },
     {
       "id": "measurement",
@@ -656,7 +729,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "7d7131602f43625fa0295498270740d96eb208d502038192dfa44ae584e6d916"
+      "sourceFingerprint": "5062cd472e29dd4e385af1d58b13de1bf22cac03208a8282e76b091fd457b784"
     },
     {
       "id": "agents",
@@ -825,7 +898,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "a93fa942d5db4d2c981da184534df588d2e58a605057bcfe47b5017ddad68320"
+      "sourceFingerprint": "b14e13f9abd0b5298ac2c0cc73135f864808d4a1e900a588d837d1c2e2b38d85"
     },
     {
       "id": "assets",
@@ -860,20 +933,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "console"
-      ],
-      "summary": "Correct the hosted Pages callback mismatch: exact /auth-confirm and /auth-reset aliases share the existing same-purpose parser and entry classification. Existing .html allowlist, origin validation, PKCE and URL scrubbing remain unchanged. Both clean-path browser regressions fail against previous code.",
-      "sources": [
-        "frontend/console/src/auth/callback.ts",
-        "frontend/console/src/auth/live.tsx",
-        "tests/e2e/owner-auth-provider.spec.ts",
-        "docs/owner-auth.md"
-      ],
-      "next": "Finish pinned review/checks, promote the narrow correction to main, then verify the actual hosted clean callback paths. Genuine staff-session/email acceptance remains separate."
-    },
     {
       "date": "2026-11-14",
       "modules": [
@@ -1011,6 +1070,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/review/fromDishDraft.ts"
       ],
       "next": "Complete combined regression checks, pinned reviews and exact-commit approvals; then verify the staging release with genuine staff access and screenshots. Do not equate local-only profile state or unavailable extracted-photo verification with a completed flow."
+    },
+    {
+      "date": "2026-11-16",
+      "modules": [
+        "backend",
+        "console",
+        "diner",
+        "contracts",
+        "delivery"
+      ],
+      "summary": "Focused main promotion of already merged owner sources and reviewed preparation fixes, preserving authored screens and main-only CORS/Queue/cleanup safeguards. Matching staging API/Pages and exact missing migrations require final release approval; shared demo must finish on an empty isolated restaurant after fixture verification.",
+      "files": [
+        "docs/owner-preparation-release.md",
+        "backend/src/owner-prepare.ts",
+        "frontend/console/src/owner/OwnerPublish.tsx"
+      ],
+      "next": "Complete pinned checks/reviews, authorize migration/release and shared synthetic access, then genuine upload→review→explicit publish→diner checks; preserve earlier fixtures and leave the shared workspace empty. No paid owner-AI calls."
     }
   ]
 }

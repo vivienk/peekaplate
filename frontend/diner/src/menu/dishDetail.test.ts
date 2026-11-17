@@ -42,7 +42,7 @@ describe('dish detail allergen note', () => {
   });
 
   it('retains text for missing or unreviewed generated art and escapes labels', () => {
-    expect(render([], 'Coconut')).not.toContain('class="pp-ingredient__icon"');
+    expect(render([], 'Coconut')).toContain('class="pp-ingredient__icon"');
     expect(render([], 'Coconut')).toContain('class="pp-ingredient__name">Coconut</p>');
     expect(render([], '<img onerror="x">')).toContain('&lt;img onerror=&quot;x&quot;&gt;');
   });

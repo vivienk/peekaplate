@@ -4,6 +4,7 @@
 // values in ./types; ingredient icons by ingredient name, because the bundle has no icon field.
 
 import generatedCatalogue from '../assets/icons/generated-ingredients/catalogue.json';
+import unknownIngredient from '../assets/icons/ingredients/unknown.svg';
 import back from '../assets/icons/ui/back-navigation.svg';
 import close from '../assets/icons/ui/close.svg';
 import heart from '../assets/icons/ui/heart.svg';
@@ -72,7 +73,8 @@ export function dietaryIcon(value: string): string | null {
 export function ingredientIcon(name: string): string | null {
   return (
     ingredientIcons.get(iconKey(name)) ??
-    generatedIngredientIcon(name, generatedCatalogue, glob.generated)
+    generatedIngredientIcon(name, generatedCatalogue, glob.generated) ??
+    unknownIngredient
   );
 }
 

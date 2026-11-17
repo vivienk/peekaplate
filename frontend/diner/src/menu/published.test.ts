@@ -76,6 +76,24 @@ const validDelivery = {
 validDelivery.response.bundle.contentHash = await sha256(JSON.stringify(validDelivery.content));
 
 describe('published adapter', () => {
+  it('carries the approved serving count through the published delivery loader', () => {
+    const delivery = parsePublishedDelivery(validDelivery);
+    const dish = delivery.content.categories[0]!.dishes[1]!;
+    if (!dish.complete) throw new Error('expected complete');
+    dish.serving_count = 2;
+    const result = deliveryToMenu(delivery);
+    if (result.status !== 'ready') throw new Error('expected ready');
+    expect(result.menu.categories[0]!.dishes[1]).toMatchObject({ servingCount: 2 });
+  });
+  it('maps a text-only published dish (no photo) to a dish without images', () => {
+    const delivery = parsePublishedDelivery(validDelivery);
+    const dish = delivery.content.categories[0]!.dishes[1]!;
+    if (!dish.complete) throw new Error('expected complete');
+    dish.images = null;
+    const result = deliveryToMenu(delivery);
+    if (result.status !== 'ready') throw new Error('expected ready');
+    expect(result.menu.categories[0]!.dishes[1]).toMatchObject({ images: null });
+  });
   it('validates a valid delivery', () => {
     const delivery = parsePublishedDelivery(validDelivery);
     expect(delivery.response.publicationId).toBe('44444444-4444-4444-8444-444444444444');

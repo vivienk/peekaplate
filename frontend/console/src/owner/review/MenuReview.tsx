@@ -46,7 +46,7 @@ export interface ReviewDishesProps {
    * complete and step 3 (Review and publish) next. Nothing is published here.
    */
   onCompleteVerification: () => void;
-  /** True while the parent is completing verification, so it cannot be sent twice. */
+  /** True while a parent mutation is pending, so commands cannot be sent twice. */
   completing?: boolean;
   /** Plain-language reason when completing failed; the owner can try again. */
   completeError?: string | null;
@@ -150,6 +150,7 @@ export function ReviewDishes({
   // The button the owner just used disappears with its row (Remove) or with the notice (Undo), so
   // keyboard focus moves to the next useful control instead of being lost.
   useEffect(() => {
+    if (completing) return;
     if (state.notice === 'removed' && removedId !== null) {
       lastRemoved.current = removedId;
       undoRef.current?.focus();
@@ -161,7 +162,7 @@ export function ReviewDishes({
         .find((button) => button.dataset.editDishId === id)
         ?.focus();
     }
-  }, [state.notice, removedId]);
+  }, [state.notice, removedId, completing]);
 
   return (
     <div className="owner-root review-root" ref={rootRef}>
@@ -196,6 +197,7 @@ export function ReviewDishes({
               <button
                 type="button"
                 className="review-undo"
+                disabled={completing}
                 ref={undoRef}
                 onClick={() => onUndoRemove?.()}
               >
@@ -260,6 +262,7 @@ export function ReviewDishes({
                             <button
                               type="button"
                               className="review-trash"
+                              disabled={completing}
                               aria-label={`Remove ${name}`}
                               onClick={() => onRemoveDish(dish.id)}
                             >

@@ -298,6 +298,17 @@ describe('RES-02 immutable diner bundle boundary', () => {
     expect(PublicMenuContentBundleSchema.safeParse(withAllergenState([])).success).toBe(true);
   });
 
+  it('accepts a complete text-only dish (images: null) but not a half-filled image pair', () => {
+    const completeDish = bundle.categories[0].dishes[0];
+    const withImages = (images: unknown) => ({
+      ...bundle,
+      categories: [{ ...bundle.categories[0], dishes: [{ ...completeDish, images }] }],
+    });
+    expect(PublicMenuContentBundleSchema.safeParse(withImages(null)).success).toBe(true);
+    expect(PublicMenuContentBundleSchema.safeParse(withImages({})).success).toBe(false);
+    expect(PublicMenuContentBundleSchema.safeParse(withImages(undefined)).success).toBe(false);
+  });
+
   it('rejects partial claims, unknown allergens and insecure image URLs', () => {
     const incompleteDish = bundle.categories[0].dishes[1];
     expect(

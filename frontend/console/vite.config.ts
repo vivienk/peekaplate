@@ -24,6 +24,8 @@ export default defineConfig({
           ? {
               foundations: page('foundations.html'),
               ownerSignIn: page('owner-sign-in.html'),
+              ownerOnboarding: page('owner-onboarding.html'),
+              ownerMenuPreview: page('owner-menu-preview.html'),
               firstDashboard: page('first-dashboard.html'),
               ownerDashboard: page('owner-dashboard.html'),
               reviewDishes: page('review-dishes.html'),

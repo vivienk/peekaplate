@@ -1,4 +1,4 @@
-import { PublicPortionSchema } from './portion';
+import { PublicPortionSchema, ServingCountSchema } from './portion';
 
 export * from './ingredient-artwork';
 export * from './owner-ai';
@@ -8,6 +8,7 @@ export {
   PlateCalibrationSchema,
   type PublicPortion,
   PublicPortionSchema,
+  ServingCountSchema,
 } from './portion';
 
 import { z } from 'zod';
@@ -209,6 +210,7 @@ export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'glute
 
 export const PublicMenuCompleteDishSchema = z.strictObject({
   portion: PublicPortionSchema.optional(),
+  serving_count: ServingCountSchema.optional(),
   ...publicMenuDishIdentity,
   complete: z.literal(true),
   name: publicMenuText.min(1).max(160),
@@ -227,10 +229,14 @@ export const PublicMenuCompleteDishSchema = z.strictObject({
     .array(PublicMenuDietaryCodeSchema)
     .max(3)
     .refine((values) => new Set(values).size === values.length, 'Dietary values must be unique'),
-  images: z.strictObject({
-    card: PublicMenuImageSchema,
-    detail: PublicMenuImageSchema,
-  }),
+  // null = a text-only dish: published without a photo for now (Jeffin, Nov 17). Diners see the
+  // name, price, description, ingredients and allergens; the menu card shows its empty image box.
+  images: z
+    .strictObject({
+      card: PublicMenuImageSchema,
+      detail: PublicMenuImageSchema,
+    })
+    .nullable(),
 });
 
 export const PublicMenuDishSchema = z.discriminatedUnion('complete', [
@@ -1473,3 +1479,5 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
   queuedAt: z.string().datetime(),
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
+
+export * from './restaurant-profile';

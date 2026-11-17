@@ -55,7 +55,7 @@ const STEP_TEXT: Record<StepId, { title: string; description: string; startLabel
   details: {
     title: 'Restaurant details',
     description:
-      'Name, address and opening hours. We check these before anything is shown to diners.',
+      'Name, address and contact details. We check these before anything is shown to diners.',
     startLabel: 'Add restaurant details',
   },
   menu: {
@@ -114,6 +114,7 @@ function lockedReasonOf(setup: OwnerSetup): string {
 }
 
 function actionOf(id: StepId, state: StepState): StepView['action'] {
+  if (id === 'details' && state === 'unknown') return { label: 'Edit', disabled: false };
   if (state === 'locked' || state === 'unknown') return null;
   // Publishing cannot be edited from here; the published menu is changed through the Menu page.
   if (id === 'publish' && state === 'done') return null;
@@ -155,7 +156,7 @@ export function setupProgress(setup: OwnerSetup): SetupProgress {
     total: steps.length,
     next: nextStep ? { id: nextStep.id, label: STEP_TEXT[nextStep.id].startLabel } : null,
     review:
-      setup.detailsStatus === 'missing' || setup.detailsStatus === 'unknown'
+      setup.detailsStatus === 'missing'
         ? null
         : { id: 'details', label: 'Review restaurant details' },
   };
