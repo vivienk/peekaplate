@@ -31,6 +31,7 @@ import {
   validateMenuPdf,
 } from './ingestion/intake';
 import { type DishDraftRow, IngestionError } from './ingestion/repository';
+import { persistStructuredHtmlMenu, retrieveStructuredHtmlMenu } from './ingestion/html-menu';
 import { bootstrapMenuReview } from './ingestion/review-bootstrap';
 import { readMenuUpload } from './ingestion/upload';
 import {
@@ -375,6 +376,18 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     const storage = c.env.INGESTION_REPORTS_BUCKET;
     const queue = c.env.INGESTION_QUEUE;
     if (!storage || !queue) throw new AuthUnavailableError();
+    // HTML MenuItem metadata is already grounded in the fetched source. Persist
+    // it directly as review-required drafts; do not submit HTML to the PDF OCR
+    // service or allow it to be published without owner confirmation.
+    const structured = await retrieveStructuredHtmlMenu(input.data.url);
+    if (structured) {
+      const job = await services.database(c.env, (client) =>
+        persistStructuredHtmlMenu(
+          client, actor, venue, input.data.url, input.data.idempotencyKey, structured,
+        ),
+      );
+      return c.json({ group: { id: job.id, jobs: [job], ready: true } }, 202);
+    }
     const upload = await materializeMenuUrl(input.data.url, input.data.idempotencyKey);
     const group = await services.database(c.env, (client) =>
       createUploadGroup(client, actor, venue, [upload]),
@@ -419,8 +432,12 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     const input = MenuJobActionSchema.safeParse(await json(c));
     if (!scope.success || !input.success) return c.json({ error: 'invalid_request' }, 400);
     const bucket = c.env.INGESTION_REPORTS_BUCKET;
-    if (!bucket?.get) throw new AuthUnavailableError();
-    const read = (key: string) => bucket.get!.call(bucket, key);
+    // Source-bound HTML review sessions are built from persisted originals;
+    // PDF/photo sessions still require immutable private extraction artifacts.
+    const read = async (key: string) => {
+      if (!bucket?.get) throw new AuthUnavailableError();
+      return bucket.get(key);
+    };
     const session = await services.database(c.env, (client) =>
       bootstrapMenuReview(
         client,
