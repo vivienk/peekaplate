@@ -239,7 +239,7 @@ describe('Part A HTTP boundary', () => {
     );
   });
 
-  it('serves admitted bundles, approved photos and logos immutably, and 404s otherwise', async () => {
+  it('serves authorized public bytes without caching, and 404s otherwise', async () => {
     const { createApp } = await import('./index');
     const readPreparedBundle = vi.fn(async (_v: string, _m: string, r: string) =>
       r === rev ? new TextEncoder().encode('{"ok":true}') : null,
@@ -265,7 +265,7 @@ describe('Part A HTTP boundary', () => {
       env,
     );
     expect(bundle.status).toBe(200);
-    expect(bundle.headers.get('Cache-Control')).toContain('immutable');
+    expect(bundle.headers.get('Cache-Control')).toBe('no-store');
     expect(bundle.headers.get('Access-Control-Allow-Origin')).toBe(
       'https://peekaplate-diner-staging.pages.dev',
     );

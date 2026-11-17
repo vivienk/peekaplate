@@ -15,7 +15,11 @@
 // Nothing here publishes: S13 still needs the owner's explicit approval and publication. A failed
 // or partial run is safe to repeat: approvals use deterministic command IDs and a stable dish ID
 // per draft, and already-approved dishes are included again on the next run.
-import { sha256 } from '@peekaplate/contracts';
+import {
+  type PublicMenuContentBundle,
+  sha256,
+  verifyPublicMenuContentBytes,
+} from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { derivedUuid } from './bundle-producer/ids';
 import { logoDimensions } from './bundle-producer/logo-image';
@@ -29,6 +33,7 @@ import {
 import { loadApprovedDishSources } from './bundle-producer/repository';
 import { type MenuBundleRequest, MenuBundleRequestSchema } from './bundle-producer/request';
 import { IngestionError } from './ingestion/repository';
+import { readPublicMenu } from './public-menu';
 import { beginAuthorizedOwner } from './publication-command';
 
 export const PREPARED_BUNDLE_PATH = '/public/prepared-bundles';
@@ -267,7 +272,7 @@ export async function prepareOwnerMenu(
   if (drafts.some((draft) => draft.verification_status !== 'verified'))
     throw new IngestionError('menu_not_verified', 409);
   for (const draft of drafts.filter((row) => row.review_status === 'pending')) {
-    const dishId = await preparedDishId(venueId, draft.id);
+    const dishId = draft.published_dish_id ?? (await preparedDishId(venueId, draft.id));
     const current = await inOwnerRead(client, actorId, venueId, async () => {
       const found = await client.query<{ version: number }>(
         'SELECT version FROM app_private.dish_current WHERE tenant_id = $1 AND dish_id = $2',
@@ -422,7 +427,55 @@ async function inPublicRead<T>(client: Client, venueId: string, work: () => Prom
   }
 }
 
-/** Public: the stored bundle bytes, only for an admitted revision of this venue. */
+async function readPublishedSnapshot(
+  client: Client,
+  storage: PreparedStorage,
+  venueId: string,
+  menuId: string,
+) {
+  // Reuse the publication -> approval -> exact bundle join used by the public menu envelope.
+  const menu = await readPublicMenu(client, venueId, menuId);
+  if (!menu) return null;
+  const origin = new URL(menu.bundle.url).origin;
+  if (
+    menu.bundle.url !==
+    `${origin}${PREPARED_BUNDLE_PATH}/${venueId}/${menuId}/${menu.menuRevisionId}.json`
+  )
+    return null;
+  const object = await storage.get(bundleKey(venueId, menuId, menu.menuRevisionId));
+  if (!object) return null;
+  const bytes = new Uint8Array(await object.arrayBuffer());
+  if (bytes.byteLength > 2_000_000) return null;
+  try {
+    const content = await verifyPublicMenuContentBytes(bytes, menu.bundle.contentHash);
+    if (
+      content.venue_id !== venueId ||
+      content.menu_id !== menuId ||
+      content.menu_revision_id !== menu.menuRevisionId
+    )
+      return null;
+    return { content, bytes, origin };
+  } catch {
+    return null;
+  }
+}
+
+async function* publishedSnapshots(client: Client, storage: PreparedStorage, venueId: string) {
+  const menus = await inPublicRead(client, venueId, () =>
+    client.query<{ menu_id: string }>(
+      `SELECT menu_id FROM app_private.menu_publication_current
+      WHERE tenant_id=$1 AND status='published' ORDER BY menu_id LIMIT 101`,
+      [venueId],
+    ),
+  );
+  if (menus.rows.length > 100) return;
+  for (const menu of menus.rows) {
+    const snapshot = await readPublishedSnapshot(client, storage, venueId, menu.menu_id);
+    if (snapshot) yield snapshot;
+  }
+}
+
+/** Public: only the exact currently published revision; withdrawal removes new exposure. */
 export async function readPreparedBundle(
   client: Client,
   storage: PreparedStorage,
@@ -430,26 +483,77 @@ export async function readPreparedBundle(
   menuId: string,
   revisionId: string,
 ): Promise<Uint8Array | null> {
-  const admitted = await inPublicRead(client, venueId, async () => {
-    const found = await client.query(
-      `SELECT 1 FROM app_private.public_menu_bundle
-        WHERE tenant_id = $1 AND menu_id = $2 AND menu_revision_id = $3
-          AND bundle_url LIKE '%' || $4`,
-      [
-        venueId,
-        menuId,
-        revisionId,
-        `${PREPARED_BUNDLE_PATH}/${venueId}/${menuId}/${revisionId}.json`,
-      ],
-    );
-    return (found.rowCount ?? 0) > 0;
-  });
-  if (!admitted) return null;
-  const object = await storage.get(bundleKey(venueId, menuId, revisionId));
-  return object ? new Uint8Array(await object.arrayBuffer()) : null;
+  const snapshot = await readPublishedSnapshot(client, storage, venueId, menuId);
+  return snapshot?.content.menu_revision_id === revisionId ? snapshot.bytes : null;
 }
 
-/** Public: an owner-approved dish photo at its immutable, hash-named address. */
+type AssetRow = { storage_key: string; content_type: string; hash: string };
+
+async function snapshotAsset(
+  client: Client,
+  content: PublicMenuContentBundle,
+  origin: string,
+  assetId: string,
+  file: string,
+): Promise<AssetRow | null> {
+  const url = `${origin}${PREPARED_ASSET_PATH}/${content.venue_id}/${assetId}/${file}`;
+  const isLogo = assetId === 'logo';
+  const selected = isLogo
+    ? content.restaurant.logo?.url === url
+    : content.categories.some((category) =>
+        category.dishes.some(
+          (dish) =>
+            dish.complete &&
+            dish.images &&
+            (dish.images.card.url === url || dish.images.detail.url === url),
+        ),
+      );
+  if (!selected) return null;
+  if (isLogo) {
+    const match = /^([0-9a-f]{64})\.(png|jpg)$/.exec(file);
+    if (!match) return null;
+    const result = await client.query<Omit<AssetRow, 'hash'>>(
+      `SELECT storage_key,content_type FROM app_private.restaurant_profile_photo
+        WHERE tenant_id=$1 AND source_hash=$2 AND content_type=$3`,
+      [content.venue_id, match[1], match[2] === 'png' ? 'image/png' : 'image/jpeg'],
+    );
+    return result.rows[0] ? { ...result.rows[0], hash: match[1]! } : null;
+  }
+  if (!/^[0-9a-f-]{36}$/i.test(assetId) || !/^[0-9a-f]{64}$/.test(file)) return null;
+  const key = `menu-assets/${content.venue_id}/${assetId}/${file}`;
+  const result = await client.query<Omit<AssetRow, 'hash'>>(
+    `SELECT storage_key,content_type FROM app_private.dish_draft_photo
+      WHERE tenant_id=$1 AND id=$2 AND source_hash=$3 AND storage_key=$4 AND verification_status='verified'`,
+    [content.venue_id, assetId, file, key],
+  );
+  return result.rows[0] ? { ...result.rows[0], hash: file } : null;
+}
+
+async function assetBytes(storage: PreparedStorage, row: AssetRow | null) {
+  if (!row) return null;
+  const bytes = await readHashedObject(storage, row.storage_key, row.hash);
+  return bytes && imageDimensions(bytes, row.content_type)
+    ? { bytes, contentType: row.content_type }
+    : null;
+}
+
+/** Owner preview uses already verified server content and rechecks current owner membership. */
+export async function readPreparedPreviewAsset(
+  client: Client,
+  storage: PreparedStorage,
+  actorId: string,
+  content: PublicMenuContentBundle,
+  origin: string,
+  assetId: string,
+  file: string,
+) {
+  const row = await inOwnerRead(client, actorId, content.venue_id, () =>
+    snapshotAsset(client, content, origin, assetId, file),
+  );
+  return assetBytes(storage, row);
+}
+
+/** Public: selected photo bytes from an exact currently published snapshot. */
 export async function readPreparedAsset(
   client: Client,
   storage: PreparedStorage,
@@ -457,24 +561,17 @@ export async function readPreparedAsset(
   photoId: string,
   hash: string,
 ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
-  const key = `menu-assets/${venueId}/${photoId}/${hash}`;
-  const contentType = await inPublicRead(client, venueId, async () => {
-    const found = await client.query<{ content_type: string }>(
-      `SELECT content_type FROM app_private.dish_draft_photo
-        WHERE tenant_id = $1 AND id = $2 AND source_hash = $3
-          AND verification_status = 'verified' AND storage_key = $4`,
-      [venueId, photoId, hash, key],
+  for await (const snapshot of publishedSnapshots(client, storage, venueId)) {
+    const row = await inPublicRead(client, venueId, () =>
+      snapshotAsset(client, snapshot.content, snapshot.origin, photoId, hash),
     );
-    return found.rows[0]?.content_type ?? null;
-  });
-  if (!contentType) return null;
-  const bytes = await readHashedObject(storage, key, hash);
-  return bytes ? { bytes, contentType } : null;
+    if (row) return assetBytes(storage, row);
+  }
+  return null;
 }
 
 /**
- * Public: a Screen 5 logo, only once the venue has an admitted prepared menu (whose bundle
- * carries the logo URL), and only bytes that still match the hash and type in that URL.
+ * Public: only the exact logo referenced by a currently published, hash-verified snapshot.
  */
 export async function readPreparedLogo(
   client: Client,
@@ -483,24 +580,11 @@ export async function readPreparedLogo(
   hash: string,
   extension: string,
 ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
-  const row = await inPublicRead(client, venueId, async () => {
-    const admitted = await client.query(
-      `SELECT 1 FROM app_private.public_menu_bundle
-        WHERE tenant_id = $1 AND bundle_url LIKE '%' || $2 LIMIT 1`,
-      [venueId, `${PREPARED_BUNDLE_PATH}/${venueId}/%`],
+  for await (const snapshot of publishedSnapshots(client, storage, venueId)) {
+    const row = await inPublicRead(client, venueId, () =>
+      snapshotAsset(client, snapshot.content, snapshot.origin, 'logo', `${hash}.${extension}`),
     );
-    if ((admitted.rowCount ?? 0) === 0) return null;
-    const found = await client.query<{ storage_key: string; content_type: string }>(
-      `SELECT storage_key, content_type FROM app_private.restaurant_profile_photo
-        WHERE tenant_id = $1 AND source_hash = $2`,
-      [venueId, hash],
-    );
-    return found.rows[0] ?? null;
-  });
-  if (!row) return null;
-  if (extension !== (row.content_type === 'image/png' ? 'png' : 'jpg')) return null;
-  const bytes = await readHashedObject(storage, row.storage_key, hash);
-  return bytes && imageDimensions(bytes, row.content_type)
-    ? { bytes, contentType: row.content_type }
-    : null;
+    if (row) return assetBytes(storage, row);
+  }
+  return null;
 }

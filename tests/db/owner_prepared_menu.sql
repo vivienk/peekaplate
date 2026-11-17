@@ -1,6 +1,19 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(16);
+SELECT plan(19);
+
+SELECT ok(EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='app_private.dish_drafts'::regclass
+  AND contype='f' AND confrelid='app_private.dish_current'::regclass
+  AND pg_get_constraintdef(oid) LIKE '%FOREIGN KEY (tenant_id, published_dish_id)%'),
+  'historical canonical association retains its tenant-scoped foreign key');
+SELECT ok(EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='app_private.dish_drafts'::regclass
+  AND conname='dish_drafts_check1' AND pg_get_constraintdef(oid) LIKE '%reviewed_at IS NULL%'
+  AND pg_get_constraintdef(oid) LIKE '%reviewed_by IS NULL%'),
+  'pending drafts still require empty reviewer metadata');
+SELECT ok(EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='app_private.dish_drafts'::regclass
+  AND conname='dish_drafts_check' AND pg_get_constraintdef(oid) LIKE '%superseded%'
+  AND pg_get_constraintdef(oid) LIKE '%published_dish_id IS NULL%'),
+  'superseded drafts cannot retain canonical associations');
 
 INSERT INTO app_private.venues (id, name) VALUES
   ('00000000-0000-0000-0000-00000000c001', 'Prepared Tenant A'),

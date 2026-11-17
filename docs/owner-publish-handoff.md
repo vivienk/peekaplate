@@ -102,14 +102,29 @@ Admission is not approval or publication: S13 previews the prepared menu and the
 confirms and publishes. A failed preparation keeps earlier prepared menus listed and says to
 prepare again.
 
-Public delivery: `GET /public/prepared-bundles/:venue/:menu/:revision.json` serves only an
-admitted revision of that venue; `GET /public/prepared-assets/:venue/:photo/:sha256` only an
-owner-approved photo whose bytes match the hash; `GET /public/prepared-assets/:venue/logo/:sha256.(png|jpg)`
-only a Screen 5 logo of a venue with an admitted prepared menu, with matching bytes and type.
-All are immutable (`max-age=31536000`) and use the existing diner CORS for `/public/*`. The
-admission function and these public reads still need Sai's boundary/security review before
-release. Ingredient artwork is unchanged: #165's catalogue and #215's live approved-artwork
+Public delivery requires the exact currently published snapshot through the existing
+publication/approval/bundle join. `/public/prepared-bundles/...` and its selected photo/logo
+URLs return 404 before publication and after withdrawal, and `Cache-Control: no-store`.
+Photo/logo membership is checked against the hash-verified snapshot; another private upload,
+a newer profile selection or a tampered stored bundle cannot authorize bytes.
+The owner previews unexposed images through authenticated
+`/venues/:venue/prepared-menus/:menu/:revision/assets/:asset/:file` reads. The controller
+uses short-lived blob URLs in a presentation copy and revokes them on leaving or changing
+the preview; the original content/hash and publication commands remain unchanged.
+Ingredient artwork is unchanged: #165's catalogue and #215's live approved-artwork
 lookup with its local fallback.
+
+Reopening an approved draft keeps its canonical dish association, including older random
+IDs; only fresh Part A drafts derive a new stable ID. Content edits invalidate verification.
+Remove/Undo preserves unchanged content verification and its stable retry receipt. The
+unreleased Part A forward migration permits that pending historical association while
+retaining the tenant foreign key, superseded exclusion and pending reviewer-metadata checks.
+
+A fresh owner venue with no profile, drafts or prepared bundles remains empty and reports
+`nothing_to_prepare`; it does not receive invented content or a successful publication.
+Dashboard publishing still waits for trusted profile verification; the existing Menu path
+does not impose that same profile gate. This reconciliation preserves that product behavior
+and does not let an owner self-verify restaurant details.
 
 Not yet: owner-written alt text and dietary codes, photo resizing to `card-480`/`detail-1280`
 (the approved original is used for both), portions for owner photos, and hosted acceptance.

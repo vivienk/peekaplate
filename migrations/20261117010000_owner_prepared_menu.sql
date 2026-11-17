@@ -1,4 +1,12 @@
 -- migrate:up
+-- A reopened pending draft retains its historical canonical dish association. Approval is still
+-- determined by review_status; superseded drafts cannot keep a link. Keep the tenant FK and the
+-- existing pending reviewed_by/reviewed_at checks unchanged.
+ALTER TABLE app_private.dish_drafts
+  DROP CONSTRAINT dish_drafts_check,
+  DROP CONSTRAINT dish_drafts_check3,
+  ADD CONSTRAINT dish_drafts_check CHECK (review_status <> 'superseded' OR published_dish_id IS NULL),
+  ADD CONSTRAINT dish_drafts_check3 CHECK (published_dish_id IS NULL OR review_status IN ('pending','accepted','edited'));
 -- Owner-prepared menus (automatic menu preparation, Part A). After an owner verifies their
 -- dishes, the Worker builds the public menu bundle and admits it for S13 through this one
 -- narrow function. The runtime role still cannot insert menu_review_subject or
@@ -92,3 +100,8 @@ REVOKE ALL ON app_private.menu_review_subject FROM peekaplate_menu_preparer;
 REVOKE ALL ON app_private.staff_membership FROM peekaplate_menu_preparer;
 REVOKE USAGE ON SCHEMA app_private FROM peekaplate_menu_preparer;
 DROP ROLE peekaplate_menu_preparer;
+ALTER TABLE app_private.dish_drafts
+  DROP CONSTRAINT dish_drafts_check,
+  DROP CONSTRAINT dish_drafts_check3,
+  ADD CONSTRAINT dish_drafts_check CHECK (review_status NOT IN ('pending','superseded') OR published_dish_id IS NULL),
+  ADD CONSTRAINT dish_drafts_check3 CHECK (published_dish_id IS NULL OR review_status IN ('accepted','edited'));

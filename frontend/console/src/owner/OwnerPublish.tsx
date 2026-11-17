@@ -44,6 +44,12 @@ export function OwnerPublish({
   );
   const [menus, setMenus] = useState<PreparedMenu[]>([]);
   const [preview, setPreview] = useState<PreparedMenuPreview | null>(null);
+  const [presentation, setPresentation] = useState<PreparedMenuPreview | null>(null);
+  const previewPhotos = useRef<string[]>([]);
+  const clearPreviewPhotos = () => {
+    for (const url of previewPhotos.current) URL.revokeObjectURL(url);
+    previewPhotos.current = [];
+  };
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [published, setPublished] = useState(false);
@@ -54,10 +60,14 @@ export function OwnerPublish({
     if (reason instanceof OwnerMenuApiError && (reason.status === 401 || reason.status === 403)) {
       setMenus([]);
       setPreview(null);
+      setPresentation(null);
+      clearPreviewPhotos();
       setLink('');
       onAccessFailure(reason.status === 401 ? 'signed_out' : 'denied');
     } else if (reason instanceof OwnerMenuApiError && reason.status === 409) {
       setPreview(null);
+      setPresentation(null);
+      clearPreviewPhotos();
       attempt.current = null;
       setError('The menu changed. Prepare again and review it again before publishing.');
     } else setError('We could not complete that request. Retry, or return to your saved dishes.');
@@ -115,6 +125,7 @@ export function OwnerPublish({
       });
     return () => {
       controller.abort();
+      clearPreviewPhotos();
       if (active.current === current) active.current = null;
     };
   }, [apiBase, actorId, venueId, getAccessToken]);
@@ -139,11 +150,37 @@ export function OwnerPublish({
   const open = (menu: PreparedMenu) =>
     run(async (client, valid) => {
       setPreview(null);
+      setPresentation(null);
+      clearPreviewPhotos();
       setLink('');
       setPublished(false);
       attempt.current = null;
       const value = await client.previewPreparedMenu(venueId, menu.menuId, menu.menuRevisionId);
       if (!valid()) return;
+      // The verified content/hash remains untouched. Only this presentation copy gets object URLs.
+      const shown = structuredClone(value);
+      try {
+        for (const category of shown.content.categories)
+          for (const dish of category.dishes) {
+            if (!dish.complete || !dish.images) continue;
+            const image = dish.images.card;
+            if (!image.url.startsWith(`${apiBase}/public/prepared-assets/`)) continue;
+            const blob = await client.readPreparedPreviewAsset(
+              venueId,
+              menu.menuId,
+              menu.menuRevisionId,
+              image.url,
+            );
+            if (!valid()) return;
+            image.url = URL.createObjectURL(blob);
+            previewPhotos.current.push(image.url);
+          }
+      } catch (error) {
+        clearPreviewPhotos();
+        throw error;
+      }
+      if (!valid()) return;
+      setPresentation(shown);
       setPreview(value);
       const isPublished = value.menu.publishedRevisionId === value.menu.menuRevisionId;
       setPublished(isPublished);
@@ -241,7 +278,7 @@ export function OwnerPublish({
       dishCount={complete}
       categoryCount={categories.length}
       dinerUrl={link || null}
-      phoneContent={<DraftMenu preview={preview} />}
+      phoneContent={presentation && <DraftMenu preview={presentation} />}
       dishesMissingDetails={complete === 0 ? Math.max(1, dishes.length) : 0}
       notReadyBody="None of this menu’s dishes is ready to display yet. Return to your dishes, then prepare the menu again."
       publishing={busy}

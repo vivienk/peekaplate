@@ -35,6 +35,7 @@ import {
   OwnerWorkspaceResponseSchema,
   PreparedMenuPreviewSchema,
   PreparedMenusSchema,
+  type PublicMenuContentBundle,
   type PublicMenuResponse,
   PublishMenuSchema,
   RestaurantSlugSchema,
@@ -124,6 +125,7 @@ import {
   readPreparedAsset,
   readPreparedBundle,
   readPreparedLogo,
+  readPreparedPreviewAsset,
 } from './owner-prepare';
 import { fetchPreparedMenu, listPreparedMenus, type OwnHost } from './owner-publication';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
@@ -356,6 +358,14 @@ type Dependencies = {
     extension: string,
     env: Bindings,
   ) => ReturnType<typeof readPreparedLogo>;
+  readPreparedPreviewAsset?: (
+    actorId: string,
+    content: PublicMenuContentBundle,
+    origin: string,
+    assetId: string,
+    file: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedPreviewAsset>;
   issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
   readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
   submitIngestion?: (
@@ -776,6 +786,18 @@ const dependencies: Dependencies = {
   readPreparedLogo: (venueId, hash, extension, env) =>
     withDatabase(env, (client) =>
       readPreparedLogo(client, preparedStorage(env), venueId, hash, extension),
+    ),
+  readPreparedPreviewAsset: (actorId, content, origin, assetId, file, env) =>
+    withDatabase(env, (client) =>
+      readPreparedPreviewAsset(
+        client,
+        preparedStorage(env),
+        actorId,
+        content,
+        origin,
+        assetId,
+        file,
+      ),
     ),
   async issuePublicMenu(menu, env) {
     if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
@@ -1241,8 +1263,7 @@ export function createApp(services: Dependencies = dependencies) {
     const scope = await services.resolveRestaurantLink(slug.data, c.env ?? {});
     return scope ? c.json(MenuScopeSchema.parse(scope)) : c.json({ error: 'not_found' }, 404);
   });
-  // Part A public reads: immutable, content-addressed, and only for admitted bundles and
-  // owner-approved photos of that venue.
+  // New public exposure requires the exact currently published snapshot, including its assets.
   app.get(`${PREPARED_BUNDLE_PATH}/:venueId/:menuId/:file`, async (c) => {
     const file = /^([0-9a-f-]{36})\.json$/i.exec(c.req.param('file'));
     const scope = MenuScopeSchema.safeParse({
@@ -1259,14 +1280,13 @@ export function createApp(services: Dependencies = dependencies) {
       c.env ?? {},
     );
     if (!bytes) return c.json({ error: 'not_found' }, 404);
-    // Content-addressed and never rewritten, unlike every other (no-store) response.
-    c.header('Cache-Control', 'public, max-age=31536000, immutable');
+    c.header('Cache-Control', 'no-store');
     return c.body(Uint8Array.from(bytes).buffer, 200, {
       'Content-Type': 'application/json',
       'X-Content-Type-Options': 'nosniff',
     });
   });
-  // Screen 5 logo of a venue with an admitted prepared menu (registered before the photo route).
+  // Exact published Screen 5 logo (registered before the photo route).
   app.get(`${PREPARED_ASSET_PATH}/:venueId/logo/:file`, async (c) => {
     const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
     const file = /^([0-9a-f]{64})\.(png|jpg)$/.exec(c.req.param('file'));
@@ -1279,7 +1299,7 @@ export function createApp(services: Dependencies = dependencies) {
       c.env ?? {},
     );
     if (!logo) return c.json({ error: 'not_found' }, 404);
-    c.header('Cache-Control', 'public, max-age=31536000, immutable');
+    c.header('Cache-Control', 'no-store');
     return c.body(Uint8Array.from(logo.bytes).buffer, 200, {
       'Content-Type': logo.contentType,
       'X-Content-Type-Options': 'nosniff',
@@ -1300,7 +1320,7 @@ export function createApp(services: Dependencies = dependencies) {
       c.env ?? {},
     );
     if (!asset) return c.json({ error: 'not_found' }, 404);
-    c.header('Cache-Control', 'public, max-age=31536000, immutable');
+    c.header('Cache-Control', 'no-store');
     return c.body(Uint8Array.from(asset.bytes).buffer, 200, {
       'Content-Type': asset.contentType,
       'X-Content-Type-Options': 'nosniff',
@@ -1621,6 +1641,7 @@ export function createApp(services: Dependencies = dependencies) {
   for (const path of [
     '/venues/:venueId/prepared-menus',
     '/venues/:venueId/prepared-menus/:menuId/:revisionId',
+    '/venues/:venueId/prepared-menus/:menuId/:revisionId/assets/:assetId/:file',
   ]) {
     app.get(path, async (c) => {
       if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
@@ -1643,6 +1664,24 @@ export function createApp(services: Dependencies = dependencies) {
       if (!menu) return c.json({ error: 'not_found' }, 404);
       // The database connection/authorization transaction has ended before the bounded public fetch.
       const content = await services.fetchPreparedMenu(menu, fetch, ownHost(c, c.env ?? {}));
+      const assetId = c.req.param('assetId');
+      if (assetId) {
+        if (!services.readPreparedPreviewAsset) throw new AuthUnavailableError();
+        const asset = await services.readPreparedPreviewAsset(
+          actorId,
+          content,
+          new URL(c.req.url).origin,
+          assetId,
+          c.req.param('file') ?? '',
+          c.env ?? {},
+        );
+        if (!asset) return c.json({ error: 'not_found' }, 404);
+        c.header('Cache-Control', 'no-store');
+        return c.body(Uint8Array.from(asset.bytes).buffer, 200, {
+          'Content-Type': asset.contentType,
+          'X-Content-Type-Options': 'nosniff',
+        });
+      }
       return c.json(PreparedMenuPreviewSchema.parse({ menu, content }));
     });
   }

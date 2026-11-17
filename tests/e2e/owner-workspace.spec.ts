@@ -609,7 +609,7 @@ async function openAccount(page: Page) {
     await menu.locator('summary').click();
 }
 
-async function preparedPublication(context: BrowserContext) {
+async function preparedPublication(context: BrowserContext, privatePhotos = false) {
   const id = (n: number) => `55555555-5555-4555-8555-${String(n).padStart(12, '0')}`;
   const menu = {
     venueId: venue.venueId,
@@ -625,7 +625,9 @@ async function preparedPublication(context: BrowserContext) {
     publishedRevisionId: null,
   };
   const photo = {
-    url: 'https://68d424e7.peekaplate-diner-staging.pages.dev/fixtures/synthetic.webp',
+    url: privatePhotos
+      ? `${api}/public/prepared-assets/${venue.venueId}/${id(6)}/${'c'.repeat(64)}`
+      : 'https://68d424e7.peekaplate-diner-staging.pages.dev/fixtures/synthetic.webp',
     width: 480,
     height: 480,
     alt: 'Labelled synthetic test image',
@@ -666,11 +668,35 @@ async function preparedPublication(context: BrowserContext) {
     denied: false,
     linkFailure: false,
     prepares: 0,
+    previewPhotoReads: 0,
+    previewPhotoAuth: [] as string[],
+    publicPhotoReads: 0,
     prepareFailure: false as false | 'unavailable' | 'menu_not_verified',
   };
   const headers = { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*' };
   await context.route('**/venues/*/prepared-menus**', async (route) => {
     if (state.denied) return route.fulfill({ status: 403, json: { error: 'forbidden' }, headers });
+    if (privatePhotos && new URL(route.request().url()).pathname.includes('/assets/')) {
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({
+          status: 204,
+          headers: {
+            ...headers,
+            'Access-Control-Allow-Methods': 'GET',
+            'Access-Control-Allow-Headers': 'Authorization',
+          },
+        });
+      state.previewPhotoReads += 1;
+      state.previewPhotoAuth.push(route.request().headers().authorization ?? '');
+      return route.fulfill({
+        headers,
+        contentType: 'image/png',
+        body: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhNsAAAAASUVORK5CYII=',
+          'base64',
+        ),
+      });
+    }
     // Part A: opening S13 (and Prepare again) prepares first; preparing never publishes.
     if (new URL(route.request().url()).pathname.endsWith('/prepared-menus/prepare')) {
       if (route.request().method() === 'OPTIONS')
@@ -761,15 +787,19 @@ async function preparedPublication(context: BrowserContext) {
       headers,
     });
   });
-  await context.route(photo.url, (route) =>
-    route.fulfill({
+  await context.route(photo.url, (route) => {
+    if (privatePhotos) {
+      state.publicPhotoReads += 1;
+      return route.fulfill({ status: 404, json: { error: 'not_found' }, headers });
+    }
+    return route.fulfill({
       contentType: 'image/png',
       body: Buffer.from(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhNsAAAAASUVORK5CYII=',
         'base64',
       ),
-    }),
-  );
+    });
+  });
   // After publishing, the S13 phone frames the returned diner page; answer it locally.
   await context.route('https://routing-staging.peekaplate-diner-staging.pages.dev/**', (route) =>
     route.fulfill({
@@ -779,6 +809,43 @@ async function preparedPublication(context: BrowserContext) {
   );
   return state;
 }
+
+test('private prepared photos use owner-authenticated blobs and are revoked on leaving preview', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  const state = await preparedPublication(context, true);
+  await page.addInitScript(() => {
+    const old = URL.revokeObjectURL;
+    (window as unknown as { revokedPhotos: string[] }).revokedPhotos = [];
+    URL.revokeObjectURL = (url) => {
+      (window as unknown as { revokedPhotos: string[] }).revokedPhotos.push(url);
+      old.call(URL, url);
+    };
+  });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  const image = page.getByRole('img', { name: 'Labelled synthetic test image' });
+  await expect(image).toBeVisible();
+  const blob = await image.getAttribute('src');
+  expect(blob).toMatch(/^blob:/);
+  expect(state.previewPhotoReads).toBe(1);
+  expect(state.previewPhotoAuth.every((value) => value.startsWith('Bearer '))).toBe(true);
+  expect(state.publicPhotoReads).toBe(0);
+  expect(state.approvals).toHaveLength(0);
+  expect(state.publishes).toHaveLength(0);
+  await page.getByRole('button', { name: 'Back to Edit', exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (url) => (window as unknown as { revokedPhotos: string[] }).revokedPhotos.includes(url!),
+        blob,
+      ),
+    )
+    .toBe(true);
+});
 
 for (const width of [1440, 390]) {
   test(`prepared owner menu publishes only after confirmation and exposes the returned URL at ${width}px`, async ({

@@ -423,12 +423,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f3fadc36a4c45f63c53392fb3a93417b7cfaf13a410995208d805dc3427afaf8"
+      "sourceFingerprint": "f3d011b16df72b4b6ae1e421e7d112c8741079cf65670576ad7a1310e2efd82d"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker rechecks current staff/tenant authority for transactional commands and replay. Canonical profiles/private photos use versioned details/setup reads; owners cannot verify themselves. Draft removal is reversible; corrections retain photo/allergen/serving metadata, advance content versions and invalidate verification. Legacy omissions preserve size/count; explicit null clears. The existing bundle producer exports branding and revision/count-bound portions; trusted preparation/admission remains separate. OCR retains transactional #210 placeholders. Facts and PostHog stay separate; reports retain privacy cohorts and unknown freshness. Optional report references bind analysis to displayed evidence while ordinary reads remain available. Authored S05–S13 callers reuse these APIs; hosted release/provider activation and the console reference-header handoff remain pending.",
+      "summary": "Canonical owner/profile/draft commands retain tenant authority, versions and replay. Part A prepares owner-verified drafts through existing approval/producer/admission. Reopened drafts preserve historical canonical dish IDs; removal/Undo retains unchanged content verification and stable retries. Exact current publication controls public prepared bundles and selected photos/logos; withdrawal prevents new exposure and responses are no-store. Owner previews use authenticated snapshot-bound image blobs without changing content hashes. Empty venues remain empty. Existing profile verification, extraction/provider and hosted release gates remain separate; the Menu path profile-verification inconsistency is documented. Other report, privacy, artwork and observation boundaries remain unchanged.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -633,7 +633,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "5d61aba1c2e6905943d26b0e07711a6737c4a1018e94f11f05b93ebfe2cdfb5b"
+      "sourceFingerprint": "d5b12b8d49e4e81b2eaf63b0a29cc32c8dd2aa5150c386e6697492b2f9bff1d3"
     },
     {
       "id": "database",
@@ -689,7 +689,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "ab8d28035ff7802c8ab9ac6f46f14ab0b4d3e742d8f3e733f823420ae3863a1e"
+      "sourceFingerprint": "d351622504725777d7f3b95b362a721059d18a65f6fa260b61074df95b2c9062"
     },
     {
       "id": "measurement",
@@ -1016,19 +1016,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-15",
       "modules": [
-        "backend"
-      ],
-      "summary": "Hosted prepared preview exposed Worker rejection of redirect error. Manual redirect handling rejects every 3xx without following; the network-free workerd regression reproduces the failure and verifies valid bytes plus hostile Location rejection.",
-      "files": [
-        "backend/src/owner-publication.ts",
-        "backend/src/owner-publication.test.ts",
-        "backend/src/owner-publication.workerd-harness.ts"
-      ],
-      "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
         "processing"
       ],
       "summary": "PR181 adds the offline strict field scorer and proposed six-source/nine-page metadata plan. Existing inspected cases remain development; two new PDFs are only candidate holdouts. Hash-bound actual outputs retain null/zero, duplicate/unresolved and per-segment mixed-page failure evidence. Two pinned Spec findings were reproduced and fixed; 39 guarded local QA-02 controls passed before integrating merged169. No fresh real-menu prediction, frozen human reference or acceptance is inferred.",
@@ -1164,6 +1151,27 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/review/fromDishDraft.test.ts"
       ],
       "next": "Coordinator reviews and publishes the resolved merge commit. Hosted migration/release, fresh provider extraction, physical-device scale and live AI header handoff remain separate gates; no staging activation was performed."
+    },
+    {
+      "date": "2026-11-16",
+      "modules": [
+        "backend",
+        "database",
+        "console"
+      ],
+      "summary": "PR216 corrections reuse existing producer/profile/publication: stable Remove/Undo verification retries, retained legacy canonical dish IDs, snapshot-selected logos, public bytes only while published, and authenticated preview image blobs. Screen markup/CSS/tokens remain. Empty venues get no invented content. The unshipped Part A migration adjusts two pending-link checks, retaining tenant FK/reviewer/superseded constraints. Local PASS: check 2011 units/117 scripts; DB 415 SQL assertions/170 integrations/Worker smoke; workspace 63 browser cases; console build. No hosted acceptance.",
+      "files": [
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-prepare.ts",
+        "backend/src/index.ts",
+        "backend/src/owner-prepare.integration.ts",
+        "migrations/20261117010000_owner_prepared_menu.sql",
+        "tests/db/owner_prepared_menu.sql",
+        "frontend/console/src/owner/OwnerPublish.tsx",
+        "frontend/console/src/owner-menu/api.ts",
+        "docs/owner-publish-handoff.md"
+      ],
+      "next": "Independent review and coordinator reconciliation with remote PR216 c44a860 (advanced from the tested base 10d420) before publishing. Hosted migration, Queue/provider/account operations and fresh empty shared-workspace acceptance remain coordinator-owned; Dashboard versus Menu profile-verification gates remain inconsistent."
     }
   ]
 }

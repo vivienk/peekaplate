@@ -419,6 +419,43 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
         (body) => PreparedMenuPreviewSchema.parse(body),
       );
     },
+    async readPreparedPreviewAsset(
+      venueId: string,
+      menuId: string,
+      revisionId: string,
+      assetUrl: string,
+    ) {
+      const url = new URL(assetUrl);
+      const prefix = `/public/prepared-assets/${venueId}/`;
+      const asset = url.pathname.slice(prefix.length).split('/');
+      if (
+        url.origin !== base ||
+        !url.pathname.startsWith(prefix) ||
+        url.search ||
+        url.hash ||
+        url.username ||
+        url.password ||
+        asset.length !== 2
+      )
+        throw new OwnerMenuApiError(0, 'invalid_request');
+      return request(
+        venuePath(
+          venueId,
+          `/prepared-menus/${encodeURIComponent(menuId)}/${encodeURIComponent(revisionId)}/assets/${encodeURIComponent(asset[0]!)}/${encodeURIComponent(asset[1]!)}`,
+        ),
+        { method: 'GET', blob: true },
+        (body) => {
+          if (
+            !(body instanceof Blob) ||
+            !['image/png', 'image/jpeg'].includes(body.type) ||
+            !body.size ||
+            body.size > MAX_FILE_BYTES
+          )
+            throw new Error('prepared photo');
+          return body;
+        },
+      );
+    },
     async approveMenu(venueId: string, menuId: string, input: ApproveMenuRevision) {
       return request(
         venuePath(venueId, `/menus/${encodeURIComponent(menuId)}/approvals`),

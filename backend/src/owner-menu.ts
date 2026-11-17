@@ -25,19 +25,20 @@ export async function reopenApprovedDraft(
     published_dish_id?: string | null;
     verification_status?: string;
   },
+  preserveVerification = false,
 ): Promise<void> {
   if (draft.review_status !== 'accepted' || draft.removed_at) return;
   const reopened = await client.query(
     `UPDATE app_private.dish_drafts
-        SET review_status='pending', published_dish_id=NULL, reviewed_by=NULL, reviewed_at=NULL,
-            verification_status='not_verified', updated_at=now()
+        SET review_status='pending', reviewed_by=NULL, reviewed_at=NULL,
+            verification_status=CASE WHEN $3 THEN verification_status ELSE 'not_verified' END,
+            updated_at=now()
       WHERE tenant_id=$1 AND id=$2 AND review_status='accepted' AND removed_at IS NULL`,
-    [venueId, draft.id],
+    [venueId, draft.id, preserveVerification],
   );
   if (reopened.rowCount !== 1) throw new CommandError('version_conflict', 409);
   draft.review_status = 'pending';
-  draft.published_dish_id = null;
-  draft.verification_status = 'not_verified';
+  if (!preserveVerification) draft.verification_status = 'not_verified';
 }
 
 export async function withOwnerMenuTransaction<T>(
@@ -209,7 +210,8 @@ export async function setDraftRemoval(
       (draft.removal_version ?? 0) !== input.expectedRemovalVersion
     )
       throw new CommandError('version_conflict', 409);
-    await reopenApprovedDraft(client, venue, draft);
+    // Removal/Undo changes visibility, not the content bound to a verification receipt.
+    await reopenApprovedDraft(client, venue, draft, true);
     if (draft.review_status !== 'pending') throw new IngestionError('draft_not_editable', 409);
     const version = input.expectedRemovalVersion + 1;
     const saved = (

@@ -3,7 +3,7 @@ import { deflateSync } from 'node:zlib';
 import { OwnerDishFieldsSchema, type PublicMenuContentBundle } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { approveDishDraftAtomic } from './index';
+import { approveDishDraftAtomic, createApp } from './index';
 import {
   promoteDraftPhoto,
   saveOwnerDishDraft,
@@ -18,8 +18,11 @@ import {
   readPreparedAsset,
   readPreparedBundle,
   readPreparedLogo,
+  readPreparedPreviewAsset,
 } from './owner-prepare';
 import { fetchPreparedMenu, listPreparedMenus } from './owner-publication';
+import { approveMenuRevision, publishMenu, withdrawMenu } from './publication-command';
+import { readRestaurantProfile, readRestaurantSetup } from './restaurant-profile';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
 const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
@@ -326,14 +329,92 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
     if (!chosenDish?.complete || !chosenDish.images) throw new Error('expected a chosen photo');
     expect(chosenDish.images.card.url).toContain(`/${chosen.photoId}/`);
 
-    // Public reads: only this venue's admitted bundle, approved photos and current logo.
+    const foreignOwner = crypto.randomUUID();
+    await admin.query(
+      "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES($1,$2,'owner')",
+      [other, foreignOwner],
+    );
+    const app = createApp({
+      verify: async (authorization) => (authorization === 'Bearer foreign' ? foreignOwner : owner),
+      execute: async () => {
+        throw new Error('not used');
+      },
+      listPreparedMenus: (actor, v) => listPreparedMenus(runtime, actor, v),
+      fetchPreparedMenu: (menu) =>
+        fetchPreparedMenu(menu, fetch, {
+          origin,
+          read: async (key) => (objects.has(key) ? new Uint8Array(objects.get(key)!) : null),
+        }),
+      readPreparedBundle: (v, m, r) => readPreparedBundle(runtime, storage, v, m, r),
+      readPreparedAsset: (v, p, hash) => readPreparedAsset(runtime, storage, v, p, hash),
+      readPreparedLogo: (v, hash, extension) =>
+        readPreparedLogo(runtime, storage, v, hash, extension),
+      readPreparedPreviewAsset: (actor, content, host, asset, file) =>
+        readPreparedPreviewAsset(runtime, storage, actor, content, host, asset, file),
+    });
+    // Preparation is private until the exact snapshot is explicitly published.
+    const [, , , , photoId, hash] = new URL(soupDish.images.card.url).pathname.split('/');
+    const publicPaths = [
+      `/public/prepared-bundles/${venue}/${first.menuId}/${first.menuRevisionId}.json`,
+      `/public/prepared-assets/${venue}/${photoId}/${hash}`,
+      `/public/prepared-assets/${venue}/logo/${sha(logo)}.png`,
+    ];
+    for (const path of publicPaths) expect((await app.request(path)).status).toBe(404);
+    const privateBase = `${origin}/venues/${venue}/prepared-menus/${first.menuId}/${first.menuRevisionId}`;
+    for (const suffix of [`${photoId}/${hash}`, `logo/${sha(logo)}.png`]) {
+      const response = await app.request(
+        `${privateBase}/assets/${suffix}`,
+        { headers: { Authorization: 'Bearer owner' } },
+        { APP_ENV: 'local' },
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(
+        (
+          await app.request(
+            `${privateBase}/assets/${suffix}`,
+            { headers: { Authorization: 'Bearer foreign' } },
+            { APP_ENV: 'local' },
+          )
+        ).status,
+      ).toBe(403);
+    }
+    expect(
+      await readPreparedBundle(runtime, storage, venue, first.menuId, first.menuRevisionId),
+    ).toBeNull();
+    expect(await readPreparedAsset(runtime, storage, venue, photoId!, hash!)).toBeNull();
+    expect(await readPreparedLogo(runtime, storage, venue, sha(logo), 'png')).toBeNull();
+    for (const table of ['menu_approval', 'menu_publication_current'])
+      expect(
+        (await admin.query(`SELECT 1 FROM app_private.${table} WHERE tenant_id=$1`, [venue]))
+          .rowCount,
+      ).toBe(0);
+    const [menu] = await listPreparedMenus(runtime, owner, venue);
+    const approval = await approveMenuRevision(runtime, owner, venue, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      menuId: menu!.menuId,
+      menuRevisionId: menu!.menuRevisionId,
+      contentApprovalId: menu!.contentApprovalId,
+      assetApprovalId: menu!.assetApprovalId,
+    });
+    await publishMenu(runtime, owner, venue, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      menuId: menu!.menuId,
+      approvalId: approval.approvalId,
+    });
+    for (const path of publicPaths) {
+      const response = await app.request(path);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+    }
     expect(
       await readPreparedBundle(runtime, storage, venue, first.menuId, first.menuRevisionId),
     ).not.toBeNull();
     expect(
       await readPreparedBundle(runtime, storage, other, first.menuId, first.menuRevisionId),
     ).toBeNull();
-    const [, , , , photoId, hash] = new URL(soupDish.images.card.url).pathname.split('/');
     expect((await readPreparedAsset(runtime, storage, venue, photoId!, hash!))?.contentType).toBe(
       'image/png',
     );
@@ -344,12 +425,68 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
     expect(await readPreparedLogo(runtime, storage, venue, sha(logo), 'jpg')).toBeNull();
     expect(await readPreparedLogo(runtime, storage, other, sha(logo), 'png')).toBeNull();
 
-    // S13 still requires explicit approval and publication: preparation recorded neither.
-    for (const table of ['menu_approval', 'menu_publication_current'])
-      expect(
-        (await admin.query(`SELECT 1 FROM app_private.${table} WHERE tenant_id=$1`, [venue]))
-          .rowCount,
-      ).toBe(0);
+    // Uploading another private logo does not select it into the admitted snapshot.
+    const unused = png(6, 3);
+    const unusedId = crypto.randomUUID();
+    const unusedKey = `restaurant-profiles/${venue}/${unusedId}/${sha(unused)}`;
+    objects.set(unusedKey, unused.slice().buffer);
+    await admin.query(
+      `INSERT INTO app_private.restaurant_profile_photo(tenant_id,id,source_hash,storage_key,content_type,size_bytes)
+       VALUES($1,$2,$3,$4,'image/png',$5)`,
+      [venue, unusedId, sha(unused), unusedKey, unused.byteLength],
+    );
+    expect(
+      (await app.request(`/public/prepared-assets/${venue}/logo/${sha(unused)}.png`)).status,
+    ).toBe(404);
+    // A new profile selection cannot change which logo the earlier snapshot admitted.
+    await admin.query(
+      "UPDATE app_private.restaurant_profile SET fields=fields || jsonb_build_object('photoId',$2::text) WHERE tenant_id=$1",
+      [venue, unusedId],
+    );
+    expect(await readPreparedLogo(runtime, storage, venue, sha(unused), 'png')).toBeNull();
+    expect((await readPreparedLogo(runtime, storage, venue, sha(logo), 'png'))?.bytes).toEqual(
+      logo,
+    );
+    const preparedKey = `prepared-menus/${venue}/${first.menuId}/${first.menuRevisionId}.json`;
+    const savedBytes = objects.get(preparedKey)!;
+    const tampered = structuredClone(bundle);
+    tampered.restaurant.logo!.url =
+      `${origin}/public/prepared-assets/${venue}/logo/${sha(unused)}.png`;
+    objects.set(
+      preparedKey,
+      Uint8Array.from(new TextEncoder().encode(JSON.stringify(tampered))).buffer,
+    );
+    expect(await readPreparedLogo(runtime, storage, venue, sha(unused), 'png')).toBeNull();
+    objects.set(preparedKey, savedBytes);
+
+    await withdrawMenu(runtime, owner, venue, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+      menuId: first.menuId,
+    });
+    for (const path of publicPaths) expect((await app.request(path)).status).toBe(404);
+    expect(
+      await readPreparedBundle(runtime, storage, venue, first.menuId, first.menuRevisionId),
+    ).toBeNull();
+    expect(await readPreparedAsset(runtime, storage, venue, photoId!, hash!)).toBeNull();
+    expect(await readPreparedLogo(runtime, storage, venue, sha(logo), 'png')).toBeNull();
+  });
+
+  it('keeps a fresh owner workspace empty without inventing prepared content or success', async () => {
+    const venue = await newVenue('Fresh Synthetic Workspace');
+    expect(await readRestaurantProfile(runtime, owner, venue)).toBeNull();
+    expect(await readRestaurantSetup(runtime, owner, venue)).toMatchObject({
+      detailsStatus: 'missing',
+      menuAdded: false,
+      menuVerified: false,
+      published: false,
+    });
+    await expect(prepare(venue)).rejects.toMatchObject({ code: 'nothing_to_prepare' });
+    expect(await listPreparedMenus(runtime, owner, venue)).toEqual([]);
+    expect(
+      (await admin.query('SELECT id FROM app_private.dish_drafts WHERE tenant_id=$1', [venue]))
+        .rowCount,
+    ).toBe(0);
   });
 
   it('refuses while any active dish is unverified, and an editor cannot prepare', async () => {
@@ -422,7 +559,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
     expect(reopened.rows[0]).toEqual({
       review_status: 'pending',
       verification_status: 'not_verified',
-      published_dish_id: null,
+      published_dish_id: dishId,
     });
     await expect(prepare(venue)).rejects.toMatchObject({ code: 'menu_not_verified' });
 
@@ -447,5 +584,72 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
       [venue, dishId],
     );
     expect(versions.rows[0]?.version).toBe(2);
+  });
+
+  it('keeps stable verification retries valid after prepare, remove and Undo without content changes', async () => {
+    const venue = await newVenue();
+    const draft = await manualDish(venue, full, false);
+    const version = await draftVersion(venue, draft);
+    const command = crypto.randomUUID();
+    const verified = await verifyOwnerDish(runtime, owner, venue, draft, command, true, version);
+    await prepare(venue);
+    const removal = {
+      commandId: crypto.randomUUID(),
+      expectedDraftVersion: version,
+      expectedRemovalVersion: 0,
+      removed: true,
+    };
+    const removed = await setDraftRemoval(runtime, owner, venue, draft, removal);
+    expect(removed.verification_status).toBe('verified');
+    await setDraftRemoval(runtime, owner, venue, draft, {
+      ...removal,
+      commandId: crypto.randomUUID(),
+      expectedRemovalVersion: 1,
+      removed: false,
+    });
+    expect(await verifyOwnerDish(runtime, owner, venue, draft, command, true, version)).toEqual(
+      JSON.parse(JSON.stringify(verified)),
+    );
+    expect(await verifyOwnerDish(runtime, owner, venue, draft, command, true, version)).toEqual(
+      JSON.parse(JSON.stringify(verified)),
+    );
+    const events = await admin.query(
+      "SELECT id FROM app_private.es_event WHERE tenant_id=$1 AND stream_id=$2 AND stream_type='owner_draft_verification'",
+      [venue, draft],
+    );
+    expect(events.rowCount).toBe(2);
+  });
+
+  it('reuses a legacy public-approval dish association after edit, re-verification and preparation', async () => {
+    const venue = await newVenue();
+    const draft = await manualDish(venue, full, false);
+    const legacy = await approveDishDraftAtomic(runtime, owner, venue, draft, {
+      commandId: crypto.randomUUID(),
+      expectedDraftVersion: await draftVersion(venue, draft),
+      confirmed: true,
+    });
+    const canonical = legacy.publishedRevision.dishId;
+    expect(canonical).not.toBe(await preparedDishId(venue, draft));
+    const saved = await saveOwnerDishDraft(runtime, owner, venue, draft, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: await draftVersion(venue, draft),
+      fields: OwnerDishFieldsSchema.parse({ ...full, name: 'Legacy dish edited' }),
+    });
+    expect(saved.published_dish_id).toBe(canonical);
+    await verify(venue, draft);
+    const prepared = await prepare(venue);
+    const bundle = await bundleOf(venue, prepared.menuRevisionId);
+    expect(dishes(bundle)).toHaveLength(1);
+    expect(dishes(bundle)[0]?.dish_id).toBe(canonical);
+    expect(dishes(bundle)[0]?.dish_revision_id).not.toBe(legacy.publishedRevision.revisionId);
+    expect(await prepare(venue)).toMatchObject({
+      status: 'already_present',
+      menuRevisionId: prepared.menuRevisionId,
+    });
+    const current = await admin.query(
+      'SELECT dish_id,version FROM app_private.dish_current WHERE tenant_id=$1',
+      [venue],
+    );
+    expect(current.rows).toEqual([{ dish_id: canonical, version: 2 }]);
   });
 });

@@ -304,7 +304,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(await save(id, { name: 'Changed' }, 1)).toMatchObject({
       review_status: 'pending',
       verification_status: 'not_verified',
-      published_dish_id: null,
+      published_dish_id: result.publishedRevision.dishId,
     });
     const events = await admin.query(
       'SELECT tenant_id AS "tenantId",stream_type AS "streamType",stream_id AS "streamId",version,schema_version AS "schemaVersion",event_type AS "eventType",payload,metadata FROM app_private.es_event WHERE tenant_id=$1 AND stream_id=$2',
