@@ -3368,3 +3368,7 @@ the summary's contributing-session floor. Use schema-validated fixture values
 and test a genuine zero average instead. The new creation case also selected
 the S05 required label including its marker; use the textbox's accessible name,
 as existing S05 tests do. Both corrections retain the original screen and API.
+# 2026-11-17 PR230 browser test collection
+
+CI run 44146794614 failed before workspace tests: the root Playwright suite could not resolve the runtime `@peekaplate/contracts/owner-report` import. Use the repository-relative contract source, matching root test execution. `pnpm exec playwright test --config playwright.workspace.config.ts --list` passes (74 tests); no browser or runtime behavior changed. An initial local listing used a nonexistent config filename; corrected to the existing `playwright.workspace.config.ts`.
+

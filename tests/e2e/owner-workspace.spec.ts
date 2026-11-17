@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
 import type { RestaurantProfile } from '@peekaplate/contracts';
-import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
 import type { DishDraft, MenuJob } from '../../frontend/console/src/owner-menu/api';
 import { JOB, reviewSession } from '../../frontend/console/src/owner-menu/fixtures.test-helpers';
+import { OwnerDishReportSchema } from '../../packages/contracts/src/owner-report';
 
 const origin = 'http://127.0.0.1:5174';
 // Narrow main releases omit preview-only demo entries; runtime journeys still always run.
