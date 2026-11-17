@@ -380,7 +380,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     // it directly as review-required drafts; do not submit HTML to the PDF OCR
     // service or allow it to be published without owner confirmation.
     const structured = await retrieveStructuredHtmlMenu(input.data.url);
-    if (structured) {
+    if (structured.items.length) {
       const job = await services.database(c.env, (client) =>
         persistStructuredHtmlMenu(
           client,
@@ -393,7 +393,11 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
       );
       return c.json({ group: { id: job.id, jobs: [job], ready: true } }, 202);
     }
-    const upload = await materializeMenuUrl(input.data.url, input.data.idempotencyKey);
+    const upload = await materializeMenuUrl(
+      input.data.url,
+      input.data.idempotencyKey,
+      structured.source,
+    );
     const group = await services.database(c.env, (client) =>
       createUploadGroup(client, actor, venue, [upload]),
     );

@@ -237,7 +237,11 @@ export function extractStructuredMenuItems(root: unknown): StructuredMenuItem[] 
       if (name) {
         const description =
           typeof obj.description === 'string' ? obj.description.trim().slice(0, 2000) : '';
-        const offer = Array.isArray(obj.offers) ? obj.offers[0] : obj.offers;
+        const offer = Array.isArray(obj.offers)
+          ? obj.offers.length === 1
+            ? obj.offers[0]
+            : undefined
+          : obj.offers;
         const offerObject =
           offer && typeof offer === 'object' ? (offer as Record<string, unknown>) : undefined;
         const rawPrice = offerObject?.price;

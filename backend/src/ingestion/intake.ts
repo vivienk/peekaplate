@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Client } from 'pg';
 import { getDocumentProxy } from 'unpdf';
 import { withOwnerMenuTransaction } from '../owner-menu';
-import { safeFetch } from '../retrieval/fetcher';
+import { type SafeFetchResult, safeFetch } from '../retrieval/fetcher';
 import { parseHtmlSource } from '../retrieval/parser';
 import { canonicalStringify } from '../review-command';
 import {
@@ -72,8 +72,12 @@ export function selectUnambiguousMenuFile(links: readonly string[]): string | nu
   return explicitlyNamed.length === 1 ? (explicitlyNamed[0] ?? null) : null;
 }
 
-export async function materializeMenuUrl(url: string, key: string): Promise<MenuUpload> {
-  let source = await safeFetch(url);
+export async function materializeMenuUrl(
+  url: string,
+  key: string,
+  fetchedSource?: SafeFetchResult,
+): Promise<MenuUpload> {
+  let source = fetchedSource ?? (await safeFetch(url));
   if (source.contentType.split(';')[0]?.trim().toLowerCase() === 'text/html') {
     const candidates = parseHtmlSource(source.content, 'menu-url', source.finalUrl).discoveredLinks;
     const selected = selectUnambiguousMenuFile(candidates);

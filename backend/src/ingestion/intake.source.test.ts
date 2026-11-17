@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type SafeFetchResult, safeFetch } from '../retrieval/fetcher';
+import { retrieveStructuredHtmlMenu } from './html-menu';
 import { materializeMenuUrl, selectUnambiguousMenuFile } from './intake';
 import { menuPdfFixture } from './pdf-fixture';
 
@@ -21,7 +22,20 @@ const fetched = (
   retrievedAt: '2026-11-12T00:00:00.000Z',
 });
 describe('materialized URL source provenance', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => vi.resetAllMocks());
+  it('reuses the structured lookup source when falling back to a linked file', async () => {
+    const url = 'https://restaurant.example/menu';
+    vi.mocked(safeFetch).mockResolvedValueOnce(
+      fetched(url, new Uint8Array(), 'text/html', '<a href="/menu.pdf">Menu</a>'),
+    );
+    const pdf = fetched('https://restaurant.example/menu.pdf', menuPdfFixture(), 'application/pdf');
+    vi.mocked(safeFetch).mockResolvedValueOnce(pdf);
+    const found = await retrieveStructuredHtmlMenu(url);
+    expect(found.items).toEqual([]);
+    const upload = await materializeMenuUrl(url, crypto.randomUUID(), found.source);
+    expect(upload.sourceHash).toBe(pdf.sha256);
+    expect(vi.mocked(safeFetch).mock.calls.map((call) => call[0])).toEqual([url, pdf.finalUrl]);
+  });
   it('retains original and resolved source plus retrieval time while extracting actual file bytes', async () => {
     const original = 'https://restaurant.example/menu';
     vi.mocked(safeFetch).mockResolvedValueOnce(

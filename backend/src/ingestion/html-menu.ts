@@ -21,7 +21,7 @@ const SOURCE_KIND = 'jsonld_menu';
 export async function retrieveStructuredHtmlMenu(url: string) {
   const source = await safeFetch(url);
   if (!/^(?:text\/html|application\/xhtml\+xml)(?:\s*;|$)/i.test(source.contentType)) {
-    return null;
+    return { source, items: [] };
   }
   const parsed = parseHtmlSource(source.content, 'url-jsonld', source.finalUrl);
   const items = parsed.segments
@@ -51,7 +51,7 @@ export async function retrieveStructuredHtmlMenu(url: string) {
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
-  return items.length ? { source, items } : null;
+  return { source, items };
 }
 
 export async function persistStructuredHtmlMenu(

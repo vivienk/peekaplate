@@ -434,7 +434,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Canonical owner/profile/draft commands retain tenant authority, versions and replay. Part A prepares owner-verified drafts through existing approval/producer/admission. Reopened drafts preserve historical canonical dish IDs; removal/Undo retains unchanged content verification and stable retries. Exact current publication controls public prepared bundles and selected photos/logos; withdrawal prevents new exposure and responses are no-store. Owner previews use authenticated snapshot-bound image blobs without changing content hashes. Empty venues remain empty. Existing profile verification, extraction/provider and hosted release gates remain separate; the Menu path profile-verification inconsistency is documented. Other report, privacy, artwork and observation boundaries remain unchanged.",
+      "summary": "Canonical owner/profile/draft commands retain tenant authority, versions and replay. Part A prepares owner-verified drafts through existing approval/producer/admission. Reopened drafts preserve historical canonical dish IDs; removal/Undo retains unchanged content verification and stable retries. Exact current publication controls public prepared bundles and selected photos/logos; withdrawal prevents new exposure and responses are no-store. Owner previews use authenticated snapshot-bound image blobs without changing content hashes. Empty venues remain empty. Existing profile verification, extraction/provider and hosted release gates remain separate; the Menu path profile-verification inconsistency is documented. Structured HTML MenuItem intake persists tenant-scoped pending drafts and reconstructs review originals server-side. Competing offers remain unpriced; fallback reuses the fetched source with existing safe-fetch limits.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -626,7 +626,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/report-reference.ts",
         "backend/src/owner-ai/report-reference.test.ts",
         "backend/src/restaurant-profile.test.ts",
-        "docs/owner-backend-wiring.md"
+        "docs/owner-backend-wiring.md",
+        "backend/src/ingestion/html-menu.ts",
+        "backend/src/ingestion/html-menu.test.ts",
+        "backend/src/retrieval/parser.menu.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -639,7 +642,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c1b3cafb395d31dedb42876d9e98d14066979b949bd46203e6990fae0d6bf1eb"
+      "sourceFingerprint": "578500c9316f3d9ef99928fbe10818153cc20a15d1e15a1f59dc876b6d57a974"
     },
     {
       "id": "database",
@@ -1022,18 +1025,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-15",
       "modules": [
-        "console"
-      ],
-      "summary": "PR189 ranks the synthetic preview most-attention answer by first opens divided by seen visits, with a ten-visit floor. The illustrative answer does not use live owner reports.",
-      "files": [
-        "frontend/console/src/owner-dashboard/data.ts",
-        "frontend/console/src/owner-dashboard/attention.test.ts"
-      ],
-      "next": "Retain the synthetic label; connect real owner AI only through validated server report semantics."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
         "diner",
         "processing",
         "contracts"
@@ -1177,6 +1168,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-auth.spec.ts"
       ],
       "next": "Coordinator reviews the reconciled local merge before publishing. No hosted authentication, deployment or legal audit acceptance claimed."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "backend"
+      ],
+      "summary": "PR222 structured website metadata creates pending dishes and evidence-bound review sessions without provider extraction or publication. Review fixes reject competing offers and reuse the first safe-fetch snapshot for linked-file fallback. Targeted ingestion/parser tests pass; hosted URL-to-owner acceptance remains unverified.",
+      "files": [
+        "backend/src/ingestion/html-menu.ts",
+        "backend/src/ingestion/intake.ts",
+        "backend/src/retrieval/parser.ts",
+        "backend/src/owner-menu-routes.ts"
+      ],
+      "next": "Require current-head CI and human review; verify hosted Screen 8 to Screen 9 before release."
     }
   ]
 }

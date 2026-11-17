@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { extractStructuredMenuItems, parseHtmlSource } from './parser';
 
 describe('restaurant URL structured menu parsing', () => {
+  it('leaves competing offers unpriced instead of selecting the first price', () => {
+    expect(
+      extractStructuredMenuItems({
+        '@type': 'MenuItem',
+        name: 'Soup',
+        offers: [
+          { price: '8', priceCurrency: 'USD' },
+          { price: '12', priceCurrency: 'USD' },
+        ],
+      }),
+    ).toEqual([{ name: 'Soup' }]);
+    expect(
+      extractStructuredMenuItems({
+        '@type': 'MenuItem',
+        name: 'Soup',
+        offers: [{ price: '8', priceCurrency: 'USD' }],
+      }),
+    ).toEqual([{ name: 'Soup', price_text: '8', price_currency: 'USD' }]);
+  });
   it('preserves genuine JSON-LD MenuItem names, descriptions and prices as review evidence', () => {
     const html = `<html><head><script type="application/ld+json">
     {"@context":"https://schema.org","@type":"Restaurant","name":"Cafe",

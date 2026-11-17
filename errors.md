@@ -4793,3 +4793,13 @@ documentation links and typechecks pass; no runtime source was changed by repair
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T06:48:17.646Z","exitCode":1}
 ```
+
+### ERR-20261117-HTML-INTAKE-REVIEW
+
+PR222 quality failed because the backend context fingerprint and PR documentation
+field were incomplete. The backend summary, source list and handoff now describe
+structured HTML intake; context refresh/check passes. Focused regressions also
+reproduced competing offers selecting the first price and fallback discarding the
+first fetched source. Singleton-offer parsing and source reuse fix those cases.
+The first failing source-reuse test left a queued mock response; resetting mocks
+between tests isolates failures. All 14 targeted parser/intake tests pass.
