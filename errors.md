@@ -4804,6 +4804,12 @@ The following refresh still saw unresolved markers and failed. Adding the source
 paths, resolving the summary and refreshing fingerprints repaired the context;
 no runtime behavior was changed by this repair.
 
+The final console-summary sentence exceeded the existing 1000-character guard;
+the verification runner rejected it. Condensing existing walkthrough prose kept
+the same responsibilities and restored context/documentation checks. The first
+reconciliation push preceded this final failed check; the immediate forward
+documentation correction passed both checks before its push.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T09:21:40.192Z","exitCode":1}
