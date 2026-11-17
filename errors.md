@@ -5170,3 +5170,8 @@ the fix (menuId missing) and passed afterward. Retain the returned identity and
 reuse the existing authenticated preview/photo loader for exactly that snapshot.
 Preparation failures retain explicit historical selection and retry; publish
 still requires the existing confirmation. The authored S13 component/CSS is unchanged.
+
+CI caught a new test reading captured requests while the shared preview heading
+was still the loading heading. Wait for the authored preview phone before asserting
+the exact request identity; do not increase timeouts or change runtime behavior.
+The other 69 workspace cases passed in that run.
