@@ -136,11 +136,14 @@ export function OwnerMenuWorkspace({
   const [editing, setEditing] = useState<Editing | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [portionReview, setPortionReview] = useState<{
-    status: 'processing' | 'needs_review' | 'failed';
-    previewUrl?: string;
-    message?: string;
-  } | undefined>(undefined);
+  const [portionReview, setPortionReview] = useState<
+    | {
+        status: 'processing' | 'needs_review' | 'failed';
+        previewUrl?: string;
+        message?: string;
+      }
+    | undefined
+  >(undefined);
   // The dish form (S09) returns to where it was opened: S10 review or S06 source choice
   // (Rania, #213 review). null = opened from the Menu list, which it returns to.
   const [editBack, setEditBack] = useState<'review' | 'sources' | null>(null);
@@ -381,7 +384,8 @@ export function OwnerMenuWorkspace({
     let disposed = false;
     let previewUrl: string | null = null;
     setPortionReview({ status: 'processing' });
-    void active.client.generateDraftPortion(venueId, draftId, photoId)
+    void active.client
+      .generateDraftPortion(venueId, draftId, photoId)
       .then(async (result) => {
         if (disposed || !current(active)) return;
         if (result.status === 'failed') {
