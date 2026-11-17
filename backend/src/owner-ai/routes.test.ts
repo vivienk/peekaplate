@@ -7,7 +7,7 @@ import {
   localOwnerAiReport,
 } from '../../scripts/owner-ai-local-fixture';
 import { AuthUnavailableError } from '../auth';
-import { CommandError } from '../dish-command';
+import { CommandError } from '../command-error';
 import type { Bindings } from '../index';
 import { mintOwnerReportReference, OWNER_REPORT_REFERENCE_HEADER } from './report-reference';
 import { registerOwnerAnalysisRoutes } from './routes';

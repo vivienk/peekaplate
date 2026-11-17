@@ -5252,3 +5252,9 @@ Three additional route regressions exposed a missing internal diagnostic for a
 failed or malformed report reread and a failed initial description draft read.
 These paths now log the fixed internal category, preserve the public response
 and make no provider call. A revoked membership still returns 403.
+
+The existing standalone launcher regression reproduced a CI failure when the
+analysis route imported a command error with TypeScript constructor parameter
+properties. The launcher uses Node's strip-only loader. Import the same shared
+error directly and use explicit class fields so the launcher can load it. The
+launcher test verifies startup and propagation of the frontend's exit status.
