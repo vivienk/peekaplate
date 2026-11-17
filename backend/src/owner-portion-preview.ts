@@ -1,8 +1,8 @@
 // Private S09 2.5D processing bridge. Draft identities MUST NOT be treated as
 // approved public dish revisions: publication remains a separate trusted step.
 import { createHash } from 'node:crypto';
-import type { Bindings } from './index';
 import { PublicPortionSchema } from '@peekaplate/contracts';
+import type { Bindings } from './index';
 
 type StoredObject = { size: number; arrayBuffer(): Promise<ArrayBuffer> };
 type Bucket = NonNullable<Bindings['INGESTION_REPORTS_BUCKET']>;
@@ -52,17 +52,25 @@ export async function readPrivatePortion(
   const value: unknown = JSON.parse(new TextDecoder().decode(bytes));
   if (!value || typeof value !== 'object') throw new Error('invalid_record');
   const record = value as PrivatePreview;
-  if (!['needs_review', 'failed'].includes(record.status) ||
-      !id.test(record.dish_id) || !id.test(record.draft_revision_id) ||
-      !/^[a-f0-9]{64}$/.test(record.photo_sha256)) {
+  if (
+    !['needs_review', 'failed'].includes(record.status) ||
+    !id.test(record.dish_id) ||
+    !id.test(record.draft_revision_id) ||
+    !/^[a-f0-9]{64}$/.test(record.photo_sha256)
+  ) {
     throw new Error('invalid_record');
   }
   return record;
 }
 
 export async function privatePreviewImage(bucket: Bucket, key: string, record: PrivatePreview) {
-  if (record.status !== 'needs_review' || !record.foreground_sha256 ||
-      !record.foreground_size || !bucket.get) return null;
+  if (
+    record.status !== 'needs_review' ||
+    !record.foreground_sha256 ||
+    !record.foreground_size ||
+    !bucket.get
+  )
+    return null;
   const image = await bucket.get(`${key}/dish.webp`);
   return objectBytes(image, record.foreground_size, record.foreground_sha256);
 }
@@ -86,8 +94,14 @@ export async function processPrivateDishPhoto(input: {
     throw new Error('portion_service_unavailable');
   }
   const endpoint = new URL(env.PORTION_SERVICE_URL);
-  if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password ||
-      endpoint.search || endpoint.hash || endpoint.pathname !== '/') {
+  if (
+    endpoint.protocol !== 'https:' ||
+    endpoint.username ||
+    endpoint.password ||
+    endpoint.search ||
+    endpoint.hash ||
+    endpoint.pathname !== '/'
+  ) {
     throw new Error('invalid_portion_service_url');
   }
   const photo = await objectBytes(await bucket.get(sourceKey), sourceSize, sourceHash);
@@ -111,7 +125,12 @@ export async function processPrivateDishPhoto(input: {
   if (!response.ok) throw new Error('portion_processing_unavailable');
   const raw: unknown = await response.json();
   if (!raw || typeof raw !== 'object') throw new Error('invalid_processor_response');
-  const result = raw as { status?: unknown; portion?: unknown; layers?: unknown; publication_eligible?: unknown };
+  const result = raw as {
+    status?: unknown;
+    portion?: unknown;
+    layers?: unknown;
+    publication_eligible?: unknown;
+  };
   if (result.publication_eligible !== false) throw new Error('invalid_processor_provenance');
   const portion = result.portion ? PublicPortionSchema.parse(result.portion) : null;
   if (portion && (portion.dish_id !== draftId || portion.dish_revision_id !== photoId)) {
@@ -136,10 +155,12 @@ export async function processPrivateDishPhoto(input: {
     photo_sha256: sourceHash,
     dish_id: draftId,
     draft_revision_id: photoId,
-    ...(foreground && portion ? {
-      foreground_sha256: hash(foreground),
-      foreground_size: foreground.byteLength,
-    } : { message: 'Cutout unavailable; original photo retained.' }),
+    ...(foreground && portion
+      ? {
+          foreground_sha256: hash(foreground),
+          foreground_size: foreground.byteLength,
+        }
+      : { message: 'Cutout unavailable; original photo retained.' }),
   };
   if (foreground) {
     await bucket.put(`${key}/dish.webp`, foreground.buffer as ArrayBuffer, {
