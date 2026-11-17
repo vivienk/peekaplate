@@ -97,12 +97,14 @@ test('verified replacement swaps the complete menu without mixing revisions', as
   };
   await open(page, state);
   await expect(page.getByRole('button', { name: 'Open Charred Leeks' }).first()).toBeVisible();
+  await expect(page.getByText('$14.00', { exact: true }).first()).toBeVisible();
   state.replacement = true;
   await page.clock.fastForward(25 * 60_000 + 1000);
   await expect(
     page.getByRole('button', { name: 'Open Replacement roasted leeks' }).first(),
   ).toBeVisible();
   await expect(page.getByText('$23.75', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('$14.00', { exact: true })).toHaveCount(0);
   await expect(page.getByText(content.categories[0].dishes[0].name, { exact: true })).toHaveCount(
     0,
   );

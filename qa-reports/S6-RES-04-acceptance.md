@@ -22,8 +22,8 @@ Use Node 24.22.3 and pnpm 11.25.0 with `pnpm install --frozen-lockfile` (PASS). 
 - `pnpm exec vitest run backend/src/bundle-producer/produce.test.ts packages/contracts/src/public-menu-integrity.test.ts frontend/diner/src/menu/published.test.ts frontend/diner/src/menu/refresh.test.ts`: PASS, 4 files / 118 tests.
 - `pnpm exec playwright test tests/e2e/published-integrity.spec.ts --workers=1`: PASS, 6 tests. Initial test attempt failed because a fixture name appeared twice in responsive markup; selectors were scoped to the interactive card before the passing run.
 - `pnpm verify test:db`: PASS, 15 integration files / 173 tests plus all 16 pgTAP files and local demo. Earlier attempts timed out building the uncached Docker image and then failed because Chromium was missing; image preparation and browser installation resolved those prerequisites.
-- `TEST_WORKERD=1 pnpm check`: PASS, lint/typecheck, 2,045 Vitest tests, 118 script tests, context and documentation checks. An earlier run identified stale context fingerprints after the test changes; they were refreshed before the passing run.
-- `pnpm verify build`: PASS, frontend builds and staging Worker dry-run. Existing build warnings include `:xr-overlay` and large chunks; no deployment occurred.
+- `TEST_WORKERD=1 pnpm check`: PASS before the final test-only review corrections, including lint/typecheck, 2,045 Vitest tests, 118 script tests, context and documentation checks. An earlier run identified stale context fingerprints after the test changes; they were refreshed before the passing run. The later corrections were checked with the affected database/browser lanes, Biome, backend typecheck and context check; see final-head CI in the PR.
+- `pnpm verify build`: PASS before the final test-only review corrections, including frontend builds and staging Worker dry-run. Existing build warnings include `:xr-overlay` and large chunks; no deployment occurred.
 - Mutation scenarios are test-design criteria; mutation runs were not performed.
 
 ## Staging and authority
