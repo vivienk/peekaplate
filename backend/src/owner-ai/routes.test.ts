@@ -1,3 +1,4 @@
+import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { Hono } from 'hono';
 import { expect, it, vi } from 'vitest';
 import {
@@ -6,6 +7,7 @@ import {
   localOwnerAiReport,
 } from '../../scripts/owner-ai-local-fixture';
 import type { Bindings } from '../index';
+import { mintOwnerReportReference, OWNER_REPORT_REFERENCE_HEADER } from './report-reference';
 import { registerOwnerAnalysisRoutes } from './routes';
 
 function setup() {
@@ -37,14 +39,16 @@ function setup() {
     allowedOrigins: ['http://127.0.0.1:5174'],
     syntheticVenues: [LOCAL_AI_VENUE],
   });
+  const secret = 'fixture-secret-for-router-tests-not-used-in-production';
   const env: Bindings = {
     APP_ENV: 'local',
     SYNTHETIC_REPORT_VENUE_ID: LOCAL_AI_VENUE,
     OWNER_AI_RESPONSES_ENABLED: 'true',
     OWNER_AI_OPENAI_API_KEY: 'synthetic',
     OWNER_AI_OPENAI_PROJECT_ID: 'proj_synthetic',
+    OWNER_AI_REPORT_REFERENCE_SECRET: secret,
   };
-  const run = (
+  const run = async (
     body: unknown = { dishId: LOCAL_AI_DISH, goal: 'menu' },
     extra: Record<string, string> = {},
   ) =>
@@ -55,6 +59,12 @@ function setup() {
         headers: {
           Authorization: 'Bearer synthetic',
           'Content-Type': 'application/json',
+          [OWNER_REPORT_REFERENCE_HEADER]: await mintOwnerReportReference(
+            OwnerDishReportSchema.parse(localOwnerAiReport(now)),
+            { actorId: 'actor', venueId: LOCAL_AI_VENUE },
+            secret,
+            now,
+          ),
           ...extra,
         },
         body: JSON.stringify(body),

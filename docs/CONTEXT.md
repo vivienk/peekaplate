@@ -580,6 +580,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingredient-artwork.integration.ts",
         "backend/src/owner-ai/responses.ts",
         "backend/src/owner-ai/responses.test.ts",
+        "backend/src/owner-ai/report-reference.ts",
+        "backend/src/owner-ai/report-reference.test.ts",
         "backend/src/owner-ai/routes.ts",
         "backend/src/owner-ai/routes.test.ts",
         "backend/scripts/owner-ai-local.ts",
@@ -615,7 +617,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "03434ef39a4be22c347c3f459411222c25fb1561e709b3cd5c51aa52ec11e39c"
+      "sourceFingerprint": "d2757ff26dad04093ee992ae223532242e700486ff27484dd27bb3d2592fe9aa"
     },
     {
       "id": "database",
@@ -994,13 +996,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-15",
+      "date": "2026-11-16",
       "modules": [
+        "backend",
         "console"
       ],
-      "summary": "The signed-in owner shell includes the opt-in AI panel with typed access cleanup and distinct displayed-report/analysis evidence periods, preserving merged menu workspace wiring.",
-      "files": [],
-      "next": "Retarget after #164; test pending sign-out, mobile, flag-off and hosted configuration gates before activation."
+      "summary": "The opt-in owner panel preserves typed access cleanup and shows the displayed report and analysis periods separately. The synthetic report GET now signs a short-lived owner and venue report reference. Analysis reauthorizes, re-reads the referenced window and rejects changed evidence before evaluation.",
+      "files": [
+        "backend/src/owner-ai/report-reference.ts",
+        "backend/src/owner-ai/report-reference.test.ts",
+        "docs/owner-ai-responses.md"
+      ],
+      "next": "Have the console attach the current report reference header. Check sign-out, mobile, the disabled mode and hosted setup separately. Preserve unknown-freshness abstention."
     },
     {
       "date": "2026-11-15",
