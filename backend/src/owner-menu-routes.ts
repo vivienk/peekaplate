@@ -30,8 +30,8 @@ import {
   readUploadGroup,
   validateMenuPdf,
 } from './ingestion/intake';
-import { type DishDraftRow, IngestionError } from './ingestion/repository';
 import { persistStructuredHtmlMenu, retrieveStructuredHtmlMenu } from './ingestion/html-menu';
+import { type DishDraftRow, IngestionError } from './ingestion/repository';
 import { bootstrapMenuReview } from './ingestion/review-bootstrap';
 import { readMenuUpload } from './ingestion/upload';
 import {
@@ -383,7 +383,12 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     if (structured) {
       const job = await services.database(c.env, (client) =>
         persistStructuredHtmlMenu(
-          client, actor, venue, input.data.url, input.data.idempotencyKey, structured,
+          client,
+          actor,
+          venue,
+          input.data.url,
+          input.data.idempotencyKey,
+          structured,
         ),
       );
       return c.json({ group: { id: job.id, jobs: [job], ready: true } }, 202);
