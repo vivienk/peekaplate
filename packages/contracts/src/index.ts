@@ -1,4 +1,4 @@
-import { PublicPortionSchema } from './portion';
+import { PublicPortionSchema, ServingCountSchema } from './portion';
 
 export * from './owner-actions';
 export * from './owner-ai';
@@ -8,6 +8,7 @@ export {
   PlateCalibrationSchema,
   type PublicPortion,
   PublicPortionSchema,
+  ServingCountSchema,
 } from './portion';
 
 import { z } from 'zod';
@@ -215,6 +216,7 @@ export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'glute
 
 export const PublicMenuCompleteDishSchema = z.strictObject({
   portion: PublicPortionSchema.optional(),
+  serving_count: ServingCountSchema.optional(),
   ...publicMenuDishIdentity,
   complete: z.literal(true),
   name: publicMenuText.min(1).max(160),
@@ -1539,3 +1541,4 @@ export {
   type VerifyOrderDeletionResponse,
   VerifyOrderDeletionResponseSchema,
 } from './order-outcome';
+export * from './restaurant-profile';

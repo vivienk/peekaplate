@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/menu and observation.v2 contracts verify exact bundle identity and normalized authority-free payloads. Reports enforce per-metric cohorts, complementary suppression and hidden internal counts; comparison_report.v1 stays a separate internal contract. Review, ingredient and artwork contracts retain source/digest and tenant authority. Order outcomes validate civil-time fields and quarantine rows. Workspace exposes actor-bound owner/editor venues, never setup status. PublicPortionSchema is optional, bounded and dish/revision-bound; private review manifests are not publication approval. Hosted acceptance remains separate.",
+      "summary": "Strict staff/publication/menu and observation contracts retain identity, tenant and privacy boundaries. Canonical restaurant profile/setup commands are versioned and bounded; owner-submitted fields cannot grant verification. Owner draft/review contracts carry serving text, optional numeric count, corrected photo/allergen fields and versioned removal. Public branding/portion fields remain serializable and revision-bound; count is not physical scale. Existing report/cohort and intent evidence contracts stay separate. Legacy draft-request omission and explicit clearing require compatibility checks against unchanged frontend callers.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -72,7 +72,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-workspace.test.ts",
         "packages/contracts/src/ingredient-artwork.ts",
         "packages/contracts/src/owner-analysis.ts",
-        "packages/contracts/src/portion.ts"
+        "packages/contracts/src/portion.ts",
+        "packages/contracts/src/restaurant-profile.ts",
+        "packages/contracts/src/restaurant-profile.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -80,7 +82,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "1d0d617910820048285c294efbc2e6d5661c140bdc6bd48dd87c25a93ed70e28"
+      "sourceFingerprint": "bec6ebe7161315c7f268c90afd7f7bda229671e8eae7416d6061ad7381e6d829"
     },
     {
       "id": "tokens",
@@ -415,7 +417,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces current staff/tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces retain versioned private draft/photo/upload flows; owner-only prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog; public reads/ingestion share exact staging CORS. Synthetic reports/CSV retain half-open windows, unknown freshness, cohorts and complementary suppression; owner actions remain idempotent. AI trust/issuance is gated. Artwork uses blob-locked repair. OCR draft saves insert per-venue placeholders, without images/approval; pending reads recheck and lock membership in their transaction. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job across redelivery. Hosted rollout/acceptance stays separate.",
+      "summary": "Worker rechecks current staff/tenant authority for transactional commands and replay. The canonical owner profile/private-photo model supports versioned details and setup reads; owner submissions cannot verify themselves. Draft removal is reversible and versioned; corrections preserve photos/allergens/serving metadata, advance content versions and invalidate old verification. The existing bundle producer exports public branding and approved count-bound portions, with trusted preparation/admission unchanged. OCR draft saves retain #210 placeholders with locked membership reads. Canonical facts and PostHog remain separate; owner reports retain privacy cohorts and unknown freshness. This backend extraction changes no screens and performs no hosted rollout or provider activation.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -592,7 +594,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.workerd-harness.ts",
         "backend/src/ingredient-artwork-placeholders.ts",
         "backend/src/ingredient-artwork-placeholders.test.ts",
-        "backend/src/ingredient-artwork-placeholders.integration.ts"
+        "backend/src/ingredient-artwork-placeholders.integration.ts",
+        "backend/src/restaurant-profile.ts",
+        "backend/src/restaurant-profile.test.ts",
+        "backend/src/restaurant-profile.integration.ts",
+        "backend/src/bundle-producer/restaurant.ts",
+        "backend/src/bundle-producer/restaurant.test.ts",
+        "backend/src/bundle-producer/logo-image.ts",
+        "backend/src/bundle-producer/logo-image.test.ts",
+        "docs/owner-backend-wiring.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -605,12 +615,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "ea5786a9c5f3d9760be002cecff80052ffcd96628263145aee4930b3ff4c9c66"
+      "sourceFingerprint": "03434ef39a4be22c347c3f459411222c25fb1561e709b3cd5c51aa52ec11e39c"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private commands/events/outbox, memberships and projections use tenant RLS. Canonical observations and typed live-only facts retain replay/conflict/backfill safeguards; local and bounded hosted evidence remain distinct. PostHog raw exports stay isolated from browser/runtime application access. Publication bundles and approvals use immutable tenant/menu/hash identities; order imports retain owner authority, reviewed mappings and activation gates. Owner insight actions add a forced-RLS table with an exact tenant/menu/revision FK, runtime SELECT/INSERT/UPDATE and no DELETE. This new migration has only local verification; hosted migration/deployment and production acceptance remain separate. Immutable tenant-scoped URL settings use unique slugs and a narrowly owned public resolver. Ingredient artwork projection and insert-only placeholders use forced tenant RLS and restricted runtime grants.",
+      "summary": "Private commands/events/outbox, memberships and projections enforce tenant RLS. Canonical observations and typed facts retain replay/conflict/backfill safeguards; PostHog raw exports stay isolated. Publication bundles/approvals use immutable tenant/menu/hash identities; owner actions retain exact revision references. Order imports keep reviewed mappings and owner/operator authority. URL settings use unique slugs and a restricted public resolver. Artwork projection and insert-only OCR placeholders retain forced RLS and restricted grants. One canonical forward migration adds owner profile/private-photo RLS and reversible draft removal; owners cannot write verification status. Hosted migration/deployment acceptance is separate.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -646,7 +656,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/restaurant_links.sql",
         "migrations/20261113020000_ingredient_artwork.sql",
         "migrations/20261116010000_ingredient_artwork_placeholders.sql",
-        "tests/db/artwork_placeholders.sql"
+        "tests/db/artwork_placeholders.sql",
+        "migrations/20261116020000_owner_flow_profile.sql",
+        "tests/db/owner_flow_profile.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -657,7 +669,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "0a3fdd062c56754634a1792735501b8c606695fd4050a07722ced48725630627"
+      "sourceFingerprint": "404122b01eb52b0f628bd66b0f6127c673bea5ff5b562ee9a147beeeb22ff73e"
     },
     {
       "id": "measurement",
@@ -986,19 +998,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "Reconcile opt-in synthetic owner analysis with merged menu wiring; client retains exact destinations, cancellation and typed access denial.",
-      "files": [
-        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
-        "backend/owner-ai-handoff.test.mjs",
-        "docs/owner-ai-responses.md"
-      ],
-      "next": "Merge analysis before shell panel; preserve unknown-freshness abstention and hosted activation gates."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
-        "console"
-      ],
       "summary": "The signed-in owner shell includes the opt-in AI panel with typed access cleanup and distinct displayed-report/analysis evidence periods, preserving merged menu workspace wiring.",
       "files": [],
       "next": "Retarget after #164; test pending sign-out, mobile, flag-off and hosted configuration gates before activation."
@@ -1116,6 +1115,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-onboarding-wiring.md"
       ],
       "next": "Complete pinned review/CI, merge the authored slice before reconciling PR205. Profile persistence/extracted-photo editing and hosted acceptance remain unclaimed."
+    },
+    {
+      "date": "2026-11-16",
+      "modules": [
+        "backend",
+        "contracts",
+        "database"
+      ],
+      "summary": "Extract existing canonical owner backend/profile/review/publication-asset adapters from held #213/#215 onto current develop; no frontend or replacement pipeline. Preserve #210 already merged and prove legacy draft-client compatibility.",
+      "files": [
+        "docs/owner-backend-wiring.md",
+        "backend/src/restaurant-profile.ts",
+        "backend/src/owner-menu.ts",
+        "packages/contracts/src/owner-menu.ts",
+        "migrations/20261116020000_owner_flow_profile.sql"
+      ],
+      "next": "Run standalone checks and review this backend-only PR; leave #213 with Jeffin. Hosted release and trusted preparation/admission require separate acceptance."
     }
   ]
 }

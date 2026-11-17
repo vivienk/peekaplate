@@ -49,6 +49,8 @@ export type MenuIngestionJobRow = {
 };
 
 export type DishDraftRow = {
+  removed_at?: string | null;
+  removal_version?: number;
   id: string;
   tenant_id: string;
   job_id: string | null;

@@ -126,6 +126,7 @@ export function resolveEffectiveFields(
   corrected: CandidateReviewRecord['corrected'],
 ): ResolvedCandidateFields {
   return ResolvedCandidateFieldsSchema.parse({
+    ...(corrected.serving_count !== undefined ? { serving_count: corrected.serving_count } : {}),
     name: corrected.name !== undefined ? corrected.name : candidate.original.name,
     description:
       corrected.description !== undefined ? corrected.description : candidate.original.description,
@@ -145,6 +146,9 @@ export function resolveEffectiveFields(
         : candidate.original.price_currency,
     ingredients:
       corrected.ingredients !== undefined ? corrected.ingredients : candidate.original.ingredients,
+    ...(corrected.serving_size !== undefined ? { serving_size: corrected.serving_size } : {}),
+    ...(corrected.allergens !== undefined ? { allergens: corrected.allergens } : {}),
+    ...(corrected.photo_id !== undefined ? { photo_id: corrected.photo_id } : {}),
   });
 }
 
@@ -603,6 +607,28 @@ export async function saveCandidateReviewCommand(
       throw new ReviewCommandError('not_found', 404);
     }
 
+    // Match approval's draft-before-review lock order; removed work cannot be edited by a stale tab.
+    const linkedDrafts = sessionResult.rows[0].job_id
+      ? (
+          await client.query<{ id: string; removed_at: string | null; review_status: string }>(
+            `SELECT id,removed_at,review_status FROM app_private.dish_drafts WHERE tenant_id=$1 AND job_id=$2 AND COALESCE(candidate_id,draft_id)=$3 ORDER BY id FOR UPDATE`,
+            [venueId, sessionResult.rows[0].job_id, candidateId],
+          )
+        ).rows
+      : [];
+    if (linkedDrafts.some((draft) => draft.removed_at))
+      throw new ReviewCommandError('version_conflict', 409);
+    if (input.corrected?.photo_id) {
+      const photo = await client.query(
+        `SELECT p.id FROM app_private.dish_draft_photo p JOIN app_private.dish_drafts d
+         ON d.tenant_id=p.tenant_id AND d.id=p.draft_id
+         WHERE p.tenant_id=$1 AND p.id=$2 AND d.job_id=$3
+           AND COALESCE(d.candidate_id,d.draft_id)=$4 AND d.review_status='pending' AND d.removed_at IS NULL`,
+        [venueId, input.corrected.photo_id, sessionResult.rows[0].job_id, candidateId],
+      );
+      if (photo.rowCount !== 1) throw new ReviewCommandError('not_found', 404);
+    }
+
     if (extractionResult.schema_version === 1 && input.corrected) {
       if (input.corrected.subcategory !== undefined || input.corrected.price_text !== undefined) {
         throw new ReviewCommandError('invalid_candidate', 400);
@@ -758,6 +784,13 @@ export async function saveCandidateReviewCommand(
           actorId,
           reviewedAt,
         ],
+      );
+    }
+
+    for (const draft of linkedDrafts.filter((draft) => draft.review_status === 'pending')) {
+      await client.query(
+        `UPDATE app_private.dish_drafts SET draft_version=draft_version+1,verification_status='not_verified',updated_at=now() WHERE tenant_id=$1 AND id=$2`,
+        [venueId, draft.id],
       );
     }
 

@@ -839,7 +839,7 @@ export async function approveDishDraftAtomic(
       [venueId, draftId],
     );
     const draft = draftRes.rows[0];
-    if (!draft || draft.review_status !== 'pending') {
+    if (!draft || draft.review_status !== 'pending' || draft.removed_at) {
       throw new IngestionError('draft_not_pending_or_not_found', 404);
     }
 
@@ -905,10 +905,11 @@ export async function approveDishDraftAtomic(
     ) {
       throw new IngestionError('draft_incomplete', 409);
     }
-    if (manual?.photoId) {
+    const approvedPhotoId = manual?.photoId ?? corrected.photo_id ?? null;
+    if (approvedPhotoId) {
       const photo = await client.query(
         'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
-        [venueId, draftId, manual.photoId],
+        [venueId, draftId, approvedPhotoId],
       );
       if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
     }
@@ -917,6 +918,7 @@ export async function approveDishDraftAtomic(
     const revisionCommandId = crypto.randomUUID();
     const facts = manual
       ? {
+          ...(manual.servingCount !== undefined ? { servingCount: manual.servingCount } : {}),
           category: manual.category,
           priceAmount: manual.priceAmount,
           priceCurrency: manual.priceCurrency,
@@ -926,12 +928,16 @@ export async function approveDishDraftAtomic(
         }
       : reviewed
         ? {
+            ...(resolved.serving_count !== undefined
+              ? { servingCount: resolved.serving_count }
+              : {}),
             category: resolved.category,
             priceAmount: resolved.price_amount,
             priceCurrency: resolved.price_currency,
             ingredients: resolved.ingredients,
-            allergens: null,
-            photoId: null,
+            allergens:
+              corrected.allergens?.status === 'confirmed' ? corrected.allergens.items : null,
+            photoId: approvedPhotoId,
           }
         : undefined;
     const parsedFacts = facts === undefined ? undefined : ApprovedDishFactsSchema.safeParse(facts);
@@ -1084,7 +1090,7 @@ export function createApp(services: Dependencies = dependencies) {
       return next();
     if (
       c.req.method === 'POST' &&
-      /^\/venues\/[^/]+\/(?:menus\/uploads|drafts\/[^/]+\/photos)$/.test(c.req.path)
+      /^\/venues\/[^/]+\/(?:profile\/photos|menus\/uploads|drafts\/[^/]+\/photos)$/.test(c.req.path)
     )
       return next();
     if (c.req.method === 'POST' && /^\/venues\/[^/]+\/orders\/import$/.test(c.req.path)) {
@@ -1101,7 +1107,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
   app.use('/venues/*', async (c, next) => {
     if (
-      !/^\/venues\/[^/]+\/(?:prepared-menus(?:\/|$)|ingredient-icons(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+      !/^\/venues\/[^/]+\/(?:profile(?:\/|$)|setup$|prepared-menus(?:\/|$)|ingredient-icons(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
         c.req.path,
       )
     )
