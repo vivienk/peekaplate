@@ -43,6 +43,7 @@ export function DishFormView({
   servingCountControl,
   portionReview,
   onApprovePortion,
+  onGeneratePortion,
 }: {
   ed: Extract<EditState, { step: 'form' | 'review' }>;
   setEd: (e: EditState) => void;
@@ -73,6 +74,7 @@ export function DishFormView({
     approved?: boolean;
   };
   onApprovePortion?: () => void;
+  onGeneratePortion?: () => void;
 }) {
   const dr = ed.draft;
   const latest = useRef(ed);
@@ -256,6 +258,11 @@ export function DishFormView({
               </section>
               <section className="card s09-sidecard s09-sidecard--25d" aria-labelledby="s09-25d">
                 <h2 id="s09-25d">2.5D preview</h2>
+                {onGeneratePortion && !portionReview?.approved && (
+                  <button type="button" disabled={busy || !dr.upload} onClick={onGeneratePortion}>
+                    Save photo and generate 2.5D
+                  </button>
+                )}
                 {portionReview?.status === 'needs_review' && portionReview.previewUrl ? (
                   <>
                     <img
