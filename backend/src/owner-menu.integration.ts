@@ -27,6 +27,7 @@ import {
   verifyOwnerDish,
 } from './owner-menu';
 import { cleanupStagedMenuPhotos } from './owner-menu-retention';
+import { previewKey } from './owner-portion-preview';
 import { saveCandidateReviewCommand } from './review-command';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -390,6 +391,169 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       [venue, approved.publishedRevision.dishId],
     );
     expect(kept.rows[0]?.approved_facts.photoId).toBe(photo.id);
+  });
+  it('exports a private portion only while its photo remains approved on the current dish revision', async () => {
+    const draftId = crypto.randomUUID();
+    const fields = {
+      name: 'Fictional soup',
+      category: 'Soup',
+      priceAmount: '8.50',
+      priceCurrency: 'USD',
+    };
+    const encode = (value: string) => new Uint8Array(Buffer.from(value));
+    const objects = new Map<string, ArrayBuffer>();
+    const storage = {
+      get: async (key: string) => {
+        const data = objects.get(key);
+        return data ? { size: data.byteLength, arrayBuffer: async () => data.slice(0) } : null;
+      },
+      put: async (key: string, data: string | ArrayBuffer) => {
+        objects.set(key, typeof data === 'string' ? encode(data).buffer : data);
+      },
+      delete: async (key: string) => {
+        objects.delete(key);
+      },
+    };
+
+    await save(draftId, fields);
+    const original = image();
+    const replacement = image();
+    replacement.bytes[10] = 4;
+    replacement.sourceHash = createHash('sha256').update(replacement.bytes).digest('hex');
+    const photo = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draftId,
+      original,
+      'image/png',
+      storage.put,
+    );
+    const nextPhoto = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draftId,
+      replacement,
+      'image/png',
+      storage.put,
+    );
+    await save(draftId, { ...fields, photoId: photo.id }, 1);
+    await promoteDraftPhoto(runtime, actor, venue, draftId, photo.id, crypto.randomUUID(), storage);
+    await promoteDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draftId,
+      nextPhoto.id,
+      crypto.randomUUID(),
+      storage,
+    );
+    const { publishedRevision } = await approveDishDraftAtomic(runtime, actor, venue, draftId, {
+      commandId: crypto.randomUUID(),
+      expectedDraftVersion: 2,
+      confirmed: true,
+    });
+    const { dishId, facts } = publishedRevision;
+    if (!facts) throw new Error('Expected approved facts for the confirmed draft');
+    expect(facts.photoId).toBe(photo.id);
+
+    const key = previewKey(venue, draftId, photo.id, original.sourceHash);
+    const layers = await Promise.all(
+      [
+        { name: 'background.svg', content: '<svg xmlns="http://www.w3.org/2000/svg"/>', depth: 0 },
+        { name: 'dish.webp', content: 'synthetic cutout', depth: 1 },
+      ].map(async ({ name, content, depth }) => {
+        const bytes = encode(content);
+        await storage.put(`${key}/${name}`, bytes.buffer);
+        return {
+          url: `https://portion-ingestion.invalid/fixture/${name}`,
+          sha256: createHash('sha256').update(bytes).digest('hex'),
+          size_bytes: bytes.byteLength,
+          depth,
+        };
+      }),
+    );
+    await storage.put(
+      `${key}/record.json`,
+      JSON.stringify({
+        status: 'needs_review',
+        photo_sha256: original.sourceHash,
+        dish_id: draftId,
+        draft_revision_id: photo.id,
+        portion: {
+          schema_version: 1,
+          dish_id: draftId,
+          dish_revision_id: photo.id,
+          width: 128,
+          height: 128,
+          layers,
+        },
+      }),
+    );
+
+    const app = createApp({ verify: async () => actor, execute: vi.fn() });
+    const env = {
+      APP_ENV: 'local',
+      LOCAL_DATABASE_URL: runtimeUrl!,
+      INGESTION_REPORTS_BUCKET: storage,
+    };
+    const path = `https://test/venues/${venue}/drafts/${draftId}/photos/${photo.id}/portion`;
+    const headers = { Authorization: 'Bearer synthetic' };
+    const exportPortion = () => app.request(`${path}/export`, { headers }, env);
+    expect((await app.request(`${path}/approve`, { method: 'POST', headers }, env)).status).toBe(
+      200,
+    );
+
+    const initial = await exportPortion();
+    expect(initial.status).toBe(200);
+    expect(await initial.json()).toMatchObject({
+      dishId,
+      dishRevisionId: publishedRevision.revisionId,
+    });
+
+    const revision = {
+      dishId,
+      name: 'Renamed fictional soup',
+      description: publishedRevision.description,
+    };
+    const renamed = await createDishRevision(runtime, actor, venue, {
+      ...revision,
+      commandId: crypto.randomUUID(),
+      expectedVersion: publishedRevision.version,
+    });
+    const afterRename = await app.request(
+      `https://test/venues/${venue}/drafts/${draftId.toUpperCase()}/photos/${photo.id.toUpperCase()}/portion/export`,
+      { headers },
+      env,
+    );
+    expect(afterRename.status).toBe(200);
+    expect(await afterRename.json()).toMatchObject({ dishId, dishRevisionId: renamed.revisionId });
+
+    const replaced = await createDishRevision(runtime, actor, venue, {
+      ...revision,
+      commandId: crypto.randomUUID(),
+      expectedVersion: renamed.version,
+      facts: { ...facts, photoId: nextPhoto.id },
+    });
+    const afterReplacement = await exportPortion();
+    await createDishRevision(runtime, actor, venue, {
+      ...revision,
+      commandId: crypto.randomUUID(),
+      expectedVersion: replaced.version,
+      facts: { ...facts, photoId: null },
+    });
+    const afterRemoval = await exportPortion();
+    expect([afterReplacement.status, afterRemoval.status]).toEqual([409, 409]);
+    expect(await afterReplacement.json()).toEqual({ error: 'approved_dish_revision_unavailable' });
+    expect(await afterRemoval.json()).toEqual({ error: 'approved_dish_revision_unavailable' });
+
+    await rejectDraftPhoto(runtime, actor, venue, draftId, photo.id, crypto.randomUUID());
+    for (const url of [path, `${path}/approve`]) {
+      const rejected = await app.request(url, { method: 'POST', headers }, env);
+      expect(rejected.status).toBe(404);
+      expect(await rejected.json()).toEqual({ error: 'photo_not_found' });
+    }
   });
   it('retains reviewed facts through a legacy text-only edit instead of reopening draft fallback', async () => {
     const id = crypto.randomUUID();
@@ -935,6 +1099,30 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       photo_id: photo.id,
       allergens: { status: 'confirmed', items: ['milk'] },
     });
+    const previewRecord = {
+      status: 'failed',
+      photo_sha256: photo.source_hash,
+      dish_id: row.id,
+      draft_revision_id: photo.id,
+    };
+    const previewBytes = new TextEncoder().encode(JSON.stringify(previewRecord));
+    const recordKey = `${previewKey(venue, row.id, photo.id, photo.source_hash)}/record.json`;
+    const preview = await app.request(
+      `https://test/venues/${venue}/drafts/${row.id}/photos/${photo.id}/portion`,
+      { headers: { Authorization: 'Bearer synthetic' } },
+      {
+        ...env,
+        INGESTION_REPORTS_BUCKET: {
+          ...env.INGESTION_REPORTS_BUCKET,
+          get: async (key: string) =>
+            key === recordKey
+              ? { size: previewBytes.byteLength, arrayBuffer: async () => previewBytes.buffer }
+              : null,
+        },
+      },
+    );
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toEqual({ portionReview: previewRecord });
     const changed = (
       await admin.query(
         'SELECT id,draft_version,verification_status FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2',
@@ -1130,7 +1318,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     ).toBe('verified');
   });
 
-  it('retention scopes restricted reads before protecting pending originals', async () => {
+  it('retention scopes restricted reads and distinguishes pending and orphaned portion files', async () => {
     const draftId = crypto.randomUUID();
     await save(draftId);
     const photo = await storeDraftPhoto(
@@ -1142,8 +1330,14 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       'image/png',
       async () => {},
     );
+    const pending = `${previewKey(venue, draftId, photo.id, photo.source_hash)}/record.json`;
+    const orphan = `${previewKey(venue, draftId, crypto.randomUUID(), photo.source_hash)}/record.json`;
     const storage = {
-      list: async () => ({ objects: [{ key: photo.storage_key, uploaded: new Date(0) }] }),
+      list: async ({ prefix }: { prefix: string }) => ({
+        objects: [photo.storage_key, pending, orphan]
+          .filter((key) => key.startsWith(prefix))
+          .map((key) => ({ key, uploaded: new Date(0) })),
+      }),
       get: async () => null,
       put: async () => {},
       delete: vi.fn(async () => {}),
@@ -1153,8 +1347,9 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       client: runtime,
       retentionConfig: { orphanGraceDays: 1 },
     });
-    expect(result.protectedPending).toBe(1);
-    expect(storage.delete).not.toHaveBeenCalled();
+    expect(result.protectedPending).toBe(2);
+    expect(result.orphansDeleted).toBe(1);
+    expect(storage.delete).toHaveBeenCalledExactlyOnceWith(orphan);
     expect(
       (await runtime.query("SELECT current_setting('app.tenant_id',true) AS tenant")).rows[0]
         .tenant,

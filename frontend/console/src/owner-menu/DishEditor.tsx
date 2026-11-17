@@ -13,6 +13,15 @@ export type DishEditorProps = {
   value: DishForm;
   photo?: ReactNode;
   photoUrl?: string | null;
+  /** Private generated portion preview; never grants publication authority. */
+  portionReview?: {
+    status: 'processing' | 'needs_review' | 'failed';
+    previewUrl?: string;
+    message?: string;
+    approved?: boolean;
+  };
+  onApprovePortion?: () => void;
+  onGeneratePortion?: () => void;
   existing?: boolean;
   categories?: string[];
   onChange: (next: DishForm) => void;
@@ -34,6 +43,9 @@ export function DishEditor({
   value,
   photo,
   photoUrl,
+  portionReview,
+  onApprovePortion,
+  onGeneratePortion,
   existing = false,
   categories = [],
   onChange,
@@ -118,6 +130,9 @@ export function DishEditor({
           });
         }}
         categories={categories}
+        {...(portionReview ? { portionReview } : {})}
+        {...(onApprovePortion ? { onApprovePortion } : {})}
+        {...(onGeneratePortion ? { onGeneratePortion } : {})}
         servingCountControl={
           <TextField
             id="dish-serving-count"

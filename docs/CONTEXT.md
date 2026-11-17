@@ -277,7 +277,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner auth/workspace reuses authored S05–S13 components, including #172 DishFormView and official #208 publication. S05 saves a tenant profile/private photo; shared setup reads drive header/content/aside without inventing verification. Manual and extracted drafts retain serving size, corrected allergens/photos and source evidence. S10 removal/Undo is persisted; candidate corrections invalidate verification. Processing success uses the selected import, not older drafts. The preview-only S05–S13 walkthrough is labelled synthetic with no provider/analytics calls. S09 AI and full report adapters remain absent. S13 Review and publish reruns owner preparation (existing approval command + producer; S11 stays verification-only); edits reopen approved drafts. Hosted migration/release/acceptance is pending. Shared S09 adds an optional people-served calibration field; report-period mismatches withhold AI suggestions. Local S01 Terms/Privacy dialogs preserve session APIs and tenant authority.",
+      "summary": "Owner auth/workspace reuses authored S05–S13 components, including #172 DishFormView and official #208 publication. S05 saves a tenant profile/private photo; shared setup reads drive header/content/aside without inventing verification. Manual and extracted drafts retain serving size, corrected allergens/photos and source evidence. S10 removal/Undo is persisted; candidate corrections invalidate verification. Processing success uses the selected import, not older drafts. The S05–S13 walkthrough is synthetic with no provider calls. S09 privately generates/reviews 2.5D previews; AI remains absent. S13 Review and publish reruns owner preparation (existing approval command + producer; S11 stays verification-only); edits reopen approved drafts. Hosted migration/release/acceptance is pending. Shared S09 adds an optional people-served calibration field; report-period mismatches withhold AI suggestions. Local S01 Terms/Privacy dialogs preserve session APIs and tenant authority.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -429,12 +429,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "dfa54be563c2d0709db8a34532a9c997c3a4a688eec84ce6f5fe7585d5368936"
+      "sourceFingerprint": "15944abe917891e48a9ae4adc639301463451d64ad6bb2e70a6b818b3035af66"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Canonical owner/profile/draft commands retain tenant authority, versions and replay. Part A prepares owner-verified drafts through existing approval/producer/admission. Reopened drafts preserve historical canonical dish IDs; removal/Undo retains unchanged content verification and stable retries. Exact current publication controls public prepared bundles and selected photos/logos; withdrawal prevents new exposure and responses are no-store. Owner previews use authenticated snapshot-bound image blobs without changing content hashes. Empty venues remain empty. Existing profile verification, extraction/provider and hosted release gates remain separate; the Menu path profile-verification inconsistency is documented. Other report, privacy, artwork and observation boundaries remain unchanged.",
+      "summary": "Canonical owner/profile/draft commands retain tenant authority, versions and replay. Part A prepares owner-verified drafts through existing approval/producer/admission. Reopened drafts preserve historical canonical dish IDs; removal/Undo retains unchanged content verification and stable retries. Exact current publication controls public prepared bundles and selected photos/logos; withdrawal prevents new exposure and responses are no-store. Owner previews use authenticated snapshot-bound image blobs without changing content hashes. Empty venues remain empty. Existing profile verification, extraction/provider and hosted release gates remain separate; the Menu path profile-verification inconsistency is documented. Private 2.5D export binds the canonical approved photo/revision; configured retention reclaims rejected or orphaned artifacts. Operator hosting/admission and hosted processor acceptance remain separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -626,7 +626,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/report-reference.ts",
         "backend/src/owner-ai/report-reference.test.ts",
         "backend/src/restaurant-profile.test.ts",
-        "docs/owner-backend-wiring.md"
+        "docs/owner-backend-wiring.md",
+        "backend/src/owner-portion-preview.ts",
+        "backend/src/bundle-producer/approved-portions.ts",
+        "backend/src/bundle-producer/approved-portions.test.ts",
+        "docs/screen9-portion-publish.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -639,7 +643,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c1b3cafb395d31dedb42876d9e98d14066979b949bd46203e6990fae0d6bf1eb"
+      "sourceFingerprint": "4419e2089dc6adb0d7754e2909704234f7595aa0c72c79974e9e3c4d7a21c9e4"
     },
     {
       "id": "database",
@@ -856,7 +860,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Vision-first source-linked needs_review drafts preserve private attempts and bounded retries. Ingredient sidecars/artwork retain provenance; FE-06.4 verification is read-only and upstream usage remains separately gated. QA-02 strict offline scoring binds frozen reference/export bytes and occurrence mappings; exposed sources stay development, new holdouts provisional. Private single-tenant portion/cutout/model helpers validate hashes and bound uploads; ambiguous provider submissions cannot auto-resubmit. Generated assets stay review-only and publication-ineligible. No human reference truth, fresh AI accuracy, physical-device scale or hosted acceptance follows from offline checks.",
+      "summary": "Vision-first source-linked needs_review drafts preserve private attempts and bounded retries. Ingredient sidecars/artwork retain provenance; FE-06.4 verification is read-only and upstream usage remains separately gated. QA-02 strict offline scoring binds frozen reference/export bytes and occurrence mappings; exposed sources stay development, new holdouts provisional. Private single-tenant portion/cutout/model helpers validate hashes and bound uploads. Screen 9 processing uses request-scoped temporary files. Ambiguous provider submissions cannot auto-resubmit. Generated assets stay review-only and publication-ineligible. No human reference truth, fresh AI accuracy, physical-device scale or hosted acceptance follows from offline checks.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -892,6 +896,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "test-data/README.md",
         "processing/src/peekaplate_processing/service.py",
         "processing/tests/test_service.py",
+        "processing/src/peekaplate_processing/portion_service.py",
         "processing/Dockerfile",
         "processing/.dockerignore",
         "processing/src/peekaplate_processing/overlay_review.py",
@@ -984,7 +989,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "b473879ba07d81f812aad20e5261a6b39733e195b0054b31368bafffad25e2e7"
+      "sourceFingerprint": "4752c84fc4a9ee86f48e340ee83038b16e2de4ab543d40277627b992cf7533b0"
     },
     {
       "id": "assets",
@@ -1019,18 +1024,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-15",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR189 ranks the synthetic preview most-attention answer by first opens divided by seen visits, with a ten-visit floor. The illustrative answer does not use live owner reports.",
-      "files": [
-        "frontend/console/src/owner-dashboard/data.ts",
-        "frontend/console/src/owner-dashboard/attention.test.ts"
-      ],
-      "next": "Retain the synthetic label; connect real owner AI only through validated server report semantics."
-    },
     {
       "date": "2026-11-15",
       "modules": [
@@ -1113,15 +1106,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "summary": "Extract existing canonical owner backend/profile/review/publication-asset adapters from held #213/#215 onto current develop; no frontend or replacement pipeline. Preserve #210 already merged and prove legacy draft-client compatibility.",
+      "summary": "Extract existing canonical owner backend/profile/review/publication-asset adapters from held #213/#215 onto current develop; no frontend or replacement pipeline. Preserve #210 already merged and prove legacy draft-client compatibility. The #219 follow-up binds private portion export to the approved photo, cleans expired private artifacts and removes the processing host's temporary files.",
       "files": [
         "docs/owner-backend-wiring.md",
         "backend/src/restaurant-profile.ts",
         "backend/src/owner-menu.ts",
         "packages/contracts/src/owner-menu.ts",
-        "migrations/20261116020000_owner_flow_profile.sql"
+        "migrations/20261116020000_owner_flow_profile.sql",
+        "backend/src/owner-menu-routes.ts",
+        "backend/src/owner-menu-retention.ts",
+        "docs/screen9-portion-publish.md"
       ],
-      "next": "Run standalone checks and review this backend-only PR; leave #213 with Jeffin. Hosted release and trusted preparation/admission require separate acceptance."
+      "next": "Run standalone checks and review this backend-only PR; leave #213 with Jeffin. Review the portion export change with #219. Hosted release and trusted preparation/admission require separate acceptance."
     },
     {
       "date": "2026-11-16",
@@ -1177,6 +1173,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-auth.spec.ts"
       ],
       "next": "Coordinator reviews the reconciled local merge before publishing. No hosted authentication, deployment or legal audit acceptance claimed."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "backend",
+        "console"
+      ],
+      "summary": "PR219 incorporates PR221 canonical approved-photo export and artifact lifecycle fixes, then reconciles current develop Part A without changing either authority boundary. Private owner preview approval remains separate from operator bundle hosting/admission and publication. Focused portion/retention/editor and processor service tests passed before reconciliation; current-head CI remains required.",
+      "files": [
+        "backend/src/owner-portion-preview.ts",
+        "backend/src/owner-menu-routes.ts",
+        "backend/src/owner-menu-retention.ts",
+        "docs/screen9-portion-publish.md"
+      ],
+      "next": "Finish current-head checks and human review before merge. Hosted processor integration, device acceptance and physical calibration remain unverified."
     }
   ]
 }
