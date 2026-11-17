@@ -24,7 +24,12 @@
 body {
   margin: 0;
 }
-body:has(.pp-detail--preview) > #consent {
+#consent {
+  max-width: 30rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+body:has(.pp-detail) > #consent {
   display: none;
 }
 main {
@@ -842,6 +847,12 @@ main:has(> .pp-compare) {
   font-size: 10px;
   line-height: 14px;
   color: #fafafa;
+}
+
+.pp-chip__icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
 
 .pp-allergy-note {

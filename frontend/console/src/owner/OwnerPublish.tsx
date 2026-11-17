@@ -23,6 +23,7 @@ export function OwnerPublish({
   apiBase,
   actorId,
   venueId,
+  restaurantName,
   getAccessToken,
   onAccessFailure,
   onBack,
@@ -31,6 +32,7 @@ export function OwnerPublish({
   apiBase: string;
   actorId: string;
   venueId: string;
+  restaurantName: string;
   getAccessToken: () => Promise<string | null>;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
   onBack: () => void;
@@ -223,6 +225,22 @@ export function OwnerPublish({
   const categories = preview?.content.categories ?? [];
   const dishes = categories.flatMap((category) => category.dishes);
   const complete = dishes.filter((dish) => dish.complete).length;
+
+  if (!preview && busy)
+    return (
+      <MenuPreview
+        layout="inline"
+        restaurantName={restaurantName}
+        dishCount={0}
+        categoryCount={0}
+        dinerUrl={null}
+        preparing
+        onBackToEdit={onBack}
+        onReviewDishes={onBack}
+        onPublish={() => {}}
+        onGoToDashboard={onDone ?? onBack}
+      />
+    );
 
   if (!preview)
     return (

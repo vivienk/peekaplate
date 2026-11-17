@@ -18,6 +18,15 @@ const render = (props: Partial<MenuPreviewProps> = {}) =>
   );
 
 describe('S13 menu preview states', () => {
+  it('preparation keeps the authored phone and link panel without invented counts or publishing', () => {
+    const html = render({ preparing: true, dinerUrl: null });
+    expect(html).toContain('pp-menu-preview__phone');
+    expect(html).toContain('pp-menu-preview__panel');
+    expect(html).toContain('Preparing your menu');
+    expect(html).not.toContain('7 dishes');
+    expect(html).not.toContain('Publish Menu');
+    expect(html).not.toContain('Choose the prepared menu');
+  });
   it('draft: no public link before publishing, Publish Menu available', () => {
     const html = render();
     expect(html).toContain('Preview your menu');
