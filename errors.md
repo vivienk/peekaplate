@@ -5161,3 +5161,12 @@ local workerd publication startup hit SQLITE_IOERR_TRUNCATE. The unchanged
 publication file passed 12/12 serially in 3.36 seconds; all 122 script tests also
 passed. Linux CI remains the final synchronization gate. No timeout or runtime
 behavior was weakened to mask this local storage failure.
+
+## November 17 — S13 preparation stopped at the historical menu chooser
+
+The successful preparation response lost its menuId in the client, and the owner
+controller only listed snapshots. The source-identity regression failed before
+the fix (menuId missing) and passed afterward. Retain the returned identity and
+reuse the existing authenticated preview/photo loader for exactly that snapshot.
+Preparation failures retain explicit historical selection and retry; publish
+still requires the existing confirmation. The authored S13 component/CSS is unchanged.

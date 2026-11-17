@@ -46,6 +46,18 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('owner menu client', () => {
+  it('preserves the exact prepared menu identity for the S13 handoff', async () => {
+    const prepared = { menuId: VENUE, menuRevisionId: JOB, completeDishes: 1 };
+    const { api } = client([{ status: 200, body: prepared }]);
+    await expect(api.prepareMenu(VENUE)).resolves.toEqual(prepared);
+    const missingIdentity = client([
+      { status: 200, body: { menuRevisionId: JOB, completeDishes: 1 } },
+    ]);
+    await expect(missingIdentity.api.prepareMenu(VENUE)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
+
   it('reads prepared preview photos only through the authenticated exact-snapshot blob route', async () => {
     const calls: Call[] = [];
     const origin = 'https://peekaplate-api-staging.vxkong.workers.dev';

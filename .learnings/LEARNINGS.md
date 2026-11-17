@@ -206,3 +206,9 @@ Browser and Node-only callers have different capabilities and need not change.
 Related: backend/src/owner-portion-preview.test.ts,
 backend/src/owner-portion-preview.workerd-harness.ts.
 Pattern: tests.platform-options-not-mocked; first occurrence, no policy promotion.
+
+November 17 S13 follow-up: a preparation handoff must carry the exact returned
+menu/revision identity into the authored preview. Stopping at an intermediate
+historical picker hides the implemented screen; choosing the first snapshot
+can instead preview stale content. Test multiple snapshots and direct navigation,
+not only a successful manual click through an incidental wrapper.

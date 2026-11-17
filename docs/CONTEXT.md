@@ -284,7 +284,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics. Existing ingredient controls reuse saved proposals; empty or duplicate results preserve review state. Stale editor/session results are discarded.",
+      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics. Ingredient proposals preserve empty/duplicate review state and reject stale results. S13 opens the exact preparation result directly in the authored preview; historical choices remain recovery-only.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -460,7 +460,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "2c64c319270a6a7b374e08a0177afca6047dc3816847ba26cf2b8f4b98a51a84"
+      "sourceFingerprint": "6c54854a22ed98b872504a6b422578c72239d6ab86637775013bfcf183466ae9"
     },
     {
       "id": "backend",
@@ -1098,26 +1098,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-16",
       "modules": [
-        "backend",
-        "contracts",
-        "database"
-      ],
-      "summary": "Extract existing canonical owner backend/profile/review/publication-asset adapters from held #213/#215 onto current develop; no frontend or replacement pipeline. Preserve #210 already merged and prove legacy draft-client compatibility. The #219 follow-up binds private portion export to the approved photo, cleans expired private artifacts and removes the processing host's temporary files.",
-      "files": [
-        "docs/owner-backend-wiring.md",
-        "backend/src/restaurant-profile.ts",
-        "backend/src/owner-menu.ts",
-        "packages/contracts/src/owner-menu.ts",
-        "migrations/20261116020000_owner_flow_profile.sql",
-        "backend/src/owner-menu-routes.ts",
-        "backend/src/owner-menu-retention.ts",
-        "docs/screen9-portion-publish.md"
-      ],
-      "next": "Run standalone checks and review this backend-only PR; leave #213 with Jeffin. Review the portion export change with #219. Hosted release and trusted preparation/admission require separate acceptance."
-    },
-    {
-      "date": "2026-11-16",
-      "modules": [
         "console",
         "backend",
         "contracts"
@@ -1254,6 +1234,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "Sync the same reviewed main ingredient/consent commits into develop, preserving existing order/comparison/local AI work. Active extraction authority and real SQL fixture regressions are included.",
       "next": "Wait for PR227 CI, merge main normally, then update develop without force or bypass. Deploy exact main only; credential approval and report completeness remain external AI gates."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "console"
+      ],
+      "summary": "Fix S13 handoff: retain preparation menu identity and load that exact snapshot in the existing PR208 MenuPreview. No screen/CSS replacement, auto-publication, or backend change.",
+      "next": "Verify direct preview and safe retry on staging; provider credentials and report completeness remain separate AI gates."
     }
   ]
 }

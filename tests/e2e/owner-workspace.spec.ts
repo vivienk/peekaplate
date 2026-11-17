@@ -728,7 +728,11 @@ async function preparedPublication(context: BrowserContext, privatePhotos = fals
     previewPhotoReads: 0,
     previewPhotoAuth: [] as string[],
     publicPhotoReads: 0,
-    prepareFailure: false as false | 'unavailable' | 'menu_not_verified',
+    prepareFailure: false as false | 'unavailable' | 'menu_not_verified' | 'not_found',
+    historicalFirst: false,
+    preparedMatch: 'exact' as 'exact' | 'missing' | 'ambiguous',
+    previewRequests: [] as string[],
+    preparedMenu: menu,
   };
   const headers = { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*' };
   await context.route('**/venues/*/prepared-menus**', async (route) => {
@@ -764,7 +768,12 @@ async function preparedPublication(context: BrowserContext, privatePhotos = fals
       state.prepares += 1;
       return state.prepareFailure
         ? route.fulfill({
-            status: state.prepareFailure === 'menu_not_verified' ? 409 : 503,
+            status:
+              state.prepareFailure === 'menu_not_verified'
+                ? 409
+                : state.prepareFailure === 'not_found'
+                  ? 404
+                  : 503,
             json: { error: state.prepareFailure },
             headers,
           })
@@ -784,10 +793,41 @@ async function preparedPublication(context: BrowserContext, privatePhotos = fals
       publicationVersion: state.publicationVersion,
       publishedRevisionId: state.publicationVersion ? menu.menuRevisionId : null,
     };
+    const historical = {
+      ...menu,
+      menuRevisionId: id(8),
+      publishedRevisionId: id(8),
+      publicationVersion: 1,
+    };
+    const menus =
+      state.preparedMatch === 'missing'
+        ? [historical]
+        : state.preparedMatch === 'ambiguous'
+          ? [liveMenu, { ...liveMenu }]
+          : state.historicalFirst
+            ? [historical, liveMenu]
+            : [liveMenu];
+    if (!new URL(route.request().url()).pathname.endsWith('prepared-menus')) {
+      const path = new URL(route.request().url()).pathname;
+      state.previewRequests.push(path);
+      const selected = menus.find((item) =>
+        path.endsWith(`/${item.menuId}/${item.menuRevisionId}`),
+      );
+      if (!selected) return route.fulfill({ status: 404, json: { error: 'not_found' }, headers });
+      return route.fulfill({
+        json: {
+          menu: selected,
+          content: {
+            ...content,
+            menu_id: selected.menuId,
+            menu_revision_id: selected.menuRevisionId,
+          },
+        },
+        headers,
+      });
+    }
     return route.fulfill({
-      json: new URL(route.request().url()).pathname.endsWith('prepared-menus')
-        ? { menus: [liveMenu] }
-        : { menu: liveMenu, content },
+      json: { menus },
       headers,
     });
   });
@@ -883,7 +923,7 @@ test('private prepared photos use owner-authenticated blobs and are revoked on l
   });
   await signIn(page);
   await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
-  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
   const image = page.getByRole('img', { name: 'Labelled synthetic test image' });
   await expect(image).toBeVisible();
   const blob = await image.getAttribute('src');
@@ -914,7 +954,9 @@ for (const width of [1440, 390]) {
     const state = await preparedPublication(context);
     await signIn(page);
     await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
-    await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Preview your menu', exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Synthetic Garden Soup' })).toBeVisible();
     await expect(
       page.getByText('Fictional soup used only for testing.', { exact: true }),
@@ -961,9 +1003,48 @@ for (const width of [1440, 390]) {
     await expect(page.getByRole('heading', { name: 'Your menu is live' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await page.getByRole('button', { name: 'Review and publish' }).click();
-    await page.getByRole('button', { name: /Preview prepared menu 1/ }).click();
     await expect(page.getByRole('heading', { name: 'Your menu is live' })).toBeVisible();
     expect(state.publishes).toHaveLength(1);
+  });
+}
+
+test('preparation opens its exact snapshot after an older published entry without a chooser or publication', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  const state = await preparedPublication(context);
+  state.historicalFirst = true;
+  await signIn(page);
+  await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Preview prepared menu/ })).toHaveCount(0);
+  expect(state.previewRequests).toEqual([
+    `/venues/${venue.venueId}/prepared-menus/${state.preparedMenu.menuId}/${state.preparedMenu.menuRevisionId}`,
+  ]);
+  expect(state.prepares).toBe(1);
+  expect(state.approvals).toEqual([]);
+  expect(state.publishes).toEqual([]);
+});
+
+for (const outcome of ['not_found', 'missing', 'ambiguous'] as const) {
+  test(`preparation preserves explicit selection when its result is ${outcome}`, async ({
+    context,
+    page,
+  }) => {
+    await fixture(context);
+    const state = await preparedPublication(context);
+    if (outcome === 'not_found') state.prepareFailure = outcome;
+    else state.preparedMatch = outcome;
+    await signIn(page);
+    await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
+    await expect(page.getByRole('list', { name: 'Prepared menus' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Preview prepared menu/ }).first()).toBeVisible();
+    await expect(page.locator('.pp-menu-preview__phone')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toHaveCount(0);
+    expect(state.previewRequests).toEqual([]);
+    expect(state.approvals).toEqual([]);
+    expect(state.publishes).toEqual([]);
   });
 }
 
@@ -976,7 +1057,7 @@ test('prepared publication retries the same command and a failed link read never
   state.approvalTimeout = true;
   await signIn(page);
   await page.getByRole('button', { name: 'Review and publish' }).click();
-  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
   await expect(page.getByRole('alert')).toContainText('We couldn’t publish your menu');
@@ -1000,7 +1081,7 @@ test('prepared publication conflict requires a fresh preview and denied access c
   state.conflict = true;
   await signIn(page);
   await page.getByRole('button', { name: 'Review and publish' }).click();
-  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
   await expect(
@@ -2841,8 +2922,9 @@ test('Review and publish prepares the menu, shows a failure and retries with Pre
   // Preparing approved and published nothing: S13 still needs the explicit Publish.
   expect(state.approvals).toEqual([]);
   expect(state.publishes).toEqual([]);
-  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Preview prepared menu/ })).toHaveCount(0);
   expect(state.publishes).toEqual([]);
 });
 
