@@ -4794,6 +4794,27 @@ documentation links and typechecks pass; no runtime source was changed by repair
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T06:48:17.646Z","exitCode":1}
 ```
 
+### ERR-20261117-PORTION-REVIEW-SETUP
+
+The plain Python service-test command could not import the processing package;
+adding `processing/src` to the invocation's module path passed all 23 tests.
+During the PR219/develop context-only conflict resolution, a pre-write assertion
+correctly detected that new portion sources were absent from the backend node.
+The following refresh still saw unresolved markers and failed. Adding the source
+paths, resolving the summary and refreshing fingerprints repaired the context;
+no runtime behavior was changed by this repair.
+
+The final console-summary sentence exceeded the existing 1000-character guard;
+the verification runner rejected it. Condensing existing walkthrough prose kept
+the same responsibilities and restored context/documentation checks. The first
+reconciliation push preceded this final failed check; the immediate forward
+documentation correction passed both checks before its push.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T09:21:40.192Z","exitCode":1}
+```
+
 ### ERR-20261117-HTML-INTAKE-REVIEW
 
 PR222 quality failed because the backend context fingerprint and PR documentation

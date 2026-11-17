@@ -45,6 +45,15 @@ import {
   withOwnerMenuTransaction,
 } from './owner-menu';
 import {
+  approvePrivatePortion,
+  exportApprovedPrivatePortion,
+  previewKey,
+  privatePreviewImage,
+  processPrivateDishPhoto,
+  readPrivatePortion,
+  readPrivatePortionApproval,
+} from './owner-portion-preview';
+import {
   readRestaurantProfile,
   readRestaurantSetup,
   restaurantPhoto,
@@ -238,6 +247,160 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
       201,
     );
   });
+
+  // S09 private 2.5D review. These routes do not approve/promote/publicly expose images.
+  // A draft's active photo ID and the authenticated venue are checked for every operation.
+  const portionScope = async (c: Context<{ Bindings: Bindings }>) => {
+    const { actor, venue } = await identity(c);
+    const scope = DraftPhotoScopeSchema.safeParse(c.req.param());
+    if (!scope.success) throw new IngestionError('invalid_request', 400);
+    const draftId = scope.data.draftId.toLowerCase();
+    const photoId = scope.data.photoId.toLowerCase();
+    const photo = await services.database(c.env, (client) =>
+      withOwnerMenuTransaction(client, actor, venue, async () => {
+        const row = await client.query<DraftPhoto>(
+          `SELECT p.* FROM app_private.dish_draft_photo p
+             JOIN app_private.dish_drafts d ON d.tenant_id=p.tenant_id
+               AND d.id=p.draft_id
+            WHERE p.tenant_id=$1 AND p.draft_id=$2 AND p.id=$3
+              AND d.removed_at IS NULL
+              AND p.verification_status<>'rejected'
+              AND (
+                lower(d.manual_fields->>'photoId')=p.id::text
+                OR EXISTS (
+                  SELECT 1 FROM app_private.extraction_review_session s
+                  JOIN app_private.candidate_review_current review
+                    ON review.tenant_id=s.tenant_id
+                   AND review.extraction_id=s.extraction_id
+                   AND review.candidate_id=d.candidate_id
+                  WHERE s.tenant_id=d.tenant_id
+                    AND s.job_id=d.job_id
+                    AND lower(review.corrected_fields->>'photo_id')=p.id::text
+                )
+              )`,
+          [venue, draftId, photoId],
+        );
+        return row.rows[0];
+      }),
+    );
+    if (!photo) throw new IngestionError('photo_not_found', 404);
+    const bucket = c.env.INGESTION_REPORTS_BUCKET;
+    if (!bucket?.get) throw new AuthUnavailableError();
+    return {
+      actor,
+      venue,
+      draftId,
+      photoId,
+      photo,
+      bucket,
+      key: previewKey(venue, draftId, photoId, photo.source_hash),
+    };
+  };
+
+  app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/portion', async (c) => {
+    const scope = await portionScope(c);
+    try {
+      const record = await processPrivateDishPhoto({
+        env: c.env,
+        bucket: scope.bucket,
+        venueId: scope.venue,
+        draftId: scope.draftId,
+        photoId: scope.photoId,
+        sourceKey: scope.photo.storage_key,
+        sourceHash: scope.photo.source_hash,
+        sourceSize: scope.photo.size_bytes,
+      });
+      const approval = await readPrivatePortionApproval(scope.bucket, scope.key, record);
+      c.header('Cache-Control', 'no-store');
+      return c.json({ portionReview: { ...record, approved: Boolean(approval) } });
+    } catch {
+      return c.json({ error: 'portion_processing_unavailable' }, 503);
+    }
+  });
+
+  app.get('/venues/:venueId/drafts/:draftId/photos/:photoId/portion', async (c) => {
+    const scope = await portionScope(c);
+    const record = await readPrivatePortion(scope.bucket, scope.key);
+    c.header('Cache-Control', 'no-store');
+    return record ? c.json({ portionReview: record }) : c.json({ error: 'not_found' }, 404);
+  });
+
+  app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/portion/approve', async (c) => {
+    const scope = await portionScope(c);
+    try {
+      const approval = await approvePrivatePortion(scope.bucket, scope.key, scope.actor);
+      c.header('Cache-Control', 'no-store');
+      return c.json({ approved: true, approvedAt: approval.approved_at });
+    } catch {
+      return c.json({ error: 'portion_not_ready' }, 409);
+    }
+  });
+
+  // Export for the existing privileged operator's exact bundle preparation. This
+  // never hosts an asset publicly or publishes a menu by itself.
+  app.get('/venues/:venueId/drafts/:draftId/photos/:photoId/portion/export', async (c) => {
+    const scope = await portionScope(c);
+    if (scope.photo.verification_status !== 'verified') {
+      return c.json({ error: 'photo_not_verified' }, 409);
+    }
+    const published = await services.database(c.env, (client) =>
+      withOwnerMenuTransaction(client, scope.actor, scope.venue, async () => {
+        const result = await client.query<{ dish_id: string; revision_id: string }>(
+          `SELECT d.published_dish_id AS dish_id, current.revision_id
+             FROM app_private.dish_drafts d
+             JOIN app_private.dish_current current
+               ON current.tenant_id=d.tenant_id
+              AND current.dish_id=d.published_dish_id
+            WHERE d.tenant_id=$1 AND d.id=$2
+              AND d.review_status IN ('accepted','edited')
+              AND d.removed_at IS NULL
+              AND lower(current.approved_facts->>'photoId')=$3
+              AND (
+                lower(d.manual_fields->>'photoId')=$3
+                OR EXISTS (
+                  SELECT 1 FROM app_private.extraction_review_session s
+                  JOIN app_private.candidate_review_current review
+                    ON review.tenant_id=s.tenant_id
+                   AND review.extraction_id=s.extraction_id
+                   AND review.candidate_id=d.candidate_id
+                  WHERE s.tenant_id=d.tenant_id
+                    AND s.job_id=d.job_id
+                    AND lower(review.corrected_fields->>'photo_id')=$3
+                )
+              )`,
+          [scope.venue, scope.draftId, scope.photoId],
+        );
+        return result.rows[0];
+      }),
+    );
+    if (!published) return c.json({ error: 'approved_dish_revision_unavailable' }, 409);
+    try {
+      const artifact = await exportApprovedPrivatePortion(scope.bucket, scope.key);
+      c.header('Cache-Control', 'private, no-store');
+      return c.json({
+        ...artifact,
+        venueId: scope.venue,
+        dishId: published.dish_id,
+        dishRevisionId: published.revision_id,
+        publicationEligible: false,
+      });
+    } catch {
+      return c.json({ error: 'portion_not_approved' }, 409);
+    }
+  });
+
+  app.get('/venues/:venueId/drafts/:draftId/photos/:photoId/portion/image', async (c) => {
+    const scope = await portionScope(c);
+    const record = await readPrivatePortion(scope.bucket, scope.key);
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    const image = await privatePreviewImage(scope.bucket, scope.key, record);
+    if (!image) return c.json({ error: 'not_found' }, 404);
+    c.header('Content-Type', 'image/webp');
+    c.header('Cache-Control', 'private, no-store');
+    c.header('X-Content-Type-Options', 'nosniff');
+    return c.body(image.buffer as ArrayBuffer);
+  });
+
   app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/approve', async (c) => {
     const { actor, venue } = await identity(c);
     const scope = DraftPhotoScopeSchema.safeParse(c.req.param());

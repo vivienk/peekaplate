@@ -18,6 +18,48 @@ const render = (props: Partial<DishEditorProps> = {}) =>
   );
 
 describe('live Screen 9 on the authored #172 presentation', () => {
+  it('renders a private actual 2.5D review image without claiming it is published', () => {
+    const html = render({
+      value: { ...emptyManualDish(), name: 'Garden Soup' },
+      portionReview: { status: 'needs_review', previewUrl: 'blob:generated-cutout' },
+    });
+    expect(html).toContain('src="blob:generated-cutout"');
+    expect(html).toContain('Review-only 2.5D preview of Garden Soup');
+    expect(html).toContain('Needs review');
+    expect(html).toContain('private until the menu is published');
+    expect(html).not.toContain('Diners can tap');
+  });
+
+  it('requires a deliberate 2.5D approval and never labels a private asset public', () => {
+    const pending = render({
+      portionReview: { status: 'needs_review', previewUrl: 'blob:review-image' },
+      onApprovePortion: noop,
+    });
+    expect(pending).toContain('Approve 2.5D preview');
+    const approved = render({
+      portionReview: {
+        status: 'needs_review',
+        previewUrl: 'blob:review-image',
+        approved: true,
+      },
+      onApprovePortion: noop,
+    });
+    expect(approved).toContain('Approved for publication review');
+    expect(approved).not.toContain('>Approve 2.5D preview</button>');
+    expect(approved).toContain('private until the menu is published');
+  });
+
+  it('does not treat a source photo or pending generation as approved 2.5D', () => {
+    const html = render({
+      photoUrl: 'blob:private-photo',
+      portionReview: { status: 'processing' },
+    });
+    expect(html).toContain('Preparing the 2.5D preview');
+    expect(html).not.toContain('src="blob:generated-cutout"');
+    const unavailable = render({ portionReview: { status: 'failed' } });
+    expect(unavailable).toContain('original dish photo remains the View Portion fallback');
+  });
+
   it('adds optional people served without replacing the authored serving-size text', () => {
     const html = render({
       value: { ...emptyManualDish(), servingSize: '1 bowl', servingCount: '2' },

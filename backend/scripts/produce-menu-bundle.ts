@@ -4,6 +4,11 @@ import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import pg from 'pg';
 import {
+  type PreparedPortionFile,
+  prepareApprovedPortion,
+  verifyHostedPortionFiles,
+} from '../src/bundle-producer/approved-portions';
+import {
   BundleProducerError,
   produceMenuBundle,
   type VerifiedT0Asset,
@@ -29,6 +34,10 @@ Options:
                          --admit requires the privileged (migration-owner) connection.
   --owner-profile-api <origin>  Read saved Screen 5 name/logo with PEEKAPLATE_OWNER_TOKEN.
                          Writes the verified logo under --out/assets for hosting.
+  --owner-portion-api <origin>  Authenticated owner API for approved Screen 9 2.5D export.
+  --portion-map <file>       JSON { venue_id, items: [{ dish_id, draft_id, photo_id }] }.
+                         Writes verified public layer bytes under --out/assets/portions.
+                         Requires PEEKAPLATE_OWNER_TOKEN. Public hosting remains operator-owned.
   --out <dir>            Output directory. Default: work/menu-bundles.
   --admit                Register the RES-02 review subject and public bundle URL.
                          Without it the command performs no database writes.
@@ -74,6 +83,8 @@ async function main() {
     options: {
       request: { type: 'string' },
       'owner-profile-api': { type: 'string' },
+      'owner-portion-api': { type: 'string' },
+      'portion-map': { type: 'string' },
       't0-root': { type: 'string' },
       'database-url': { type: 'string' },
       out: { type: 'string', default: 'work/menu-bundles' },
@@ -127,6 +138,96 @@ async function main() {
       request.venue_id,
       requestedDishes.map((dish) => dish.dish_id),
     );
+
+    const approvedPortionFiles: PreparedPortionFile[] = [];
+    if (values['portion-map']) {
+      if (!values['owner-portion-api'] || !process.env.PEEKAPLATE_OWNER_TOKEN) {
+        throw new CliError('--portion-map requires --owner-portion-api and PEEKAPLATE_OWNER_TOKEN');
+      }
+      const api = new URL(values['owner-portion-api']);
+      if (
+        api.protocol !== 'https:' ||
+        api.username ||
+        api.password ||
+        api.search ||
+        api.hash ||
+        api.pathname !== '/'
+      ) {
+        throw new CliError('Approved portion API must be a bare HTTPS origin');
+      }
+      const mapping: unknown = JSON.parse(await readFile(values['portion-map'], 'utf8'));
+      if (!mapping || typeof mapping !== 'object') {
+        throw new CliError('Invalid portion mapping');
+      }
+      const manifest = mapping as {
+        venue_id?: unknown;
+        items?: Array<{ dish_id: string; draft_id: string; photo_id: string }>;
+      };
+      const ids = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (
+        manifest.venue_id !== request.venue_id ||
+        !Array.isArray(manifest.items) ||
+        manifest.items.length === 0 ||
+        manifest.items.length > 500
+      ) {
+        throw new CliError('Portion map venue/items do not match the bundle request');
+      }
+      const seen = new Set<string>();
+      for (const item of manifest.items) {
+        if (
+          !item ||
+          !ids.test(item.dish_id) ||
+          !ids.test(item.draft_id) ||
+          !ids.test(item.photo_id) ||
+          seen.has(item.dish_id)
+        ) {
+          throw new CliError('Invalid or duplicate portion map entry');
+        }
+        seen.add(item.dish_id);
+        const dish = request.categories
+          .flatMap((category) => category.dishes)
+          .find((candidate) => candidate.dish_id === item.dish_id);
+        const source = sources.get(item.dish_id);
+        if (!dish || !source || dish.portion) {
+          throw new CliError('Portion map must target one existing, unmapped approved dish');
+        }
+        const endpoint = new URL(
+          `/venues/${request.venue_id}/drafts/${item.draft_id}/photos/${item.photo_id}/portion/export`,
+          api,
+        );
+        const options = {
+          headers: { Authorization: `Bearer ${process.env.PEEKAPLATE_OWNER_TOKEN}` },
+          credentials: 'omit',
+          cache: 'no-store',
+          redirect: 'error',
+          signal: AbortSignal.timeout(15_000),
+        } as const;
+        const response = await fetch(endpoint, options);
+        if (!response.ok) {
+          throw new CliError(`Approved 2.5D export unavailable for dish ${item.dish_id}`);
+        }
+        const raw: unknown = await response.json();
+        const prepared = prepareApprovedPortion(raw, {
+          venueId: request.venue_id,
+          dishId: item.dish_id,
+          dishRevisionId: source.dishRevisionId,
+          draftId: item.draft_id,
+          photoId: item.photo_id,
+          assetBaseUrl: request.asset_base_url,
+        });
+        dish.portion = prepared.portion;
+        for (const file of prepared.files) {
+          const localPath = join(values.out, 'assets', file.relativePath);
+          await mkdir(dirname(localPath), { recursive: true });
+          await writeImmutable(localPath, file.bytes);
+          approvedPortionFiles.push(file);
+        }
+      }
+    }
+    // A producer admission must not point at unhosted or tampered public assets.
+    if (values.admit && approvedPortionFiles.length) {
+      await verifyHostedPortionFiles(approvedPortionFiles);
+    }
     const produced = await produceMenuBundle(request, sources, assets);
     if (ownerRestaurant?.logoFile) {
       const path = join(values.out, 'assets', ownerRestaurant.logoFile.path);

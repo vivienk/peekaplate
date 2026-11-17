@@ -260,6 +260,9 @@ export type Bindings = {
   ORDER_IMPORT_HISTORICAL_DAYS?: string;
   ORDER_IMPORT_RETENTION_DAYS?: string;
   ORDER_IMPORT_GRACE_PERIOD_MS?: string;
+  /** Server-only Python 2.5D service; never exposed to the console bundle. */
+  PORTION_SERVICE_URL?: string;
+  PORTION_SERVICE_SECRET?: string;
   EXTRACTION_SERVICE_URL?: string;
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;

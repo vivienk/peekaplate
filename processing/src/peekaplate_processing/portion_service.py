@@ -12,7 +12,7 @@ from peekaplate_processing.portion_ingestion import ingest_dish_photo
 from peekaplate_processing.sources import MAX_SOURCE_BYTES
 
 
-def register_portion_routes(app, *, authorized, reply, root, processor=ingest_dish_photo):
+def register_portion_routes(app, *, authorized, reply, root, retain_artifacts=True, processor=ingest_dish_photo):
     slots = threading.BoundedSemaphore(1)
 
     @app.post('/v1/portion-uploads/{dish_id}/{revision_id}')
@@ -41,11 +41,17 @@ def register_portion_routes(app, *, authorized, reply, root, processor=ingest_di
             if not body:
                 return reply({'error': 'empty_photo'}, 422)
             def process():
-                with tempfile.TemporaryDirectory(prefix='portion-upload-') as temporary:
-                    source = Path(temporary) / 'photo'
+                scratch_root = None
+                if not retain_artifacts:
+                    root.mkdir(parents=True, exist_ok=True)
+                    scratch_root = root
+                with tempfile.TemporaryDirectory(prefix='portion-upload-', dir=scratch_root) as temporary:
+                    workdir = Path(temporary)
+                    source = workdir / 'photo'
                     source.write_bytes(body)
+                    output_root = (root if retain_artifacts else workdir) / 'portions'
                     directory, record = processor(input_path=source, dish_id=dish_id,
-                        revision_id=revision_id, output_root=root / 'portions',
+                        revision_id=revision_id, output_root=output_root,
                         capture_evidence='Private local photo upload; review required', serving_width_mm=serving_width, plate_calibration=plate)
                     # Delivery is bounded by the 180KB portion contract. Never expose disk paths.
                     layers = {}
