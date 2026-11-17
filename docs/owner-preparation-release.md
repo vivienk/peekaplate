@@ -101,3 +101,8 @@ These browser cases use synthetic provider/API HTTP fixtures. They are local
 regressions, not evidence of live OCR, a hosted staff session or provider billing.
 PR #219's Screen9-to-approved-2.5D asset work is explicitly excluded from this
 release and is the next integration step.
+
+The full release CI exposed one retained camera test expecting the older plate
+calibration wording. The serving-bound runtime message was already correct;
+updating that exact assertion made both desktop/mobile cases pass locally
+(`playwright.portion-published.config.ts`, 2/2, 8.1s). No runtime source changed.
