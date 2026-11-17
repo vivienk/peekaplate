@@ -38,7 +38,7 @@ import { renderDishDetail } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
-import { ingredientIconsEnabled, UI_ICONS } from './icons';
+import { UI_ICONS } from './icons';
 import { mountLiveArtwork } from './liveArtwork';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
@@ -645,7 +645,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     }
     const state = saveState;
     const stopArtwork =
-      menu.source === 'published' && import.meta.env.VITE_PUBLIC_API_URL && ingredientIconsEnabled()
+      menu.source === 'published' && import.meta.env.VITE_PUBLIC_API_URL
         ? mountLiveArtwork(container, dish, {
             apiBase: import.meta.env.VITE_PUBLIC_API_URL,
             venueId: menu.venueId,

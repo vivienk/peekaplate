@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderDishDetail } from './dishDetail';
 import type { CompleteDish } from './types';
 
@@ -35,7 +35,6 @@ const count = (html: string) => html.split(NOTE).length - 1;
 
 describe('dish detail allergen note', () => {
   it('renders Figma decoration with its visible ingredient label', () => {
-    vi.stubEnv('VITE_INGREDIENT_ICONS', 'on'); // icon behaviour itself (off by default)
     const html = render([], 'Avocado');
     expect(html).toContain('class="pp-ingredient__icon"');
     expect(html).toContain('alt="" aria-hidden="true"');
@@ -43,7 +42,6 @@ describe('dish detail allergen note', () => {
   });
 
   it('retains text for missing or unreviewed generated art and escapes labels', () => {
-    vi.stubEnv('VITE_INGREDIENT_ICONS', 'on'); // icon behaviour itself (off by default)
     expect(render([], 'Coconut')).toContain('class="pp-ingredient__icon"');
     expect(render([], 'Coconut')).toContain('class="pp-ingredient__name">Coconut</p>');
     expect(render([], '<img onerror="x">')).toContain('&lt;img onerror=&quot;x&quot;&gt;');
@@ -85,17 +83,5 @@ describe('dish detail allergen note', () => {
 
   it('never says there are no allergens', () => {
     expect(render([]).toLowerCase()).not.toContain('no allergens');
-  });
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
-
-describe('ingredients are text only by default (Jeffin, Nov 17)', () => {
-  it('shows the ingredient name and no icon unless VITE_INGREDIENT_ICONS=on', () => {
-    const html = render([], 'Avocado');
-    expect(html).not.toContain('pp-ingredient__icon');
-    expect(html).toContain('<p class="pp-ingredient__name">Avocado</p>');
   });
 });

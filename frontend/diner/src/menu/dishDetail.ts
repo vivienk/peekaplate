@@ -1,5 +1,5 @@
 import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
-import { ingredientIcon, ingredientIconsEnabled } from './icons';
+import { ingredientIcon } from './icons';
 import { navButtonMarkup } from './navButton';
 import { bindPortionPreview } from './portionPreview';
 import { formatPrice } from './price';
@@ -43,7 +43,7 @@ export function dietaryChips(dish: CompleteDish): string {
 function ingredientTiles(dish: CompleteDish): string {
   return dish.ingredients
     .map((ingredient) => {
-      const icon = ingredientIconsEnabled() ? ingredientIcon(ingredient.name) : null;
+      const icon = ingredientIcon(ingredient.name);
       return `
         <div class="pp-ingredient" role="group" aria-label="${escapeHtml(ingredient.name)}">
           ${icon ? `<img class="pp-ingredient__icon" src="${escapeHtml(icon)}" alt="" aria-hidden="true" width="36" height="36" />` : ''}
