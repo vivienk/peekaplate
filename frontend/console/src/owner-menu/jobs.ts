@@ -54,10 +54,12 @@ export function menuProcessingState(jobs: readonly MenuJob[]): MenuProcessingSta
   const errorCodes = [...new Set(live.flatMap((job) => (job.error_code ? [job.error_code] : [])))];
 
   let phase: MenuProcessingPhase;
-  if (ordered.length > 0 && live.length === 0) phase = 'cancelled';
+  if (ordered.length === 0) phase = 'processing';
+  else if (live.length === 0) phase = 'cancelled';
   else if (uploaded < live.length) phase = 'uploading';
   else if (live.some((job) => !FINISHED.has(job.status))) phase = 'processing';
-  else if (live.every((job) => job.status === 'failed')) phase = 'failed';
+  else if (draftCount === 0 && live.some((job) => ['failed', 'incomplete'].includes(job.status)))
+    phase = 'failed';
   else if (draftCount === 0) phase = 'empty';
   else if (live.some((job) => job.status !== 'complete')) phase = 'partial';
   else phase = 'ready';
@@ -77,6 +79,10 @@ export function menuProcessingState(jobs: readonly MenuJob[]): MenuProcessingSta
 // Screen copy for the API's error codes. Unknown codes fall back to a generic message rather
 // than showing the raw code.
 const ERROR_COPY: Record<string, string> = {
+  extraction_failed:
+    'The source could not be fully extracted. Try another source or add dishes manually.',
+  provider_call_budget_exhausted:
+    'The extraction limit has been reached. Add dishes manually or contact your administrator.',
   menu_file_link_required:
     'That page is not a single menu file. Paste a direct link to the PDF or image instead.',
   pdf_page_limit: 'This PDF has more than 10 pages. Upload a shorter PDF or a few photos.',

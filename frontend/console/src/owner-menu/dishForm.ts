@@ -25,8 +25,10 @@ export type DishForm = {
   name: string;
   category: string;
   description: string;
+  servingSize: string;
   priceAmount: string;
   priceCurrency: string;
+  servingCount?: string;
   ingredients: { status: ValueStatus; items: string[] };
   allergens: { status: ValueStatus; items: AllergenCode[] };
   photoId: string | null;
@@ -51,8 +53,10 @@ export function emptyManualDish(): DishForm {
     name: '',
     category: '',
     description: '',
+    servingSize: '',
     priceAmount: '',
     priceCurrency: '',
+    servingCount: '',
     ingredients: { status: 'unknown', items: [] },
     allergens: { status: 'unknown', items: [] },
     photoId: null,
@@ -81,15 +85,17 @@ export function dishFromReviewItem(
     name: effective.name,
     category: text(effective.category),
     description: text(effective.description),
+    servingSize: text(effective.serving_size),
     priceAmount: text(effective.price_amount),
     priceCurrency: text(effective.price_currency),
+    servingCount: effective.serving_count == null ? '' : String(effective.serving_count),
     ingredients:
       ingredients && ingredients.length > 0
         ? { status: 'proposed', items: [...ingredients] }
         : { status: 'unknown', items: [] },
-    // Extraction never supplies allergens; the owner has to add and confirm them.
-    allergens: { status: 'unknown', items: [] },
-    photoId: null,
+    // Only an explicit owner correction can add these; extraction never supplies them.
+    allergens: effective.allergens ?? { status: 'unknown', items: [] },
+    photoId: effective.photo_id ?? null,
     source: {
       extractionId,
       candidateId: review.candidateId,
@@ -116,8 +122,10 @@ export function dishFromManualDraft(draft: DishDraft): DishForm {
     name: text(fields.name),
     category: text(fields.category),
     description: text(fields.description),
+    servingSize: text(fields.servingSize),
     priceAmount: text(fields.priceAmount),
     priceCurrency: text(fields.priceCurrency),
+    servingCount: fields.servingCount == null ? '' : String(fields.servingCount),
     ingredients: { status: fields.ingredients.status, items: [...fields.ingredients.items] },
     allergens: { status: fields.allergens.status, items: [...fields.allergens.items] },
     photoId: fields.photoId,
@@ -147,13 +155,24 @@ export function manualSaveCommand(
       name: orNull(form.name),
       category: orNull(form.category),
       description: orNull(form.description),
+      servingSize: orNull(form.servingSize),
       priceAmount: orNull(form.priceAmount),
       priceCurrency: orNull(form.priceCurrency)?.toUpperCase() ?? null,
       ingredients: list(form.ingredients),
       allergens: list(form.allergens),
       photoId: form.photoId,
+      ...(form.servingCount !== undefined
+        ? { servingCount: servingCountValue(form.servingCount) }
+        : {}),
     },
   };
+}
+
+function servingCountValue(value: string): number | null {
+  if (!value.trim()) return null;
+  if (!/^(?:[1-9]\d?|100)$/.test(value.trim()))
+    throw new Error('Serving size must be a whole number from 1 to 100.');
+  return Number(value);
 }
 
 // The review correction for an extracted dish: only fields that differ from the current effective
@@ -164,6 +183,8 @@ export function reviewCorrection(
 ): CandidateCorrectedFields | null {
   const effective = item.effective;
   const corrected: CandidateCorrectedFields = {};
+  const servingCount = servingCountValue(form.servingCount ?? '');
+  if (servingCount !== (effective.serving_count ?? null)) corrected.serving_count = servingCount;
   const name = form.name.trim();
   if (name !== '' && name !== effective.name) corrected.name = name;
   const compare = <K extends 'description' | 'category' | 'price_amount' | 'price_currency'>(
@@ -180,6 +201,15 @@ export function reviewCorrection(
     form.ingredients.status === 'unknown' ? null : [...new Set(form.ingredients.items)];
   const before = effective.ingredients ?? null;
   if (JSON.stringify(ingredients) !== JSON.stringify(before)) corrected.ingredients = ingredients;
+  if (orNull(form.servingSize) !== (effective.serving_size ?? null))
+    corrected.serving_size = orNull(form.servingSize);
+  const allergens = list(form.allergens);
+  if (
+    JSON.stringify(allergens) !==
+    JSON.stringify(effective.allergens ?? { status: 'unknown', items: [] })
+  )
+    corrected.allergens = allergens;
+  if (form.photoId !== (effective.photo_id ?? null)) corrected.photo_id = form.photoId;
   return Object.keys(corrected).length === 0 ? null : corrected;
 }
 

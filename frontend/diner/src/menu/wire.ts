@@ -9,6 +9,7 @@ export type WireIncompleteDish = { dish_id: string; dish_revision_id: string; co
 
 export type WireCompleteDish = {
   portion?: PublicPortion;
+  serving_count?: number;
   dish_id: string;
   dish_revision_id: string;
   complete: true;

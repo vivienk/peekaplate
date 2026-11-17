@@ -15,6 +15,7 @@ import type { RestaurantDetails as Details } from './details';
 import { MenuProcessing, type MenuProcessingState, type MenuSourceItem } from './MenuProcessing';
 import { menuFileKind } from './menu-source';
 import { OnboardingLayout } from './OnboardingLayout';
+import { OwnerJourneyDemo } from './OwnerJourneyDemo';
 import { RestaurantDetails } from './RestaurantDetails';
 import { type MenuUpload, UploadMenu } from './UploadMenu';
 
@@ -443,6 +444,6 @@ function useUploads(answer: string, onRequest: () => void) {
 
 createRoot(root).render(
   <StrictMode>
-    <Demo />
+    {new URLSearchParams(window.location.search).has('journey') ? <OwnerJourneyDemo /> : <Demo />}
   </StrictMode>,
 );

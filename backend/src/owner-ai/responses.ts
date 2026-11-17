@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   type OwnerAnalysisRequest,
   type OwnerAnalysisResult,
@@ -6,6 +5,7 @@ import {
 } from '@peekaplate/contracts/owner-analysis';
 import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { z } from 'zod';
+import { ownerReportSnapshot } from './report-reference';
 
 export const OWNER_ANALYSIS_MODEL = 'gpt-6-luna';
 export const OWNER_ANALYSIS_MAX_TOKENS = 128;
@@ -42,7 +42,7 @@ export async function analyzeOwnerReport(options: {
     dishId: dish.dish_id,
     goal: options.request.goal,
     source: 'synthetic' as const,
-    reportSnapshot: createHash('sha256').update(JSON.stringify(report)).digest('hex'),
+    reportSnapshot: ownerReportSnapshot(report),
     timeWindow: { start: meta.date_window.start_time, end: meta.date_window.end_time },
     approvalRequired: true as const,
     allowedEffects: [] as [],

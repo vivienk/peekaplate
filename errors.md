@@ -4469,3 +4469,300 @@ origin, then passed after both paths reused the existing staging-only rule.
 Production/unconfigured/lookalike origins and missing-token denial are covered.
 Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
 
+## ERR-20261116-OWNER-PROFILE-ADAPTER — saved details reopen
+
+The new profile-save/reload browser case reproduced a S05 crash: the adapter
+passed profile `photoId` into the authored text-only details form. Its existing
+field validator correctly expects strings, and `null.trim()` failed. The live
+adapter now explicitly passes the six authored text fields; private photo data
+stays on the existing photo prop. The same regression passes after the fix,
+including submission status and cancelled sign-out retaining unsaved edits.
+
+## ERR-20261116-OWNER-TEST-FIXTURES — fixed candidate during browser checks
+
+The first workspace run used obsolete processing/navigation expectations and an
+incomplete required serving-size fixture. Assertions now follow #207's explicit
+empty/queued states and still verify saved work; valid dish fixtures include the
+authored required fields. Editing served source during that run also triggered
+Vite HMR while a photo case was clicking Continue. An uninterrupted rerun passes
+that case. Candidate source must stay unchanged until browser execution ends.
+
+Two read commands used guessed filenames and returned path-not-found. Subsequent
+inspection used targeted file discovery; no missing-file result was treated as
+implementation evidence.
+
+## ERR-20261116-OWNER-SESSION-GENERATION — cross-tab identity change
+
+The connected workspace suite exposed an old request returning a local token
+denial after another tab had signed in as a new owner. Its stale callback expired
+the new session before React cleanup ran. Session-expiration callbacks now check
+the identity generation that created them. The original cross-tab regression
+passes five consecutive runs (13.8s); actor-bound token rejection is preserved.
+
+## ERR-20261116-PREVIEW-CONTROLLER-IMPORT — synthetic walkthrough isolation
+
+The strict preview build rejected a contracts label pulled in through the live
+publication controller. The existing DraftMenu presentation was moved unchanged
+to a data-only file used by both controller and demo. No analytics assertion was
+weakened. All five console-preview build/isolation tests pass (3.79s).
+
+## ERR-20261116-OWNER-REMOVAL-VERIFY — visible draft snapshot
+
+Independent review found that verification's final count still included removed
+drafts. A remove/Undo/remove/verify browser sequence reproduced a false conflict
+after successful writes. The confirmed snapshot now uses the same nonremoved
+predicate as the rendered review list. The extended S10 regression passes.
+
+The PDF cross-check also identified the missing account-to-details transition
+and demo-only progress coupling. Both reuse existing screens and setup rules.
+The original S05 photo-baseline regression exposed a compatibility distinction:
+private blob URL arrival is not a changed saved photo. The live adapter supplies
+stable photo identity; callers without it retain the authored URL-baseline rule.
+
+The final snapshot also rejects a removed original when another tab adds a new
+unverified draft with the same active count. The fixture reproduces the stale
+success before the identity predicate is corrected. The final 50-case workspace
+suite passes in 54.4s. Its delayed-review test now waits for initial hydration
+before delaying the intended editor request; direct loading/picker states retain
+their existing account-menu helper behavior.
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-16T08:53:58.689Z","exitCode":1}
+```
+
+## ERR-20261116-OWNER-BACKEND-CONSOLIDATION — combined correction contract
+
+Combining the original serving-size/photo/allergen corrections with numeric
+serving count produced twelve editable fields while the incomplete-field command
+still allowed eleven. The new all-fields regression failed with the intended
+array bound, then passed after deriving the bound from the existing enum. The
+focused contract/review/profile/producer run passes 105 tests in 1.01 seconds.
+
+A placeholder test was started before parallel conflict resolution had finished
+and failed collection on a contract diff marker. Source collection was paused
+until the candidate parsed. The stable placeholder/auth tests then passed. The
+optional formatter command was unavailable; the installed repository Biome
+formatter was used without installing another dependency.
+
+The combined typecheck found a duplicated profile import left by three-way
+reconciliation. Removing that duplicate preserves the shared profile module;
+the complete typecheck then passed. Windows audit helpers also required explicit
+UTF-8 decoding; the affected merge buffers were restored before validation.
+
+The first combined database run passed all 396 SQL assertions and 161 integration
+cases, then failed an older test that expected a stale verification receipt to
+report success after an extraction retry. The reconciled guard intentionally
+returns a version conflict. That assertion now requires the denial and still
+checks the new draft remains unverified; the existing same-version replay and
+new-version re-verification assertions are retained. A fresh full run is required.
+
+The subsequent full database run passed 396 assertions and all 162 integration
+cases (37.44 seconds), followed by the disposable local Worker smoke. The first
+aggregate unit run also exposed a redundant incoming dashboard edit-action prop:
+the retained setup rules already supply the original accessible Edit action.
+The duplicate branch and its redundant assertion were omitted; the original
+dashboard tests remain intact. The final aggregate check passed 1,991 unit and
+117 script tests. No profile status or publication gate was relaxed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T10:04:42.388Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-16T10:06:30.671Z","exitCode":1}
+```
+
+
+## ERR-20261116-DINER-MAPPING · Local implementation checks
+
+The new producer regression first failed because `portion` was rejected by the request schema. The header regression was added for ignored published logos; its first combined run also exposed incomplete DOM test doubles. Generic fallback icons required updating the previous no-icon expectations and DOM doubles. The profile test double initially inferred a zero-argument query and failed TypeScript; its SQL argument is now explicit. Regression locations: `backend/src/bundle-producer/produce.test.ts`, `frontend/diner/src/menu/menuScreen.test.ts`, `frontend/diner/src/menu/icons.test.ts`, `backend/src/restaurant-profile.test.ts`.
+
+Local setup initially used Node 24.14 and offline installation missed a locked package. Node 24.16 (Intel) and the locked dependencies were downloaded; no dependency versions changed. The first browser launch found port 5173 occupied, so bounded test copies use isolated ports 5193/5194. No existing server was stopped. Final results are recorded in the PR; these initial failures are not acceptance evidence.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-16T10:18:12.130Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-16T10:23:30.925Z","exitCode":1}
+```
+
+
+### ERR-20261116-DINER-MAPPING follow-up
+
+The unrestricted focused profile database integration passed (persistence, unauthorized venue/viewer rejection, stale versions, idempotency and replay). The standard full database runner exceeded its 120-second integration deadline after all 13 SQL test files passed. The first full unit run could not bind local auth test sockets or write the Worker tool log; 1,941 assertions passed, while auth/Worker setup and local-session cleanup failed. The full test runner was then rerun with local server access. Browser authoring corrected strict label selectors, the configured auth origin, and duplicate notice rendering. Browser testing also found the unknown-status dashboard hid the profile edit action; `FirstDashboard` now exposes editing independently from verification state. Review fixes and regressions cover broken-logo replacement and conflict recovery without losing the form's edits.
+
+The unrestricted full Vitest run passed 1,962 tests (5 skipped). The script suite passed 116/117; its unchanged app-site overlap test compared `/var` and `/private/var` aliases and received the filesystem's EINVAL rather than the expected application error. Final checks use canonical `TMPDIR=/private/tmp`. No app-site source change is included.
+
+The extended disposable-database integration run completed with 151 passed and three failures in existing `backend/src/dish.integration.ts` cases: owner browser transport, team analytics authorization, and real-JWT staff persistence each exceeded their 15-second test deadlines. These remain unresolved full-suite failures; the new Screen 5 integration passed. No timeout or application behavior was weakened to obtain a pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-16T10:41:00.627Z","exitCode":1}
+```
+
+### ERR-20261116-DINER-MAPPING database follow-up
+
+The standard local database runner again exhausted its 120-second child-process deadline. An isolated diagnostic reproduced only the browser-transport case at 15 seconds; analytics completed in 3.1 seconds and real-JWT persistence in 0.3 seconds. Chromium startup/document navigation consumed the same test budget as API assertions, and the fixture silently reused an unrelated listener when port 5174 was occupied. It now routes only the synthetic document at the allowed console origin, moves browser startup into the existing bounded setup hook, and closes the browser in teardown even after timeout. Worker API/database calls and all authorization/persistence assertions remain real. The sequential integration process budget is five minutes; individual test/hook deadlines remain 15/45 seconds. The launcher regression still rejects child timeout/nonzero results. Full rerun results belong in the PR.
+
+CI run 43849900559 already passed all 154 database integration tests, but its browser lane found an old local-demo selector for the removed text wordmark. The demo now waits for the header container; the dedicated published-logo test still checks image rendering and broken-image text recovery. PR documentation failed because three required contract field labels were missing; the description now supplies those labels without relaxing its validator.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-16T10:46:32.976Z","exitCode":1}
+```
+
+The first lifecycle fix used a routed HTML document; Chromium then rejected its first real API fetch, and the complete suite reported 153 passed/1 failed. Restored an owned real HTTP document server in the setup hook, with occupied-port errors now failing setup instead of adopting another server. No browser security flag or API/CORS assertion was bypassed.
+
+Final `TMPDIR=/private/tmp VITEST_MAX_WORKERS=2 pnpm verify test:db` passed all 13 SQL files, all 154 integration tests (39.46s Vitest duration), and the local Worker startup/demo/cleanup smoke. The original three timed-out cases passed with their existing 15-second deadlines.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T17:44:40.365Z","exitCode":2}
+```
+
+## ERR-20261116-SERVING-AR
+
+Source inspection found the authored Screen 9 Serving Size input disabled and absent from saved/approved/public contracts. Added optional owner-confirmed count through both manual and extracted review paths. The first focused suite exposed a stale exact expected draft payload (new unknown count is null); updated it to retain the explicit unknown. Typecheck caught the explicit-undefined count under exact optional properties; the AR call boundary now declares that input. New producer/scale regressions bind measurements to the approved count, not a count-based multiplier. Existing events without the optional field retain their shape.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-16T17:49:53.815Z","exitCode":1}
+```
+
+The independent review found `publicBundleToWire` omitted `serving_count`, disabling measured AR on actual published deliveries. A new published-loader regression failed before the mapping fix and all 31 loader tests passed afterward. The first full check passed 1967 unit tests and 117 script tests but detected a stale diner context fingerprint; refreshed it after reviewing the serving-count handoff. Browser regressions passed saved/reloaded Screen 9 count, matching published calibration, cross-dish navigation, mismatched calibration rejection, and approximate fallback labels.
+
+The full affected browser run passed 57 cases and failed an outdated exact motion-label expectation after adding the required approximate notice. Updated the expectation. A separate original-photo comparison path still replaced that notice; the new serving browser regression reproduced the missing label before the one-line fix. The comparison return now uses the same approximate label as initial display and motion changes.
+
+## ERR-20261116-PR215-REVIEW
+
+Sai's count-only correction case reproduced on a disposable real database: the effective count changed but the draft remained version 1 and verified (expected version 2/not_verified). Reused PR213's draft-before-review locks and same-transaction invalidation; added count-only correction/retry/stale-verification coverage. Profile source inspection confirmed two projections writing the same event stream. Reused PR213's canonical fields/status/photo-ID contract, routes and unchanged migration; removed the undeployed PR215-only migration. Added actual HTTP upload/save/export integration through the shared profile and exact byte checks. No cloud database or deployment was changed.
+
+The full reconciled database suite passed 14 SQL files and 158 integration tests plus Worker smoke. Independent correctness review found a same-photo recovery defect inherited from the canonical upload path: receipt/hash deduplication skipped storage repair. The added HTTP regression removed the synthetic stored object and reproduced failed export after reupload. Upload retries now verify or repair only the exact authorized hash-bound bytes, preserving photo IDs and profile history; the same-key and new-key recovery paths are covered.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-16T22:36:28.170Z","exitCode":2}
+```
+
+Final typecheck caught the optional storage-reader interface in the retry repair route. The route now treats an unavailable reader as an unverified object and restores the authenticated exact bytes through the existing writer; it does not claim a verified object without reading it.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-16T22:37:38.938Z","exitCode":1}
+```
+
+The follow-up callback edit introduced two extra spaces; the aggregate formatter caught it before type/unit stages. Applied the repository formatter and refreshed context before rerunning.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-17T02:31:10.263Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-17T02:34:07.716Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T02:37:57.083Z","exitCode":1}
+```
+
+### ERR-20261117-OWNER-PROFILE-NAVIGATION
+
+Independent review of the latest authored screen refinements found that a delayed
+restaurant-profile save reopened source selection after the owner had already
+returned to the dashboard. The focused browser regression reproduced the missing
+dashboard heading before the fix. The save now reuses the existing view-generation
+fence: persistence and its notice complete, but an abandoned view cannot navigate.
+The same regression passed afterward (1/1, 3.9s including startup). No authored
+screen, button placement or save/authorization semantics changed.
+
+### ERR-20261117-OWNER-OCR-RECONCILIATION
+
+The final PR207 source comparison found omitted recovery copy, uploading-state
+guidance and outcome regressions in the consolidated branch. A focused unit test
+reproduced generic guidance for an exhausted provider allowance; a browser test
+reproduced queued copy while a file was still missing. Restored the original
+source increments and adapted its five outcome/correction cases to current S09.
+All seven job units and six OCR browser cases pass. The copied retry assertion
+also exposed an older fixture omission: it now mirrors the existing SQL
+GREATEST(max_attempts,attempt_count+3), without changing backend/provider budgets.
+
+### ERR-20261117-REVIEW-UNDO-PENDING
+
+The expanded workspace run passed 58 cases and reproduced a dropped Undo click:
+the removal notice appeared before its status refresh completed, while the
+shared command runner still rejected concurrent work. A delayed-read regression
+confirmed Undo was incorrectly enabled. ReviewDishes now reuses its existing
+pending prop to disable Remove/Undo and defers Undo focus until it is enabled.
+The corrected case passed three repeats in 11.3s. The first edit accidentally
+put the effect guard in the adjacent verification dialog; browser execution
+caught the undefined variable, and the edit was corrected before commit. Screen
+markup, placement, command identity and persistence remain unchanged.
+## ERR-20261117-ARTWORK-PENDING-AUTHORITY
+
+The backend-only PR210 review reproduced a private-read authorization gap:
+the pending-artwork reader accepted a membership that could be revoked after
+route preflight. The focused regression resolved instead of rejecting before
+the fix. The reader now reuses existing staff authorization with a membership
+row lock inside the same transaction as the tenant-scoped read; the route passes
+the verified actor. Unit denial/rollback and real-database revocation regressions
+pass. Full database verification passes 14 SQL files and 156 integration tests
+(37.39s), plus the local Worker smoke; disposable resources were cleaned up.
+No profile/frontend code, admission grant or hosted migration is included.
+
+Context refresh initially rejected the expanded backend summary's length.
+Shortened that index summary without changing scope, refreshed its fingerprint,
+then passed the full check (1,962 unit and 117 script tests, lint/types/context/docs).
+
+## ERR-20261116-BACKEND-SPLIT-COMPATIBILITY
+
+Separating the existing backend from held PR213 exposed a compatibility issue
+with develop's unchanged manual-draft caller: omitted serving fields were required
+by the inferred request type and normalized away saved serving metadata. A
+focused real-database regression reproduced size/count loss. The shared request
+now accepts legacy omission; the existing locked save transaction preserves
+omitted extensions while explicit null clears them. Request hashes keep legacy
+omission distinct from clearing, and event snapshots preserve replayed values.
+Focused verification passed 16 unit tests, 23 real-database owner-menu cases
+(6.84s), console typecheck and formatter checks. A receipt assertion was corrected
+to compare its JSON wire snapshot with PostgreSQL dates; no runtime check was
+weakened. Full standalone checks are recorded on the wiring PR.
+
+
+### ERR-20261117-OWNER-MERGE-CONTEXT
+
+The PR213/develop reconciliation first exceeded the context node summary limit
+while combining the existing backend and report-reference descriptions. Context
+refresh rejected the oversized summary before checks. The summary was condensed
+within the existing 1000-character limit; module paths, both handoffs and runtime
+behavior were retained. This was documentation normalization, not a runtime failure.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-17T05:17:56.435Z","exitCode":2}
+```
+
+### ERR-20261117-OWNER-MERGE-OPTIONAL-SIZE
+
+Merging PR217 compatibility into PR213 reproduced TS2375 in the review adapter:
+the optional serving-size contract could produce an explicitly undefined property,
+which ReviewDish rejects under exactOptionalPropertyTypes. The focused existing
+adapter suite also failed its omitted-property regression before the fix. A
+conditional spread now omits only undefined and preserves explicit null/text.
+The five focused adapter cases pass; authored markup, styles and tokens are unchanged.
+
+### ERR-20261116-LEGAL-RECONCILE-CONTEXT
+
+The PR201 merge handoff script initially addressed context graph `modules` rather
+than its actual `nodes` key and stopped before writing. Reading the schema and
+using `nodes` resolved the documentation-only failure. Context validation,
+documentation links and typechecks pass; no runtime source was changed by repair.

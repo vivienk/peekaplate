@@ -53,12 +53,15 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
       if (generation === identityGeneration.current) setLoading(false);
     }
   }, [auth]);
+  const sessionGeneration = identityGeneration.current;
   const sessionExpired = useCallback(() => {
+    // An old workspace can finish after a cross-tab identity change, before effect cleanup.
+    if (sessionGeneration !== identityGeneration.current) return;
     identityGeneration.current++;
     setOwner(null);
     setLoading(false);
     setMessage('Your session could not be verified. Please sign in again.');
-  }, []);
+  }, [sessionGeneration]);
   const signOut = useCallback(async () => {
     setBusy(true);
     if (await auth.signOut()) {

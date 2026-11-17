@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+// Number of people served; never a physical scale multiplier.
+export const ServingCountSchema = z.number().int().min(1).max(100);
+
 export const PlateCalibrationSchema = z
   .strictObject({
     shape: z.enum(['round', 'rectangular']),
@@ -45,6 +48,7 @@ export const PublicPortionSchema = z
       .optional(),
     physical_size: z
       .strictObject({
+        serving_count: ServingCountSchema.optional(),
         plate: PlateCalibrationSchema,
         foreground_sha256: z.string().regex(/^[a-f0-9]{64}$/),
         source: z.literal('owner'),

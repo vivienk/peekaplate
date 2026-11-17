@@ -87,7 +87,7 @@ test('S05 clears the chosen photo after its saved baseline changes', async ({ pa
     ),
   );
   await expect(save(page)).toHaveAttribute('aria-disabled', 'true');
-  await expect(page.getByRole('img', { name: 'Restaurant photo' })).toHaveAttribute(
+  await expect(page.getByRole('img', { name: 'Restaurant logo' })).toHaveAttribute(
     'src',
     '/brand/peekaplate-logo.svg',
   );
@@ -184,14 +184,14 @@ test('choosing a photo previews it and rejects other file types', async ({ page 
     'base64',
   );
   await input.setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: png });
-  await expect(page.getByRole('img', { name: 'Restaurant photo' })).toBeVisible();
-  await expect(page.getByText('Change photo')).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Restaurant logo' })).toBeVisible();
+  await expect(page.getByText('Change logo')).toBeVisible();
 });
 
-test('S05 Upload photo is a Design System button that opens the file picker', async ({ page }) => {
+test('S05 Upload logo is a Design System button that opens the file picker', async ({ page }) => {
   await page.goto(demo);
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: 'Upload photo' }).click();
+  await page.getByRole('button', { name: 'Upload logo' }).click();
   expect((await chooser).isMultiple()).toBe(false);
 });
 
