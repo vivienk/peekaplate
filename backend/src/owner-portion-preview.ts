@@ -64,8 +64,11 @@ export async function readPrivatePortion(
   }
   if (record.portion) {
     const parsed = PublicPortionSchema.safeParse(record.portion);
-    if (!parsed.success || parsed.data.dish_id !== record.dish_id ||
-      parsed.data.dish_revision_id !== record.draft_revision_id) {
+    if (
+      !parsed.success ||
+      parsed.data.dish_id !== record.dish_id ||
+      parsed.data.dish_revision_id !== record.draft_revision_id
+    ) {
       throw new Error('invalid_private_portion');
     }
   }
