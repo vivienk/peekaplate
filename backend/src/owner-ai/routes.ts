@@ -3,10 +3,17 @@ import { z } from 'zod';
 const VenueScopeSchema = z.strictObject({ venueId: z.uuid().transform((id) => id.toLowerCase()) });
 
 import { OwnerAnalysisRequestSchema } from '@peekaplate/contracts/owner-analysis';
+import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import type { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import type { Bindings } from '../index';
+import { configuredSyntheticReportVenues } from '../owner-report-scope';
+import {
+  OWNER_REPORT_REFERENCE_HEADER,
+  ownerReportSnapshot,
+  readOwnerReportReference,
+} from './report-reference';
 import { analyzeOwnerReport, OwnerAnalysisUnavailable } from './responses';
 
 export function registerOwnerAnalysisRoutes(
@@ -22,6 +29,7 @@ export function registerOwnerAnalysisRoutes(
     ) => Promise<unknown>;
     allowedOrigins: readonly string[];
     syntheticVenues: readonly string[];
+    syntheticLoopbackPreview?: true;
     now?: () => Date;
     fetchImpl?: typeof fetch;
   },
@@ -33,7 +41,7 @@ export function registerOwnerAnalysisRoutes(
     cors({
       origin: [...options.allowedOrigins],
       allowMethods: ['POST', 'OPTIONS'],
-      allowHeaders: ['Authorization', 'Content-Type'],
+      allowHeaders: ['Authorization', 'Content-Type', OWNER_REPORT_REFERENCE_HEADER],
       maxAge: 600,
     }),
   );
@@ -52,13 +60,15 @@ export function registerOwnerAnalysisRoutes(
     const origin = c.req.header('Origin');
     if (origin && !options.allowedOrigins.includes(origin))
       return c.json({ error: 'forbidden' }, 403);
+    const preview = options.syntheticLoopbackPreview === true && env.APP_ENV === 'local';
+    const referenceSecret = env.OWNER_AI_REPORT_REFERENCE_SECRET;
     if (
       env.OWNER_AI_RESPONSES_ENABLED !== 'true' ||
       !['local', 'staging'].includes(env.APP_ENV ?? '') ||
-      !options.syntheticVenues.includes(scope.data.venueId) ||
-      scope.data.venueId !== env.SYNTHETIC_REPORT_VENUE_ID ||
+      !configuredSyntheticReportVenues(env, options.syntheticVenues).includes(scope.data.venueId) ||
       !env.OWNER_AI_OPENAI_API_KEY ||
       !env.OWNER_AI_OPENAI_PROJECT_ID ||
+      (!referenceSecret && !preview) ||
       !options.readReport ||
       (env.APP_ENV === 'staging' && !env.OWNER_AI_RATE_LIMITER)
     ) {
@@ -71,12 +81,35 @@ export function registerOwnerAnalysisRoutes(
     if (!input.success || new URL(c.req.url).search)
       return c.json({ error: 'invalid_request' }, 400);
     const now = options.now?.() ?? new Date();
+    const reference = referenceSecret
+      ? await readOwnerReportReference(
+          c.req.header(OWNER_REPORT_REFERENCE_HEADER),
+          { actorId: actor, venueId: scope.data.venueId },
+          referenceSecret,
+          now,
+        )
+      : null;
+    if (!reference && (!preview || referenceSecret)) {
+      return c.json({ error: 'report_reference_unavailable' }, 409);
+    }
     // The existing reader checks current owner membership in a tenant-scoped read-only transaction.
     // No browser report, metrics, prompt, model, policy or credential is accepted.
-    const report = await options.readReport(actor, scope.data.venueId, now, env, 'synthetic');
+    const report = OwnerDishReportSchema.safeParse(
+      await options.readReport(
+        actor,
+        scope.data.venueId,
+        reference?.anchor ?? now,
+        env,
+        'synthetic',
+      ),
+    );
+    if (!report.success) return c.json({ error: 'service_unavailable' }, 503);
+    if (reference && ownerReportSnapshot(report.data) !== reference.snapshot) {
+      return c.json({ error: 'report_reference_unavailable' }, 409);
+    }
     try {
       const result = await analyzeOwnerReport({
-        report,
+        report: report.data,
         venueId: scope.data.venueId,
         request: input.data,
         now,

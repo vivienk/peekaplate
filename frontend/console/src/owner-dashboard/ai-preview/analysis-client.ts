@@ -12,13 +12,20 @@ export class OwnerAnalysisAccessError extends Error {
   }
 }
 
+export class OwnerAnalysisReferenceError extends Error {
+  constructor() {
+    super('Reload the report before requesting analysis.');
+    this.name = 'OwnerAnalysisReferenceError';
+  }
+}
+
 export function createOwnerAnalysisClient(options: {
   baseUrl: string;
   venueId: string;
   getAccessToken: () => Promise<string | null>;
   fetchImpl?: typeof fetch;
 }) {
-  return async (request: OwnerAnalysisRequest, signal: AbortSignal) => {
+  return async (request: OwnerAnalysisRequest, signal: AbortSignal, reportReference?: string) => {
     const input = OwnerAnalysisRequestSchema.parse(request);
     const base = new URL(options.baseUrl);
     const apiBase =
@@ -40,12 +47,20 @@ export function createOwnerAnalysisClient(options: {
         redirect: 'error',
         credentials: 'omit',
         cache: 'no-store',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          ...(reportReference ? { 'X-Owner-Report-Ref': reportReference } : {}),
+        },
         body: JSON.stringify(input),
       },
     );
     if (response.status === 401 || response.status === 403)
       throw new OwnerAnalysisAccessError(response.status);
+    if (response.status === 409) {
+      const body = await response.json().catch(() => null);
+      if (body?.error === 'report_reference_unavailable') throw new OwnerAnalysisReferenceError();
+    }
     if (!response.ok) throw new Error('Analysis unavailable');
     const result = OwnerAnalysisResultSchema.parse(await response.json());
     signal.throwIfAborted();

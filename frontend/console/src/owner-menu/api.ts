@@ -11,6 +11,9 @@ import {
   type ApproveMenuRevision,
   ApproveMenuRevisionSchema,
   CreateMenuUploadGroupSchema,
+  type DishAssistanceRequest,
+  DishAssistanceRequestSchema,
+  DishAssistanceResultSchema,
   DishRevisionSchema,
   type ExtractionReviewSessionResponse,
   ExtractionReviewSessionResponseSchema,
@@ -320,6 +323,31 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   });
 
   return {
+    async assistDish(venueId: string, draftId: string, input: DishAssistanceRequest) {
+      const payload = DishAssistanceRequestSchema.parse(input);
+      return request(
+        venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/ai/assist`),
+        json('POST', payload),
+        (body) => {
+          const value = DishAssistanceResultSchema.parse(body);
+          if (
+            value.venueId !== venueId ||
+            value.draftId !== draftId ||
+            value.requestId !== payload.requestId ||
+            value.expectedVersion !== payload.expectedVersion ||
+            value.operation !== payload.operation
+          )
+            throw new Error('assistance scope');
+          if (
+            value.evidence?.source === 'owner_input' &&
+            payload.facts.description.slice(value.evidence.start, value.evidence.end) !==
+              value.description
+          )
+            throw new Error('assistance evidence');
+          return value;
+        },
+      );
+    },
     async setDraftRemoval(venueId: string, draftId: string, input: SetDraftRemoval) {
       return request(
         venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/removal`),
@@ -490,6 +518,62 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           )
             throw new Error('link');
           return url.href;
+        },
+      );
+    },
+    // Generated 2.5D artifacts remain private and needs-review; these methods never publish.
+    async generateDraftPortion(venueId: string, draftId: string, photoId: string) {
+      return request(
+        venuePath(
+          venueId,
+          `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion`,
+        ),
+        { method: 'POST', upload: true },
+        (body) => {
+          const record = field(body, 'portionReview') as Record<string, unknown>;
+          if (
+            !record ||
+            !['needs_review', 'failed'].includes(String(record.status)) ||
+            record.dish_id !== draftId ||
+            record.draft_revision_id !== photoId
+          )
+            throw new Error('portion review identity');
+          return {
+            status: record.status as 'needs_review' | 'failed',
+            approved: record.approved === true,
+          };
+        },
+      );
+    },
+    async approveDraftPortion(venueId: string, draftId: string, photoId: string) {
+      return request(
+        venuePath(
+          venueId,
+          `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion/approve`,
+        ),
+        { method: 'POST' },
+        (body) => {
+          if (field(body, 'approved') !== true) throw new Error('portion approval');
+          return true;
+        },
+      );
+    },
+    async readDraftPortionImage(venueId: string, draftId: string, photoId: string): Promise<Blob> {
+      return request(
+        venuePath(
+          venueId,
+          `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion/image`,
+        ),
+        { method: 'GET', blob: true },
+        (body) => {
+          if (
+            !(body instanceof Blob) ||
+            body.size === 0 ||
+            body.size > 180_000 ||
+            body.type !== 'image/webp'
+          )
+            throw new Error('portion image');
+          return body;
         },
       );
     },

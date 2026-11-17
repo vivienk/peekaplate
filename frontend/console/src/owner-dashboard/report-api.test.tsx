@@ -22,6 +22,26 @@ function request(fetch: ReturnType<typeof vi.fn>, overrides = {}) {
 }
 
 describe('fetchOwnerReport (S3-RES-03)', () => {
+  it('keeps the server-issued reference with its validated report only', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json(UNEEZA_REPORT, {
+        headers: { 'X-Owner-Report-Ref': 'signed.report.reference' },
+      }),
+    );
+    expect(await request(fetch)).toMatchObject({
+      kind: 'ready',
+      reference: 'signed.report.reference',
+    });
+    const wrong = vi.fn(async () =>
+      Response.json(
+        { ...UNEEZA_REPORT, venue_id: '00000000-0000-4000-8000-000000000123' },
+        {
+          headers: { 'X-Owner-Report-Ref': 'signed.report.reference' },
+        },
+      ),
+    );
+    expect(await request(wrong)).toEqual({ kind: 'invalid' });
+  });
   it('asks for the synthetic report with the owner token and no cache', async () => {
     const fetch = respond(200, UNEEZA_REPORT);
     const state = await request(fetch);

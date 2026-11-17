@@ -37,6 +37,7 @@ import { evidenceExcerpts } from '../owner-menu/evidence';
 import { errorMessage, menuProcessingState } from '../owner-menu/jobs';
 import { Button } from '../ui';
 import { FirstDashboardContent } from './FirstDashboard';
+import { type MenuSnapshot, menuSnapshot } from './menu-snapshot';
 import { OwnerPublish } from './OwnerPublish';
 import { draftToReviewDish } from './review/fromDishDraft';
 import { ReviewDishes } from './review/MenuReview';
@@ -53,7 +54,13 @@ type Editing = {
   saved: string;
   session?: ExtractionReviewSessionResponse;
 };
-type FileSelection = { files: File[]; groupKey: string; fileKeys: string[]; groupId?: string };
+type FileSelection = {
+  files: File[];
+  previewUrls: (string | null)[];
+  groupKey: string;
+  fileKeys: string[];
+  groupId?: string;
+};
 
 // Dropped files may lack a MIME. Declare the UI-accepted kind without changing bytes;
 // the server still verifies the actual signature and manifest hash.
@@ -80,6 +87,8 @@ export function OwnerMenuWorkspace({
   renderShell,
   accountActions,
   onSetupChange,
+  onMenuChange,
+  dishAssistanceEnabled = false,
 }: {
   apiBase: string;
   actorId: string;
@@ -95,11 +104,17 @@ export function OwnerMenuWorkspace({
   renderShell: (content: ReactNode) => ReactNode;
   accountActions: ReactNode;
   onSetupChange?: (setup: RestaurantSetup | null) => void;
+  onMenuChange?: (menu: MenuSnapshot | null) => void;
+  dishAssistanceEnabled?: boolean;
 }) {
   const runtime = useRef<Active | null>(null);
   const running = useRef(false);
   const commands = useRef(new Map<string, string>());
   const selection = useRef<FileSelection | null>(null);
+  const clearSelection = useCallback(() => {
+    for (const url of selection.current?.previewUrls ?? []) if (url) URL.revokeObjectURL(url);
+    selection.current = null;
+  }, []);
   const readGeneration = useRef(0);
   const urlAttempt = useRef<{ url: string; key: string } | null>(null);
   const photoAttempt = useRef<{ file: File; key: string } | null>(null);
@@ -136,6 +151,16 @@ export function OwnerMenuWorkspace({
   const [editing, setEditing] = useState<Editing | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [portionReview, setPortionReview] = useState<
+    | {
+        status: 'processing' | 'needs_review' | 'failed';
+        previewUrl?: string;
+        message?: string;
+        approved?: boolean;
+      }
+    | undefined
+  >(undefined);
+  const [portionRetry, setPortionRetry] = useState(0);
   // The dish form (S09) returns to where it was opened: S10 review or S06 source choice
   // (Rania, #213 review). null = opened from the Menu list, which it returns to.
   const [editBack, setEditBack] = useState<'review' | 'sources' | null>(null);
@@ -177,6 +202,7 @@ export function OwnerMenuWorkspace({
   const failure = useCallback(
     (reason: unknown) => {
       if (reason instanceof OwnerMenuApiError && reason.code === 'aborted') return;
+      onMenuChange?.(null);
       if (reason instanceof OwnerMenuApiError && (reason.status === 401 || reason.status === 403)) {
         setDrafts([]);
         setReviews({});
@@ -198,7 +224,7 @@ export function OwnerMenuWorkspace({
             : 'We could not complete that request. Try again.',
         );
     },
-    [onAccessFailure, onSetupChange],
+    [onAccessFailure, onSetupChange, onMenuChange],
   );
   const load = useCallback(
     async (active: Active) => {
@@ -282,13 +308,22 @@ export function OwnerMenuWorkspace({
       setReviewUnavailable(unavailable);
       setJobs(nextJobs);
       setDrafts(nextDrafts);
+      onMenuChange?.(
+        menuSnapshot(
+          venueId,
+          nextDrafts,
+          nextReviews,
+          unavailable || nextJobs.some((job) => ['queued', 'running'].includes(job.status)),
+        ),
+      );
       setLoaded(true);
       return nextDrafts;
     },
-    [venueId, current, command, onSetupChange],
+    [venueId, current, command, onSetupChange, onMenuChange],
   );
   useEffect(() => {
     void actorId;
+    setUploads([]);
     const controller = new AbortController();
     const active = {
       controller,
@@ -304,9 +339,10 @@ export function OwnerMenuWorkspace({
     });
     return () => {
       controller.abort();
+      clearSelection();
       if (runtime.current === active) runtime.current = null;
     };
-  }, [actorId, apiBase, getAccessToken, load, current, failure]);
+  }, [actorId, apiBase, getAccessToken, load, current, failure, clearSelection]);
   useEffect(() => {
     setView(detailsRequested ? 'details' : section === 'menu' ? 'list' : 'overview');
     setEditing(null);
@@ -363,6 +399,49 @@ export function OwnerMenuWorkspace({
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [pendingPhoto, editing?.form.photoId, editing?.id, venueId, current, failure]);
+  // Generate from the saved photo, never an unsaved browser File. The private service
+  // keys artifacts to the current draft/photo and does not authorize publication.
+  useEffect(() => {
+    const active = runtime.current;
+    const draftId = editing?.id;
+    const photoId = editing?.form.photoId;
+    if (view !== 'edit' || !active || !draftId || !photoId || pendingPhoto) {
+      setPortionReview(undefined);
+      return;
+    }
+    let disposed = false;
+    let previewUrl: string | null = null;
+    setPortionReview({ status: 'processing' });
+    void active.client
+      .generateDraftPortion(venueId, draftId, photoId)
+      .then(async (result) => {
+        if (disposed || !current(active)) return;
+        if (result.status === 'failed') {
+          setPortionReview({
+            status: 'failed',
+            message: 'The 2.5D cutout could not be generated. The original photo is retained.',
+          });
+          return;
+        }
+        const blob = await active.client.readDraftPortionImage(venueId, draftId, photoId);
+        if (disposed || !current(active)) return;
+        previewUrl = URL.createObjectURL(blob);
+        setPortionReview({ status: 'needs_review', previewUrl, approved: result.approved });
+      })
+      .catch(() => {
+        if (!disposed && current(active)) {
+          setPortionReview({
+            status: 'failed',
+            message: '2.5D processing is unavailable. The original photo is retained.',
+          });
+        }
+      });
+    return () => {
+      disposed = true;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [view, editing?.id, editing?.form.photoId, pendingPhoto, venueId, current, portionRetry]);
+
   const dirty =
     (view === 'details' && detailsDirty) ||
     Boolean(editing && (JSON.stringify(editing.form) !== editing.saved || pendingPhoto));
@@ -453,7 +532,7 @@ export function OwnerMenuWorkspace({
     setView('edit');
   };
   const nextSource = (next?: MenuSource) => {
-    selection.current = null;
+    clearSelection();
     setUploads([]);
     if (next === 'manual') {
       setEditBack('sources');
@@ -487,12 +566,17 @@ export function OwnerMenuWorkspace({
         setError('Choose a PDF, JPEG or PNG menu source.');
         return;
       }
-      if (!retry)
+      if (!retry) {
+        clearSelection();
         selection.current = {
           files,
+          previewUrls: files.map((file) =>
+            file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+          ),
           groupKey: newIdempotencyKey(),
           fileKeys: files.map(() => newIdempotencyKey()),
         };
+      }
       const selected = selection.current;
       if (!selected) return;
       const rows: MenuUpload[] = selected.files.map((file, index) => ({
@@ -501,10 +585,12 @@ export function OwnerMenuWorkspace({
         size: file.size,
         kind: file.type === 'application/pdf' ? 'pdf' : 'image',
         status: 'uploading',
+        previewUrl: selected.previewUrls[index],
       }));
       setUploads(rows);
       try {
         const hashes = await Promise.all(selected.files.map(sha256Hex));
+        if (!current(active) || selection.current !== selected) return;
         const group = await active.client.createUploadGroup(venueId, {
           idempotencyKey: selected.groupKey,
           files: selected.files.map((file, index) => ({
@@ -512,6 +598,7 @@ export function OwnerMenuWorkspace({
             sourceHash: hashes[index]!,
           })),
         });
+        if (!current(active) || selection.current !== selected) return;
         selected.groupId = group.id;
         if (current(active)) setProcessingIds(group.jobs.map((job) => job.id));
         for (const [index, file] of selected.files.entries()) {
@@ -522,17 +609,17 @@ export function OwnerMenuWorkspace({
             file,
             selected.fileKeys[index]!,
           );
-          if (!current(active)) return;
+          if (!current(active) || selection.current !== selected) return;
           rows[index] = { ...rows[index]!, status: 'uploaded' };
           setUploads([...rows]);
         }
         await load(active);
       } catch (reason) {
-        if (current(active))
+        if (current(active) && selection.current === selected)
           setUploads(
             rows.map((row) => (row.status === 'uploaded' ? row : { ...row, status: 'failed' })),
           );
-        throw reason;
+        if (current(active) && selection.current === selected) throw reason;
       }
     });
   const openDraft = (draft: DishDraft) => {
@@ -574,12 +661,13 @@ export function OwnerMenuWorkspace({
         );
       await load(active);
     });
-    if (!cancelled || generation !== viewGeneration.current) return;
-    selection.current = null;
+    if (!cancelled || generation !== viewGeneration.current || selection.current !== selected)
+      return;
+    clearSelection();
     setUploads([]);
     if (files.length) uploadFiles(files);
   };
-  const saveDish = () =>
+  const saveDish = (stayOnEditor = false) =>
     void run(async (active) => {
       if (!editing) return;
       if (editing.form.origin === 'manual') {
@@ -672,8 +760,12 @@ export function OwnerMenuWorkspace({
       if (editing.form.origin === 'extracted' && reviewChecked)
         setReviewedIds((ids) => new Set(ids).add(editing.id));
       setNotice('Draft saved. This has not approved or published your menu.');
-      // S8: Save in the dish form returns to the review list, as Cancel does.
-      {
+      // Explicit 2.5D preparation remains on S09 while the saved photo generates.
+      // Normal Continue to review retains the authored S09 -> S10 navigation.
+      // A new photo already triggers generation; retry explicitly only for the saved photo.
+      if (stayOnEditor && !pendingPhoto && editing.form.photoId)
+        setPortionRetry((attempt) => attempt + 1);
+      if (!stayOnEditor) {
         setEditing(null);
         setPendingPhoto(null);
         setEditBack(null);
@@ -934,7 +1026,11 @@ export function OwnerMenuWorkspace({
             if (selection.current) uploadFiles(selection.current.files, true);
           }}
           onContinue={() => setView('processing')}
-          onBack={() => setView('sources')}
+          onBack={() => {
+            clearSelection();
+            setUploads([]);
+            setView('sources');
+          }}
         />
       </>
     ) : view === 'processing' ? (
@@ -981,7 +1077,37 @@ export function OwnerMenuWorkspace({
       <>
         <DishEditor
           value={editing.form}
+          {...(dishAssistanceEnabled && {
+            draftDescription: async () => {
+              const active = runtime.current;
+              if (!active || !current(active)) throw new Error('Workspace unavailable');
+              const result = await active.client.assistDish(venueId, editing.id, {
+                operation: 'description',
+                expectedVersion: editing.draft?.draft_version ?? 0,
+                requestId: newCommandId(),
+                facts: { description: editing.form.description },
+              });
+              if (!current(active) || result.status !== 'review' || !result.description)
+                throw new Error('No supported description suggestion');
+              return result.description;
+            },
+          })}
           photoUrl={photoUrl}
+          {...(portionReview ? { portionReview } : {})}
+          onGeneratePortion={() => saveDish(true)}
+          onApprovePortion={() => {
+            const id = editing.id;
+            const photoId = editing.form.photoId;
+            if (!photoId || pendingPhoto || portionReview?.status !== 'needs_review') return;
+            void run(async (active) => {
+              await active.client.approveDraftPortion(venueId, id, photoId);
+              if (current(active)) {
+                setPortionReview((previous) =>
+                  previous?.status === 'needs_review' ? { ...previous, approved: true } : previous,
+                );
+              }
+            });
+          }}
           existing={Boolean(editing.draft)}
           categories={drafts.map((draft) => draft.category ?? '').filter(Boolean)}
           photo={

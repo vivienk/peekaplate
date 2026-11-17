@@ -24,6 +24,17 @@ const draft: DishDraft = {
 };
 
 describe('saved candidate corrections in the review table', () => {
+  it('uses the same USD default as Screen 9 while retaining a known source currency', () => {
+    expect(draftToReviewDish(draft).priceCurrency).toBe('USD');
+    expect(draftToReviewDish({ ...draft, price_currency: 'CAD' }).priceCurrency).toBe('CAD');
+    expect(draftToReviewDish({ ...draft, origin: 'manual', manual_fields: {} }).priceCurrency).toBe(
+      'USD',
+    );
+    const item = { ...original, effective: { ...original.effective, price_currency: null } };
+    expect(
+      draftToReviewDish(draft, session.extractionResult.extraction_id, item).priceCurrency,
+    ).toBe('USD');
+  });
   it('omits an absent manual serving size while preserving explicit unknown and text', () => {
     const manual = { ...draft, origin: 'manual' as const };
     expect(draftToReviewDish({ ...manual, manual_fields: {} })).not.toHaveProperty('servingSize');

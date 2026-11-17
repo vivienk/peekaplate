@@ -7,7 +7,7 @@ import { type OwnerDishReport, OwnerDishReportSchema } from '@peekaplate/contrac
 
 export type ReportState =
   | { kind: 'loading' }
-  | { kind: 'ready'; report: OwnerDishReport }
+  | { kind: 'ready'; report: OwnerDishReport; reference?: string }
   // 401: no valid sign-in. Owner sign-in is S4-FE-04 (Ehab).
   | { kind: 'signed_out' }
   // 403: not a member of this restaurant, or membership was removed.
@@ -74,5 +74,12 @@ export async function fetchOwnerReport({
   if (!parsed.success || parsed.data.venue_id.toLowerCase() !== venueId.toLowerCase()) {
     return { kind: 'invalid' };
   }
-  return { kind: 'ready', report: parsed.data };
+  const reference = response.headers.get('X-Owner-Report-Ref');
+  return {
+    kind: 'ready',
+    report: parsed.data,
+    ...(reference && reference.length <= 2048 && /^[\x21-\x7e]+$/.test(reference)
+      ? { reference }
+      : {}),
+  };
 }

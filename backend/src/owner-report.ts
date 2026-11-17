@@ -12,6 +12,7 @@ export async function readOwnerReport(
   venueId: string,
   now: Date,
   source: OwnerReportSource = 'production',
+  options: { trafficClass?: 'live' | 'test' } = {},
 ): Promise<unknown> {
   let started = false;
   try {
@@ -34,7 +35,8 @@ export async function readOwnerReport(
     // Tenant scope is set only after the owner permission is confirmed.
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
-    const result = await client.query(OWNER_REPORT_QUERY, [
+    const query = options.trafficClass === 'test' ? TEST_OWNER_REPORT_QUERY : OWNER_REPORT_QUERY;
+    const result = await client.query(query, [
       venueId,
       new Date(now.getTime() - 24 * 60 * 60 * 1000),
       now,
@@ -263,6 +265,10 @@ const OWNER_REPORT_QUERY = `
 `;
 
 type ReportRow = Record<string, unknown>;
+const TEST_OWNER_REPORT_QUERY = OWNER_REPORT_QUERY.replace(
+  'FROM app_private.owner_observation_v1 obs',
+  'FROM app_private.owner_test_observation_v1 obs',
+);
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
 
 function rateMetric(

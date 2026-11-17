@@ -5,7 +5,7 @@
 // row shows what is still missing until the owner corrects it in the dish form (S09).
 import { OwnerDishFieldsSchema, type ReviewCandidateItemResponse } from '@peekaplate/contracts';
 import type { DishDraft } from '../../owner-menu/api';
-import { dishFromReviewItem } from '../../owner-menu/dishForm';
+import { dishFromReviewItem, pilotPriceCurrency } from '../../owner-menu/dishForm';
 import type { ReviewDish } from './reviewDishes';
 
 // Draft review statuses that mean the owner has already reviewed or corrected the dish.
@@ -27,7 +27,7 @@ export function draftToReviewDish(
         ...(fields.servingSize !== undefined && { servingSize: fields.servingSize }),
         ...(fields.servingCount !== undefined && { servingCount: fields.servingCount }),
         priceAmount: fields.priceAmount,
-        priceCurrency: fields.priceCurrency,
+        priceCurrency: pilotPriceCurrency(fields.priceCurrency),
         ingredients: fields.ingredients,
         allergens: fields.allergens,
         photoId: fields.photoId,
@@ -52,7 +52,7 @@ export function draftToReviewDish(
     category: draft.category,
     description: draft.description,
     priceAmount: draft.price_amount,
-    priceCurrency: draft.price_currency,
+    priceCurrency: pilotPriceCurrency(draft.price_currency),
     ingredients: { status: proposed.length > 0 ? 'proposed' : 'unknown', items: proposed },
     allergens: { status: 'unknown', items: [] },
     photoId: null,

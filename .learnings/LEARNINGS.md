@@ -152,3 +152,9 @@ progress. Keep sample design content confined to labelled demos.
 
 Related: docs/owner-onboarding-wiring.md, tests/e2e/owner-workspace.spec.ts.
 Pattern: frontend.composition-before-wiring; first occurrence, no policy promotion.
+
+November 17 release follow-up: compare candidate files with the deployed main
+branch, not only develop. A selective promotion can otherwise remove main-only
+authored performance presentation and lazy camera cleanup even when develop
+tests pass. Preserve those implementations and rerun their original regressions;
+source provenance and a green feature branch do not establish release parity.

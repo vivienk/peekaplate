@@ -26,6 +26,7 @@ const runtime = config ? connectOwnerAuth(config) : null;
 const apiBase = readWorkspaceApiBase(import.meta.env.VITE_PUBLIC_API_URL);
 // The owner AI panel stays off unless this console build turns it on (see docs/owner-ai-responses.md).
 const aiEnabled = import.meta.env.VITE_OWNER_AI_ENABLED === 'true';
+const dishAssistanceEnabled = import.meta.env.VITE_OWNER_AI_DISH_ASSISTANCE_ENABLED === 'true';
 
 function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   const [owner, setOwner] = useState<SignedInOwner | null>(null);
@@ -185,6 +186,7 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
           owner={owner}
           apiBase={apiBase}
           aiEnabled={aiEnabled}
+          dishAssistanceEnabled={dishAssistanceEnabled}
           onSessionExpired={sessionExpired}
           onSignOut={() => {
             void signOut();

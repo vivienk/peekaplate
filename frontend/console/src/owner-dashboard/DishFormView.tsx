@@ -33,6 +33,7 @@ export function DishFormView({
   suggestIngredients,
   suggestAllergens,
   draftDescription,
+  descriptionActionLabel = 'Draft with AI',
   currency = 'USD',
   allowZeroPrice = false,
   busy = false,
@@ -41,6 +42,9 @@ export function DishFormView({
   evidence,
   photo,
   servingCountControl,
+  portionReview,
+  onApprovePortion,
+  onGeneratePortion,
 }: {
   ed: Extract<EditState, { step: 'form' | 'review' }>;
   setEd: (e: EditState) => void;
@@ -55,6 +59,7 @@ export function DishFormView({
   suggestIngredients?: (name: string) => Promise<string[]>;
   suggestAllergens?: (name: string, ingredients: string[]) => Promise<string[]>;
   draftDescription?: (name: string, ingredients: string[]) => Promise<string>;
+  descriptionActionLabel?: string;
   currency?: string;
   allowZeroPrice?: boolean;
   busy?: boolean;
@@ -63,6 +68,15 @@ export function DishFormView({
   evidence?: ReactNode;
   photo?: ReactNode;
   servingCountControl?: ReactNode;
+  /** Private owner-only preview, never public publication evidence. */
+  portionReview?: {
+    status: 'processing' | 'needs_review' | 'failed';
+    previewUrl?: string;
+    message?: string;
+    approved?: boolean;
+  };
+  onApprovePortion?: () => void;
+  onGeneratePortion?: () => void;
 }) {
   const dr = ed.draft;
   const latest = useRef(ed);
@@ -246,14 +260,49 @@ export function DishFormView({
               </section>
               <section className="card s09-sidecard s09-sidecard--25d" aria-labelledby="s09-25d">
                 <h2 id="s09-25d">2.5D preview</h2>
-                <span className={`s09-chip${dr.has25 ? ' good' : ''}`}>
-                  {dr.has25 ? 'Available' : 'Not available'}
-                </span>
-                <p>
-                  {dr.has25
-                    ? 'Diners can tap “View in 2.5D” to see the ingredients floating apart.'
-                    : 'Until a preview exists, diners who tap “View in 2.5D” see the photo.'}
-                </p>
+                {onGeneratePortion && !portionReview?.approved && (
+                  <button type="button" disabled={busy || !dr.upload} onClick={onGeneratePortion}>
+                    Save photo and generate 2.5D
+                  </button>
+                )}
+                {portionReview?.status === 'needs_review' && portionReview.previewUrl ? (
+                  <>
+                    <img
+                      src={portionReview.previewUrl}
+                      alt={`Review-only 2.5D preview of ${dr.name || 'this dish'}`}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        height: 'auto',
+                        objectFit: 'contain',
+                      }}
+                    />
+                    <span className={`s09-chip${portionReview.approved ? ' good' : ''}`}>
+                      {portionReview.approved ? 'Approved for publication review' : 'Needs review'}
+                    </span>
+                    <p>
+                      This generated image remains private until the menu is published with the
+                      approved portion assets.
+                    </p>
+                    {!portionReview.approved && onApprovePortion && (
+                      <button type="button" onClick={onApprovePortion} disabled={busy}>
+                        Approve 2.5D preview
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span className="s09-chip">
+                      {portionReview?.status === 'processing' ? 'Processing' : 'Not available'}
+                    </span>
+                    <p role="status">
+                      {portionReview?.message ??
+                        (portionReview?.status === 'processing'
+                          ? 'Preparing the 2.5D preview from the dish photo.'
+                          : 'The original dish photo remains the View Portion fallback until an approved 2.5D preview is published.')}
+                    </p>
+                  </>
+                )}
               </section>
               {evidence}
             </>
@@ -343,7 +392,7 @@ export function DishFormView({
                     );
                 }}
               >
-                Draft with AI
+                {descriptionActionLabel}
               </Btn>
               <span className="s09-hint">
                 {draftDescription

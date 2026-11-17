@@ -55,6 +55,8 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
     this.envVars = {
       EXTRACTION_SERVICE_SECRET: env.EXTRACTION_SERVICE_SECRET ?? '',
       EXTRACTION_SOURCE_ORIGIN: env.EXTRACTION_SOURCE_ORIGIN,
+      PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
+      U2NET_HOME: '/app/models',
       ...Object.fromEntries(
         pipelineVariables.flatMap((key) => (env[key] ? [[key, env[key]]] : [])),
       ),
@@ -260,6 +262,7 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
 
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const sourcePath = new RegExp(`^/sources/(${uuid})/(${uuid})$`);
+const portionPath = new RegExp(`^/v1/portion-uploads/(${uuid})/(${uuid})$`);
 const json = (error: string, status: number) =>
   Response.json(
     { error },
@@ -270,8 +273,47 @@ const json = (error: string, status: number) =>
   );
 
 const maxBundleBytes = 32_000_000;
+const maxPortionSourceBytes = 12_000_000;
+const maxPortionResponseBytes = 300_000;
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+async function readPortionBytes(
+  body: ReadableStream<Uint8Array> | null,
+  limit: number,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  if (!body) return new Uint8Array();
+  const reader = body.getReader();
+  const cancel = () => void reader.cancel().catch(() => {});
+  signal.addEventListener('abort', cancel, { once: true });
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      signal.throwIfAborted();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
 
 async function safeErrorResponse(response: Response): Promise<Response> {
   const status = response.status >= 400 && response.status < 600 ? response.status : 502;
@@ -442,6 +484,31 @@ export default {
     const url = new URL(request.url);
     if (url.search) return json('invalid_request', 400);
     try {
+      if (portionPath.test(url.pathname) && request.method === 'POST') {
+        const signal = AbortSignal.timeout(220_000);
+        if (
+          !/^application\/octet-stream(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')
+        )
+          return json('unsupported_media_type', 415);
+        if (Number(request.headers.get('content-length')) > maxPortionSourceBytes)
+          return json('request_too_large', 413);
+        const photo = await readPortionBytes(request.body, maxPortionSourceBytes, signal);
+        if (!photo) return json('request_too_large', 413);
+        if (!photo.byteLength) return json('empty_photo', 400);
+        const headers = new Headers(request.headers);
+        headers.delete('Content-Length');
+        const response = await env.EXTRACTOR.getByName('staging-extractor').fetch(
+          new Request(url, { method: 'POST', headers, body: photo, signal, redirect: 'error' }),
+        );
+        const bytes = await readPortionBytes(response.body, maxPortionResponseBytes, signal);
+        if (!bytes || !response.headers.get('content-type')?.startsWith('application/json'))
+          return json('portion_unavailable', 502);
+        const bounded = new Response(bytes, { status: response.status, headers: response.headers });
+        if (!response.ok) return await safeErrorResponse(bounded);
+        return new Response(bytes, {
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+        });
+      }
       const source = sourcePath.exec(url.pathname);
       if (source && request.method === 'GET') {
         const scope = await readExtractionCapability(
