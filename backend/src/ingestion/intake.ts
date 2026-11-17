@@ -69,17 +69,13 @@ export function selectUnambiguousMenuFile(links: readonly string[]): string | nu
     }
     return /(?:^|[-_\s])menu(?:[-_\s.]|$)/i.test(filename);
   });
-  return explicitlyNamed.length === 1 ? explicitlyNamed[0] ?? null : null;
+  return explicitlyNamed.length === 1 ? (explicitlyNamed[0] ?? null) : null;
 }
 
 export async function materializeMenuUrl(url: string, key: string): Promise<MenuUpload> {
   let source = await safeFetch(url);
   if (source.contentType.split(';')[0]?.trim().toLowerCase() === 'text/html') {
-    const candidates = parseHtmlSource(
-      source.content,
-      'menu-url',
-      source.finalUrl,
-    ).discoveredLinks;
+    const candidates = parseHtmlSource(source.content, 'menu-url', source.finalUrl).discoveredLinks;
     const selected = selectUnambiguousMenuFile(candidates);
     if (!selected) throw new IngestionError('menu_file_link_required', 422);
     source = await safeFetch(selected);
