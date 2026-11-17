@@ -7,7 +7,20 @@ import { dishFromReviewItem, emptyManualDish } from './dishForm';
 import { evidenceExcerpts } from './evidence';
 import { EXTRACTION_ID, reviewSession } from './fixtures.test-helpers';
 
-const captured = vi.hoisted(() => ({ props: null as ComponentProps<typeof DishFormView> | null }));
+const captured = vi.hoisted(() => ({
+  props: null as ComponentProps<typeof DishFormView> | null,
+  buttons: [] as ComponentProps<typeof import('../owner-dashboard/controls').Btn>[],
+}));
+vi.mock('../owner-dashboard/controls', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../owner-dashboard/controls')>();
+  return {
+    ...actual,
+    Btn: (props: ComponentProps<typeof actual.Btn>) => {
+      captured.buttons.push(props);
+      return <actual.Btn {...props} />;
+    },
+  };
+});
 vi.mock('../owner-dashboard/DishFormView', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../owner-dashboard/DishFormView')>();
   return {
@@ -32,6 +45,53 @@ const render = (props: Partial<DishEditorProps> = {}) =>
   );
 
 describe('live Screen 9 on the authored #172 presentation', () => {
+  it.each([{ items: [] }, { items: ['Carrot'] }])(
+    'leaves review unchanged when ingredients add nothing: %j',
+    async ({ items }) => {
+      captured.buttons = [];
+      const onChange = vi.fn();
+      const suggestIngredients = vi.fn(async () => items);
+      render({
+        value: { ...emptyManualDish(), ingredients: { status: 'confirmed', items: ['Carrot'] } },
+        reviewConfirmed: true,
+        onChange,
+        suggestIngredients,
+      });
+      captured.buttons
+        .find((button) => button.children === 'Suggest with AI')!
+        .onClick?.({} as never);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(suggestIngredients).toHaveBeenCalledTimes(1);
+      expect(onChange).not.toHaveBeenCalled();
+    },
+  );
+  it('adds returned ingredients as proposed through the existing button and requires review', async () => {
+    captured.buttons = [];
+    const onChange = vi.fn();
+    const onReviewConfirmedChange = vi.fn();
+    render({
+      value: { ...emptyManualDish(), ingredients: { status: 'confirmed', items: ['Carrot'] } },
+      reviewConfirmed: true,
+      onChange,
+      onReviewConfirmedChange,
+      suggestIngredients: async () => ['Carrot', 'Peas'],
+    });
+    captured.buttons
+      .find((button) => button.children === 'Suggest with AI')!
+      .onClick?.({} as never);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ingredients: { status: 'proposed', items: ['Carrot', 'Peas'] },
+        aiIng: ['Peas'],
+        aiUsed: true,
+      }),
+    );
+    expect(onReviewConfirmedChange).toHaveBeenCalledWith(false);
+  });
+
   it('connects the optional callbacks to the authored controls', () => {
     const suggestIngredients = vi.fn(async () => ['Carrot']);
     const suggestAllergens = vi.fn(async () => ['milk']);

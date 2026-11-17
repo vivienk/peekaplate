@@ -465,6 +465,12 @@ export function DishFormView({
                     .then((items) => {
                       if (!stillCurrent()) return;
                       const s = items.filter((x) => !dr.ing.includes(x));
+                      if (!s.length) {
+                        setSuggestionError(
+                          'No additional ingredients were suggested. Your dish has not changed.',
+                        );
+                        return;
+                      }
                       setAi({ ing: [...dr.ing, ...s], aiIng: [...dr.aiIng, ...s] });
                     })
                     .catch(

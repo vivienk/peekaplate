@@ -1,8 +1,13 @@
+import { createHash } from 'node:crypto';
 import {
+  CandidateCorrectedFieldsSchema,
   type DishAssistanceRequest,
   DishAssistanceRequestSchema,
+  type DishAssistanceResult,
   DishAssistanceResultSchema,
   DraftScopeSchema,
+  OwnerDishFieldsSchema,
+  ReviewCandidateResultSchema,
 } from '@peekaplate/contracts';
 import type { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -14,6 +19,7 @@ import type { Bindings } from '../index';
 import { IngestionError } from '../ingestion/repository';
 import { withOwnerMenuTransaction } from '../owner-menu';
 import { configuredSyntheticReportVenues } from '../owner-report-scope';
+import { canonicalStringify, resolveEffectiveFields } from '../review-command';
 import { OWNER_ANALYSIS_MODEL } from './responses';
 
 type Draft = {
@@ -63,7 +69,10 @@ async function readDraft(
 // Conservative text exclusion, not ingredient classification. Never shorten safety/qualified text.
 const safetyText =
   /\b(allerg\w*|free|vegan|vegetarian|gluten|dairy|nuts?|peanuts?|sesame|soy|wheat|shellfish|milk|eggs?|fish|safe\w*|suitable|without|no|not|non|may|might|traces?|optional|substitut\w*|except|unless|only|or)\b|cross.contact|\b\w+n['’]t\b/i;
-function evidence(input: DishAssistanceRequest, draft: Draft | undefined): Source[] {
+function evidence(
+  input: Extract<DishAssistanceRequest, { operation: 'description' }>,
+  draft: Draft | undefined,
+): Source[] {
   if (safetyText.test(input.facts.description)) return [];
   const sources: Source[] = [];
   for (const [source, value] of [
@@ -91,6 +100,133 @@ function evidence(input: DishAssistanceRequest, draft: Draft | undefined): Sourc
     if (spans.length) sources.push({ source, text: value, spans });
   }
   return sources;
+}
+
+type IngredientProposal = Pick<
+  Extract<DishAssistanceResult, { operation: 'ingredients' }>,
+  'ingredients' | 'evidence'
+>;
+type IngredientDraft = Draft & {
+  origin: string;
+  manual_fields: unknown;
+  job_id: string | null;
+  candidate_id: string | null;
+  source_id: string | null;
+  payload: unknown;
+  source_sha256: string | null;
+  job_source_hash: string | null;
+  corrected_fields: unknown;
+  candidate_status: string | null;
+  incomplete_fields: string[] | null;
+  review_version: number | null;
+};
+const snapshotHash = (value: unknown) =>
+  createHash('sha256').update(canonicalStringify(value)).digest('hex');
+
+// Resurface saved proposals only. This does not classify ingredients, expand recipes,
+// infer allergens, call a model, or change owner confirmation/publication state.
+async function readIngredientProposal(
+  client: Client,
+  actor: string,
+  venue: string,
+  id: string,
+  version: number,
+): Promise<IngredientProposal | null> {
+  return withOwnerMenuTransaction(client, actor, venue, async () => {
+    const found = await client.query<IngredientDraft>(
+      `SELECT d.*, s.payload, s.source_sha256, j.source_hash AS job_source_hash,
+              r.corrected_fields, r.review_status AS candidate_status,
+              r.incomplete_fields, coalesce(r.version,0) AS review_version
+       FROM app_private.dish_drafts d
+       LEFT JOIN app_private.menu_ingestion_jobs j ON j.tenant_id=d.tenant_id AND j.id=d.job_id
+         AND j.status IN ('complete','incomplete')
+       LEFT JOIN app_private.extraction_review_session s ON s.tenant_id=d.tenant_id
+         AND s.job_id=j.id AND s.source_sha256=j.source_hash
+         AND s.extraction_id=j.active_review_extraction_id
+       LEFT JOIN app_private.candidate_review_current r ON r.tenant_id=d.tenant_id
+         AND r.extraction_id=s.extraction_id AND r.candidate_id=d.candidate_id
+       WHERE d.tenant_id=$1 AND d.id=$2`,
+      [venue, id],
+    );
+    const draft = found.rows[0];
+    if (
+      (!draft && version !== 0) ||
+      (draft &&
+        (draft.draft_version !== version ||
+          draft.removed_at ||
+          ['rejected', 'superseded'].includes(draft.review_status)))
+    )
+      throw new IngestionError('version_conflict', 409);
+    if (!draft || found.rows.length !== 1) return null;
+    let ingredients: unknown;
+    let binding: NonNullable<IngredientProposal['evidence']>;
+    if (draft.origin === 'manual') {
+      const fields = draft.manual_fields as { ingredients?: unknown } | null;
+      const parsed = OwnerDishFieldsSchema.shape.ingredients.safeParse(fields?.ingredients);
+      if (!parsed.success || parsed.data.status === 'unknown') return null;
+      ingredients = parsed.data.items;
+      binding = {
+        source: 'saved_manual_draft',
+        snapshotSha256: '',
+        sourceSha256: null,
+        extractionId: null,
+        candidateId: null,
+        reviewVersion: null,
+      };
+    } else {
+      const parsed = ReviewCandidateResultSchema.safeParse(draft.payload);
+      const corrected = CandidateCorrectedFieldsSchema.or(z.strictObject({})).safeParse(
+        draft.corrected_fields ?? {},
+      );
+      if (
+        !parsed.success ||
+        !corrected.success ||
+        !draft.job_id ||
+        !draft.candidate_id ||
+        parsed.data.source.sha256 !== draft.source_sha256 ||
+        draft.source_sha256 !== draft.job_source_hash ||
+        parsed.data.source.source_id !== draft.source_id ||
+        draft.candidate_status === 'rejected' ||
+        draft.incomplete_fields?.includes('ingredients')
+      )
+        return null;
+      const candidate = parsed.data.candidates.find(
+        (item) => item.candidate_id === draft.candidate_id,
+      );
+      if (!candidate || candidate.original.source_id !== parsed.data.source.source_id) return null;
+      ingredients = resolveEffectiveFields(candidate, corrected.data).ingredients;
+      binding = {
+        source: Object.hasOwn(corrected.data, 'ingredients')
+          ? 'saved_owner_correction'
+          : 'saved_extraction',
+        snapshotSha256: '',
+        sourceSha256: draft.source_sha256,
+        extractionId: parsed.data.extraction_id,
+        candidateId: draft.candidate_id,
+        reviewVersion: draft.review_version ?? 0,
+      };
+    }
+    const list = z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(256)
+          .refine((value) => !value.includes('\u0000')),
+      )
+      .max(100)
+      .safeParse(ingredients);
+    if (!list.success || !list.data.length) return null;
+    const items = [...new Set(list.data)];
+    return {
+      ingredients: items,
+      evidence: {
+        ...binding,
+        snapshotSha256: snapshotHash({ version, ingredients: items, binding }),
+      },
+    };
+  });
 }
 
 async function selectEvidence(
@@ -241,10 +377,7 @@ export function registerDishAssistanceRoutes(
     if (
       env.OWNER_AI_DISH_ASSISTANCE_ENABLED !== 'true' ||
       !['local', 'staging'].includes(env.APP_ENV ?? '') ||
-      !configuredSyntheticReportVenues(env, options.approvedVenues).includes(venue) ||
-      !env.OWNER_AI_OPENAI_API_KEY ||
-      !/^proj_[A-Za-z0-9]+$/.test(env.OWNER_AI_OPENAI_PROJECT_ID ?? '') ||
-      !env.OWNER_AI_RATE_LIMITER
+      !configuredSyntheticReportVenues(env, options.approvedVenues).includes(venue)
     )
       return c.json({ error: 'service_unavailable' }, 503);
     if (
@@ -255,6 +388,41 @@ export function registerDishAssistanceRoutes(
     const input = DishAssistanceRequestSchema.safeParse(await c.req.json().catch(() => null));
     if (!input.success) return c.json({ error: 'invalid_request' }, 400);
     await options.authorizeVenue(actor, venue, env);
+    if (input.data.operation === 'ingredients') {
+      const proposal = await options.database(env, (db) =>
+        readIngredientProposal(db, actor, venue, id, input.data.expectedVersion),
+      );
+      // Recheck membership and current saved-source/version after the asynchronous read.
+      await options.authorizeVenue(actor, venue, env);
+      const current = await options.database(env, (db) =>
+        readIngredientProposal(db, actor, venue, id, input.data.expectedVersion),
+      );
+      if (canonicalStringify(current) !== canonicalStringify(proposal))
+        throw new IngestionError('version_conflict', 409);
+      return c.json(
+        DishAssistanceResultSchema.parse({
+          schemaVersion: 'dish-assistance.v1',
+          venueId: venue,
+          draftId: id,
+          requestId: input.data.requestId,
+          expectedVersion: input.data.expectedVersion,
+          operation: 'ingredients',
+          status: proposal ? 'review' : 'abstained',
+          description: null,
+          ingredients: proposal?.ingredients ?? [],
+          evidence: proposal?.evidence ?? null,
+          approvalRequired: true,
+          publishable: false,
+          provenance: 'unverified',
+        }),
+      );
+    }
+    if (
+      !env.OWNER_AI_OPENAI_API_KEY ||
+      !/^proj_[A-Za-z0-9]+$/.test(env.OWNER_AI_OPENAI_PROJECT_ID ?? '') ||
+      !env.OWNER_AI_RATE_LIMITER
+    )
+      return c.json({ error: 'service_unavailable' }, 503);
     const draft = await options.database(env, (db) =>
       readDraft(db, actor, venue, id, input.data.expectedVersion),
     );

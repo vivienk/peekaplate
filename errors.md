@@ -3306,3 +3306,17 @@ The generated cutout used full width and intrinsic height, bypassing the authore
 original 2.5D card. The existing retry browser scenario now checks that the image
 remains inside that labelled card and at most 120px tall. Photo rights, source
 evidence, serving metadata, approval and backend behavior are unchanged.
+
+## November 17 — empty ingredient suggestions changed review state
+
+Two focused regressions showed the existing ingredient callback marked a dish
+AI-assisted and reset review for empty or duplicate-only proposals. Preserve the
+dish unchanged and report no additional suggestions through its existing status
+line. The two regressions and 27 related tests pass. A transient optional-version
+type error was corrected with the existing version-zero fallback.
+
+The separate develop/main reconciliation passed 2,177 unit and 122 script tests.
+Its first focused workerd run hit SQLITE_BUSY_RECOVERY at publication startup;
+the unchanged publication file passed 12/12 serially. This is local runtime
+contention, not an application fix. Reconciled line-ending/export-order lint
+failures were formatted, then lint/typecheck/build passed.

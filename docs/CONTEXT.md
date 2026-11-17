@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Shared tenant, command, owner-draft, menu-publication and diner-observation contracts remain strict. Serving count is not physical scale. Owner actions retain bounded versioned status transitions. Description assistance is version-bound and returns an exact evidence sentence as an unverified proposal; no generated food or allergen claims. Report privacy/status contracts and published revision-bound portions are unchanged.",
+      "summary": "Shared tenant, command, owner-draft, menu-publication and diner-observation contracts remain strict. Serving count is not physical scale. Owner actions retain bounded versioned status transitions. Description assistance is version-bound and returns an exact evidence sentence as an unverified proposal; no generated food or allergen claims. Report privacy/status contracts and published revision-bound portions are unchanged. Ingredient assistance is a strict operation union; saved proposals carry evidence identity and remain unverified.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -74,7 +74,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "14ab865aa209d5eaffdc39801954bee06a8cc1395106f6debc264cedfe898b9a"
+      "sourceFingerprint": "a0ce97131d02c45a74817edde2075b21d1b837eedbd90e211c399fddfda423f7"
     },
     {
       "id": "tokens",
@@ -112,7 +112,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Verified portion blobs retain supported image MIME for opaque published SVG URLs; exact byte/hash and dimension checks remain. Release preserves deliberate camera entry while binding measurements to serving count; approximate fallbacks remain labelled. Consent-gated PostHog/canonical tracking remains the existing implementation; withdrawn publication denies new prepared-content reads.",
+      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Verified portion blobs retain supported image MIME for opaque published SVG URLs; exact byte/hash and dimension checks remain. Release preserves deliberate camera entry while binding measurements to serving count; approximate fallbacks remain labelled. Consent-gated PostHog/canonical tracking remains the existing implementation; withdrawn publication denies new prepared-content reads. Consent hides only during the existing portion preview/camera state and returns on exit without resetting the choice.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -254,12 +254,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "6f12c796b7dd5e410632ce52a2b84f826ec41b8a353342f7cb5f0af7af916c19"
+      "sourceFingerprint": "6747dfb26c00148e55a79e3c7e505e0231dd8f1111a3226794b84c7854cfc7bc"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics.",
+      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics. Existing ingredient controls reuse saved proposals; empty or duplicate results preserve review state. Stale editor/session results are discarded.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -429,12 +429,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5881ca7fecc56c9155e0fbbfed75de18bb4467940faf2e4ff411b98615260454"
+      "sourceFingerprint": "5e484061e2f5eb796975f91c44620036a4b78418aa6555a17f42f302695f2f86"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker preserves staff/JWKS and tenant authority, expected versions and transactional event/outbox commands. Owner upload, verification, preparation and publication reuse existing services. Preparation validates approved private portion bytes against current photo/revision; serving uses the exact published snapshot so draft edits cannot hide live assets. Extraction host forwards bounded authenticated CPU cutout requests to the existing container. Report references bind actor, venue, window and digest; strict configured synthetic scopes choose separate live/test views. Owner Actions and CSV use existing owner checks. Description assistance selects literal evidence only and never saves or publishes. Unknown report freshness remains unusable for AI.",
+      "summary": "Worker preserves staff/JWKS and tenant authority, expected versions and transactional event/outbox commands. Owner upload, verification, preparation and publication reuse existing services. Preparation validates approved private portion bytes against current photo/revision; serving uses the exact published snapshot so draft edits cannot hide live assets. Extraction host forwards bounded authenticated CPU cutout requests to the existing container. Report references bind actor, venue, window and digest; strict configured synthetic scopes choose separate live/test views. Owner Actions and CSV use existing owner checks. Description assistance selects literal evidence only and never saves or publishes. Unknown report freshness remains unusable for AI. Ingredient assistance reuses current saved source-bound values; corrections override originals, missing evidence abstains, and no provider is called.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -630,7 +630,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/html-menu.test.ts",
         "backend/src/retrieval/parser.menu.test.ts",
         "backend/src/owner-portion-preview.test.ts",
-        "backend/src/owner-retention-scheduler.test.ts"
+        "backend/src/owner-retention-scheduler.test.ts",
+        "backend/src/owner-ai/dish-assistance.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -643,7 +644,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c6e2cd278d8f12f0e476226361a2679e3ea71871302334791e0510bef851b554"
+      "sourceFingerprint": "cb0b8a7b352d53dd2914f70aaf54d2a4be72c1ba9dc0c40fd3c73556d5dada5e"
     },
     {
       "id": "database",
@@ -1003,20 +1004,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-15",
       "modules": [
-        "console",
-        "backend",
-        "contracts"
-      ],
-      "summary": "Narrow staging release of merged owner menu client156, workspace190 and opt-in AI164/187, including required onboarding/dish screen dependencies. Main database, extraction, diner, Queue and DNS configuration preserved.",
-      "sources": [
-        "docs/owner-onboarding-wiring.md",
-        "docs/owner-ai-responses.md"
-      ],
-      "next": "Verify exact main API/console deployment and synthetic/denial behavior. Keep paid AI activation, unknown freshness, restaurant-details persistence and final publish UI separate."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
         "console"
       ],
       "summary": "Restore authored dashboard, onboarding and Screen 9 composition while preserving the existing authenticated menu controller. Reproduced missing dashboard/form frames before correction; explicit unavailable setup facts avoid fake progress. Hosted mobile readback exposed an intrinsic-width restaurant selector; constrain the shared picker/select and verify long names in dashboard and onboarding account menu.",
@@ -1157,6 +1144,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/OwnerWorkspace.tsx"
       ],
       "next": "PR223 is merged and deployed; hosted portion testing exposed unsupported Worker redirect:error. The narrow correction uses manual redirect handling with unchanged non-OK rejection and actual-function workerd regression evidence. Deploy the corrected exact-main release and finish authenticated portion/publication screenshots. AI secret provisioning still awaits the protected environment reviewer; unknown freshness abstains. Preserve Poulet drafts and accounts; no new OCR/provider call or physical-scale claim."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "backend",
+        "console",
+        "diner",
+        "contracts"
+      ],
+      "summary": "Reuse saved menu evidence through the existing ingredient suggestion operation and hide the repeated consent block only during portion preview. No new screen, recipe classifier, provider call or migration.",
+      "next": "Verify the exact main release on staging. Description/owner-report AI still require protected credential provisioning; normal unknown report freshness must abstain."
     }
   ]
 }

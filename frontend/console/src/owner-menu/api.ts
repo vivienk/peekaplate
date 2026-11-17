@@ -339,6 +339,8 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           )
             throw new Error('assistance scope');
           if (
+            value.operation === 'description' &&
+            payload.operation === 'description' &&
             value.evidence?.source === 'owner_input' &&
             payload.facts.description.slice(value.evidence.start, value.evidence.end) !==
               value.description

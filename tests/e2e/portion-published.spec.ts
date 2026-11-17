@@ -97,12 +97,20 @@ test('published portion offers the existing camera portal only after a deliberat
     });
   await page.goto(`/venues/${content.venue_id}/menus/${content.menu_id}`);
   await expect(page.locator('.pp-card__open').first()).toBeVisible();
+  const consent = page.locator('#consent');
+  const consentChoice = consent.locator('button');
+  await expect(consent).toBeVisible();
+  await expect(consentChoice).toHaveAttribute('aria-pressed', 'false');
+  await consentChoice.click();
+  await expect(consentChoice).toHaveAttribute('aria-pressed', 'true');
   await snapshot('menu');
   await page.locator('.pp-card__open').first().click();
   await snapshot('detail');
   expect(cameraChunks).toEqual([]);
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
   await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+  await expect(consent).toBeHidden();
+  await expect(consentChoice).toHaveAttribute('aria-pressed', 'true');
   await page.getByText('Preview controls', { exact: true }).click();
   const entry = page.getByRole('button', { name: 'View on your table', exact: true });
   await expect(entry).toBeVisible();
@@ -113,6 +121,7 @@ test('published portion offers the existing camera portal only after a deliberat
   await entry.click();
   const portal = page.getByRole('dialog', { name: 'Dish on your table', exact: true });
   await expect(portal).toBeVisible();
+  await expect(consent).toBeHidden();
   await expect.poll(() => page.evaluate(() => (window as any).cameraRequests)).toBe(1);
   await expect(portal.locator('.pp-ar__scale-status')).toContainText(
     'Approximate preview · matching serving/plate measurements not supplied',
@@ -125,8 +134,19 @@ test('published portion offers the existing camera portal only after a deliberat
   await snapshot('camera-denied');
   await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
   await expect(entry).toBeFocused();
+  await expect(consent).toBeHidden();
   await expect(page.locator('.pp-portion__css')).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(consent).toBeVisible();
+  await expect(consentChoice).toHaveAttribute('aria-pressed', 'true');
+  await consentChoice.click();
+  await expect(consentChoice).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+  await expect(consent).toBeHidden();
+  await expect(consentChoice).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Escape');
+  await expect(consent).toBeVisible();
+  await expect(consentChoice).toHaveAttribute('aria-pressed', 'false');
 });

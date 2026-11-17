@@ -66,3 +66,54 @@ it('rejects response text that does not match the cited owner-input slice', asyn
     code: 'invalid_response',
   });
 });
+
+const ingredientInput = { ...input, operation: 'ingredients' as const, facts: {} };
+const ingredientResult = {
+  ...result,
+  operation: 'ingredients',
+  description: null,
+  ingredients: ['Rice', 'Tomato'],
+  evidence: {
+    source: 'saved_manual_draft',
+    snapshotSha256: 'a'.repeat(64),
+    sourceSha256: null,
+    extractionId: null,
+    candidateId: null,
+    reviewVersion: null,
+  },
+};
+it('requests saved ingredients without sending browser facts and retains review evidence', async () => {
+  const s = setup(ingredientResult);
+  expect(await s.api.assistDish(venue, draft, ingredientInput)).toMatchObject({
+    operation: 'ingredients',
+    ingredients: ['Rice', 'Tomato'],
+    approvalRequired: true,
+    publishable: false,
+    provenance: 'unverified',
+    evidence: ingredientResult.evidence,
+  });
+  expect(JSON.parse(s.send.mock.calls[0]![1]!.body as string)).toEqual(ingredientInput);
+});
+it('preserves an ingredient abstention without invented fallback ingredients', async () => {
+  const s = setup({ ...ingredientResult, status: 'abstained', ingredients: [], evidence: null });
+  expect(await s.api.assistDish(venue, draft, ingredientInput)).toMatchObject({
+    status: 'abstained',
+    ingredients: [],
+    evidence: null,
+  });
+});
+it.each([
+  {
+    operation: 'description',
+    ingredients: undefined,
+    description: result.description,
+    evidence: result.evidence,
+  },
+  { expectedVersion: 9 },
+  { evidence: null },
+])('rejects incompatible ingredient response %j', async (mismatch) => {
+  const s = setup({ ...ingredientResult, ...mismatch });
+  await expect(s.api.assistDish(venue, draft, ingredientInput)).rejects.toMatchObject({
+    code: 'invalid_response',
+  });
+});

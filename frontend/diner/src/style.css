@@ -24,6 +24,9 @@
 body {
   margin: 0;
 }
+body:has(.pp-detail--preview) > #consent {
+  display: none;
+}
 main {
   max-width: 48rem;
   margin: 12vh auto;
