@@ -261,9 +261,15 @@ export function DishFormView({
               <section className="card s09-sidecard s09-sidecard--25d" aria-labelledby="s09-25d">
                 <h2 id="s09-25d">2.5D preview</h2>
                 {onGeneratePortion && !portionReview?.approved && (
-                  <button type="button" disabled={busy || !dr.upload} onClick={onGeneratePortion}>
+                  <Btn
+                    kind="outlined"
+                    size="md"
+                    type="button"
+                    disabled={busy || !dr.upload}
+                    onClick={onGeneratePortion}
+                  >
                     Save photo and generate 2.5D
-                  </button>
+                  </Btn>
                 )}
                 {portionReview?.status === 'needs_review' && portionReview.previewUrl ? (
                   <>
@@ -285,9 +291,15 @@ export function DishFormView({
                       approved portion assets.
                     </p>
                     {!portionReview.approved && onApprovePortion && (
-                      <button type="button" onClick={onApprovePortion} disabled={busy}>
+                      <Btn
+                        kind="outlined"
+                        size="md"
+                        type="button"
+                        onClick={onApprovePortion}
+                        disabled={busy}
+                      >
                         Approve 2.5D preview
-                      </button>
+                      </Btn>
                     )}
                   </>
                 ) : (

@@ -59,3 +59,24 @@ on Actions and invoker/security-barrier protection on the test view. This schema
 check does not establish the still-pending application deployment or hosted UI
 round trip. Existing accounts, memberships, Poulet drafts and publications were
 not reset.
+
+## Hosted Worker redirect correction
+
+The merged release passed CI, but the hosted S09 photo-generation request returned
+503 before reaching the extraction host. The saved photo's R2 size and SHA-256
+matched its database row. A bounded diagnostic and the installed workerd runtime
+identified `redirect: 'error'` as unsupported at the edge. Mocked fetch tests had
+accepted that browser/Node option and missed the failure.
+
+The API and extraction-host portion requests use `redirect: 'manual'` and retain
+their existing non-success response checks. Redirects are rejected without
+forwarding credentials or following Location. The regression exercises the actual
+functions under workerd with a synthetic outbound service, including redirect
+rejection; it makes no external provider calls. Node-only bundle CLI readers and
+browser clients retain their supported redirect policy.
+
+The two S09 portion actions also reuse the existing authored `Btn` component.
+No screen, design-token package, processing service or publication path is added.
+The temporary diagnostic was removed from staging after identifying the cause.
+Hosted generation, approval and publication must be retested on the corrected
+exact-main release before claiming that portion flow has passed.

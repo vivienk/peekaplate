@@ -390,7 +390,7 @@ describe('staging extraction host', () => {
     const forwarded = forward.mock.calls[0]![0];
     expect(new URL(forwarded.url).pathname).toBe(path);
     expect(forwarded.headers.get('authorization')).toBe(`Bearer ${secret}`);
-    expect(forwarded.redirect).toBe('error');
+    expect(forwarded.redirect).toBe('manual');
     expect(await forwarded.text()).toBe('synthetic-photo');
     expect(get).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();

@@ -428,7 +428,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "ef5fd6b970a4db7bfe2f2c1fc28b7480c71d1ffe1ddc07f4abb2d18dc3a2d5b5"
+      "sourceFingerprint": "3bfd0f1c517db0501c4d77aebaeed8bbb5a819adbac863dec29932d92082f5c2"
     },
     {
       "id": "backend",
@@ -621,6 +621,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/dish-assistance.test.ts",
         "docs/owner-flow-retest.md",
         "backend/src/owner-portion-preview.ts",
+        "backend/src/owner-portion-preview.workerd-harness.ts",
         "backend/src/bundle-producer/approved-portions.ts",
         "backend/src/bundle-producer/approved-portions.test.ts",
         "docs/screen9-portion-publish.md",
@@ -641,7 +642,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "391d4c82a7f45103f33d6d5f467dd64581ddd83179262c72f023666c36079408"
+      "sourceFingerprint": "c685df66062e3de0d8b9c85816c895093da405ba5065a96a294cb828e4ce8033"
     },
     {
       "id": "database",
@@ -1154,7 +1155,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/extraction-host.ts",
         "frontend/console/src/owner/OwnerWorkspace.tsx"
       ],
-      "next": "Run final focused-main checks, independent reviews and CI, then matching staging deployment and authenticated publication/diner screenshots. The two restricted report/action migrations are applied on staging. Preserve all Poulet drafts and existing demo accounts; no fresh OCR/provider run or physical-scale claim."
+      "next": "PR223 is merged and deployed; hosted portion testing exposed unsupported Worker redirect:error. The narrow correction uses manual redirect handling with unchanged non-OK rejection and actual-function workerd regression evidence. Deploy the corrected exact-main release and finish authenticated portion/publication screenshots. AI secret provisioning still awaits the protected environment reviewer; unknown freshness abstains. Preserve Poulet drafts and accounts; no new OCR/provider call or physical-scale claim."
     }
   ]
 }

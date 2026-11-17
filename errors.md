@@ -3265,3 +3265,14 @@ The repaired workspace run passed 64 cases. Its two viewport screenshot cases
 then exposed an assertion checking the shell sidebar while S10 intentionally
 renders without that sidebar. Assert no verification request before the explicit
 action instead; the separate shell tests retain locked-navigation coverage.
+
+## November 17 — hosted portion request rejected before transport
+
+S09 persisted the dish/photo but its hosted portion POST returned503. R2 source
+size/hash matched the database and the configured destination matched the existing
+extraction Worker. Temporary allowlisted diagnostics isolated a redirect TypeError.
+Installed workerd reproduced `redirect: 'error'` rejecting before any outbound call;
+`manual` exposes the response without following it. The API and extraction-host
+portion requests now use manual redirect handling and preserve non-OK rejection.
+Actual-function workerd regressions cover successful dispatch and redirected
+responses. No secret, raw log, provider call or diagnostic endpoint is retained.

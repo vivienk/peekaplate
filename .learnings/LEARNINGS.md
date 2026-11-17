@@ -158,3 +158,17 @@ branch, not only develop. A selective promotion can otherwise remove main-only
 authored performance presentation and lazy camera cleanup even when develop
 tests pass. Preserve those implementations and rerun their original regressions;
 source provenance and a green feature branch do not establish release parity.
+
+## LRN-20261117-WORKER-REDIRECT · Test platform request options in workerd
+
+**Logged**: November 17, 2026 · **Status**: resolved · **Area**: tests
+
+Node fetch mocks accepted `redirect: 'error'`, but workerd rejected it before any
+outbound request. Use manual redirects with explicit non-success rejection at
+the Worker boundary. A regression must import the actual bridge and host under
+workerd; checking a mocked options object cannot establish platform support.
+Browser and Node-only callers have different capabilities and need not change.
+
+Related: backend/src/owner-portion-preview.test.ts,
+backend/src/owner-portion-preview.workerd-harness.ts.
+Pattern: tests.platform-options-not-mocked; first occurrence, no policy promotion.
