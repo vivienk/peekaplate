@@ -4,7 +4,12 @@ import type { Client } from 'pg';
 import { withOwnerMenuTransaction } from '../owner-menu';
 import { safeFetch } from '../retrieval/fetcher';
 import { parseHtmlSource } from '../retrieval/parser';
-import { createIngestionJob, type DishDraftRow, IngestionError, type MenuIngestionJobRow } from './repository';
+import {
+  createIngestionJob,
+  type DishDraftRow,
+  IngestionError,
+  type MenuIngestionJobRow,
+} from './repository';
 
 const MAX_HTML_DISHES = 150;
 const SOURCE_KIND = 'jsonld_menu';
@@ -26,11 +31,17 @@ export async function retrieveStructuredHtmlMenu(url: string) {
       const data = segment.metadata ?? {};
       const name = typeof data.name === 'string' ? data.name.trim().slice(0, 160) : '';
       if (!name) return null;
-      const description = typeof data.description === 'string' ? data.description.slice(0, 4000) : null;
-      const price = typeof data.price_text === 'string' && /^(0|[1-9]\d{0,7})(?:\.\d{1,2})?$/.test(data.price_text)
-        ? data.price_text : null;
-      const currency = typeof data.price_currency === 'string' && /^[A-Z]{3}$/.test(data.price_currency)
-        ? data.price_currency : null;
+      const description =
+        typeof data.description === 'string' ? data.description.slice(0, 4000) : null;
+      const price =
+        typeof data.price_text === 'string' &&
+        /^(0|[1-9]\d{0,7})(?:\.\d{1,2})?$/.test(data.price_text)
+          ? data.price_text
+          : null;
+      const currency =
+        typeof data.price_currency === 'string' && /^[A-Z]{3}$/.test(data.price_currency)
+          ? data.price_currency
+          : null;
       return {
         name,
         description,
@@ -38,7 +49,8 @@ export async function retrieveStructuredHtmlMenu(url: string) {
         currency,
         sourceText: segment.text,
       };
-    }).filter((item): item is NonNullable<typeof item> => item !== null);
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
   return items.length ? { source, items } : null;
 }
 
@@ -88,15 +100,27 @@ export async function persistStructuredHtmlMenu(
           $1,$2,$3,$4,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,'needs_review','pending'
         )`,
         [
-          randomUUID(), venue, job.id, candidateId, index, item.name, item.description,
-          item.price, item.price, item.currency, sourceId, item.sourceText,
+          randomUUID(),
+          venue,
+          job.id,
+          candidateId,
+          index,
+          item.name,
+          item.description,
+          item.price,
+          item.price,
+          item.currency,
+          sourceId,
+          item.sourceText,
           JSON.stringify({
             source_kind: SOURCE_KIND,
             source_sha256: sourceHash,
             final_url: source.finalUrl,
             code_point_spans: [{ segment_id: candidateId, start: 0, end: spanEnd }],
           }),
-          ['Imported from structured website metadata; owner must verify all fields, ingredients and allergens.'],
+          [
+            'Imported from structured website metadata; owner must verify all fields, ingredients and allergens.',
+          ],
         ],
       );
     }
@@ -113,8 +137,13 @@ export async function persistStructuredHtmlMenu(
            draft_count=$3, source_uploaded=true, source_provenance=$4::jsonb,
            result_storage_key=$5
        WHERE tenant_id=$1 AND id=$2 AND status='queued' RETURNING *`,
-      [venue, job.id, items.length, JSON.stringify(provenance),
-        `reports/${venue}/${job.id}/html-jsonld`],
+      [
+        venue,
+        job.id,
+        items.length,
+        JSON.stringify(provenance),
+        `reports/${venue}/${job.id}/html-jsonld`,
+      ],
     );
     if (result.rowCount !== 1) throw new IngestionError('job_state_conflict', 409);
     return result.rows[0]!;
@@ -139,7 +168,8 @@ export function structuredHtmlReviewResult(
     !job.source_url ||
     typeof provenance.retrievedAt !== 'string' ||
     typeof provenance.sizeBytes !== 'number'
-  ) throw new IngestionError('review_not_ready', 409);
+  )
+    throw new IngestionError('review_not_ready', 409);
   if (drafts.length !== job.draft_count || drafts.length === 0)
     throw new IngestionError('review_draft_mismatch', 409);
   const sourceId = `sha256:${job.source_hash}`;
@@ -171,12 +201,18 @@ export function structuredHtmlReviewResult(
       review_warnings: draft.review_warnings,
       status: 'needs_review' as const,
     };
-    const missing_fields = (['description', 'category', 'price_amount', 'price_currency', 'ingredients'] as const)
-      .filter((field) => original[field] === null && !(field === 'price_amount' && draft.price_text != null));
+    const missing_fields = (
+      ['description', 'category', 'price_amount', 'price_currency', 'ingredients'] as const
+    ).filter(
+      (field) =>
+        original[field] === null && !(field === 'price_amount' && draft.price_text != null),
+    );
     return {
       candidate_id: draft.candidate_id,
       original: { ...original, price_text: draft.price_text ?? null },
-      evidence: [{ segment_id: draft.candidate_id, start: 0, end: Array.from(draft.source_text).length }],
+      evidence: [
+        { segment_id: draft.candidate_id, start: 0, end: Array.from(draft.source_text).length },
+      ],
       missing_fields,
     };
   });
