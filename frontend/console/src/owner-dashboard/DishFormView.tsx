@@ -42,6 +42,7 @@ export function DishFormView({
   photo,
   servingCountControl,
   portionReview,
+  onApprovePortion,
 }: {
   ed: Extract<EditState, { step: 'form' | 'review' }>;
   setEd: (e: EditState) => void;
@@ -69,7 +70,9 @@ export function DishFormView({
     status: 'processing' | 'needs_review' | 'failed';
     previewUrl?: string;
     message?: string;
+    approved?: boolean;
   };
+  onApprovePortion?: () => void;
 }) {
   const dr = ed.draft;
   const latest = useRef(ed);
@@ -265,11 +268,18 @@ export function DishFormView({
                           objectFit: 'contain',
                         }}
                     />
-                    <span className="s09-chip">Needs review</span>
+                    <span className={`s09-chip${portionReview.approved ? ' good' : ''}`}>
+                      {portionReview.approved ? 'Approved for publication review' : 'Needs review'}
+                    </span>
                     <p>
-                        This generated image is private and will not appear in View Portion until
-                        approved and published.
+                        This generated image remains private until the menu is published with the
+                        approved portion assets.
                       </p>
+                    {!portionReview.approved && onApprovePortion && (
+                      <button type="button" onClick={onApprovePortion} disabled={busy}>
+                        Approve 2.5D preview
+                      </button>
+                    )}
                   </>
                 ) : (
                   <>
