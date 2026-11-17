@@ -4,6 +4,7 @@
 // OwnerAuthService; these screens only react to its results.
 import { type FormEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import { TextField } from '../foundations/TextField';
+import { LegalDialog, type LegalDocumentId } from '../legal/LegalDialog';
 import { Button } from '../ui';
 import logo from './assets/logo.png';
 import type { OwnerAuthService, RateLimited } from './auth-service';
@@ -346,6 +347,7 @@ function CreateStep({
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [terms, setTerms] = useState(false);
+  const [legal, setLegal] = useState<LegalDocumentId | null>(null);
   const [errors, setErrors] = useState<CreateErrors>({});
   const [banner, setBanner] = useState<'failed' | 'exists' | 'unavailable' | BannerCopy | null>(
     null,
@@ -457,6 +459,9 @@ function CreateStep({
               className="pp-auth-terms__box"
               type="checkbox"
               checked={terms}
+              // The links inside the label make some screen readers drop their words from the
+              // checkbox name, so the full visible sentence is given explicitly (Rania, 16 Nov).
+              aria-label={AGREEMENT_LABEL}
               aria-invalid={errors.terms ? true : undefined}
               aria-describedby={errors.terms ? termsErrorId : undefined}
               onChange={(event) => {
@@ -466,8 +471,25 @@ function CreateStep({
               }}
             />
             <label className="pp-auth-terms__label" htmlFor="pp-auth-terms">
-              I agree to the Terms of Service and Privacy Policy, and confirm I’m authorized to
-              manage this restaurant.
+              I agree to the{' '}
+              <button
+                type="button"
+                className="pp-auth-inline-link"
+                aria-haspopup="dialog"
+                onClick={() => setLegal('terms')}
+              >
+                Terms of Service
+              </button>{' '}
+              and{' '}
+              <button
+                type="button"
+                className="pp-auth-inline-link"
+                aria-haspopup="dialog"
+                onClick={() => setLegal('privacy')}
+              >
+                Privacy Policy
+              </button>
+              , and confirm I’m authorized to manage this restaurant.
             </label>
           </div>
           {errors.terms && (
@@ -484,6 +506,7 @@ function CreateStep({
           busyLabel="Creating account…"
         />
       </form>
+      {legal && <LegalDialog document={legal} onClose={() => setLegal(null)} />}
       <p className="pp-auth__footer">
         Already have an account?{' '}
         <button
@@ -498,6 +521,10 @@ function CreateStep({
     </>
   );
 }
+
+// The S01 agreement sentence, word for word as shown next to the checkbox.
+const AGREEMENT_LABEL =
+  'I agree to the Terms of Service and Privacy Policy, and confirm I’m authorized to manage this restaurant.';
 
 // S02: sign in for an email with an account (S02 handoff, sections 1-7).
 function SignInStep({

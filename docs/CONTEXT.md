@@ -277,7 +277,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner auth/workspace reuses authored S05–S13 components, including #172 DishFormView and official #208 publication. S05 saves a tenant profile/private photo; shared setup reads drive header/content/aside without inventing verification. Manual and extracted drafts retain serving size, corrected allergens/photos and source evidence. S10 removal/Undo is persisted; candidate corrections invalidate verification. Processing success uses the selected import, not older drafts. The preview-only S05–S13 walkthrough is labelled synthetic with no provider/analytics calls. Live S09 AI drafting and complete report-page adapters remain absent. New snapshot preparation/admission remains operator-owned; hosted migration/release/acceptance is pending. Shared S09 adds an optional people-served calibration field; report-period mismatches withhold AI suggestions.",
+      "summary": "Owner auth/workspace reuses authored S05–S13 components, including #172 DishFormView and official #208 publication. S05 saves a tenant profile/private photo; shared setup reads drive header/content/aside without inventing verification. Manual and extracted drafts retain serving size, corrected allergens/photos and source evidence. S10 removal/Undo is persisted; candidate corrections invalidate verification. Processing success uses the selected import, not older drafts. The preview-only S05–S13 walkthrough is labelled synthetic with no provider/analytics calls. Live S09 AI drafting and complete report-page adapters remain absent. New snapshot preparation/admission remains operator-owned; hosted migration/release/acceptance is pending. Shared S09 adds an optional people-served calibration field; report-period mismatches withhold AI suggestions. S01 Terms/Privacy open local dialogs; account/session APIs and tenant authority remain unchanged.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -326,6 +326,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/OwnerAuth.tsx",
         "frontend/console/src/auth/auth-service.ts",
         "frontend/console/src/auth/auth.css",
+        "frontend/console/src/legal/LegalDialog.tsx",
+        "frontend/console/src/legal/markdown.tsx",
+        "frontend/console/src/legal/markdown.test.tsx",
+        "frontend/console/src/legal/legal.css",
+        "frontend/console/src/legal/terms.md",
+        "frontend/console/src/legal/privacy-policy.md",
         "frontend/console/src/auth/callback.test.tsx",
         "frontend/console/src/auth/callback.ts",
         "frontend/console/src/auth/copy.ts",
@@ -423,7 +429,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f73c4139163a5119d75c9d69de13ea89321b161757418cb558020b304d11e21c"
+      "sourceFingerprint": "ddf25910720468072dee19e0a86632276280ba662ce0ea929235400aa919e380"
     },
     {
       "id": "backend",
@@ -778,7 +784,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "7d3b3ff875fe60937b7143b3882b9e46c46d54fec3a44c8e0a51bb2cf4b2ab0c"
+      "sourceFingerprint": "fa50a24eca0fa67621a4b15e1d2f9a0f93f373a0d6286e6eced8f60e82ccb3a1"
     },
     {
       "id": "agents",
@@ -1011,19 +1017,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-15",
       "modules": [
-        "backend"
-      ],
-      "summary": "Hosted prepared preview exposed Worker rejection of redirect error. Manual redirect handling rejects every 3xx without following; the network-free workerd regression reproduces the failure and verifies valid bytes plus hostile Location rejection.",
-      "files": [
-        "backend/src/owner-publication.ts",
-        "backend/src/owner-publication.test.ts",
-        "backend/src/owner-publication.workerd-harness.ts"
-      ],
-      "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
         "processing"
       ],
       "summary": "PR181 adds the offline strict field scorer and proposed six-source/nine-page metadata plan. Existing inspected cases remain development; two new PDFs are only candidate holdouts. Hash-bound actual outputs retain null/zero, duplicate/unresolved and per-segment mixed-page failure evidence. Two pinned Spec findings were reproduced and fixed; 39 guarded local QA-02 controls passed before integrating merged169. No fresh real-menu prediction, frozen human reference or acceptance is inferred.",
@@ -1159,6 +1152,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/review/fromDishDraft.test.ts"
       ],
       "next": "Coordinator reviews and publishes the resolved merge commit. Hosted migration/release, fresh provider extraction, physical-device scale and live AI header handoff remain separate gates; no staging activation was performed."
+    },
+    {
+      "date": "2026-11-16",
+      "modules": [
+        "console"
+      ],
+      "summary": "Reconcile reviewed PR201 Terms/Privacy dialogs with develop d1b5c29. Preserve authored S05–S13 styles and context, existing agreement validation and Supabase session/API flow; no backend or migration change and no persisted agreement audit added. Local PASS: 46 auth/legal units, six preview/analytics guards, 23 auth Chromium cases, lint/typecheck/context/docs. Auth/legal source remains identical to approved 8686b593; hosted authentication and legal-content approval remain separate.",
+      "files": [
+        "frontend/console/src/auth/OwnerAuth.tsx",
+        "frontend/console/src/auth/auth.css",
+        "frontend/console/src/legal/LegalDialog.tsx",
+        "scripts/console-preview-demos.test.mjs",
+        "tests/e2e/owner-auth.spec.ts"
+      ],
+      "next": "Coordinator reviews the reconciled local merge before publishing. No hosted authentication, deployment or legal audit acceptance claimed."
     }
   ]
 }

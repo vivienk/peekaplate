@@ -4759,3 +4759,10 @@ which ReviewDish rejects under exactOptionalPropertyTypes. The focused existing
 adapter suite also failed its omitted-property regression before the fix. A
 conditional spread now omits only undefined and preserves explicit null/text.
 The five focused adapter cases pass; authored markup, styles and tokens are unchanged.
+
+### ERR-20261116-LEGAL-RECONCILE-CONTEXT
+
+The PR201 merge handoff script initially addressed context graph `modules` rather
+than its actual `nodes` key and stopped before writing. Reading the schema and
+using `nodes` resolved the documentation-only failure. Context validation,
+documentation links and typechecks pass; no runtime source was changed by repair.
