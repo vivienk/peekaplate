@@ -449,25 +449,39 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
     // Generated 2.5D artifacts remain private and needs-review; these methods never publish.
     async generateDraftPortion(venueId: string, draftId: string, photoId: string) {
       return request(
-        venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion`),
+        venuePath(
+          venueId,
+          `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion`,
+        ),
         { method: 'POST', upload: true },
         (body) => {
           const record = field(body, 'portionReview') as Record<string, unknown>;
           if (
-            !record || !['needs_review', 'failed'].includes(String(record.status)) ||
-            record.dish_id !== draftId || record.draft_revision_id !== photoId
-          ) throw new Error('portion review identity');
+            !record ||
+            !['needs_review', 'failed'].includes(String(record.status)) ||
+            record.dish_id !== draftId ||
+            record.draft_revision_id !== photoId
+          )
+            throw new Error('portion review identity');
           return { status: record.status as 'needs_review' | 'failed' };
         },
       );
     },
     async readDraftPortionImage(venueId: string, draftId: string, photoId: string): Promise<Blob> {
       return request(
-        venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion/image`),
+        venuePath(
+          venueId,
+          `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion/image`,
+        ),
         { method: 'GET', blob: true },
         (body) => {
-          if (!(body instanceof Blob) || body.size === 0 || body.size > 180_000 ||
-              body.type !== 'image/webp') throw new Error('portion image');
+          if (
+            !(body instanceof Blob) ||
+            body.size === 0 ||
+            body.size > 180_000 ||
+            body.type !== 'image/webp'
+          )
+            throw new Error('portion image');
           return body;
         },
       );
