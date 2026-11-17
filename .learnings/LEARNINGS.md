@@ -167,3 +167,18 @@ An external reconciliation script combined DOTALL with a greedy closing-marker p
 
 Related: frontend/diner/src/menu/dishDetail.ts, tests/e2e/portion.spec.ts.
 Pattern: tooling.bounded-conflict-repair; first occurrence, no policy promotion.
+
+## LRN-20261117-VISUAL-HARNESS · Preserve the official HTML shell
+
+**Logged**: November 17, 2026 · **Status**: resolved · **Area**: tests
+
+A standalone screen harness rendered the real components but omitted the
+official HTML theme and reversed CSS import order. Its screenshots showed pale
+headings despite passing API/database assertions. Matching the official entry's
+theme, language, viewport and stylesheet order corrected the screenshots without
+changing product CSS. Pin both the component source and its entry shell before
+treating an external screenshot as a product defect.
+
+Related: frontend/console/owner-auth.html, frontend/console/src/auth/live.tsx,
+docs/review/owner-backend-screens/README.md.
+Pattern: tests.visual-entry-parity; first occurrence, no policy promotion.

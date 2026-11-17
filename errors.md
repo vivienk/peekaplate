@@ -4684,3 +4684,26 @@ dashboard heading before the fix. The save now reuses the existing view-generati
 fence: persistence and its notice complete, but an abandoned view cannot navigate.
 The same regression passed afterward (1/1, 3.9s including startup). No authored
 screen, button placement or save/authorization semantics changed.
+
+### ERR-20261117-OWNER-OCR-RECONCILIATION
+
+The final PR207 source comparison found omitted recovery copy, uploading-state
+guidance and outcome regressions in the consolidated branch. A focused unit test
+reproduced generic guidance for an exhausted provider allowance; a browser test
+reproduced queued copy while a file was still missing. Restored the original
+source increments and adapted its five outcome/correction cases to current S09.
+All seven job units and six OCR browser cases pass. The copied retry assertion
+also exposed an older fixture omission: it now mirrors the existing SQL
+GREATEST(max_attempts,attempt_count+3), without changing backend/provider budgets.
+
+### ERR-20261117-REVIEW-UNDO-PENDING
+
+The expanded workspace run passed 58 cases and reproduced a dropped Undo click:
+the removal notice appeared before its status refresh completed, while the
+shared command runner still rejected concurrent work. A delayed-read regression
+confirmed Undo was incorrectly enabled. ReviewDishes now reuses its existing
+pending prop to disable Remove/Undo and defers Undo focus until it is enabled.
+The corrected case passed three repeats in 11.3s. The first edit accidentally
+put the effect guard in the adjacent verification dialog; browser execution
+caught the undefined variable, and the edit was corrected before commit. Screen
+markup, placement, command identity and persistence remain unchanged.

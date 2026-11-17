@@ -423,7 +423,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "0783a9b8e071930f182e1ff2aab3b294e24cf6cf2086d77e9565a5210d0372b5"
+      "sourceFingerprint": "6ef481e5560a66fd90336110a1ef87e588f33341198191f55854b7b66c1f6ef2"
     },
     {
       "id": "backend",
@@ -1132,9 +1132,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "contracts"
       ],
-      "summary": "Reuse official screens for S05–S13; merge #208 first, extend missing profile/setup and removal persistence, preserve extracted photo/allergen/serving edits, and expose a labelled synthetic PR-preview journey with screenshots. Source PRs are mapped in the correction guide.",
+      "summary": "Single PR213 reconciles official S05–S13 with #207 OCR recovery, #209 report-period guard, #210 transactional artwork placeholders and #215 branding/serving calibration. Canonical profile and existing forms/transport remain; delayed profile saves cannot override navigation. Isolated Worker/DB/local-R2 saves, verification, denials and PDF queued intake pass with 18 screenshots and cleanup. Fresh extraction, hosted publication and owner AI remain separate gates.",
       "files": [
         "docs/owner-flow-corrections.md",
+        "docs/review/owner-backend-screens/README.md",
         "frontend/console/src/owner-dashboard/DishFormView.tsx",
         "frontend/console/src/onboarding/OwnerJourneyDemo.tsx",
         "backend/src/restaurant-profile.ts",

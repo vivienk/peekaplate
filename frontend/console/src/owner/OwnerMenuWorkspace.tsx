@@ -952,11 +952,13 @@ export function OwnerMenuWorkspace({
           }
           failureReason={errorMessage(processing.errorCodes[0] ?? 'extraction_failed')}
           step={
-            jobs
-              .filter((job) => processingIds.includes(job.id))
-              .some((job) => job.status === 'running')
-              ? 'Processing the uploaded source'
-              : 'Queued for processing'
+            processing.phase === 'uploading'
+              ? 'Waiting for the remaining source files'
+              : jobs
+                    .filter((job) => processingIds.includes(job.id))
+                    .some((job) => job.status === 'running')
+                ? 'Processing the uploaded source'
+                : 'Queued for processing'
           }
           onCancel={() =>
             void run(async (active) => {
