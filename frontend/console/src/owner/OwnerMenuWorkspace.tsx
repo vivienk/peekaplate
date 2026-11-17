@@ -1219,6 +1219,7 @@ export function OwnerMenuWorkspace({
     ) : view === 'publish' && canPublish ? (
       <OwnerPublish
         key={`${actorId}:${venueId}`}
+        restaurantName={shownName}
         apiBase={apiBase}
         actorId={actorId}
         venueId={venueId}

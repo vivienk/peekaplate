@@ -62,8 +62,12 @@ export function mountAnalyticsConsent(
   const stop = controller?.subscribe(update);
   update();
   button.addEventListener('click', () => {
-    setConsent(!allowed());
+    const enabling = !allowed();
+    setConsent(enabling);
     update();
+    if (controller && !allowed() && enabling) {
+      status.textContent = 'Your browser privacy preferences keep optional analytics off.';
+    }
     if (!controller && allowed()) void analytics!.captureShellView();
   });
   section.append(description, button, status);
