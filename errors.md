@@ -4781,3 +4781,15 @@ This repeats the existing PowerShell quoting guidance and changed no source.
 Check passes (2011 unit cases and 117 script cases); disposable DB passes (415 SQL
 assertions in 16 files, 170 integration cases and local Worker smoke). Browser and
 build evidence is recorded in the handoff. No hosted state changed in these fixes.
+
+### ERR-20261116-LEGAL-RECONCILE-CONTEXT
+
+The PR201 merge handoff script initially addressed context graph `modules` rather
+than its actual `nodes` key and stopped before writing. Reading the schema and
+using `nodes` resolved the documentation-only failure. Context validation,
+documentation links and typechecks pass; no runtime source was changed by repair.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-17T06:48:17.646Z","exitCode":1}
+```
