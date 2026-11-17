@@ -1,7 +1,7 @@
 // Private S09 2.5D processing bridge. Draft identities MUST NOT be treated as
 // approved public dish revisions: publication remains a separate trusted step.
 import { createHash } from 'node:crypto';
-import { PublicPortionSchema } from '@peekaplate/contracts';
+import { type PublicPortion, PublicPortionSchema } from '@peekaplate/contracts';
 import type { Bindings } from './index';
 
 type StoredObject = { size: number; arrayBuffer(): Promise<ArrayBuffer> };
@@ -30,13 +30,15 @@ function objectBytes(object: StoredObject | null, expectedSize: number, expected
   });
 }
 
-type PrivatePreview = {
+export type PrivatePreview = {
   status: 'needs_review' | 'failed';
   photo_sha256: string;
   dish_id: string;
   draft_revision_id: string;
   foreground_sha256?: string;
   foreground_size?: number;
+  /** Private draft/photo identities only. Never use as the published portion directly. */
+  portion?: PublicPortion;
   message?: string;
 };
 
@@ -59,6 +61,13 @@ export async function readPrivatePortion(
     !/^[a-f0-9]{64}$/.test(record.photo_sha256)
   ) {
     throw new Error('invalid_record');
+  }
+  if (record.portion) {
+    const parsed = PublicPortionSchema.safeParse(record.portion);
+    if (!parsed.success || parsed.data.dish_id !== record.dish_id ||
+      parsed.data.dish_revision_id !== record.draft_revision_id) {
+      throw new Error('invalid_private_portion');
+    }
   }
   return record;
 }
@@ -139,6 +148,7 @@ export async function processPrivateDishPhoto(input: {
   const layers = result.layers;
   if (portion && (!layers || typeof layers !== 'object')) throw new Error('missing_layers');
   let foreground: Uint8Array | null = null;
+  const privateLayers: Array<{ filename: string; bytes: Uint8Array }> = [];
   if (portion) {
     for (const layer of portion.layers) {
       const encoded = (layers as Record<string, unknown>)[layer.url];
@@ -148,6 +158,11 @@ export async function processPrivateDishPhoto(input: {
         throw new Error('layer_integrity_failure');
       }
       if (layer.depth > 0) foreground = bytes;
+      const filename = layer.depth === 0 ? 'background.svg' : 'dish.webp';
+      if (privateLayers.some((item) => item.filename === filename)) {
+        throw new Error('duplicate_layer');
+      }
+      privateLayers.push({ filename, bytes });
     }
   }
   const record: PrivatePreview = {
@@ -159,12 +174,15 @@ export async function processPrivateDishPhoto(input: {
       ? {
           foreground_sha256: hash(foreground),
           foreground_size: foreground.byteLength,
+          portion,
         }
       : { message: 'Cutout unavailable; original photo retained.' }),
   };
-  if (foreground) {
-    await bucket.put(`${key}/dish.webp`, foreground.buffer as ArrayBuffer, {
-      httpMetadata: { contentType: 'image/webp' },
+  for (const layer of privateLayers) {
+    await bucket.put(`${key}/${layer.filename}`, layer.bytes.buffer as ArrayBuffer, {
+      httpMetadata: {
+        contentType: layer.filename.endsWith('.svg') ? 'image/svg+xml' : 'image/webp',
+      },
     });
   }
   await bucket.put(`${key}/record.json`, JSON.stringify(record));
