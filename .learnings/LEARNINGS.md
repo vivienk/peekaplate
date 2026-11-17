@@ -153,6 +153,12 @@ progress. Keep sample design content confined to labelled demos.
 Related: docs/owner-onboarding-wiring.md, tests/e2e/owner-workspace.spec.ts.
 Pattern: frontend.composition-before-wiring; first occurrence, no policy promotion.
 
+November 16 correction follow-up: extracting the existing S09 presentation lets
+the demo and authenticated adapter share the authored markup without sharing
+fixture providers. A saved-profile browser test also caught excess metadata
+crossing a text-form boundary; adapt only the form's actual fields. Review the
+whole rendered composition and save/reopen behavior, not just a successful POST.
+
 ## LRN-20261115-CONFLICT-001 · Bound conflict repair to marker lines
 
 **Logged**: November 15, 2026 · **Status**: resolved · **Area**: tooling
@@ -161,3 +167,18 @@ An external reconciliation script combined DOTALL with a greedy closing-marker p
 
 Related: frontend/diner/src/menu/dishDetail.ts, tests/e2e/portion.spec.ts.
 Pattern: tooling.bounded-conflict-repair; first occurrence, no policy promotion.
+
+## LRN-20261117-VISUAL-HARNESS · Preserve the official HTML shell
+
+**Logged**: November 17, 2026 · **Status**: resolved · **Area**: tests
+
+A standalone screen harness rendered the real components but omitted the
+official HTML theme and reversed CSS import order. Its screenshots showed pale
+headings despite passing API/database assertions. Matching the official entry's
+theme, language, viewport and stylesheet order corrected the screenshots without
+changing product CSS. Pin both the component source and its entry shell before
+treating an external screenshot as a product defect.
+
+Related: frontend/console/owner-auth.html, frontend/console/src/auth/live.tsx,
+docs/review/owner-backend-screens/README.md.
+Pattern: tests.visual-entry-parity; first occurrence, no policy promotion.

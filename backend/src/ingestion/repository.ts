@@ -422,8 +422,7 @@ export async function persistExtractedDrafts(
     );
     const supersededCount = supersedeResult.rowCount ?? 0;
 
-    // 4b. Record an artwork placeholder for each new ingredient label, in the same transaction,
-    // so a failed save leaves none behind. Placeholders approve nothing and change no draft.
+    // Placeholders approve nothing and commit atomically with the extracted drafts.
     const placeholderCount = await recordArtworkPlaceholders(client, {
       tenantId: params.tenantId,
       jobId: params.jobId,

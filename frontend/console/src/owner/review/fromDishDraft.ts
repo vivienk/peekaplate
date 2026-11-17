@@ -24,6 +24,8 @@ export function draftToReviewDish(
         name: fields.name,
         category: fields.category,
         description: fields.description,
+        ...(fields.servingSize !== undefined && { servingSize: fields.servingSize }),
+        ...(fields.servingCount !== undefined && { servingCount: fields.servingCount }),
         priceAmount: fields.priceAmount,
         priceCurrency: fields.priceCurrency,
         ingredients: fields.ingredients,
@@ -37,6 +39,7 @@ export function draftToReviewDish(
     return {
       id: draft.id,
       ...dishFromReviewItem(extractionId, item),
+      servingCount: item.effective.serving_count ?? null,
       reviewed: item.review.reviewStatus === 'corrected',
     };
   }

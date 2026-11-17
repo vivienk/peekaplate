@@ -229,8 +229,11 @@ function renderMenu(
       <header class="pp-header">
         ${savedHeaderMarkup()}
         <div class="pp-logo">
-          <span class="pp-logo__emblem" aria-hidden="true"></span>
-          <span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>
+          ${
+            menu.restaurant.logo
+              ? `<img class="pp-logo__image" src="${escapeHtml(menu.restaurant.logo.url)}" alt="${escapeHtml(menu.restaurant.name)}" width="${menu.restaurant.logo.width}" height="${menu.restaurant.logo.height}" />`
+              : `<span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>`
+          }
         </div>
         <button class="pp-search" type="button" aria-label="Search menu" aria-expanded="false" aria-controls="pp-search-panel">
           <img class="pp-search__icon" src="${UI_ICONS.search}" alt="" aria-hidden="true" width="18" height="18" />
@@ -275,6 +278,18 @@ function renderMenu(
       <p class="pp-notice">Compare is not available yet.</p>
     </div>
   `;
+
+  container.querySelector<HTMLImageElement>('.pp-logo__image')?.addEventListener(
+    'error',
+    (event) => {
+      const image = event.currentTarget as HTMLImageElement;
+      const name = document.createElement('span');
+      name.className = 'pp-logo__name';
+      name.textContent = menu.restaurant.name;
+      image.replaceWith(name);
+    },
+    { once: true },
+  );
 
   const tabButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('.pp-tab'));
   const categoryBlocks = Array.from(container.querySelectorAll<HTMLElement>('.pp-category'));

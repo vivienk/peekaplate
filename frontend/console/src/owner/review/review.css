@@ -272,8 +272,10 @@
   flex: 1 1 var(--pp-space-80);
   min-width: 208px; /* Figma button min width: no size token */
   max-width: 280px; /* Figma button max width: no size token */
+  /* Exactly 48 including the border, like the other onboarding Large buttons (Rania, #213). */
+  box-sizing: border-box;
   min-height: var(--pp-space-48);
-  padding: var(--pp-space-12) var(--pp-space-20);
+  padding: 0 var(--pp-space-20);
   font-size: var(--pp-font-size-h5);
   line-height: var(--pp-line-height-h5);
 }

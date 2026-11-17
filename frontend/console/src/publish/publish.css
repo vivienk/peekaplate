@@ -8,6 +8,7 @@
   --pp-s13-pending-phone-height: 680px;
   --pp-s13-pending-phone-radius: 32px;
   --pp-s13-pending-dialog-width: 600px;
+  --pp-s13-pending-dialog-icon: 96px; /* Publish Confirmation check circle: no 96 size token */
 }
 .pp-menu-preview {
   display: grid;
@@ -215,6 +216,17 @@
 }
 .pp-menu-preview__dialog::backdrop {
   background: color-mix(in srgb, var(--pp-color-gray-900) 40%, transparent);
+}
+.pp-menu-preview__dialog-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--pp-s13-pending-dialog-icon);
+  block-size: var(--pp-s13-pending-dialog-icon);
+  margin-block-end: var(--pp-space-48);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-orange-500);
+  color: var(--pp-color-white);
 }
 .pp-menu-preview__dialog h2 {
   margin: 0 0 var(--pp-space-6);

@@ -311,6 +311,19 @@ function PublishConfirmDialog({
         onCancel();
       }}
     >
+      {/* Orange check (Rania's updated Publish Confirmation, Figma 3501:9485), drawn like the
+          S11 "Menu verified" icon. */}
+      <span className="pp-menu-preview__dialog-icon" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" focusable="false">
+          <path
+            d="M5 12.5l4.5 4.5L19 7.5"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
       <h2 id={`${ids}-title`}>Publish your menu?</h2>
       <p id={`${ids}-text`}>
         Your menu will be public on PeekaPlate. Anyone with the link will be able to see it.

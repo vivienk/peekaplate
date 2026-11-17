@@ -5,7 +5,7 @@
 //
 // Not here: S08 "Your menu is ready to review" (Figma 1937:6239; handoff item 4). Harshita builds
 // it with S10 (FE-10), per Adam. When dishes are found the caller opens that screen instead.
-import { useEffect, useId, useRef } from 'react';
+import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { ActionButton, ErrorBanner } from '../auth/parts';
 import bowlIcon from './assets/bowl-sad.svg';
 import fileIcon from './assets/file-info.svg';
@@ -38,6 +38,7 @@ export type MenuProcessingProps = {
   onCancel: () => void;
   // Back to S06 Choose how to add your menu.
   onTryAnother: () => void;
+  secondaryAction?: ReactNode;
 };
 
 const KIND_LABEL: Record<MenuSourceItem['kind'], string> = {
@@ -59,6 +60,7 @@ export function MenuProcessing({
   sources = [],
   onCancel,
   onTryAnother,
+  secondaryAction,
 }: MenuProcessingProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
@@ -152,7 +154,7 @@ export function MenuProcessing({
               <ErrorBanner
                 copy={{
                   title: `Extraction error — ${failureReason}`,
-                  body: 'We couldn’t process your menu. Try again, use another source, or enter your dishes manually.',
+                  body: 'Choose Try another source to upload a different file, paste a link or add your dishes manually.',
                 }}
               />
               {sources.length > 0 && (
@@ -189,6 +191,7 @@ export function MenuProcessing({
         <ActionButton variant="outlined" onClick={onCancel}>
           Cancel
         </ActionButton>
+        {secondaryAction}
         {state !== 'processing' && (
           <ActionButton variant="primary" onClick={onTryAnother}>
             Try another source

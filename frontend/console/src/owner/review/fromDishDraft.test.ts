@@ -24,6 +24,40 @@ const draft: DishDraft = {
 };
 
 describe('saved candidate corrections in the review table', () => {
+  it('omits an absent manual serving size while preserving explicit unknown and text', () => {
+    const manual = { ...draft, origin: 'manual' as const };
+    expect(draftToReviewDish({ ...manual, manual_fields: {} })).not.toHaveProperty('servingSize');
+    expect(draftToReviewDish({ ...manual, manual_fields: { servingSize: null } })).toHaveProperty(
+      'servingSize',
+      null,
+    );
+    expect(
+      draftToReviewDish({ ...manual, manual_fields: { servingSize: '1 bowl' } }),
+    ).toHaveProperty('servingSize', '1 bowl');
+  });
+
+  it('keeps manual count and descriptive serving size as separate saved facts', () => {
+    const row = draftToReviewDish({
+      ...draft,
+      origin: 'manual',
+      manual_fields: { servingSize: '1 bowl', servingCount: 2 },
+    });
+    expect(row.servingSize).toBe('1 bowl');
+    expect(row.servingCount).toBe(2);
+  });
+
+  it('maps an extracted count as a number and keeps a missing count unknown', () => {
+    const corrected = structuredClone(original);
+    corrected.effective.serving_count = 2;
+    expect(
+      draftToReviewDish(draft, session.extractionResult.extraction_id, corrected).servingCount,
+    ).toBe(2);
+    corrected.effective.serving_count = null;
+    expect(
+      draftToReviewDish(draft, session.extractionResult.extraction_id, corrected).servingCount,
+    ).toBeNull();
+  });
+
   it('reads the same effective fields as the editor after reloading a review session', () => {
     const corrected = structuredClone(original);
     corrected.effective = {
