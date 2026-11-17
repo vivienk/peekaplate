@@ -3276,3 +3276,25 @@ Installed workerd reproduced `redirect: 'error'` rejecting before any outbound c
 portion requests now use manual redirect handling and preserve non-OK rejection.
 Actual-function workerd regressions cover successful dispatch and redirected
 responses. No secret, raw log, provider call or diagnostic endpoint is retained.
+
+## November 17 — published SVG portion fell back to photo
+
+Hosted generation, approval and S13 publication succeeded, but the diner repeated
+the successful SVG background download and displayed its photo fallback. The
+verified-layer reader discarded Content-Type; the renderer restored SVG MIME only
+for development fixture URLs. Published hash URLs therefore produced undecodable
+untyped SVG blobs. The shared reader now returns verified blobs with supported
+image MIME, including the existing local upload SVG path. Unit regressions failed
+before this fix and passed afterward. The published browser fixture now uses an
+SVG background and opaque hash URLs, with unknown asset requests returning 404.
+
+The first full local check encountered an unrelated workerd SQLite
+`SQLITE_IOERR_TRUNCATE` during owner-publication startup and timed out one test;
+1,882 tests passed. The unchanged 12-test publication file then passed alone in
+3.33 seconds. This is recorded as a local runtime I/O failure, not a MIME defect
+or a clean first pass; no production code or timeout was changed for it.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-17T12:46:27.318Z","exitCode":1}
+```

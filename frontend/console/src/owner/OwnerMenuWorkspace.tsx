@@ -1349,7 +1349,7 @@ export function OwnerMenuWorkspace({
                       </span>
                       <span className="lab st">{draft.review_status}</span>
                       <span className="hidem">
-                        <span className="lab st">Not connected</span>
+                        <span className="lab st">Review in dish</span>
                       </span>
                       <Btn
                         kind="outlined"

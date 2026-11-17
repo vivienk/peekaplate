@@ -112,7 +112,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Release preserves deliberate camera entry while binding measurements to serving count; approximate fallbacks remain labelled. No portion assets are invented for newly prepared owner photos. Consent-gated PostHog/canonical tracking remains the existing implementation; withdrawn publication denies new prepared-content reads.",
+      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Verified portion blobs retain supported image MIME for opaque published SVG URLs; exact byte/hash and dimension checks remain. Release preserves deliberate camera entry while binding measurements to serving count; approximate fallbacks remain labelled. Consent-gated PostHog/canonical tracking remains the existing implementation; withdrawn publication denies new prepared-content reads.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -212,6 +212,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/serve-restaurant-routing-test.mjs",
         "frontend/diner/src/menu/portionPreview.ts",
         "frontend/diner/src/menu/portionAssets.ts",
+        "frontend/diner/src/menu/portionAssets.test.ts",
         "frontend/diner/src/menu/portionAR.ts",
         "frontend/diner/src/compare/pickerScreen.ts",
         "frontend/diner/src/compare/resultScreen.ts",
@@ -253,7 +254,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1819f5eb0e94e50b15a5150e6343b6b6943ab3fd47b13414e6f632d4793ba031"
+      "sourceFingerprint": "6f12c796b7dd5e410632ce52a2b84f826ec41b8a353342f7cb5f0af7af916c19"
     },
     {
       "id": "console",
@@ -428,7 +429,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3bfd0f1c517db0501c4d77aebaeed8bbb5a819adbac863dec29932d92082f5c2"
+      "sourceFingerprint": "864dd72e39b03c2881dea3b03f3f651afb7f447e3fb8b36a20c5009fe4dac91e"
     },
     {
       "id": "backend",
@@ -642,7 +643,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c685df66062e3de0d8b9c85816c895093da405ba5065a96a294cb828e4ce8033"
+      "sourceFingerprint": "be6de7d8fc0dd01040885bd9d07f084013d4e786967ca5b3f7b6a12bee638a23"
     },
     {
       "id": "database",

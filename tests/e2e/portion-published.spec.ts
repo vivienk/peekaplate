@@ -7,9 +7,12 @@ test('published portion offers the existing camera portal only after a deliberat
   page,
 }, testInfo) => {
   const hash = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
-  const images = ['background', 'foreground'].map((name) =>
-    readFileSync(`tests/fixtures/portion/${name}.png`),
-  );
+  const images = [
+    Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#eee"/></svg>',
+    ),
+    readFileSync('tests/fixtures/portion/foreground.png'),
+  ];
   const content = JSON.parse(
     readFileSync('packages/contracts/fixtures/public-menu-bundle.v1/bundle.json', 'utf8'),
   );
@@ -21,7 +24,7 @@ test('published portion offers the existing camera portal only after a deliberat
     width: 64,
     height: 64,
     layers: images.map((bytes, depth) => ({
-      url: `https://assets.example.test/portion/${depth}.png`,
+      url: `https://assets.example.test/public/prepared-assets/${content.venue_id}/55555555-5555-4555-8555-555555555555/${hash(bytes)}`,
       sha256: hash(bytes),
       size_bytes: bytes.length,
       depth,
@@ -52,11 +55,20 @@ test('published portion offers the existing camera portal only after a deliberat
   await page.route('https://bundle.example.test/portion.json', (route) =>
     route.fulfill({ contentType: 'application/json', body: bytes }),
   );
-  await page.route('https://assets.example.test/**', (route) => {
-    const layer = /\/([01])\.png$/.exec(route.request().url());
+  await page.route('https://assets.example.test/t0_*/**', (route) =>
+    route.fulfill({ contentType: 'image/png', body: images[1] }),
+  );
+  await page.route('https://assets.example.test/public/prepared-assets/**', (route) => {
+    const layer = images.findIndex((image) =>
+      route
+        .request()
+        .url()
+        .endsWith(`/${hash(image)}`),
+    );
+    if (layer < 0) return route.fulfill({ status: 404 });
     return route.fulfill({
-      contentType: 'image/png',
-      body: images[layer ? Number(layer[1]) : 0],
+      contentType: layer === 0 ? 'image/svg+xml' : 'image/png',
+      body: images[layer],
       headers: { 'Access-Control-Allow-Origin': '*' },
     });
   });
