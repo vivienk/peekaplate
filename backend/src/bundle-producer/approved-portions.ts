@@ -130,13 +130,14 @@ export async function verifyHostedPortionFiles(
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), 10_000);
     try {
-      const response = await doFetch(file.url, {
+      const options = {
         method: 'GET',
         redirect: 'error',
         credentials: 'omit',
         cache: 'no-store',
         signal: abort.signal,
-      });
+      } as const;
+      const response = await doFetch(file.url, options);
       if (!response.ok) throw new Error('Approved public portion asset not hosted');
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (bytes.byteLength !== file.sizeBytes || sha(bytes) !== file.sha256) {

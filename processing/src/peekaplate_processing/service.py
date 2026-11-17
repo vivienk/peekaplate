@@ -232,8 +232,8 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
     def reply(body, status=200, **headers):
         return JSONResponse(body, status_code=status, headers={"Cache-Control": "no-store", **headers})
 
-    # Optional private portion processor. It shares the existing server token,
-    # never a browser-facing credential, and stores only review artifacts.
+    # The Worker retains the returned review layers. The extraction host uses
+    # this directory only for per-request scratch files.
     portion_root = os.environ.get("PORTION_REVIEW_ROOT", "")
     if portion_root and Path(portion_root).is_absolute():
         from peekaplate_processing.portion_service import register_portion_routes
@@ -245,6 +245,7 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
             ),
             reply=reply,
             root=Path(portion_root),
+            retain_artifacts=False,
         )
 
     @app.get("/health")

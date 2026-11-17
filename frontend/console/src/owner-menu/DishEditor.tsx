@@ -130,9 +130,9 @@ export function DishEditor({
           });
         }}
         categories={categories}
-        portionReview={portionReview}
-        onApprovePortion={onApprovePortion}
-        onGeneratePortion={onGeneratePortion}
+        {...(portionReview ? { portionReview } : {})}
+        {...(onApprovePortion ? { onApprovePortion } : {})}
+        {...(onGeneratePortion ? { onGeneratePortion } : {})}
         servingCountControl={
           <TextField
             id="dish-serving-count"

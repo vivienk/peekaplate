@@ -423,12 +423,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "58864fa2d5df934ae3618845f72784d1b96b779213be852fdf941d45c47ed7cf"
+      "sourceFingerprint": "8de023c9a7377a7e7e806ce5b5a05f49cfd2451e181363d78251e648bd75c795"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker rechecks current staff/tenant authority for transactional commands and replay. Canonical profiles/private photos use versioned details/setup reads; owners cannot verify themselves. Draft removal is reversible; corrections retain photo/allergen/serving metadata, advance content versions and invalidate verification. Legacy omissions preserve size/count; explicit null clears. The bundle producer exports branding and revision/count-bound portions. Private portion export requires the canonical approved photo; trusted bundle preparation/admission remains separate. OCR retains transactional #210 placeholders. Facts and PostHog stay separate; reports retain privacy cohorts and unknown freshness. Optional report references bind analysis to displayed evidence while ordinary reads remain available. Authored S05–S13 callers reuse these APIs; hosted release/provider activation and the console reference-header handoff remain pending.",
+      "summary": "Worker rechecks staff/tenant authority for transactional commands and replay. Canonical profiles/private photos use versioned details/setup reads; owners cannot verify themselves. Draft removal is reversible; corrections preserve metadata, advance versions and invalidate verification. Legacy omissions preserve size/count; explicit null clears. The bundle producer exports branding and revision/count-bound portions. Private portion export requires the canonical approved photo. Configured retention reclaims rejected or orphaned portion files; bundle preparation/admission stays separate. OCR retains transactional #210 placeholders. Facts and PostHog stay separate; reports retain privacy cohorts and unknown freshness. Optional report references bind analysis to displayed evidence while ordinary reads remain available. Authored S05–S13 callers reuse these APIs; hosted release/provider activation and the console reference-header handoff remain pending.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -630,7 +630,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a56b23f444ca0301a56e76654be64613531661003364b547380f32b7d195efc6"
+      "sourceFingerprint": "58fc473e5e439300613e6b7fa5b058aa001a3af595e05ad266b4e731dfe84461"
     },
     {
       "id": "database",
@@ -845,7 +845,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Vision-first source-linked needs_review drafts preserve private attempts and bounded retries. Ingredient sidecars/artwork retain provenance; FE-06.4 verification is read-only and upstream usage remains separately gated. QA-02 strict offline scoring binds frozen reference/export bytes and occurrence mappings; exposed sources stay development, new holdouts provisional. Private single-tenant portion/cutout/model helpers validate hashes and bound uploads; ambiguous provider submissions cannot auto-resubmit. Generated assets stay review-only and publication-ineligible. No human reference truth, fresh AI accuracy, physical-device scale or hosted acceptance follows from offline checks.",
+      "summary": "Vision-first source-linked needs_review drafts preserve private attempts and bounded retries. Ingredient sidecars/artwork retain provenance; FE-06.4 verification is read-only and upstream usage remains separately gated. QA-02 strict offline scoring binds frozen reference/export bytes and occurrence mappings; exposed sources stay development, new holdouts provisional. Private single-tenant portion/cutout/model helpers validate hashes and bound uploads. Screen 9 processing uses request-scoped temporary files. Ambiguous provider submissions cannot auto-resubmit. Generated assets stay review-only and publication-ineligible. No human reference truth, fresh AI accuracy, physical-device scale or hosted acceptance follows from offline checks.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -881,6 +881,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "test-data/README.md",
         "processing/src/peekaplate_processing/service.py",
         "processing/tests/test_service.py",
+        "processing/src/peekaplate_processing/portion_service.py",
         "processing/Dockerfile",
         "processing/.dockerignore",
         "processing/src/peekaplate_processing/overlay_review.py",
@@ -973,7 +974,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "c0be7f3512676027ad797e3cb2808471765c80e671c71f651474c0ec88e0e1d0"
+      "sourceFingerprint": "4752c84fc4a9ee86f48e340ee83038b16e2de4ab543d40277627b992cf7533b0"
     },
     {
       "id": "assets",
@@ -1131,7 +1132,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "summary": "Extract existing canonical owner backend/profile/review/publication-asset adapters from held #213/#215 onto current develop; no frontend or replacement pipeline. Preserve #210 already merged and prove legacy draft-client compatibility. The #219 follow-up binds private portion export to the current revision's approved photo and rejects replaced or cleared photos.",
+      "summary": "Extract existing canonical owner backend/profile/review/publication-asset adapters from held #213/#215 onto current develop; no frontend or replacement pipeline. Preserve #210 already merged and prove legacy draft-client compatibility. The #219 follow-up binds private portion export to the approved photo, cleans expired private artifacts and removes the processing host's temporary files.",
       "files": [
         "docs/owner-backend-wiring.md",
         "backend/src/restaurant-profile.ts",
@@ -1139,6 +1140,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-menu.ts",
         "migrations/20261116020000_owner_flow_profile.sql",
         "backend/src/owner-menu-routes.ts",
+        "backend/src/owner-menu-retention.ts",
         "docs/screen9-portion-publish.md"
       ],
       "next": "Run standalone checks and review this backend-only PR; leave #213 with Jeffin. Review the portion export change with #219. Hosted release and trusted preparation/admission require separate acceptance."

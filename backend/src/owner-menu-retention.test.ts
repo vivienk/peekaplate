@@ -10,6 +10,10 @@ const bytes = new Uint8Array([1, 2, 3]).buffer;
 const hash = createHash('sha256').update(Buffer.from(bytes)).digest('hex');
 const key = `menu-staging/${venue}/${draft}/${hash}`;
 const destination = `menu-assets/${venue}/${photoId}/${hash}`;
+const portionPrefix = `private-portions/${venue}/${draft}/${photoId}/${hash}`;
+const portionKeys = ['approval.json', 'record.json', 'background.svg', 'dish.webp'].map(
+  (name) => `${portionPrefix}/${name}`,
+);
 function fixture(photo?: Record<string, unknown>, pending = false) {
   const query = vi.fn(async (sql: string) => ({
     rows: sql.includes('FROM app_private.dish_drafts')
@@ -121,10 +125,58 @@ describe('staged photo retention', () => {
     ).toBe(1);
     expect(orphan.storage.delete).toHaveBeenCalledExactlyOnceWith(key);
   });
+  it('cleans only expired rejected portion artifacts, even if the draft is pending', async () => {
+    const f = fixture({ verification_status: 'rejected', updated_at: new Date(0) }, true);
+    f.storage.list.mockResolvedValue({
+      objects: [
+        ...portionKeys.map((key) => ({ key, uploaded: new Date(0) })),
+        { key: `${portionPrefix}/unexpected`, uploaded: new Date(0) },
+        { key, uploaded: new Date(0) },
+      ],
+    });
+    const options = { ...f, retentionConfig: { rejectedRetentionDays: 1 } };
+    expect((await cleanupStagedMenuPhotos({ ...options, dryRun: true })).rejectedDeleted).toBe(4);
+    expect(f.storage.delete).not.toHaveBeenCalled();
+    expect((await cleanupStagedMenuPhotos(options)).rejectedDeleted).toBe(4);
+    expect(f.storage.delete.mock.calls.flat()).toEqual(portionKeys);
+  });
+  it('protects active portion files and retains fresh orphans until the configured grace expires', async () => {
+    const stale = `${portionPrefix}/approval.json`;
+    const fresh = `${portionPrefix.replace(photoId, '00000000-0000-4000-8000-000000000004')}/record.json`;
+    for (const photo of [promoted, { verification_status: 'not_verified' }, undefined]) {
+      const f = fixture(photo, true);
+      f.storage.list.mockResolvedValue({
+        objects: [
+          { key: stale, uploaded: new Date(0) },
+          { key: fresh, uploaded: new Date() },
+        ],
+      });
+      await cleanupStagedMenuPhotos({
+        ...f,
+        retentionConfig: { promotedRetentionDays: 0, orphanGraceDays: 1 },
+      });
+      expect(f.storage.delete.mock.calls.flat()).toEqual(photo ? [] : [stale]);
+      expect(f.storage.get).not.toHaveBeenCalled();
+    }
+  });
+  it('retains all layers if the manifest cannot be removed', async () => {
+    const f = fixture({ verification_status: 'rejected', updated_at: new Date(0) });
+    f.storage.list.mockResolvedValue({
+      objects: portionKeys.map((key) => ({ key, uploaded: new Date(0) })),
+    });
+    f.storage.delete.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('R2 failed'));
+    const result = await cleanupStagedMenuPhotos({
+      ...f,
+      retentionConfig: { rejectedRetentionDays: 1 },
+    });
+    expect(f.storage.delete.mock.calls.flat()).toEqual(portionKeys.slice(0, 2));
+    expect(result).toMatchObject({ scanned: 4, rejectedDeleted: 1, retained: 3 });
+  });
   it('reads successive R2 pages and refuses repeated cursors', async () => {
     const f = fixture();
     const list = vi
       .fn()
+      .mockResolvedValue({ objects: [], truncated: false })
       .mockResolvedValueOnce({ objects: [], truncated: true, cursor: 'next' })
       .mockResolvedValueOnce({ objects: [{ key, uploaded: new Date(0) }], truncated: false });
     expect(
@@ -136,7 +188,11 @@ describe('staged photo retention', () => {
         })
       ).orphansDeleted,
     ).toBe(1);
-    expect(list).toHaveBeenLastCalledWith({ prefix: 'menu-staging/', cursor: 'next' });
+    expect(list.mock.calls).toEqual([
+      [{ prefix: 'menu-staging/', cursor: undefined }],
+      [{ prefix: 'menu-staging/', cursor: 'next' }],
+      [{ prefix: 'private-portions/', cursor: undefined }],
+    ]);
     list.mockResolvedValue({ objects: [], truncated: true, cursor: 'next' });
     await expect(
       cleanupStagedMenuPhotos({

@@ -14,8 +14,9 @@ and operator-controlled prepared-menu pipeline. **No 3D generation is introduced
    and draft, reads exact private R2 photo bytes and verifies SHA-256 and size.
    It then calls the server-only Python
    `/v1/portion-uploads/:draftId/:photoId` endpoint.
-4. The Python process creates a bounded foreground WebP and background SVG,
-   or retains the photo when segmentation fails. The Worker validates
+4. The Python process creates a bounded foreground WebP and background SVG.
+   If segmentation fails, the console falls back to the stored original. The
+   processor's temporary copies are removed after the request. The Worker validates
    `PublicPortionSchema`, the private draft/photo identity, each layer SHA-256
    and byte count. It stores the layers and review manifest in private R2.
 5. S09 retrieves the foreground with authenticated
@@ -24,7 +25,16 @@ and operator-controlled prepared-menu pipeline. **No 3D generation is introduced
    separate source/hash-bound private approval record. A visual approval is not
    dish verification, menu publication or public hosting.
 6. Replacing a photo changes the preview key and invalidates the old photo's
-   eligibility. Removed drafts and another venue's photos fail authorization.
+   eligibility. The private routes reject removed drafts, rejected photos and
+   photos from another venue.
+
+When configured, the existing rejected-photo retention period and orphan grace
+period apply to private R2 layers, manifests and approvals. The cleanup checks
+the tenant, draft, photo ID, source hash and age of the artifact files. It removes
+the approval and manifest before their layers. Files for verified or unverified
+source photos are retained, including promoted photos and photos from removable
+drafts that can still be restored. The staged-original retention setting applies
+only to originals.
 
 The current 2.5D preview shows the **actual generated cutout**, not a synthetic
 2.5D fixture or 3D model. Diner camera/AR placement remains in PR #162.
@@ -33,14 +43,21 @@ The current 2.5D preview shows the **actual generated cutout**, not a synthetic
 
 The Worker requires server-side `PORTION_SERVICE_URL` (bare HTTPS origin)
 and `PORTION_SERVICE_SECRET` (the extraction host's service bearer token).
-The extraction host must be deployed with an absolute `PORTION_REVIEW_ROOT`
-to mount the private portion endpoint. Its host already uses
+The extraction host must be deployed with an absolute, writable
+`PORTION_REVIEW_ROOT` to mount the private portion endpoint. Each request uses a
+temporary directory under that root. Its host already uses
 `EXTRACTION_SERVICE_SECRET`; configure the Worker portion token to match the
 host's secret. Do not expose these values via `VITE_*`, HTML, assets, docs or logs.
 
 The service is **disabled until configured and deployed**. The owner UI retains
 the photo fallback and reports service unavailability. No provider credits,
 Tripo or billable 3D calls are involved.
+
+The checked-in staging extraction Worker does not forward the portion upload
+route or pass the scratch root to the Python container. Its image installs the
+`service` extra, while automatic segmentation of an opaque photo requires the
+`cutout` extra and the U2NET model. Verify a real opaque-photo request against a
+configured host before counting staging generation as accepted.
 
 ## Approved publication handoff
 

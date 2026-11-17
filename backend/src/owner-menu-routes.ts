@@ -263,6 +263,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
                AND d.id=p.draft_id
             WHERE p.tenant_id=$1 AND p.draft_id=$2 AND p.id=$3
               AND d.removed_at IS NULL
+              AND p.verification_status<>'rejected'
               AND (
                 lower(d.manual_fields->>'photoId')=p.id::text
                 OR EXISTS (

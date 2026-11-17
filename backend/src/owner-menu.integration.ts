@@ -516,6 +516,13 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect([afterReplacement.status, afterRemoval.status]).toEqual([409, 409]);
     expect(await afterReplacement.json()).toEqual({ error: 'approved_dish_revision_unavailable' });
     expect(await afterRemoval.json()).toEqual({ error: 'approved_dish_revision_unavailable' });
+
+    await rejectDraftPhoto(runtime, actor, venue, draftId, photo.id, crypto.randomUUID());
+    for (const url of [path, `${path}/approve`]) {
+      const rejected = await app.request(url, { method: 'POST', headers }, env);
+      expect(rejected.status).toBe(404);
+      expect(await rejected.json()).toEqual({ error: 'photo_not_found' });
+    }
   });
   it('retains reviewed facts through a legacy text-only edit instead of reopening draft fallback', async () => {
     const id = crypto.randomUUID();
@@ -1280,7 +1287,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     ).toBe('verified');
   });
 
-  it('retention scopes restricted reads before protecting pending originals', async () => {
+  it('retention scopes restricted reads and distinguishes pending and orphaned portion files', async () => {
     const draftId = crypto.randomUUID();
     await save(draftId);
     const photo = await storeDraftPhoto(
@@ -1292,8 +1299,14 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       'image/png',
       async () => {},
     );
+    const pending = `${previewKey(venue, draftId, photo.id, photo.source_hash)}/record.json`;
+    const orphan = `${previewKey(venue, draftId, crypto.randomUUID(), photo.source_hash)}/record.json`;
     const storage = {
-      list: async () => ({ objects: [{ key: photo.storage_key, uploaded: new Date(0) }] }),
+      list: async ({ prefix }: { prefix: string }) => ({
+        objects: [photo.storage_key, pending, orphan]
+          .filter((key) => key.startsWith(prefix))
+          .map((key) => ({ key, uploaded: new Date(0) })),
+      }),
       get: async () => null,
       put: async () => {},
       delete: vi.fn(async () => {}),
@@ -1303,8 +1316,9 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       client: runtime,
       retentionConfig: { orphanGraceDays: 1 },
     });
-    expect(result.protectedPending).toBe(1);
-    expect(storage.delete).not.toHaveBeenCalled();
+    expect(result.protectedPending).toBe(2);
+    expect(result.orphansDeleted).toBe(1);
+    expect(storage.delete).toHaveBeenCalledExactlyOnceWith(orphan);
     expect(
       (await runtime.query("SELECT current_setting('app.tenant_id',true) AS tenant")).rows[0]
         .tenant,

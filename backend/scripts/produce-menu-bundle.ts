@@ -195,13 +195,14 @@ async function main() {
           `/venues/${request.venue_id}/drafts/${item.draft_id}/photos/${item.photo_id}/portion/export`,
           api,
         );
-        const response = await fetch(endpoint, {
+        const options = {
           headers: { Authorization: `Bearer ${process.env.PEEKAPLATE_OWNER_TOKEN}` },
           credentials: 'omit',
           cache: 'no-store',
           redirect: 'error',
           signal: AbortSignal.timeout(15_000),
-        });
+        } as const;
+        const response = await fetch(endpoint, options);
         if (!response.ok) {
           throw new CliError(`Approved 2.5D export unavailable for dish ${item.dish_id}`);
         }

@@ -1,14 +1,19 @@
 """HTTP boundary checks; no provider calls or paid extraction."""
 import hashlib
 import base64
+import io
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
+from PIL import Image
 
+from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.service import Settings, create_app, run_extraction, read_source, ExtractRequest
 
 
@@ -56,6 +61,42 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(response.headers["cache-control"], "no-store")
         self.storage.assert_called_once()
         self.assertEqual(self.storage.call_args.args[0].expected_key(), self.payload["source_storage_key"])
+
+    def test_screen9_portion_returns_layers_or_fallback_without_retaining_files(self):
+        photo, mask = io.BytesIO(), io.BytesIO()
+        with Image.new("RGB", (80, 60), "orange") as image:
+            image.save(photo, format="JPEG")
+        with Image.new("L", (80, 60), 0) as image:
+            image.paste(255, (20, 15, 60, 45))
+            image.save(mask, format="PNG")
+        path = "/v1/portion-uploads/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222"
+        headers = {"Authorization": self.headers["Authorization"]}
+
+        for status in ("ready", "fallback_retained"):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as scratch:
+                with patch.dict("os.environ", {"PORTION_REVIEW_ROOT": scratch}):
+                    client = TestClient(create_app(self.settings))
+                with patch("peekaplate_processing.cutout.automatic_mask") as automatic_mask:
+                    if status == "ready":
+                        automatic_mask.return_value = (mask.getvalue(), {"model": "test"})
+                    else:
+                        automatic_mask.side_effect = ExtractionError("unavailable")
+                    response = client.post(path, content=photo.getvalue(), headers=headers)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers["Cache-Control"], "no-store")
+                result = response.json()
+                self.assertEqual(result["status"], status)
+                if status == "ready":
+                    self.assertEqual(len(result["layers"]), 2)
+                    for layer in result["portion"]["layers"]:
+                        data = base64.b64decode(result["layers"][layer["url"]])
+                        self.assertEqual(len(data), layer["size_bytes"])
+                        self.assertEqual(hashlib.sha256(data).hexdigest(), layer["sha256"])
+                else:
+                    self.assertIsNone(result["portion"])
+                    self.assertEqual(result["layers"], {})
+                self.assertEqual(list(Path(scratch).iterdir()), [])
 
     def test_invalid_token_has_no_storage_or_provider_side_effect(self):
         self.headers["Authorization"] = "Bearer invalid"
@@ -191,7 +232,6 @@ class ServiceTests(unittest.TestCase):
             context.__exit__.assert_called_once()
 
     def test_temporary_source_is_removed_after_child_timeout(self):
-        from pathlib import Path
         seen = []
         def timeout(command, **kwargs):
             seen.append(Path(kwargs["cwd"]))

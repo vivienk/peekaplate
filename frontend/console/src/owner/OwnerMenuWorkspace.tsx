@@ -1033,7 +1033,7 @@ export function OwnerMenuWorkspace({
         <DishEditor
           value={editing.form}
           photoUrl={photoUrl}
-          portionReview={portionReview}
+          {...(portionReview ? { portionReview } : {})}
           onGeneratePortion={() => saveDish(true)}
           onApprovePortion={() => {
             const id = editing.id;

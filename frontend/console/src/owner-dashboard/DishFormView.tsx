@@ -281,7 +281,7 @@ export function DishFormView({
                     <p>
                       This generated image remains private until the menu is published with the
                       approved portion assets.
-                      </p>
+                    </p>
                     {!portionReview.approved && onApprovePortion && (
                       <button type="button" onClick={onApprovePortion} disabled={busy}>
                         Approve 2.5D preview
