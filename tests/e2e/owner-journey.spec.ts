@@ -122,8 +122,15 @@ test('onboarding Back, focus, button and wording fixes from the design review', 
   await page.getByText('Add manually', { exact: true }).click();
   await main.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Add dish' })).toBeFocused();
+  // Design QA #213: Add stays inactive until something is typed; the review box is the shared Checkbox.
+  const addIngredient = page.getByRole('button', { name: 'Add ingredient', exact: true });
+  await expect(addIngredient).toBeDisabled();
+  await expect(
+    page.getByLabel('I reviewed the AI-drafted text and ingredients. They are accurate.'),
+  ).toHaveCSS('appearance', 'none');
   await page.getByPlaceholder('Add an ingredient').fill('Basil');
-  await page.getByRole('button', { name: 'Add ingredient', exact: true }).click();
+  await expect(addIngredient).toBeEnabled();
+  await addIngredient.click();
   const remove = page.getByRole('button', { name: 'Remove Basil', exact: true });
   const box = await remove.boundingBox();
   expect(box?.width).toBeGreaterThanOrEqual(24);
