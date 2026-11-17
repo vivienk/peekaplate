@@ -62,10 +62,13 @@ describe('S3-RES-01.2 review-command unit tests', () => {
       const corrected = {
         name: 'Organic Garden Soup',
         price_amount: '9.50',
+        serving_count: 2,
       };
 
       const effective = resolveEffectiveFields(soup, corrected);
 
+      expect(effective.serving_count).toBe(2);
+      expect(resolveEffectiveFields(soup, { serving_count: null }).serving_count).toBeNull();
       expect(effective.name).toBe('Organic Garden Soup');
       expect(effective.price_amount).toBe('9.50');
       // Untouched fields from original:

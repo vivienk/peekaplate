@@ -2,6 +2,7 @@ import type { PublicPortion } from '@peekaplate/contracts';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { cameraGrabOffset, cameraPlacement, rotatedCameraBounds } from './portionPlacement';
+import { sizeForServing } from './portionSize';
 
 export function portionWorldWidth(size?: PublicPortion['physical_size']) {
   return size ? size.plate.width_mm / 1000 / size.plate.boundary.width : 0.3;
@@ -16,8 +17,13 @@ export function bindPortionAR(
   orientation?: { request: () => void; release: () => void },
   physicalSize?: PublicPortion['physical_size'],
   originalSource?: () => HTMLImageElement | null,
+  publishedServing?: { count: number | undefined },
   entry?: HTMLButtonElement,
 ) {
+  // Legacy/unbound calibration may still support local review, never measured live placement.
+  const measuredSize = publishedServing
+    ? sizeForServing(physicalSize ? { physical_size: physicalSize } : {}, publishedServing.count)
+    : physicalSize;
   const open = entry ?? document.createElement('button');
   open.type = 'button';
   open.textContent = 'View on your table';
@@ -40,7 +46,7 @@ export function bindPortionAR(
       <p class="pp-ar__scale-status" role="status"></p>
       <details class="pp-ar__settings"><summary>Adjust view</summary><div class="pp-ar__panel">
         <p class="pp-ar__message" role="status">Checking table AR support…</p>
-        <p>Visual scale only. This is not a serving-size measurement.</p>
+        <p>Camera and 2.5D previews are approximate. Measured table AR requires plate measurements for this serving.</p>
         <div class="pp-ar__actions">
           <button type="button" data-action="start" disabled>Start camera preview</button>
           <button type="button" data-action="place" hidden>Place dish</button>
@@ -122,7 +128,7 @@ export function bindPortionAR(
     const texture = new THREE.Texture(image);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
-    const width = portionWorldWidth(physicalSize);
+    const width = portionWorldWidth(measuredSize);
     const height = width * (image.naturalHeight / image.naturalWidth);
     let cameraScale = 0.3 / width;
     let preferredWidth: number | undefined;
@@ -167,7 +173,7 @@ export function bindPortionAR(
     );
     cutout.position.y = height / 2;
     content.add(cutout);
-    const plate = physicalSize?.plate;
+    const plate = measuredSize?.plate;
     const footprint = plate
       ? new THREE.Mesh(
           plate.shape === 'round'
@@ -267,19 +273,21 @@ export function bindPortionAR(
     const updateScaleStatus = () => {
       const prefix = sampleNotice?.includes('shared sample cutout')
         ? 'Shared sample, not this dish · '
-        : 'Review preview · ';
+        : publishedServing?.count
+          ? `Serves ${publishedServing.count} ${publishedServing.count === 1 ? 'person' : 'people'} · `
+          : 'Review preview · ';
       scaleStatus.textContent =
         prefix +
         (plate
-          ? `Owner plate: ${plate.width_mm / 10} × ${plate.depth_mm / 10} cm · ${tracked ? 'measured footprint; appearance approximate, device validation pending' : 'camera scale is approximate'}`
-          : 'Approximate preview · owner plate calibration not supplied');
+          ? `Owner plate: ${plate.width_mm / 10} × ${plate.depth_mm / 10} cm · ${tracked ? '1:1 measured plate footprint; dish appearance approximate, device validation pending' : 'camera scale is approximate'}`
+          : 'Approximate preview · matching serving/plate measurements not supplied');
     };
     const changed = () => {
       const tilt = Math.max(-3, Math.min(3, Number(rotation.value)));
       content.rotation.y = THREE.MathUtils.degToRad(use3d ? Number(rotation.value) : tilt);
       if (model && modelDimensions) model.position.y = tracked ? modelDimensions.y / 2 : 0;
       if (!tracked) layoutCameraDish();
-      else content.scale.setScalar(physicalSize ? 1 : Number(size.value) / 100);
+      else content.scale.setScalar(measuredSize ? 1 : Number(size.value) / 100);
     };
     rotation.addEventListener('input', changed);
     size.addEventListener('input', changed);
@@ -315,7 +323,8 @@ export function bindPortionAR(
       place.hidden = true;
       reset.hidden = false;
       rotation.disabled = false;
-      size.disabled = tracked && !!physicalSize;
+      size.disabled = tracked && !!measuredSize;
+      size.closest('label')!.hidden = tracked && !!measuredSize;
       if (footprint) footprint.visible = tracked;
       cutout.position.set(
         tracked && plate ? width * (0.5 - plate.boundary.x - plate.boundary.width / 2) : 0,
@@ -430,7 +439,7 @@ export function bindPortionAR(
         : 'Manual camera preview — no surface tracking. Tap Place dish to position it.';
     };
     const startCamera = async (useTracked = false) => {
-      if (busy || !live) return;
+      if (busy || !live || (useTracked && publishedServing && !measuredSize)) return;
       busy = true;
       tracked = useTracked;
       start.disabled = true;
@@ -513,7 +522,7 @@ export function bindPortionAR(
         if (live) start.disabled = false;
       }
     };
-    start.addEventListener('click', () => void startCamera(xrSupported && running));
+    start.addEventListener('click', () => void startCamera(xrSupported));
 
     mode.addEventListener('click', () => {
       if (!model) return;
@@ -607,8 +616,13 @@ export function bindPortionAR(
     void (navigator.xr?.isSessionSupported('immersive-ar') ?? Promise.resolve(false))
       .then((supported) => {
         if (!live || !supported) return;
+        if (publishedServing && !measuredSize) {
+          message.textContent =
+            'Actual-size AR needs confirmed plate measurements for this serving. The camera preview is approximate.';
+          return;
+        }
         xrSupported = true;
-        start.textContent = 'Start table AR';
+        start.textContent = measuredSize ? 'Place measured size on table' : 'Start table AR';
         start.hidden = false;
       })
       .catch(() => {});

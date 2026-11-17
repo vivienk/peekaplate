@@ -50,6 +50,33 @@ describe('dishFromReviewItem', () => {
 });
 
 describe('reviewCorrection', () => {
+  it('saves and reloads reviewed serving size, allergens and the private photo reference', () => {
+    const item = firstItem();
+    const form = {
+      ...dishFromReviewItem(EXTRACTION_ID, item),
+      servingSize: '1 bowl',
+      allergens: { status: 'confirmed' as const, items: ['milk' as const] },
+      photoId: '00000000-0000-4000-8000-000000000111',
+    };
+    const correction = reviewCorrection(item, form);
+    expect(correction).toMatchObject({
+      serving_size: '1 bowl',
+      allergens: { status: 'confirmed', items: ['milk'] },
+      photo_id: form.photoId,
+    });
+    const reloaded = dishFromReviewItem(EXTRACTION_ID, {
+      ...item,
+      effective: {
+        ...item.effective,
+        serving_size: correction?.serving_size,
+        allergens: correction?.allergens,
+        photo_id: correction?.photo_id,
+      },
+    });
+    expect(reloaded.servingSize).toBe('1 bowl');
+    expect(reloaded.allergens).toEqual(form.allergens);
+    expect(reloaded.photoId).toBe(form.photoId);
+  });
   it('sends only the fields the owner changed', () => {
     const item = firstItem();
     const form = dishFromReviewItem(EXTRACTION_ID, item);
@@ -86,6 +113,7 @@ describe('manual dishes', () => {
       commandId: '00000000-0000-4000-8000-000000000001',
       expectedVersion: 0,
       fields: {
+        servingSize: null,
         name: 'Fictional soup',
         category: null,
         description: null,
@@ -94,6 +122,7 @@ describe('manual dishes', () => {
         ingredients: { status: 'unknown', items: [] },
         allergens: { status: 'unknown', items: [] },
         photoId: null,
+        servingCount: null,
       },
     });
   });
@@ -185,6 +214,34 @@ describe('approval', () => {
       expectedVersion: 0,
       expectedDraftVersion: 1,
       confirmed: true,
+    });
+  });
+});
+
+describe('serving count from Screen 9', () => {
+  it('saves a manual count and keeps unknowns unknown', () => {
+    const form = { ...emptyManualDish(), name: 'Soup', servingCount: '2' };
+    expect(manualSaveCommand(form, 0, crypto.randomUUID()).fields.servingCount).toBe(2);
+    expect(
+      manualSaveCommand({ ...form, servingCount: '' }, 0, crypto.randomUUID()).fields.servingCount,
+    ).toBeNull();
+    for (const count of ['0', '-1', '1.5', '101', 'two'])
+      expect(() =>
+        manualSaveCommand({ ...form, servingCount: count }, 0, crypto.randomUUID()),
+      ).toThrow(/Serving size/);
+  });
+  it('persists an extracted count as an explicit correction, including clearing it', () => {
+    const item = firstItem();
+    const form = dishFromReviewItem(EXTRACTION_ID, item);
+    expect(form.servingCount).toBe('');
+    expect(reviewCorrection(item, { ...form, servingCount: '2' })).toMatchObject({
+      serving_count: 2,
+    });
+    item.effective.serving_count = 2;
+    const resumed = dishFromReviewItem(EXTRACTION_ID, item);
+    expect(resumed.servingCount).toBe('2');
+    expect(reviewCorrection(item, { ...resumed, servingCount: '' })).toMatchObject({
+      serving_count: null,
     });
   });
 });

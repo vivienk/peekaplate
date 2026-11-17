@@ -49,8 +49,9 @@ describe('menu icons', () => {
     expect(ingredientIcon('Cherry tomato')).toMatch(svgUrl);
     expect(ingredientIcon('Cherry tomato')).not.toBe(ingredientIcon('Avocado'));
     expect(ingredientIcon('  cherry   TOMATO ')).toBe(ingredientIcon('Cherry tomato'));
-    expect(ingredientIcon('Cherry tomatoes')).toBeNull();
-    expect(ingredientIcon(NO_ICON_INGREDIENT)).toBeNull();
+    expect(ingredientIcon('Cherry tomatoes')).toBe(ingredientIcon(NO_ICON_INGREDIENT));
+    expect(ingredientIcon('Cherry tomatoes')).not.toBe(ingredientIcon('Cherry tomato'));
+    expect(ingredientIcon(NO_ICON_INGREDIENT)).toMatch(svgUrl);
     expect(iconKey('House Sauce')).toBe('house-sauce');
   });
 

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import pg from 'pg';
 import {
@@ -14,6 +14,7 @@ import {
   T0AssetManifestSchema,
   webpVariant,
 } from '../src/bundle-producer/request';
+import { loadOwnerRestaurant } from '../src/bundle-producer/restaurant';
 
 const USAGE = `Usage: pnpm produce:bundle --request <file> --t0-root <dir> [options]
 
@@ -26,6 +27,8 @@ Options:
   --t0-root <dir>        Directory containing <asset_id>/manifest.json T0 bundles. Required.
   --database-url <url>   PostgreSQL URL. Default: PEEKAPLATE_PRODUCER_DATABASE_URL.
                          --admit requires the privileged (migration-owner) connection.
+  --owner-profile-api <origin>  Read saved Screen 5 name/logo with PEEKAPLATE_OWNER_TOKEN.
+                         Writes the verified logo under --out/assets for hosting.
   --out <dir>            Output directory. Default: work/menu-bundles.
   --admit                Register the RES-02 review subject and public bundle URL.
                          Without it the command performs no database writes.
@@ -70,6 +73,7 @@ async function main() {
   const { values } = parseArgs({
     options: {
       request: { type: 'string' },
+      'owner-profile-api': { type: 'string' },
       't0-root': { type: 'string' },
       'database-url': { type: 'string' },
       out: { type: 'string', default: 'work/menu-bundles' },
@@ -97,6 +101,15 @@ async function main() {
     throw new CliError(`Request file is invalid:\n${issues.join('\n')}`);
   }
   const request = parsedRequest.data;
+  const ownerRestaurant = values['owner-profile-api']
+    ? await loadOwnerRestaurant(
+        values['owner-profile-api'],
+        process.env.PEEKAPLATE_OWNER_TOKEN ?? '',
+        request.venue_id,
+        request.asset_base_url,
+      )
+    : null;
+  if (ownerRestaurant) request.restaurant = ownerRestaurant.restaurant;
   const requestedDishes = request.categories.flatMap((category) => category.dishes);
 
   const assets = new Map<string, VerifiedT0Asset>();
@@ -115,6 +128,11 @@ async function main() {
       requestedDishes.map((dish) => dish.dish_id),
     );
     const produced = await produceMenuBundle(request, sources, assets);
+    if (ownerRestaurant?.logoFile) {
+      const path = join(values.out, 'assets', ownerRestaurant.logoFile.path);
+      await mkdir(dirname(path), { recursive: true });
+      await writeImmutable(path, ownerRestaurant.logoFile.bytes);
+    }
     const handoff = {
       bundleUrl: produced.bundleUrl,
       contentHash: produced.contentHash,

@@ -1,5 +1,11 @@
 # PR previews
 
+The authored owner walkthrough is available in PR preview builds at
+`/owner-onboarding.html?journey`; the separate official S13 presentation is at
+`/owner-menu-preview.html`. Both use labelled synthetic responses and publish
+nothing. Normal staging builds use the authenticated `/owner-auth` workspace
+and exclude these demo entry pages.
+
 A PR preview is a temporary copy of the diner and console pages built from one pull request. Design, product and QA reviewers can open it in a browser without running the code locally.
 
 ## For reviewers

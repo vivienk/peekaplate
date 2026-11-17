@@ -3,11 +3,43 @@ import {
   type OwnerDishFields,
   OwnerDishFieldsSchema,
   type SaveOwnerDishDraft,
+  type SetDraftRemoval,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { CommandError } from './dish-command';
 import { type DishDraftRow, IngestionError } from './ingestion/repository';
 import { authorizeStaffVenue } from './staff-venue';
+
+/**
+ * Back/Edit after Part A preparation. Preparation approves each verified draft onto a canonical
+ * dish revision (review_status 'accepted'). An owner edit, removal, photo upload or
+ * un-verification of such a draft reopens it first: it returns to pending and not verified,
+ * while the canonical dish keeps its ID and published history. The next preparation approves a
+ * new revision of that same dish. Call inside the edit command's transaction after the draft row
+ * is locked; mutates the passed row so the caller's pending checks see the reopened state.
+ */
+export async function reopenApprovedDraft(
+  client: Client,
+  venueId: string,
+  draft: Pick<DishDraftRow, 'id' | 'review_status' | 'removed_at'> & {
+    published_dish_id?: string | null;
+    verification_status?: string;
+  },
+  preserveVerification = false,
+): Promise<void> {
+  if (draft.review_status !== 'accepted' || draft.removed_at) return;
+  const reopened = await client.query(
+    `UPDATE app_private.dish_drafts
+        SET review_status='pending', reviewed_by=NULL, reviewed_at=NULL,
+            verification_status=CASE WHEN $3 THEN verification_status ELSE 'not_verified' END,
+            updated_at=now()
+      WHERE tenant_id=$1 AND id=$2 AND review_status='accepted' AND removed_at IS NULL`,
+    [venueId, draft.id, preserveVerification],
+  );
+  if (reopened.rowCount !== 1) throw new CommandError('version_conflict', 409);
+  draft.review_status = 'pending';
+  if (!preserveVerification) draft.verification_status = 'not_verified';
+}
 
 export async function withOwnerMenuTransaction<T>(
   client: Client,
@@ -40,7 +72,12 @@ export async function saveOwnerDishDraft(
   input: SaveOwnerDishDraft,
 ): Promise<DishDraftRow> {
   return withOwnerMenuTransaction(client, actorId, venueId, async () => {
-    const payload = { commandType: 'owner.draft.save.v1', draftId, ...input };
+    // Optional extension fields stay absent in legacy command hashes; explicit null is a clear.
+    const payload = {
+      commandType: 'owner.draft.save.v1',
+      draftId,
+      ...input,
+    };
     const hash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `command:${venueId}:${actorId}:${input.commandId}`,
@@ -63,9 +100,20 @@ export async function saveOwnerDishDraft(
     const draft = current.rows[0];
     if ((draft?.draft_version ?? 0) !== input.expectedVersion)
       throw new CommandError('version_conflict', 409);
-    if (draft && (draft.origin !== 'manual' || draft.review_status !== 'pending'))
+    if (draft?.origin === 'manual') await reopenApprovedDraft(client, venueId, draft);
+    if (
+      draft &&
+      (draft.origin !== 'manual' || draft.review_status !== 'pending' || draft.removed_at)
+    )
       throw new IngestionError('draft_not_editable', 409);
-    const fields = OwnerDishFieldsSchema.parse(input.fields);
+    const previous = OwnerDishFieldsSchema.parse(draft?.manual_fields ?? {});
+    const fields = OwnerDishFieldsSchema.parse({
+      ...input.fields,
+      servingSize:
+        input.fields.servingSize === undefined ? previous.servingSize : input.fields.servingSize,
+      servingCount:
+        input.fields.servingCount === undefined ? previous.servingCount : input.fields.servingCount,
+    });
     if (fields.photoId !== null) {
       const photo = await client.query(
         'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
@@ -124,6 +172,83 @@ export async function saveOwnerDishDraft(
     await client.query(
       `INSERT INTO app_private.outbox(id,tenant_id,event_id,topic,payload) VALUES ($1,$2,$3,'owner.draft.saved',$4::jsonb)`,
       [randomUUID(), venueId, eventId, JSON.stringify({ draftId, version })],
+    );
+    return saved;
+  });
+}
+
+export async function setDraftRemoval(
+  client: Client,
+  actor: string,
+  venue: string,
+  draftId: string,
+  input: SetDraftRemoval,
+): Promise<DishDraftRow> {
+  return withOwnerMenuTransaction(client, actor, venue, async () => {
+    const payload = { commandType: 'owner.draft.removal.v1', draftId, ...input };
+    const hash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+      `command:${venue}:${actor}:${input.commandId}`,
+    ]);
+    const receipt = await client.query(
+      'SELECT request_hash,result FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
+      [venue, actor, input.commandId],
+    );
+    if (receipt.rows[0]) {
+      if (receipt.rows[0].request_hash !== hash) throw new CommandError('command_conflict', 409);
+      return receipt.rows[0].result as DishDraftRow;
+    }
+    const draft = (
+      await client.query<DishDraftRow>(
+        'SELECT * FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2 FOR UPDATE',
+        [venue, draftId],
+      )
+    ).rows[0];
+    if (!draft) throw new IngestionError('draft_not_found', 404);
+    if (
+      draft.draft_version !== input.expectedDraftVersion ||
+      (draft.removal_version ?? 0) !== input.expectedRemovalVersion
+    )
+      throw new CommandError('version_conflict', 409);
+    // Removal/Undo changes visibility, not the content bound to a verification receipt.
+    await reopenApprovedDraft(client, venue, draft, true);
+    if (draft.review_status !== 'pending') throw new IngestionError('draft_not_editable', 409);
+    const version = input.expectedRemovalVersion + 1;
+    const saved = (
+      await client.query<DishDraftRow>(
+        `UPDATE app_private.dish_drafts SET removed_at=CASE WHEN $3 THEN now() ELSE NULL END,removal_version=$4,updated_at=now() WHERE tenant_id=$1 AND id=$2 RETURNING *`,
+        [venue, draftId, input.removed, version],
+      )
+    ).rows[0]!;
+    const eventId = randomUUID();
+    await client.query(
+      `INSERT INTO app_private.es_event(id,tenant_id,stream_type,stream_id,version,schema_version,event_type,payload,metadata)
+      VALUES($1,$2,'owner_draft_removal',$3,$4,1,'owner.draft.removal.changed',$5::jsonb,$6::jsonb)`,
+      [
+        eventId,
+        venue,
+        draftId,
+        version,
+        JSON.stringify({ draftId, version, removed: input.removed }),
+        JSON.stringify({ actorId: actor }),
+      ],
+    );
+    await client.query(
+      `INSERT INTO app_private.es_command(id,tenant_id,actor_id,command_type,idempotency_key,payload,request_hash,result)
+      VALUES($1,$2,$3,'owner.draft.removal.v1',$4,$5::jsonb,$6,$7::jsonb)`,
+      [
+        randomUUID(),
+        venue,
+        actor,
+        input.commandId,
+        JSON.stringify(payload),
+        hash,
+        JSON.stringify(saved),
+      ],
+    );
+    await client.query(
+      `INSERT INTO app_private.outbox(id,tenant_id,event_id,topic,payload) VALUES($1,$2,$3,'owner.draft.removal.changed',$4::jsonb)`,
+      [randomUUID(), venue, eventId, JSON.stringify({ draftId, version, removed: input.removed })],
     );
     return saved;
   });
@@ -240,7 +365,8 @@ export async function storeDraftPhoto(
       [venueId, draftId],
     );
     if (!draft.rows[0]) throw new IngestionError('draft_not_found', 404);
-    if (draft.rows[0].review_status !== 'pending')
+    await reopenApprovedDraft(client, venueId, draft.rows[0]);
+    if (draft.rows[0].review_status !== 'pending' || draft.rows[0].removed_at)
       throw new IngestionError('draft_not_editable', 409);
     const key = `menu-staging/${venueId}/${draftId}/${upload.sourceHash}`;
     if (createHash('sha256').update(upload.bytes).digest('hex') !== upload.sourceHash)
@@ -504,7 +630,6 @@ export async function verifyOwnerDish(
     );
     if (receipt.rows[0] && receipt.rows[0].request_hash !== hash)
       throw new CommandError('command_conflict', 409);
-    if (receipt.rows[0]) return receipt.rows[0].result;
 
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
       `owner-draft:${venueId}:${draftId}`,
@@ -515,8 +640,17 @@ export async function verifyOwnerDish(
     );
     const draft = draftRes.rows[0];
     if (!draft) throw new IngestionError('draft_not_found', 404);
-    if (draft.review_status !== 'pending') throw new IngestionError('draft_not_editable', 409);
     if (draft.draft_version !== expectedVersion) throw new CommandError('version_conflict', 409);
+    if (!verified && !receipt.rows[0]) await reopenApprovedDraft(client, venueId, draft);
+    if (draft.review_status !== 'pending' || draft.removed_at)
+      throw new IngestionError('draft_not_editable', 409);
+
+    // A historical receipt cannot verify newer content or undo a later verification decision.
+    if (receipt.rows[0]) {
+      if (draft.verification_status !== receipt.rows[0].result.draft.verification_status)
+        throw new CommandError('version_conflict', 409);
+      return receipt.rows[0].result;
+    }
 
     const targetStatus = verified ? 'verified' : 'not_verified';
     const updatedDraftRes = await client.query<DishDraftRow>(

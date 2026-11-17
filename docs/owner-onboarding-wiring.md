@@ -1,5 +1,11 @@
 # Owner menu wiring from merged code
 
+Current correction (2026-11-16): see the [S05–S13 correction guide](owner-flow-corrections.md)
+for source PR attribution, profile/setup persistence, authored S09 adaptation,
+removal/Undo, extracted-photo fixes and the full synthetic PR-preview journey.
+Earlier sections below describe their dated release slices; they do not establish
+that this new migration or code has reached hosted staging.
+
 This slice connects the signed-in owner shell to the existing staff-authorized
 menu APIs. DES-02 guides the multi-source journey, but this is not the complete
 owner onboarding or publication flow.
@@ -52,7 +58,7 @@ part of this narrowed slice.
 - Harshita's pending PR163 owns verification-only S10 integration.
   Required owner confirmations, optional verification badges, approval and
   publication must remain separate. Use the returned diner URL after an explicit
-  successful publish. The separately authorized [temporary S13 handoff](owner-publish-handoff.md)
+  successful publish. The [S13 handoff](owner-publish-handoff.md)
   publishes already prepared snapshots through the existing owner commands.
 - Pending AI, portion/2.5D and other team PRs remain separate. No unfinished
   screen is used as a live fallback.

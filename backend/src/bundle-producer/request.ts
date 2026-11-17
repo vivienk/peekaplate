@@ -2,6 +2,7 @@ import {
   PublicMenuAllergenCodeSchema,
   PublicMenuDietaryCodeSchema,
   PublicMenuImageSchema,
+  PublicPortionSchema,
 } from '@peekaplate/contracts';
 import { z } from 'zod';
 
@@ -25,6 +26,8 @@ const baseUrl = z
  */
 export const MenuBundleRequestDishSchema = z.strictObject({
   dish_id: uuid,
+  // Operator confirmation of these exact public layers is part of asset approval.
+  portion: PublicPortionSchema.optional(),
   allergens: z
     .array(PublicMenuAllergenCodeSchema)
     .max(9)

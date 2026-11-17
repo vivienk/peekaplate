@@ -51,6 +51,9 @@ class MockIntersectionObserver {
 
 // Minimal fake container that supports innerHTML and querySelectorAll
 class FakeContainer {
+  setAttribute() {}
+  remove() {}
+  prepend() {}
   _html = '';
   get innerHTML(): string {
     return this._html;
@@ -75,6 +78,7 @@ class FakeContainer {
         const openDishId = tag.match(/\bdata-open-dish-id="([^"]*)"/)?.[1];
         elements.push({
           className,
+          prepend: vi.fn(),
           getAttribute: (name: string) =>
             tag.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? null,
           hasAttribute: () => false,
@@ -551,5 +555,27 @@ describe('menu screen observer lifecycle', () => {
     // New mount's independent detail flow still works.
     listeners2.get('open-dish:click')?.[0]?.();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('published restaurant branding', () => {
+  it('replaces the generic emblem and wordmark with the published logo', async () => {
+    vi.stubGlobal('addEventListener', vi.fn());
+    vi.stubGlobal('removeEventListener', vi.fn());
+    const result = await createFixtureMenuSource('demo').load();
+    if (result.status !== 'ready') throw new Error('Expected menu');
+    result.menu.restaurant.logo = {
+      url: 'https://assets.example.test/owner-logo.png',
+      width: 800,
+      height: 200,
+      alt: 'Restaurant logo',
+    };
+    vi.mocked(createFixtureMenuSource).mockReturnValueOnce({ load: async () => result });
+    const container = new FakeContainer();
+    await mountAndWait(container);
+    expect(container.innerHTML).toContain('class="pp-logo__image"');
+    expect(container.innerHTML).toContain('https://assets.example.test/owner-logo.png');
+    expect(container.innerHTML).not.toContain('pp-logo__emblem');
+    expect(container.innerHTML).not.toContain('pp-logo__name');
   });
 });

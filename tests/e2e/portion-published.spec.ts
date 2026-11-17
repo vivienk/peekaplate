@@ -103,7 +103,7 @@ test('published portion offers the existing camera portal only after a deliberat
   await expect(portal).toBeVisible();
   await expect.poll(() => page.evaluate(() => (window as any).cameraRequests)).toBe(1);
   await expect(portal.locator('.pp-ar__scale-status')).toContainText(
-    'Approximate preview · owner plate calibration not supplied',
+    'Approximate preview · matching serving/plate measurements not supplied',
   );
   expect(cameraChunks.length).toBeGreaterThan(0);
   await snapshot('camera');
