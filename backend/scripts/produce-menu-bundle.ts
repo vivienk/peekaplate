@@ -4,16 +4,16 @@ import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import pg from 'pg';
 import {
+  type PreparedPortionFile,
+  prepareApprovedPortion,
+  verifyHostedPortionFiles,
+} from '../src/bundle-producer/approved-portions';
+import {
   BundleProducerError,
   produceMenuBundle,
   type VerifiedT0Asset,
 } from '../src/bundle-producer/produce';
 import { admitMenuBundleHandoff, loadApprovedDishSources } from '../src/bundle-producer/repository';
-import {
-  prepareApprovedPortion,
-  verifyHostedPortionFiles,
-  type PreparedPortionFile,
-} from '../src/bundle-producer/approved-portions';
 import {
   MenuBundleRequestSchema,
   T0AssetManifestSchema,
@@ -175,13 +175,17 @@ async function main() {
       const seen = new Set<string>();
       for (const item of manifest.items) {
         if (
-          !item || !ids.test(item.dish_id) || !ids.test(item.draft_id) ||
-          !ids.test(item.photo_id) || seen.has(item.dish_id)
+          !item ||
+          !ids.test(item.dish_id) ||
+          !ids.test(item.draft_id) ||
+          !ids.test(item.photo_id) ||
+          seen.has(item.dish_id)
         ) {
           throw new CliError('Invalid or duplicate portion map entry');
         }
         seen.add(item.dish_id);
-        const dish = request.categories.flatMap((category) => category.dishes)
+        const dish = request.categories
+          .flatMap((category) => category.dishes)
           .find((candidate) => candidate.dish_id === item.dish_id);
         const source = sources.get(item.dish_id);
         if (!dish || !source || dish.portion) {
