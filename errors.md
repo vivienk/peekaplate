@@ -4469,3 +4469,19 @@ origin, then passed after both paths reused the existing staging-only rule.
 Production/unconfigured/lookalike origins and missing-token denial are covered.
 Hosted redeployment/retest and the twelve joined DATA-01 cases remain pending.
 
+## ERR-20261117-ARTWORK-PENDING-AUTHORITY
+
+The backend-only PR210 review reproduced a private-read authorization gap:
+the pending-artwork reader accepted a membership that could be revoked after
+route preflight. The focused regression resolved instead of rejecting before
+the fix. The reader now reuses existing staff authorization with a membership
+row lock inside the same transaction as the tenant-scoped read; the route passes
+the verified actor. Unit denial/rollback and real-database revocation regressions
+pass. Full database verification passes 14 SQL files and 156 integration tests
+(37.39s), plus the local Worker smoke; disposable resources were cleaned up.
+No profile/frontend code, admission grant or hosted migration is included.
+
+Context refresh initially rejected the expanded backend summary's length.
+Shortened that index summary without changing scope, refreshed its fingerprint,
+then passed the full check (1,962 unit and 117 script tests, lint/types/context/docs).
+
