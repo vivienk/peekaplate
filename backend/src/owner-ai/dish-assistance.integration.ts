@@ -98,7 +98,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('saved ingredient assistance (real dat
     await admin.query(
       `INSERT INTO app_private.menu_ingestion_jobs
        (id,tenant_id,source_type,source_hash,idempotency_key,status,finished_at,active_review_extraction_id)
-       VALUES($1,$2,'pdf',$3,$1::text,'complete',now(),$4)`,
+       VALUES($1::uuid,$2,'pdf',$3,$1::uuid::text,'complete',now(),$4)`,
       [job, venue, payload.source.sha256, payload.extraction_id],
     );
     await admin.query(
@@ -120,7 +120,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('saved ingredient assistance (real dat
     await admin.query(
       `INSERT INTO app_private.dish_drafts
        (id,tenant_id,job_id,draft_id,candidate_id,draft_index,name,source_id,source_text,evidence,draft_version)
-       VALUES($1,$2,$3,$1::text,$4,0,'Synthetic extracted bowl',$5,'Synthetic rice and tomato','{}',1)`,
+       VALUES($1::uuid,$2,$3,$1::uuid::text,$4,0,'Synthetic extracted bowl',$5,'Synthetic rice and tomato','{}',1)`,
       [draft, venue, job, candidate.candidate_id, payload.source.source_id],
     );
     if (correction !== undefined || rejected)

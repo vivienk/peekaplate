@@ -3320,3 +3320,13 @@ Its first focused workerd run hit SQLITE_BUSY_RECOVERY at publication startup;
 the unchanged publication file passed 12/12 serially. This is local runtime
 contention, not an application fix. Reconciled line-ending/export-order lint
 failures were formatted, then lint/typecheck/build passed.
+
+## November 17 — ingredient fixture PostgreSQL parameter typing
+
+PR227 CI run 44130472518 reached the real database and rejected the new fixture's
+shared UUID/text parameter with `inconsistent types deduced for parameter $1`.
+Both fixture inserts now cast the identity to UUID before its text projection;
+runtime SQL is unchanged. The PR body also lacked an exact command in its PASS
+entries; its verification records now use the required command format. Database
+acceptance remains pending the corrected CI run rather than being inferred from
+mocked unit tests.
