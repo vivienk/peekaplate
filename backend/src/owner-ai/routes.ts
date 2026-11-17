@@ -9,6 +9,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import type { Bindings } from '../index';
 import { configuredSyntheticReportVenues } from '../owner-report-scope';
+import { logOwnerAiFailure, OwnerAiProviderFailure } from './provider';
 import {
   OWNER_REPORT_REFERENCE_HEADER,
   ownerReportSnapshot,
@@ -72,6 +73,10 @@ export function registerOwnerAnalysisRoutes(
       !options.readReport ||
       (env.APP_ENV === 'staging' && !env.OWNER_AI_RATE_LIMITER)
     ) {
+      logOwnerAiFailure(
+        'owner_analysis',
+        new OwnerAiProviderFailure({ category: 'configuration', httpStatus: null }),
+      );
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {

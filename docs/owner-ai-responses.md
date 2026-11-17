@@ -61,6 +61,36 @@ values, snapshot hash and review-only constraints are produced by the server/cod
 not accepted as model-generated prose. This is a bounded review prompt, not a
 forecast, business threshold, causal claim, or automatic menu/CRM action.
 
+## Safe provider diagnostics
+
+Dashboard analysis and description assistance emit an `owner_ai_failure` event
+in server logs when a configured request fails. Its only fields are `operation`,
+`category`, `httpStatus`, and `providerCode`. Provider codes come from an explicit
+allowlist; unknown or absent codes are `null`. No keys, project IDs, request IDs,
+headers, prompts, report facts, provider messages or response prose are logged.
+The public response remains `503 {"error":"service_unavailable"}`; that status
+does not establish that OpenAI returned 503.
+
+| Category | Meaning |
+| --- | --- |
+| `provider_http` | OpenAI returned a non-success HTTP status. Preserve that status even when its error body is missing, malformed, too large or stalls. |
+| `timeout` / `transport` | The request or body could not complete. A null status means no HTTP response was observed. |
+| `invalid_response` | JSON, the model envelope, usage or selected evidence failed validation. A 200 status means transport succeeded, not that the output is usable. |
+| `configuration` / `request_budget` | A local configuration or reservation gate prevented the request. This is not an OpenAI error. |
+| `internal` | An unrelated local operation failed, such as the post-request draft reread. Do not attribute this to provider output. |
+
+Both adapters use the same five-second whole-response deadline and 32 KiB streamed
+body limit, including error bodies. They make one attempt and never follow
+redirects. Runtime project IDs accept the same alphanumeric, hyphen and underscore
+characters as protected staging provisioning. Invalid configuration still fails
+closed before consuming a reservation or calling OpenAI.
+
+After an approved staging deployment, observe the existing Worker logs/tail during
+one approved synthetic request and filter for `owner_ai_failure`. Diagnostic
+events are not returned to the UI and cannot recover failures that occurred before
+this code was deployed. No new provider storage, logging retention, feature
+activation, credential provisioning or paid request is enabled by this change.
+
 ## Private local trial
 
 These private launcher and mock-provider instructions apply to `develop`; the focused release omits that separate local trial tooling. Use `develop` for this trial.

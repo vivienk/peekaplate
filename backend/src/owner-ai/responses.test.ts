@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   LOCAL_AI_DISH,
   LOCAL_AI_VENUE,
@@ -7,6 +7,10 @@ import {
 import { analyzeOwnerReport } from './responses';
 
 const now = new Date('2026-11-12T12:00:00Z');
+beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+afterEach(() => vi.restoreAllMocks());
 function reply(metric = 'save_rate') {
   return {
     model: 'gpt-6-luna',
@@ -38,6 +42,52 @@ function setup() {
   return { input, fetchImpl, reserveRequest };
 }
 describe('owner Responses adapter', () => {
+  it('accepts the same project ID characters as protected provisioning', async () => {
+    const { input, fetchImpl } = setup();
+    input.projectId = 'proj_synthetic-branch_1';
+    expect(await analyzeOwnerReport(input)).toMatchObject({ status: 'review' });
+    const init = (fetchImpl.mock.calls as unknown as [string, RequestInit][])[0]![1];
+    expect(new Headers(init.headers).get('OpenAI-Project')).toBe(input.projectId);
+  });
+  it('retains only safe provider status and code in a server diagnostic', async () => {
+    const { input, fetchImpl } = setup();
+    fetchImpl.mockResolvedValue(
+      Response.json(
+        { error: { code: 'insufficient_quota', message: 'sk-private-response-and-report' } },
+        { status: 429 },
+      ),
+    );
+    await expect(analyzeOwnerReport(input)).rejects.toThrow('Owner analysis unavailable');
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+      operation: 'owner_analysis',
+      category: 'provider_http',
+      httpStatus: 429,
+      providerCode: 'insufficient_quota',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+  it('distinguishes a timeout from an HTTP rejection without logging exception text', async () => {
+    const { input, fetchImpl } = setup();
+    fetchImpl.mockRejectedValue(new DOMException('sk-private-exception', 'TimeoutError'));
+    await expect(analyzeOwnerReport(input)).rejects.toThrow('Owner analysis unavailable');
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+      operation: 'owner_analysis',
+      category: 'timeout',
+      httpStatus: null,
+      providerCode: null,
+    });
+  });
+  it('identifies invalid model output separately from an OpenAI HTTP failure', async () => {
+    const { input, fetchImpl } = setup();
+    fetchImpl.mockResolvedValue(Response.json(reply('not_an_allowed_metric')));
+    await expect(analyzeOwnerReport(input)).rejects.toThrow('Owner analysis unavailable');
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+      operation: 'owner_analysis',
+      category: 'invalid_response',
+      httpStatus: 200,
+      providerCode: null,
+    });
+  });
   it('sends only three public rates, keeps valid zero, and returns server-bound review metadata', async () => {
     const { input, fetchImpl } = setup();
     const result = await analyzeOwnerReport(input);

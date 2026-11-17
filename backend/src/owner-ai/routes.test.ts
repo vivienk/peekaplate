@@ -1,6 +1,6 @@
 import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { Hono } from 'hono';
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   LOCAL_AI_DISH,
   LOCAL_AI_VENUE,
@@ -9,6 +9,11 @@ import {
 import type { Bindings } from '../index';
 import { mintOwnerReportReference, OWNER_REPORT_REFERENCE_HEADER } from './report-reference';
 import { registerOwnerAnalysisRoutes } from './routes';
+
+beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+afterEach(() => vi.restoreAllMocks());
 
 function setup() {
   const now = new Date('2026-11-12T12:00:00Z');
@@ -73,6 +78,25 @@ function setup() {
     );
   return { app, env, run, verify, readReport, fetchImpl };
 }
+it('returns the generic public error while retaining safe provider diagnostics on the server', async () => {
+  const s = setup();
+  s.fetchImpl.mockResolvedValue(
+    Response.json(
+      { error: { code: 'model_not_found', message: 'sk-private-provider-message' } },
+      { status: 404 },
+    ),
+  );
+  const response = await s.run();
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: 'service_unavailable' });
+  expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+    operation: 'owner_analysis',
+    category: 'provider_http',
+    httpStatus: 404,
+    providerCode: 'model_not_found',
+  });
+  expect(s.fetchImpl).toHaveBeenCalledTimes(1);
+});
 it('uses the same additive venue configuration as JSON reports', async () => {
   const s = setup();
   delete s.env.SYNTHETIC_REPORT_VENUE_ID;

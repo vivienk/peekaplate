@@ -5,6 +5,12 @@ import {
 } from '@peekaplate/contracts/owner-analysis';
 import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { z } from 'zod';
+import {
+  isOwnerAiProjectId,
+  logOwnerAiFailure,
+  OwnerAiProviderFailure,
+  requestOwnerAiResponse,
+} from './provider';
 import { ownerReportSnapshot } from './report-reference';
 
 export const OWNER_ANALYSIS_MODEL = 'gpt-6-luna';
@@ -13,6 +19,40 @@ const selectionSchema = z.strictObject({
   metric: z.enum(['open_rate', 'engagement_rate', 'save_rate', 'abstain']),
 });
 const keys = ['open_rate', 'engagement_rate', 'save_rate'] as const;
+const providerEnvelopeSchema = z.object({
+  status: z.literal('completed'),
+  model: z
+    .string()
+    .refine(
+      (model) => model === OWNER_ANALYSIS_MODEL || /^gpt-6-luna-\d{4}-\d{2}-\d{2}$/.test(model),
+    ),
+  output: z.array(z.unknown()),
+  usage: z.object({
+    input_tokens: z.number().int().positive(),
+    output_tokens: z.number().int().positive(),
+    total_tokens: z.number().int().positive(),
+  }),
+});
+const providerMessageSchema = z.object({
+  type: z.literal('message'),
+  role: z.literal('assistant'),
+  status: z.literal('completed'),
+  content: z.tuple([z.object({ type: z.literal('output_text'), text: z.string() })]),
+});
+
+/** Provider output remains untrusted; both adapters apply the same envelope limits. */
+export function ownerAiOutputText(value: unknown, maxOutputTokens: number): string {
+  const data = providerEnvelopeSchema.parse(value);
+  const messages = data.output.filter(
+    (item) => !(item && typeof item === 'object' && 'type' in item && item.type === 'reasoning'),
+  );
+  const { input_tokens: input, output_tokens: output, total_tokens: total } = data.usage;
+  if (messages.length !== 1 || output > maxOutputTokens || total !== input + output) {
+    throw new Error('Invalid owner AI response');
+  }
+  return providerMessageSchema.parse(messages[0]).content[0].text;
+}
+
 export class OwnerAnalysisUnavailable extends Error {
   constructor() {
     super('Owner analysis unavailable');
@@ -69,22 +109,26 @@ export async function analyzeOwnerReport(options: {
   ) {
     return abstain('unusable_evidence');
   }
-  if (!options.apiKey || !/^proj_[A-Za-z0-9]+$/.test(options.projectId)) {
-    throw new OwnerAnalysisUnavailable();
-  }
-  if (!(await options.reserveRequest())) throw new OwnerAnalysisUnavailable();
   const metrics = Object.fromEntries(keys.map((key) => [key, dish.metrics[key].value]));
+  let httpStatus: number | null = null;
   try {
-    const response = await (options.fetchImpl ?? fetch)('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      redirect: 'manual',
-      signal: AbortSignal.timeout(5_000),
-      headers: {
-        Authorization: `Bearer ${options.apiKey}`,
-        'OpenAI-Project': options.projectId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    if (!options.apiKey || !isOwnerAiProjectId(options.projectId)) {
+      throw new OwnerAiProviderFailure({ category: 'configuration', httpStatus: null });
+    }
+    // A reservation failure is local, never evidence of an OpenAI HTTP rejection.
+    let reserved = false;
+    try {
+      reserved = await options.reserveRequest();
+    } catch {
+      throw new OwnerAiProviderFailure({ category: 'request_budget', httpStatus: null });
+    }
+    if (!reserved)
+      throw new OwnerAiProviderFailure({ category: 'request_budget', httpStatus: null });
+    const response = await requestOwnerAiResponse({
+      apiKey: options.apiKey,
+      projectId: options.projectId,
+      ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+      body: {
         model: OWNER_ANALYSIS_MODEL,
         store: false,
         stream: false,
@@ -108,41 +152,12 @@ export async function analyzeOwnerReport(options: {
             },
           },
         },
-      }),
+      },
     });
-    if (!response.ok) throw new OwnerAnalysisUnavailable();
-    // A bounded response prevents unexpected provider payloads from reaching the UI or logs.
-    const raw = await response.text();
-    if (raw.length > 32_768) throw new OwnerAnalysisUnavailable();
-    const data = JSON.parse(raw);
-    if (
-      data.status !== 'completed' ||
-      (data.model !== OWNER_ANALYSIS_MODEL && !/^gpt-6-luna-\d{4}-\d{2}-\d{2}$/.test(data.model))
-    ) {
-      throw new OwnerAnalysisUnavailable();
-    }
-    const messages = data.output?.filter((item: { type: string }) => item.type !== 'reasoning');
-    const message = messages?.[0];
-    if (
-      messages?.length !== 1 ||
-      message?.type !== 'message' ||
-      message.role !== 'assistant' ||
-      message.status !== 'completed' ||
-      message.content?.length !== 1 ||
-      message.content[0]?.type !== 'output_text'
-    )
-      throw new OwnerAnalysisUnavailable();
-    const usage = data.usage;
-    if (
-      !usage ||
-      ![usage.input_tokens, usage.output_tokens, usage.total_tokens].every(Number.isSafeInteger) ||
-      usage.input_tokens <= 0 ||
-      usage.output_tokens <= 0 ||
-      usage.output_tokens > OWNER_ANALYSIS_MAX_TOKENS ||
-      usage.total_tokens !== usage.input_tokens + usage.output_tokens
-    )
-      throw new OwnerAnalysisUnavailable();
-    const choice = selectionSchema.parse(JSON.parse(message.content[0].text));
+    httpStatus = response.httpStatus;
+    const choice = selectionSchema.parse(
+      JSON.parse(ownerAiOutputText(response.data, OWNER_ANALYSIS_MAX_TOKENS)),
+    );
     if (choice.metric === 'abstain') return abstain('model_abstained');
     return OwnerAnalysisResultSchema.parse({
       ...base,
@@ -151,8 +166,9 @@ export async function analyzeOwnerReport(options: {
       value: dish.metrics[choice.metric].value,
       reason: 'review_evidence',
     });
-  } catch {
-    // Never expose provider errors, credentials, response text or unvalidated model prose.
+  } catch (error) {
+    logOwnerAiFailure('owner_analysis', error, { category: 'invalid_response', httpStatus });
+    // Provider diagnostics are server-only; public errors and result contracts stay generic.
     throw new OwnerAnalysisUnavailable();
   }
 }
