@@ -3251,3 +3251,12 @@ PR223 browser CI passed318 cases but exposed three stale test expectations: the
 S10 count copy still said extracted, and the category-ID checks included unrelated
 native options from the demo AI selector. Update the exact copy and scope IDs to
 the category listbox; preserve its pointer, keyboard and accessibility assertions.
+
+The next CI stage passed the primary 321 browser cases but failed 16 workspace
+cases whose report fixtures still had empty menus. The saved-verification gate
+correctly kept navigation locked. Report/AI cases now opt into verified saved
+dishes, while negative setup cases remain empty. The screenshot journey verifies
+through S10 before opening reports and asserts that verification did not publish.
+The report fixture also exposes its actor/venue-bound reference so analysis tests
+exercise forwarding instead of the obsolete body-only request. CI must confirm
+the repaired browser paths; these fixture edits do not weaken runtime guards.
