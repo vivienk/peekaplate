@@ -752,13 +752,12 @@ function LiveAiPanel({
   async function ask(event: FormEvent) {
     event.preventDefault();
     if (!dishId || !reportReference || pending.current) return;
-    const requestGoal = matchReportQuestion(question);
+    const requestGoal = question.trim() ? matchReportQuestion(question) : goal;
     if (!requestGoal) {
       setQuestionError('Ask about menu presentation, engagement, saves, or customer retention.');
       return;
     }
     setQuestionError(null);
-    setGoal(requestGoal);
     const controller = new AbortController();
     pending.current = controller;
     const dishName = dishes.find((dish) => dish.dish_id === dishId)?.name ?? '';
@@ -914,7 +913,13 @@ function LiveAiPanel({
           id={`${ids}-question`}
           className="owner-ai__input"
           value={question}
-          onChange={(event) => setQuestion(event.target.value)}
+          onChange={(event) => {
+            const value = event.target.value;
+            setQuestion(value);
+            setQuestionError(null);
+            const matched = matchReportQuestion(value);
+            if (matched) setGoal(matched);
+          }}
           placeholder="Ask about engagement, saves, or menu presentation"
           disabled={dishes.length === 0}
         />
@@ -947,7 +952,11 @@ function LiveAiPanel({
             id={`${ids}-focus`}
             className="owner-ai__input"
             value={goal}
-            onChange={(event) => setGoal(event.target.value as OwnerAnalysisRequest['goal'])}
+            onChange={(event) => {
+              setGoal(event.target.value as OwnerAnalysisRequest['goal']);
+              setQuestion('');
+              setQuestionError(null);
+            }}
           >
             {FOCUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -955,17 +964,10 @@ function LiveAiPanel({
               </option>
             ))}
           </select>
-          <span className="owner-muted" aria-live="polite">
-            {
-              FOCUS_OPTIONS.find(
-                (option) => option.value === (matchReportQuestion(question) ?? goal),
-              )?.label
-            }
-          </span>
           <button
             type="submit"
             className="owner-ai__send"
-            disabled={busy || dishes.length === 0 || !reportReference || !question.trim()}
+            disabled={busy || dishes.length === 0 || !reportReference}
             aria-label="Review report"
           >
             <Icon name="send" size={18} />
