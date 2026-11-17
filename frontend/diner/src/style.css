@@ -24,7 +24,42 @@
 body {
   margin: 0;
 }
-body:has(.pp-detail--preview) > #consent {
+#consent {
+  max-width: 30rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+#consent section {
+  position: fixed;
+  z-index: 5;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  right: 1rem;
+  width: min(18rem, calc(100vw - 2rem));
+  box-sizing: border-box;
+  max-height: 55vh;
+  overflow: auto;
+  padding: 1rem;
+  border-radius: 1rem;
+  color: #fff;
+  background: #292c35;
+  box-shadow: 0 4px 20px #0005;
+}
+#consent details,
+#consent [role="status"] {
+  margin-block: 0.5rem;
+  font-size: 0.875rem;
+}
+#consent button {
+  border-radius: 2rem;
+  padding: 0.55rem 0.9rem;
+  margin-inline-end: 0.5rem;
+}
+#consent section button:first-of-type {
+  color: #201a14;
+  background: #ffad6a;
+}
+body:not(:has(#app .pp-menu)) > #consent,
+body:has(.pp-detail, .pp-picker, .pp-result) > #consent {
   display: none;
 }
 main {
@@ -842,6 +877,12 @@ main:has(> .pp-compare) {
   font-size: 10px;
   line-height: 14px;
   color: #fafafa;
+}
+
+.pp-chip__icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
 
 .pp-allergy-note {

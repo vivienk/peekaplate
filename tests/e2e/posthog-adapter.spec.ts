@@ -104,7 +104,7 @@ test('the actual diner banner dispatches one live event to the real SDK and cano
     );
   });
   expect(requests).toHaveLength(0);
-  await page.getByRole('button', { name: 'Allow optional analytics', exact: true }).click();
+  await page.getByRole('button', { name: 'Yes, allow optional analytics', exact: true }).click();
   const emit = () =>
     page.evaluate(async () => {
       const { track } = await import(/* @vite-ignore */ '/src/tracking/index.ts');
