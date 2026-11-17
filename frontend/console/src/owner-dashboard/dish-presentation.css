@@ -207,12 +207,29 @@
   font-weight: var(--pp-font-weight-semibold);
   cursor: pointer;
 }
+/* Design QA (#213, item 1): the shared Owner Checkbox (Figma 1325:8653), the same box and images
+   as the S01-S04 terms checkbox (auth.css .pp-auth-terms__box). */
 .s09-check input {
   flex: none;
-  inline-size: var(--pp-space-20);
-  block-size: var(--pp-space-20);
-  margin: var(--pp-space-2);
-  accent-color: var(--pp-color-orange-500);
+  inline-size: var(--pp-space-24);
+  block-size: var(--pp-space-24);
+  margin: 0;
+  border-radius: var(--pp-radius-4);
+  background: url("../auth/assets/checkbox-empty.svg") center / 19.58px 19.58px no-repeat;
+  appearance: none;
+  cursor: pointer;
+}
+.s09-check input:checked {
+  background-image: url("../auth/assets/checkbox-checked.svg");
+  background-size: 19.28px 19.28px;
+}
+.s09-check input:focus-visible {
+  outline: 2px solid var(--pp-color-info-600);
+  outline-offset: 2px;
+}
+.s09-check input[aria-invalid="true"] {
+  outline: 1.5px solid var(--pp-color-error-700);
+  outline-offset: 1px;
 }
 /* error msg 2224:4337: error-100 fill, 16 padding, radius 12, 18/28 SemiBold error-700. */
 .s09-errmsg {

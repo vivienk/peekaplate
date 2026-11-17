@@ -391,6 +391,7 @@ export function DishFormView({
                 kind="outlined"
                 size="md"
                 type="button"
+                disabled={!ingText.trim()}
                 onClick={addIng}
                 aria-label="Add ingredient"
               >
@@ -440,6 +441,7 @@ export function DishFormView({
                 kind="outlined"
                 size="md"
                 type="button"
+                disabled={!algText.trim()}
                 onClick={addAlg}
                 aria-label="Add allergen"
               >
