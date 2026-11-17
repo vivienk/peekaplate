@@ -56,7 +56,11 @@ describe('materialized URL source provenance', () => {
         '<a href="/files/catering.pdf">Catering</a><a href="/files/main-menu.pdf">Menu</a>',
       ),
     );
-    const pdf = fetched('https://restaurant.example/files/main-menu.pdf', menuPdfFixture(), 'application/pdf');
+    const pdf = fetched(
+      'https://restaurant.example/files/main-menu.pdf',
+      menuPdfFixture(),
+      'application/pdf',
+    );
     vi.mocked(safeFetch).mockResolvedValueOnce(pdf);
     const result = await materializeMenuUrl(url, crypto.randomUUID());
     expect(result.sourceHash).toBe(pdf.sha256);
