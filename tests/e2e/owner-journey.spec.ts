@@ -139,6 +139,19 @@ test('onboarding Back, focus, button and wording fixes from the design review', 
   });
   await expect(main.getByText(/Try again, use another source/)).toHaveCount(0);
 
+  // S13 Publish Confirmation shows Rania's orange check above the title, with 48px buttons.
+  await page.goto('http://127.0.0.1:5174/owner-menu-preview.html');
+  await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Publish your menu?' });
+  const icon = dialog.locator('.pp-menu-preview__dialog-icon');
+  expect((await icon.boundingBox())?.width).toBe(96);
+  const iconBox = await icon.boundingBox();
+  const titleBox = await dialog.getByRole('heading').boundingBox();
+  expect((titleBox?.y ?? 0) - ((iconBox?.y ?? 0) + (iconBox?.height ?? 0))).toBe(48);
+  for (const button of await dialog.getByRole('button').all())
+    expect((await button.boundingBox())?.height).toBe(48);
+  await page.goto('http://127.0.0.1:5174/owner-onboarding.html?journey');
+
   // S12 step 1 names the fields S05 actually has.
   await page.getByRole('combobox', { name: 'Screen', exact: true }).selectOption('s12');
   await expect(main.getByText(/Name, address and contact details\./).first()).toBeVisible();
