@@ -604,16 +604,17 @@ describe('S6-RES-04 synthetic publication handoff', () => {
               name: 'Charred Leeks',
               price: { amount: '15.25', currency: 'USD' },
               ingredients: [{ name: 'Reviewed leeks' }],
+              allergens: [],
               dietary: ['Vegetarian'],
               images: {
                 card: {
-                  url: expect.stringContaining('card-480.webp'),
+                  url: `https://assets.example.test/t0/${assetId}/card-480.webp`,
                   width: 480,
                   height: 360,
                   alt: 'Synthetic dish photo',
                 },
                 detail: {
-                  url: expect.stringContaining('detail-1280.webp'),
+                  url: `https://assets.example.test/t0/${assetId}/detail-1280.webp`,
                   width: 1280,
                   height: 960,
                   alt: 'Synthetic dish photo',
@@ -624,6 +625,7 @@ describe('S6-RES-04 synthetic publication handoff', () => {
         },
       ],
     });
+    expect(a.bundle.categories[0]?.dishes[0]).toMatchObject({ allergens: null });
     expect(JSON.stringify(loadedA.menu)).not.toMatch(/private source text|private reviewer note/);
     expect(deliveries).toEqual([publicationA.publicationId]);
     expect(new TextDecoder().decode(a.bytes)).not.toMatch(
@@ -637,7 +639,12 @@ describe('S6-RES-04 synthetic publication handoff', () => {
         venue,
         dishId,
         nextRevision,
-        JSON.stringify({ ...facts, priceAmount: '18.75', ingredients: ['New leeks'] }),
+        JSON.stringify({
+          ...facts,
+          priceAmount: '18.75',
+          ingredients: ['New leeks'],
+          allergens: ['sesame'],
+        }),
       ],
     );
     const b = await makeBundle(nextRevision);
@@ -675,7 +682,17 @@ describe('S6-RES-04 synthetic publication handoff', () => {
       menuRevisionId: b.menuRevisionId,
       publicationRevisionId: publicationB.publicationId,
       categories: [
-        { dishes: [{ name: 'Roasted Leeks', price: { amount: '18.75', currency: 'USD' } }] },
+        {
+          dishes: [
+            {
+              name: 'Roasted Leeks',
+              price: { amount: '18.75', currency: 'USD' },
+              ingredients: [{ name: 'New leeks' }],
+              allergens: ['Sesame'],
+              dietary: ['Vegetarian'],
+            },
+          ],
+        },
       ],
     });
     expect(deliveries).toEqual([publicationB.publicationId]);
