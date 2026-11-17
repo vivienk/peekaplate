@@ -47,7 +47,10 @@ Tripo or billable 3D calls are involved.
 Only after S10 verifies the dish and photo, and the approved `dish_current`
 revision exists, does authenticated `GET .../portion/export` return the
 exact private 2.5D layers. The endpoint rejects removed drafts, unverified
-photos, absent owner artwork approval, and missing accepted revisions.
+photos, absent owner artwork approval, and missing accepted revisions. The
+exported photo must match the current revision's approved photo. A text-only
+revision can reuse the artwork if it retains that photo. Replacing or clearing
+the approved photo makes the old artwork ineligible for export.
 
 The existing privileged producer now accepts optional arguments:
 

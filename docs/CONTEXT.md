@@ -423,12 +423,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f73c4139163a5119d75c9d69de13ea89321b161757418cb558020b304d11e21c"
+      "sourceFingerprint": "58864fa2d5df934ae3618845f72784d1b96b779213be852fdf941d45c47ed7cf"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker rechecks current staff/tenant authority for transactional commands and replay. Canonical profiles/private photos use versioned details/setup reads; owners cannot verify themselves. Draft removal is reversible; corrections retain photo/allergen/serving metadata, advance content versions and invalidate verification. Legacy omissions preserve size/count; explicit null clears. The existing bundle producer exports branding and revision/count-bound portions; trusted preparation/admission remains separate. OCR retains transactional #210 placeholders. Facts and PostHog stay separate; reports retain privacy cohorts and unknown freshness. Optional report references bind analysis to displayed evidence while ordinary reads remain available. Authored S05–S13 callers reuse these APIs; hosted release/provider activation and the console reference-header handoff remain pending.",
+      "summary": "Worker rechecks current staff/tenant authority for transactional commands and replay. Canonical profiles/private photos use versioned details/setup reads; owners cannot verify themselves. Draft removal is reversible; corrections retain photo/allergen/serving metadata, advance content versions and invalidate verification. Legacy omissions preserve size/count; explicit null clears. The bundle producer exports branding and revision/count-bound portions. Private portion export requires the canonical approved photo; trusted bundle preparation/admission remains separate. OCR retains transactional #210 placeholders. Facts and PostHog stay separate; reports retain privacy cohorts and unknown freshness. Optional report references bind analysis to displayed evidence while ordinary reads remain available. Authored S05–S13 callers reuse these APIs; hosted release/provider activation and the console reference-header handoff remain pending.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -630,7 +630,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "04d5c2fdb7345465fe033e9142875a686b7257ac65555187b6c76bd36cad4611"
+      "sourceFingerprint": "a56b23f444ca0301a56e76654be64613531661003364b547380f32b7d195efc6"
     },
     {
       "id": "database",
@@ -973,7 +973,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "b473879ba07d81f812aad20e5261a6b39733e195b0054b31368bafffad25e2e7"
+      "sourceFingerprint": "c0be7f3512676027ad797e3cb2808471765c80e671c71f651474c0ec88e0e1d0"
     },
     {
       "id": "assets",
@@ -1131,15 +1131,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "summary": "Extract existing canonical owner backend/profile/review/publication-asset adapters from held #213/#215 onto current develop; no frontend or replacement pipeline. Preserve #210 already merged and prove legacy draft-client compatibility.",
+      "summary": "Extract existing canonical owner backend/profile/review/publication-asset adapters from held #213/#215 onto current develop; no frontend or replacement pipeline. Preserve #210 already merged and prove legacy draft-client compatibility. The #219 follow-up binds private portion export to the current revision's approved photo and rejects replaced or cleared photos.",
       "files": [
         "docs/owner-backend-wiring.md",
         "backend/src/restaurant-profile.ts",
         "backend/src/owner-menu.ts",
         "packages/contracts/src/owner-menu.ts",
-        "migrations/20261116020000_owner_flow_profile.sql"
+        "migrations/20261116020000_owner_flow_profile.sql",
+        "backend/src/owner-menu-routes.ts",
+        "docs/screen9-portion-publish.md"
       ],
-      "next": "Run standalone checks and review this backend-only PR; leave #213 with Jeffin. Hosted release and trusted preparation/admission require separate acceptance."
+      "next": "Run standalone checks and review this backend-only PR; leave #213 with Jeffin. Review the portion export change with #219. Hosted release and trusted preparation/admission require separate acceptance."
     },
     {
       "date": "2026-11-16",

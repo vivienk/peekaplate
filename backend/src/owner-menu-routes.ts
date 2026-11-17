@@ -253,7 +253,8 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     const { actor, venue } = await identity(c);
     const scope = DraftPhotoScopeSchema.safeParse(c.req.param());
     if (!scope.success) throw new IngestionError('invalid_request', 400);
-    const { draftId, photoId } = scope.data;
+    const draftId = scope.data.draftId.toLowerCase();
+    const photoId = scope.data.photoId.toLowerCase();
     const photo = await services.database(c.env, (client) =>
       withOwnerMenuTransaction(client, actor, venue, async () => {
         const row = await client.query<DraftPhoto>(
@@ -263,7 +264,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
             WHERE p.tenant_id=$1 AND p.draft_id=$2 AND p.id=$3
               AND d.removed_at IS NULL
               AND (
-                d.manual_fields->>'photoId'=$3
+                lower(d.manual_fields->>'photoId')=p.id::text
                 OR EXISTS (
                   SELECT 1 FROM app_private.extraction_review_session s
                   JOIN app_private.candidate_review_current review
@@ -272,7 +273,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
                    AND review.candidate_id=d.candidate_id
                   WHERE s.tenant_id=d.tenant_id
                     AND s.job_id=d.job_id
-                    AND review.corrected_fields->>'photo_id'=$3
+                    AND lower(review.corrected_fields->>'photo_id')=p.id::text
                 )
               )`,
           [venue, draftId, photoId],
@@ -351,8 +352,9 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
             WHERE d.tenant_id=$1 AND d.id=$2
               AND d.review_status IN ('accepted','edited')
               AND d.removed_at IS NULL
+              AND lower(current.approved_facts->>'photoId')=$3
               AND (
-                d.manual_fields->>'photoId'=$3
+                lower(d.manual_fields->>'photoId')=$3
                 OR EXISTS (
                   SELECT 1 FROM app_private.extraction_review_session s
                   JOIN app_private.candidate_review_current review
@@ -361,7 +363,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
                    AND review.candidate_id=d.candidate_id
                   WHERE s.tenant_id=d.tenant_id
                     AND s.job_id=d.job_id
-                    AND review.corrected_fields->>'photo_id'=$3
+                    AND lower(review.corrected_fields->>'photo_id')=$3
                 )
               )`,
           [scope.venue, scope.draftId, scope.photoId],
