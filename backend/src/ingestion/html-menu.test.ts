@@ -97,7 +97,7 @@ describe('HTML MenuItem URL ingestion', () => {
     const calls: { sql: string; params?: unknown[] }[] = [];
     const client = {
       async query(sql: string, params?: unknown[]) {
-        calls.push({ sql, params });
+        calls.push(params ? { sql, params } : { sql });
         if (sql.includes('INSERT INTO app_private.menu_ingestion_jobs'))
           return { rows: [job], rowCount: 1 };
         if (sql.includes('UPDATE app_private.menu_ingestion_jobs'))
