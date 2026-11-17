@@ -55,7 +55,7 @@ const STEP_TEXT: Record<StepId, { title: string; description: string; startLabel
   details: {
     title: 'Restaurant details',
     description:
-      'Name, address and opening hours. We check these before anything is shown to diners.',
+      'Name, address and contact details. We check these before anything is shown to diners.',
     startLabel: 'Add restaurant details',
   },
   menu: {

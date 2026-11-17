@@ -88,3 +88,59 @@ for (const width of [1440, 390]) {
     ).toEqual([]);
   });
 }
+
+// Rania's #213 review (Nov 17): Back returns where the owner came from, S06 → S05 stays in
+// onboarding, focus moves to each new screen's heading, 48px Large buttons, 24px remove targets,
+// and the agreed wording (S05 logo, S12 contact details, S08 failure).
+test('onboarding Back, focus, button and wording fixes from the design review', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('http://127.0.0.1:5174/owner-onboarding.html?journey');
+  const main = page.locator('main');
+  await expect(main.getByRole('button', { name: 'Upload logo', exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: /Restaurant name/ }).fill('Ember & Stone');
+  await page.getByRole('textbox', { name: /^City/ }).fill('San Francisco');
+  await page.getByRole('textbox', { name: /Street address/ }).fill('100 Fictional Street');
+  await page.getByRole('textbox', { name: /Phone number/ }).fill('(555) 234-5678');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+  // Each screen change moves focus to the new heading.
+  const s06 = page.getByRole('heading', { level: 1, name: 'Choose how to add your menu' });
+  await expect(s06).toBeFocused();
+  for (const button of await main.locator('.pp-onboard__actions .pp-auth-btn').all())
+    expect((await button.boundingBox())?.height).toBe(48);
+
+  // S06 Back opens S05 in onboarding mode; saving it again continues to S06.
+  await main.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Restaurant Details' })).toBeFocused();
+  await expect(main.getByRole('button', { name: 'Go to dashboard', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(s06).toBeFocused();
+
+  // S09 opened from S06 returns to S06, not S10.
+  await page.getByText('Add manually', { exact: true }).click();
+  await main.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Add dish' })).toBeFocused();
+  await page.getByPlaceholder('Add an ingredient').fill('Basil');
+  await page.getByRole('button', { name: 'Add ingredient', exact: true }).click();
+  const remove = page.getByRole('button', { name: 'Remove Basil', exact: true });
+  const box = await remove.boundingBox();
+  expect(box?.width).toBeGreaterThanOrEqual(24);
+  expect(box?.height).toBeGreaterThanOrEqual(24);
+  await main.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(s06).toBeFocused();
+
+  // S08 failure text names only the buttons on screen.
+  await page.getByRole('combobox', { name: 'Extraction answer' }).selectOption('failed');
+  await page.getByRole('combobox', { name: 'Screen', exact: true }).selectOption('s08');
+  await expect(main.getByText(/Choose Try another source to upload a different file/)).toBeVisible({
+    timeout: 5000,
+  });
+  await expect(main.getByText(/Try again, use another source/)).toHaveCount(0);
+
+  // S12 step 1 names the fields S05 actually has.
+  await page.getByRole('combobox', { name: 'Screen', exact: true }).selectOption('s12');
+  await expect(main.getByText(/Name, address and contact details\./).first()).toBeVisible();
+  await expect(main.getByText(/opening hours/)).toHaveCount(0);
+});

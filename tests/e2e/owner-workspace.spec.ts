@@ -1172,7 +1172,7 @@ test('a delayed restaurant photo does not reset unsaved restaurant details', asy
     .poll(() => state.apiCalls.some((call) => call.path.endsWith(`/profile/photos/${photoId}`)))
     .toBe(true);
   state.releaseProfilePhoto();
-  await expect(page.getByRole('img', { name: 'Restaurant photo', exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Restaurant logo', exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: /^Street address/ })).toHaveValue(
     '101 Fictional Street',
   );
@@ -1254,6 +1254,27 @@ test('keeps the authored onboarding frame and Screen 9 cards when connected', as
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
   await page.screenshot({ path: testInfo.outputPath('authored-mobile.png'), fullPage: true });
+});
+
+// Rania's #213 review: the live S09 opened from S06 returns to S06 (not the Menu list or S10),
+// and each screen change moves focus to the new heading.
+test('live Screen 9 opened from S06 goes Back to S06 and focus follows each screen', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  await signIn(page, 'owner@example.test', false);
+  await page.getByRole('button', { name: 'Start: Add your menu', exact: true }).click();
+  const s06 = page.getByRole('heading', { level: 1, name: 'Choose how to add your menu' });
+  await expect(s06).toBeFocused();
+  await page.getByText('Add manually', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.locator('.s09-grid')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Add dish' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Continue to review', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(s06).toBeVisible();
+  await expect(s06).toBeFocused();
 });
 
 test('manual dish and original private photo survive save and reload', async ({
