@@ -6,6 +6,7 @@ import { AuthenticationError, AuthUnavailableError } from './auth';
 import type { Bindings } from './index';
 import { IngestionError } from './ingestion/repository';
 import { artworkKey, readArtwork, reviewArtwork } from './ingredient-artwork';
+import { listPendingArtwork } from './ingredient-artwork-placeholders';
 
 export const resolveArtworkBucket = (env?: Bindings) =>
   env?.INGREDIENT_ARTWORK_BUCKET ?? env?.INGESTION_REPORTS_BUCKET;
@@ -39,6 +40,14 @@ export function registerArtworkRoutes(app: Hono<{ Bindings: Bindings }>, service
       readArtwork(client, venue, [label.data]),
     );
     return c.json({ state: states[0] ?? null });
+  });
+  // Staff only: extracted ingredient labels that still have no approved artwork.
+  app.get('/venues/:venueId/ingredient-icons/pending', async (c) => {
+    const { actor, venue } = await staff(c);
+    const pending = await services.database(c.env, (client) =>
+      listPendingArtwork(client, venue, actor),
+    );
+    return c.json({ pending });
   });
   app.post('/venues/:venueId/ingredient-icons/review', async (c) => {
     const { actor, venue } = await staff(c);

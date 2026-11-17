@@ -28,6 +28,7 @@ export type DishForm = {
   servingSize: string;
   priceAmount: string;
   priceCurrency: string;
+  servingCount?: string;
   ingredients: { status: ValueStatus; items: string[] };
   allergens: { status: ValueStatus; items: AllergenCode[] };
   photoId: string | null;
@@ -55,6 +56,7 @@ export function emptyManualDish(): DishForm {
     servingSize: '',
     priceAmount: '',
     priceCurrency: '',
+    servingCount: '',
     ingredients: { status: 'unknown', items: [] },
     allergens: { status: 'unknown', items: [] },
     photoId: null,
@@ -86,6 +88,7 @@ export function dishFromReviewItem(
     servingSize: text(effective.serving_size),
     priceAmount: text(effective.price_amount),
     priceCurrency: text(effective.price_currency),
+    servingCount: effective.serving_count == null ? '' : String(effective.serving_count),
     ingredients:
       ingredients && ingredients.length > 0
         ? { status: 'proposed', items: [...ingredients] }
@@ -122,6 +125,7 @@ export function dishFromManualDraft(draft: DishDraft): DishForm {
     servingSize: text(fields.servingSize),
     priceAmount: text(fields.priceAmount),
     priceCurrency: text(fields.priceCurrency),
+    servingCount: fields.servingCount == null ? '' : String(fields.servingCount),
     ingredients: { status: fields.ingredients.status, items: [...fields.ingredients.items] },
     allergens: { status: fields.allergens.status, items: [...fields.allergens.items] },
     photoId: fields.photoId,
@@ -157,8 +161,18 @@ export function manualSaveCommand(
       ingredients: list(form.ingredients),
       allergens: list(form.allergens),
       photoId: form.photoId,
+      ...(form.servingCount !== undefined
+        ? { servingCount: servingCountValue(form.servingCount) }
+        : {}),
     },
   };
+}
+
+function servingCountValue(value: string): number | null {
+  if (!value.trim()) return null;
+  if (!/^(?:[1-9]\d?|100)$/.test(value.trim()))
+    throw new Error('Serving size must be a whole number from 1 to 100.');
+  return Number(value);
 }
 
 // The review correction for an extracted dish: only fields that differ from the current effective
@@ -169,6 +183,8 @@ export function reviewCorrection(
 ): CandidateCorrectedFields | null {
   const effective = item.effective;
   const corrected: CandidateCorrectedFields = {};
+  const servingCount = servingCountValue(form.servingCount ?? '');
+  if (servingCount !== (effective.serving_count ?? null)) corrected.serving_count = servingCount;
   const name = form.name.trim();
   if (name !== '' && name !== effective.name) corrected.name = name;
   const compare = <K extends 'description' | 'category' | 'price_amount' | 'price_currency'>(

@@ -42,6 +42,51 @@ blue synthetic control bar from product controls.
 No design-token values are changed. The new preview controller contains local
 navigation/state only. It does not implement another S05–S13 visual system.
 
+## Backend consolidation on this same PR
+
+The integration retains this PR as the single owner-flow correction. Source
+increments from #210 at `40281acf`, #215 at `6bf4498f` and #209 at `7dba1a89`
+are reconciled here; their presence does not constitute separate hosted releases.
+
+- #215 now reuses this PR's profile contract, private-photo model and unchanged
+  `20261116020000` migration. Its earlier duplicate profile projection is removed.
+  Photo retries repair missing/corrupt objects only with the authenticated exact
+  hash-bound bytes. The producer reads public name/logo through that same model.
+- Preserve this PR's removal/Undo, corrected allergens/photo ownership checks and
+  descriptive serving size while adding #215's separate numeric serving count.
+  A numeric-looking serving label is not evidence of a people-served count.
+  The existing S09 presentation has an additional optional People served field;
+  its placement is a functional extension awaiting design review. No original
+  field, form, token or style is replaced. Blank count remains unknown and does
+  not qualify a dish for measured placement.
+- #210 records pending ingredient labels in the existing draft-save transaction.
+  Its read-only pending list also locks and rechecks current membership inside
+  its transaction. Placeholders contain no image and confer no artwork approval.
+  Existing #165/#178 generation/review/delivery remains the implementation.
+- #209's exact report-period guard hides recommendations for another window.
+  It does not provide trusted freshness, model credentials or S09 AI drafting.
+- The combined correction schema derives its incomplete-field limit from the
+  supported field enum, so all twelve fields can be marked incomplete without
+  dropping serving-size/photo/allergen or serving-count information.
+
+The approval-to-admission bridge reported by Teeyansh must be pinned to its
+actual repository/commit before adding runtime adapters. Until that source and
+its trusted runner are integrated, the existing producer/admission operator
+boundary below still applies. This consolidation does not invent another bridge,
+enable provider traffic or grant the API runtime privileged admission rights.
+
+Consolidation verification (local; no hosted rollout): `pnpm check` passed 1,991
+unit tests with five existing skips and all 117 script tests. `pnpm verify
+test:db` passed 396 pgTAP assertions and 162 Worker/database tests (37.44s
+integration phase), plus the disposable Worker smoke. The connected workspace
+suite passed 51/51 Chromium cases in 1.1 minutes, including manual photo/text/count
+save/reload, exact snapshot publication/retry, session/tenant isolation and the
+report-period guard. Published branding/artwork/portion checks passed 5/5 in 16.9s;
+they cover gating/fallback, not physical-device scale. `pnpm verify build` passed
+both frontend builds and Worker dry-run. Production-like builds exclude the
+synthetic demo controllers. These checks do not certify fresh provider extraction
+or end-to-end hosted owner-report/AI acceptance.
+
 ## Confirmed missing backend pieces added
 
 - Profile read/save/setup endpoints reuse the existing staff/venue transaction

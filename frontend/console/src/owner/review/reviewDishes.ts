@@ -26,10 +26,12 @@ export interface ReviewDish {
   allergens: DishFacts;
   photoId: string | null;
   /**
-   * Serving size (S09 requires it; S10 shows "Serving Size Missing"). Not in the draft contract yet:
+   * Descriptive serving size (S09 requires it; S10 shows "Serving Size Missing"):
    * undefined means the source does not provide it, so it is not checked; null or blank is missing.
    */
   servingSize?: string | null;
+  /** Explicit number of people served; unknown never follows from the descriptive serving label. */
+  servingCount?: number | null;
   /** Currency of priceAmount (three letters), when the source provides it. */
   priceCurrency?: string | null;
   /**

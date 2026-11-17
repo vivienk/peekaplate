@@ -40,6 +40,7 @@ export function DishFormView({
   sourceNote,
   evidence,
   photo,
+  servingCountControl,
 }: {
   ed: Extract<EditState, { step: 'form' | 'review' }>;
   setEd: (e: EditState) => void;
@@ -61,6 +62,7 @@ export function DishFormView({
   sourceNote?: ReactNode;
   evidence?: ReactNode;
   photo?: ReactNode;
+  servingCountControl?: ReactNode;
 }) {
   const dr = ed.draft;
   const latest = useRef(ed);
@@ -303,6 +305,7 @@ export function DishFormView({
               onChange={(e) => set({ size: e.target.value })}
             />
           </div>
+          {servingCountControl}
           <div className="s09-desc">
             <div className="pp-field">
               <label className="pp-field__label" htmlFor="f-desc">

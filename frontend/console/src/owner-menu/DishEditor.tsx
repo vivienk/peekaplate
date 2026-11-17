@@ -48,6 +48,11 @@ export function DishEditor({
   onLicenseConfirmedChange,
 }: DishEditorProps) {
   const [fieldError, setFieldError] = useState('');
+  const countText = value.servingCount?.trim() ?? '';
+  const countError =
+    countText && !/^(?:[1-9]\d?|100)$/.test(countText)
+      ? 'Enter a whole number from 1 to 100, or leave blank if unknown.'
+      : '';
   const [repairCurrency] = useState(() => !value.priceCurrency);
   const menu: MenuItem = {
     id: existing ? (value.source?.candidateId ?? 'saved-draft') : null,
@@ -113,6 +118,20 @@ export function DishEditor({
           });
         }}
         categories={categories}
+        servingCountControl={
+          <TextField
+            id="dish-serving-count"
+            label="People served"
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={value.servingCount ?? ''}
+            error={countError}
+            hint="Optional. Actual-size AR also needs confirmed plate measurements for this count; this number never scales the dish."
+            onChange={(event) => onChange({ ...value, servingCount: event.target.value })}
+          />
+        }
         imageFor={() => photoUrl ?? (value.photoId ? 'private-photo' : null)}
         onSelectPhoto={() => {}}
         photo={photo}
@@ -165,7 +184,8 @@ export function DishEditor({
         }
         cancel={onCancel}
         toReview={() => {
-          if (busy || fieldError || (onLicenseConfirmedChange && !licenseConfirmed)) return;
+          if (busy || fieldError || countError || (onLicenseConfirmedChange && !licenseConfirmed))
+            return;
           onSave();
         }}
       />
