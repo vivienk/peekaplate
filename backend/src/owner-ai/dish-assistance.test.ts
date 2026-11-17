@@ -1,12 +1,16 @@
 import { Hono } from 'hono';
 import type { Client } from 'pg';
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import extraction from '../../../processing/tests/fixtures/review-candidates/representative-candidates-v2.json';
 import { CommandError } from '../dish-command';
 import type { Bindings } from '../index';
 import { registerDishAssistanceRoutes } from './dish-assistance';
 
 const venue = '11111111-1111-4111-8111-111111111111';
+beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+afterEach(() => vi.restoreAllMocks());
 const id = '22222222-2222-4222-8222-222222222222';
 const input = {
   operation: 'description',
@@ -94,7 +98,9 @@ function setup() {
   };
   const app = new Hono<{ Bindings: Bindings }>();
   app.onError((error, c) =>
-    c.json({ error: 'denied' }, ('status' in error ? error.status : 500) as 403),
+    'status' in error
+      ? c.json({ error: 'denied' }, error.status as 403)
+      : c.json({ error: 'service_unavailable' }, 503),
   );
   registerDishAssistanceRoutes(app, {
     verify,
@@ -116,6 +122,77 @@ function setup() {
     );
   return { state, query, fetchImpl, verify, authorizeVenue, limit, env, run };
 }
+it('accepts project IDs permitted by protected provisioning for description requests', async () => {
+  const s = setup();
+  s.env.OWNER_AI_OPENAI_PROJECT_ID = 'proj_synthetic-branch_1';
+  expect((await s.run()).status).toBe(200);
+  expect(s.fetchImpl).toHaveBeenCalledTimes(1);
+});
+it('keeps provider failure diagnostics server-only and does not retry', async () => {
+  const s = setup();
+  s.fetchImpl.mockResolvedValue(
+    Response.json(
+      { error: { code: 'invalid_api_key', message: 'sk-private-provider-message' } },
+      { status: 401 },
+    ),
+  );
+  const response = await s.run();
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: 'service_unavailable' });
+  expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+    operation: 'dish_description',
+    category: 'provider_http',
+    httpStatus: 401,
+    providerCode: 'invalid_api_key',
+  });
+  expect(s.fetchImpl).toHaveBeenCalledTimes(1);
+});
+it('classifies a rejected local reservation without attributing it to OpenAI', async () => {
+  const s = setup();
+  s.limit.mockRejectedValue(new Error('private limiter details'));
+  const response = await s.run();
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: 'service_unavailable' });
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+  expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+    operation: 'dish_description',
+    category: 'request_budget',
+    httpStatus: null,
+    providerCode: null,
+  });
+});
+it('classifies a later database failure without blaming valid provider output', async () => {
+  const s = setup();
+  s.fetchImpl.mockImplementation(async () => {
+    s.query.mockRejectedValue(new Error('private database details'));
+    return Response.json(provider());
+  });
+  const response = await s.run();
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: 'service_unavailable' });
+  expect(s.fetchImpl).toHaveBeenCalledTimes(1);
+  expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+    operation: 'dish_description',
+    category: 'internal',
+    httpStatus: null,
+    providerCode: null,
+  });
+});
+it('classifies an initial database failure before reserving or calling the provider', async () => {
+  const s = setup();
+  s.query.mockRejectedValue(new Error('private database details'));
+  const response = await s.run();
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: 'service_unavailable' });
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+  expect(s.limit).not.toHaveBeenCalled();
+  expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+    operation: 'dish_description',
+    category: 'internal',
+    httpStatus: null,
+    providerCode: null,
+  });
+});
 it('reads current membership and tenant-scoped draft before one constrained provider request', async () => {
   const s = setup();
   const response = await s.run();

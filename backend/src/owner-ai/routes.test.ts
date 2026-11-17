@@ -1,21 +1,32 @@
 import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { Hono } from 'hono';
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   LOCAL_AI_DISH,
   LOCAL_AI_VENUE,
   localOwnerAiReport,
 } from '../../scripts/owner-ai-local-fixture';
+import { AuthUnavailableError } from '../auth';
+import { CommandError } from '../command-error';
 import type { Bindings } from '../index';
 import { mintOwnerReportReference, OWNER_REPORT_REFERENCE_HEADER } from './report-reference';
 import { registerOwnerAnalysisRoutes } from './routes';
 
+beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+afterEach(() => vi.restoreAllMocks());
+
 function setup() {
   const now = new Date('2026-11-12T12:00:00Z');
   const app = new Hono<{ Bindings: Bindings }>();
-  app.onError(() => new Response('forbidden', { status: 403 }));
+  app.onError((error, c) =>
+    error instanceof CommandError
+      ? c.json({ error: error.code }, error.status)
+      : c.json({ error: 'service_unavailable' }, 503),
+  );
   const verify = vi.fn(async () => 'actor');
-  const readReport = vi.fn(async () => localOwnerAiReport(now));
+  const readReport = vi.fn(async (): Promise<unknown> => localOwnerAiReport(now));
   const fetchImpl = vi.fn(async () =>
     Response.json({
       status: 'completed',
@@ -73,6 +84,25 @@ function setup() {
     );
   return { app, env, run, verify, readReport, fetchImpl };
 }
+it('returns the generic public error while retaining safe provider diagnostics on the server', async () => {
+  const s = setup();
+  s.fetchImpl.mockResolvedValue(
+    Response.json(
+      { error: { code: 'model_not_found', message: 'sk-private-provider-message' } },
+      { status: 404 },
+    ),
+  );
+  const response = await s.run();
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: 'service_unavailable' });
+  expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+    operation: 'owner_analysis',
+    category: 'provider_http',
+    httpStatus: 404,
+    providerCode: 'model_not_found',
+  });
+  expect(s.fetchImpl).toHaveBeenCalledTimes(1);
+});
 it('uses the same additive venue configuration as JSON reports', async () => {
   const s = setup();
   delete s.env.SYNTHETIC_REPORT_VENUE_ID;
@@ -80,6 +110,25 @@ it('uses the same additive venue configuration as JSON reports', async () => {
   expect((await s.run()).status).toBe(200);
   expect(s.readReport).toHaveBeenCalledOnce();
 });
+
+it.each(['unavailable', 'invalid'])(
+  'diagnoses an %s internal report reread before any provider request',
+  async (failure) => {
+    const s = setup();
+    if (failure === 'unavailable') s.readReport.mockRejectedValue(new AuthUnavailableError());
+    else s.readReport.mockResolvedValue({ privateDatabaseDetails: 'fixture' });
+    const response = await s.run();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'service_unavailable' });
+    expect(s.fetchImpl).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('owner_ai_failure', {
+      operation: 'owner_analysis',
+      category: 'internal',
+      httpStatus: null,
+      providerCode: null,
+    });
+  },
+);
 
 it('fails closed on an invalid additive venue configuration before reading or calling a provider', async () => {
   const s = setup();
@@ -106,9 +155,10 @@ it('checks owner membership through the reader before sending a single provider 
 it('denies absent authentication and revoked membership without a model call', async () => {
   const s = setup();
   expect((await s.run(undefined, { Authorization: '' })).status).toBe(401);
-  s.readReport.mockRejectedValue(new Error('revoked'));
+  s.readReport.mockRejectedValue(new CommandError('forbidden', 403));
   expect((await s.run()).status).toBe(403);
   expect(s.fetchImpl).not.toHaveBeenCalled();
+  expect(console.warn).not.toHaveBeenCalled();
 });
 it.each(['production', '', 'staging'])(
   'fails closed in unconfigured environment %s',
