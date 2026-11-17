@@ -53,8 +53,13 @@ describe('restaurant URL structured menu parsing', () => {
     );
     expect(parsed.hasStructuredMenu).toBe(false);
     expect(parsed.segments.some((segment) => segment.text.includes('Soup $8'))).toBe(true);
-    expect(extractStructuredMenuItems(Array.from({ length: 200 }, (_, i) => ({
-      '@type': 'MenuItem', name: `Dish ${i}`,
-    })))).toHaveLength(150);
+    expect(
+      extractStructuredMenuItems(
+        Array.from({ length: 200 }, (_, i) => ({
+          '@type': 'MenuItem',
+          name: `Dish ${i}`,
+        })),
+      ),
+    ).toHaveLength(150);
   });
 });
