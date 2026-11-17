@@ -259,7 +259,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics. Existing ingredient controls reuse saved proposals; empty or duplicate results preserve review state. Stale editor/session results are discarded.",
+      "summary": "Merged auth, owner shell, onboarding, S09/S10 and S13 presentation remain shared. Saved nonempty verified drafts or publication unlock owner pages; actor/venue changes clear old state. Existing dashboard and performance layouts receive real menu/report/actions and explicit empty/error states. S09 defaults missing currency to USD, retains explicit currencies, and retries same-photo 2.5D only on explicit save. Its generated preview fills the original 2.5D card using the existing 120px photo area, preserving review and approval controls. S10 wraps names/categories. Reports pass the server reference to AI and offer explicit refresh on expiration; unknown freshness still abstains. Upload previews release object URLs and reject stale responses. No replacement screens or fake live metrics. Ingredient proposals preserve empty/duplicate review state and reject stale results. S13 opens the exact preparation result directly in the authored preview; historical choices remain recovery-only.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -429,7 +429,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5e484061e2f5eb796975f91c44620036a4b78418aa6555a17f42f302695f2f86"
+      "sourceFingerprint": "8e9f266bb58023e923b6dc15f64413059dbbf92aafdc1825e32a8f69f6d1e943"
     },
     {
       "id": "backend",
@@ -1004,21 +1004,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-15",
       "modules": [
-        "console"
-      ],
-      "summary": "Restore authored dashboard, onboarding and Screen 9 composition while preserving the existing authenticated menu controller. Reproduced missing dashboard/form frames before correction; explicit unavailable setup facts avoid fake progress. Hosted mobile readback exposed an intrinsic-width restaurant selector; constrain the shared picker/select and verify long names in dashboard and onboarding account menu.",
-      "files": [
-        "frontend/console/src/owner/FirstDashboard.tsx",
-        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
-        "frontend/console/src/owner-dashboard/menu-presentation.tsx",
-        "tests/e2e/owner-workspace.spec.ts",
-        "docs/owner-onboarding-wiring.md"
-      ],
-      "next": "Local workspace/browser screenshots pass; finish authored-demo checks, pinned reviews and Pages-only staging readback. Final publication, profile persistence and provider activation remain separate."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
         "console",
         "backend",
         "contracts"
@@ -1155,6 +1140,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "Reuse saved menu evidence through the existing ingredient suggestion operation and hide the repeated consent block only during portion preview. No new screen, recipe classifier, provider call or migration.",
       "next": "Verify the exact main release on staging. Description/owner-report AI still require protected credential provisioning; normal unknown report freshness must abstain."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "console"
+      ],
+      "summary": "Fix S13 handoff: retain preparation menu identity and load that exact snapshot in the existing PR208 MenuPreview. No screen/CSS replacement, auto-publication, or backend change.",
+      "next": "Verify direct preview and safe retry on staging; provider credentials and report completeness remain separate AI gates."
     }
   ]
 }
