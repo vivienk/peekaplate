@@ -330,6 +330,16 @@ durable browser events have no match in the PostHog export. The available
 files leave these matches unresolved. The separate 90-event synthetic report
 fixture has its own provenance and is excluded from all browser join counts.
 
+For D01-10, the operator's November 17 read-only follow-up matched all 7
+accepted event IDs from the November 16 06:41 UTC Save retest. The database
+lookup at 00:23:56 UTC found an accepted index row, an envelope fact, and
+exactly one matching typed fact for each ID. The R2 lookup completed at
+00:26:47 UTC and verified all 7 archive contents against their canonical index
+checksums. The events were 3 menu views, 2 Saves, 1 Unsave, and 1 shortlist
+view. The follow-up covered canonical persistence. PostHog and R2 custom
+metadata remain unchecked for these 7 IDs, so the earlier PostHog join counts
+are unchanged.
+
 | Case | Evidence available for this run | Disposition |
 | --- | --- | --- |
 | D01-01 | Pre-consent and privacy-signal cases lack attributed observations. | Pending case evidence |
@@ -341,7 +351,7 @@ fixture has its own provenance and is excluded from all browser join counts.
 | D01-07 | Mixed and uncertain receipts need a matched batch and outbox record. | Pending case evidence |
 | D01-08 | Withdrawal and re-opt-in need a matched send, retry and persistence record. | Pending case evidence |
 | D01-09 | Publication and token checks are pending. | Pending token and publication evidence |
-| D01-10 | The Save retest completed at 06:41:35.557 UTC and yielded 7 accepted per-event receipts. The canonical snapshot predates the retest. Later index, archive and fact evidence is pending for those IDs. Save, Unsave and Undo still need evidence for each agreed storage mode. | Save retest pending canonical evidence |
+| D01-10 | The Save retest completed at 06:41:35.557 UTC. The later read-only check verified canonical persistence for all 7 accepted event IDs. Case evidence is still needed for Undo and coverage across the agreed storage modes. | Save retest persistence verified; case acceptance pending |
 | D01-11 | The packet records a retry on one of the 11 exact matches. Identical replay and conflicting reuse still need case-level evidence across the receipt, archive, index and fact. | Pending case evidence |
 | D01-12 | The separately labelled synthetic path covered the 9/10/11-session boundaries. Authorized owner, cross-tenant and revoked access, exact reporting window, and reconciliation to this run's canonical facts are pending. | Partial synthetic report evidence |
 
