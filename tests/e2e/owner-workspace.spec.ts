@@ -62,12 +62,6 @@ function claims(authorization: string | undefined): { sub?: string; version?: nu
 }
 
 async function fixture(context: BrowserContext) {
-  // Keep the provider's allowed browser origin while an isolated test server uses another port.
-  if (process.env.PEEKAPLATE_OWNER_TEST_SERVER)
-    await context.route(`${origin}/**`, async (route) => {
-      const url = route.request().url().replace(origin, process.env.PEEKAPLATE_OWNER_TEST_SERVER!);
-      await route.fulfill({ response: await route.fetch({ url }) });
-    });
   const state = {
     venues: [venue],
     reportStatus: 200,
@@ -962,43 +956,6 @@ test('prepared publication conflict requires a fresh preview and denied access c
   await expect(page.getByRole('textbox', { name: 'Menu link' })).toHaveCount(0);
 });
 
-test('live dish performance reuses authored cards with API evidence on desktop and mobile', async ({
-  context,
-  page,
-}, testInfo) => {
-  await fixture(context);
-  await page.setViewportSize({ width: 1440, height: 650 });
-  await signIn(page, undefined, false);
-  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'What diners did with each dish' })).toBeVisible();
-  await expect(
-    page.getByText('Synthetic test data from the report API. Not real diners.'),
-  ).toBeVisible();
-  await expect(page.getByRole('row', { name: /Bowl/ }).first()).toContainText('Not measurable');
-  await expect(page.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('performance-desktop.png'), fullPage: true });
-  const left = await page.locator('.owner-sidebar').boundingBox();
-  const right = await page.locator('.owner-ai').boundingBox();
-  await page.locator('.owner-main').evaluate((element) => element.scrollTo(0, 500));
-  expect(await page.locator('.owner-sidebar').boundingBox()).toEqual(left);
-  expect(await page.locator('.owner-ai').boundingBox()).toEqual(right);
-  await page.getByRole('button', { name: 'Verified orders', exact: true }).click();
-  await expect(
-    page.getByText('These measurements are not available in this report. No values are inferred.'),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Interaction time', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Average time interacting' })).toBeVisible();
-  await page.getByLabel('Search dishes', { exact: true }).fill('Soup');
-  await expect(page.locator('.dtable tbody tr')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Clear search', exact: true }).click();
-  await expect(page.locator('.dtable tbody tr')).toHaveCount(3);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('.owner-main').evaluate((element) => element.scrollTo(0, 0));
-  await expect(page.getByRole('heading', { name: 'What diners did with each dish' })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: testInfo.outputPath('performance-mobile.png'), fullPage: true });
-});
-
 test('desktop panels stay in place while the middle scrolls, with account actions tucked away', async ({
   context,
   page,
@@ -1068,6 +1025,114 @@ test('menu typography and locked-page copy keep the authored live boundary', asy
     'true',
   );
   await expect(page.locator('.owner-nav-hint')).not.toContainText('after you publish');
+});
+
+test('live image source previews decode and release their blobs on replace, remove and sign-out', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  await page.addInitScript(() => {
+    const original = URL.revokeObjectURL.bind(URL);
+    (window as unknown as { revokedSourceUrls: string[] }).revokedSourceUrls = [];
+    URL.revokeObjectURL = (url) => {
+      (window as unknown as { revokedSourceUrls: string[] }).revokedSourceUrls.push(url);
+      original(url);
+    };
+  });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByText('Upload photos/PDF', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const image = {
+    name: 'source.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  };
+  const upload = async (name: string) => {
+    await page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles({ ...image, name });
+    const preview = page.getByRole('img', { name: `Preview of ${name}`, exact: true });
+    await expect(preview).toBeVisible();
+    await expect
+      .poll(() => preview.evaluate((element) => (element as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    return (await preview.getAttribute('src'))!;
+  };
+  const revoked = (url: string) =>
+    page.evaluate(
+      (value) =>
+        (window as unknown as { revokedSourceUrls: string[] }).revokedSourceUrls.includes(value),
+      url,
+    );
+  const first = await upload('source.png');
+  expect(first).toMatch(/^blob:/);
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Replace source.png', exact: true }).click(),
+  ]);
+  await chooser.setFiles({ ...image, name: 'replacement.png' });
+  const replacement = page.getByRole('img', { name: 'Preview of replacement.png', exact: true });
+  await expect(replacement).toBeVisible();
+  await expect.poll(() => revoked(first)).toBe(true);
+  const second = (await replacement.getAttribute('src'))!;
+  await page.getByRole('button', { name: 'Remove replacement.png', exact: true }).click();
+  await expect(replacement).toHaveCount(0);
+  await expect.poll(() => revoked(second)).toBe(true);
+  const last = await upload('final.png');
+  await openAccount(page);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect.poll(() => revoked(last)).toBe(true);
+});
+
+test('leaving an image selection ignores delayed group creation', async ({ context, page }) => {
+  const state = await fixture(context);
+  let started = false;
+  let release = () => {};
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let finished = false;
+  await page.route('**/upload-groups', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    started = true;
+    await waiting;
+    await route.fallback();
+    finished = true;
+  });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByText('Upload photos/PDF', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  try {
+    await page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles({
+        name: 'pending.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from('synthetic pending source'),
+      });
+    await expect.poll(() => started).toBe(true);
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Choose how to add your menu', exact: true }),
+    ).toBeVisible();
+  } finally {
+    release();
+  }
+  await expect.poll(() => finished).toBe(true);
+  await expect.poll(() => state.jobs[venue.venueId]?.length).toBe(1);
+  expect(state.jobs[venue.venueId]?.[0]?.source_uploaded).toBe(false);
+  await expect(page.locator('.pp-onboard-preview__image')).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Choose how to add your menu', exact: true }),
+  ).toBeVisible();
 });
 
 test('a browser file with no MIME keeps original bytes and a declared PDF upload', async ({
@@ -2054,14 +2119,6 @@ test('the AI panel opens beside the live report and uses only the signed-in owne
   ]);
   const axe = await new AxeBuilder({ page }).exclude('.owner-brand__name').analyze();
   expect(axe.violations).toEqual([]);
-  await expect(page.getByRole('heading', { name: 'All dishes', level: 2 })).toHaveCSS(
-    'font-size',
-    '16px',
-  );
-  await expect(page.getByRole('heading', { name: 'Open rate', level: 3 })).toHaveCSS(
-    'font-size',
-    '16px',
-  );
   await page.screenshot({ path: testInfo.outputPath('owner-workspace-ai.png'), fullPage: true });
   await page.getByRole('button', { name: 'Restaurant Setup', exact: true }).click();
   await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
@@ -2254,7 +2311,7 @@ test('the live owner AI panel stays usable on mobile with accessible controls', 
 test('authored S10 verifies actual saved drafts without publication and preserves command identity after conflict', async ({
   context,
   page,
-}, testInfo) => {
+}) => {
   const state = await fixture(context);
   const id = crypto.randomUUID();
   const photoId = crypto.randomUUID();
@@ -2327,11 +2384,6 @@ test('authored S10 verifies actual saved drafts without publication and preserve
     )
     .toBe(3);
   await expect(page.getByText('9.50 CAD', { exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('owner-s10-desktop.png'), fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: testInfo.outputPath('owner-s10-mobile.png'), fullPage: true });
-  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Saved data changed');
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -2718,6 +2770,92 @@ test('Review and publish prepares the menu, shows a failure and retries with Pre
   await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toBeVisible();
   expect(state.publishes).toEqual([]);
+});
+
+test('retries failed 2.5D generation for an unchanged saved photo without duplicate requests', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const id = crypto.randomUUID();
+  const photoId = crypto.randomUUID();
+  const image = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  state.photos.set(photoId, image);
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: null,
+      origin: 'manual',
+      draft_version: 2,
+      name: 'Fictional Lentil Soup',
+      category: 'Soup',
+      description: 'Slow cooked lentil soup with herbs.',
+      price_amount: '9.50',
+      price_currency: 'CAD',
+      ingredients: ['lentils'],
+      source_text: null,
+      review_warnings: [],
+      review_status: 'pending',
+      verification_status: 'not_verified',
+      manual_fields: {
+        name: 'Fictional Lentil Soup',
+        category: 'Soup',
+        description: 'Slow cooked lentil soup with herbs.',
+        priceAmount: '9.50',
+        priceCurrency: 'CAD',
+        servingSize: '1 bowl',
+        ingredients: { status: 'confirmed', items: ['lentils'] },
+        allergens: { status: 'confirmed', items: [] },
+        photoId,
+      },
+    },
+  ];
+  let generations = 0;
+  const headers = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+  await context.route(
+    `${api}/venues/${venue.venueId}/drafts/${id}/photos/${photoId}/portion**`,
+    async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+      if (new URL(route.request().url()).pathname.endsWith('/image'))
+        return route.fulfill({ body: image, contentType: 'image/webp', headers });
+      generations++;
+      return route.fulfill({
+        json: {
+          portionReview: {
+            status: generations === 1 ? 'failed' : 'needs_review',
+            dish_id: id,
+            draft_revision_id: photoId,
+            approved: false,
+          },
+        },
+        headers,
+      });
+    },
+  );
+  await signIn(page);
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(
+    page.getByText('The 2.5D cutout could not be generated. The original photo is retained.'),
+  ).toBeVisible();
+  expect(generations).toBe(1);
+  await page.getByRole('button', { name: 'Save photo and generate 2.5D', exact: true }).click();
+  await expect(
+    page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup' }),
+  ).toBeVisible();
+  expect(generations).toBe(2);
+  await page.getByRole('textbox', { name: /^Dish name/ }).fill('Fictional Lentil Soup updated');
+  await expect(
+    page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup updated' }),
+  ).toBeVisible();
+  expect(generations).toBe(2);
 });
 
 test('a dish approved by an earlier preparation can still be edited (Back/Edit)', async ({

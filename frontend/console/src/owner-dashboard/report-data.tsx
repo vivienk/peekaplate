@@ -98,7 +98,7 @@ export function reportSourceFromEnv(
 // Loads the report for one restaurant. Changing restaurant clears the old report at once, and an
 // answer for a previous restaurant or attempt is dropped, so one restaurant's numbers never show
 // under another.
-function useOwnerReport(source: ReportSource): { state: ReportState; retry: () => void } {
+export function useOwnerReport(source: ReportSource): { state: ReportState; retry: () => void } {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<ReportState>(
     source.mode === 'saved' ? { kind: 'ready', report: SAVED_REPORT } : { kind: 'loading' },
@@ -209,7 +209,7 @@ export function ReportData({
   source?: ReportSource;
   onAccessFailure?: (kind: 'signed_out' | 'denied') => void;
   /** The report on screen, or null while none is (loading, failed or denied). */
-  onReport?: (report: OwnerDishReport | null) => void;
+  onReport?: (report: OwnerDishReport | null, reference?: string) => void;
   presentation?: 'data' | 'performance';
 }) {
   const { state, retry } = useOwnerReport(source);
@@ -217,9 +217,10 @@ export function ReportData({
     if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure?.(state.kind);
   }, [state.kind, onAccessFailure]);
   const report = state.kind === 'ready' ? state.report : null;
+  const reference = state.kind === 'ready' ? state.reference : undefined;
   useEffect(() => {
-    onReport?.(report);
-  }, [report, onReport]);
+    onReport?.(report, reference);
+  }, [report, reference, onReport]);
   useEffect(() => () => onReport?.(null), [onReport]);
   return (
     <ReportView

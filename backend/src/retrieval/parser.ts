@@ -34,6 +34,8 @@ export function parseHtmlSource(
   const warnings: string[] = [];
   const discoveredLinks: string[] = [];
   let hasStructuredMenu = false;
+  const structuredMenuSegments: ExtractedSegment[] = [];
+  const seenStructuredItems = new Set<string>();
 
   // 1. Extract JSON-LD scripts before stripping tags
   const jsonLdRegex =
@@ -46,6 +48,27 @@ export function parseHtmlSource(
       const parsed = JSON.parse(rawJson);
       if (hasMenuItemEntity(parsed)) {
         hasStructuredMenu = true;
+        // Emit only source-grounded MenuItem fields. Detecting JSON-LD alone
+        // formerly dropped the dish facts when script tags were stripped.
+        for (const item of extractStructuredMenuItems(parsed)) {
+          const key = JSON.stringify(item);
+          if (seenStructuredItems.has(key)) continue;
+          seenStructuredItems.add(key);
+          const fields = [item.name, item.description, item.price_text].filter(Boolean);
+          structuredMenuSegments.push({
+            segment_id: `${sourceId}#jsonld-${structuredMenuSegments.length + 1}`,
+            text: fields.join(' — '),
+            method: 'html',
+            is_menu_scope: true,
+            metadata: {
+              schema_type: 'MenuItem',
+              name: item.name,
+              ...(item.description ? { description: item.description } : {}),
+              ...(item.price_text ? { price_text: item.price_text } : {}),
+              ...(item.price_currency ? { price_currency: item.price_currency } : {}),
+            },
+          });
+        }
       }
     } catch {
       // Ignore invalid JSON-LD scripts
@@ -137,7 +160,7 @@ export function parseHtmlSource(
   }
 
   return {
-    segments,
+    segments: [...structuredMenuSegments, ...segments],
     discoveredLinks,
     hasStructuredMenu,
     warnings,
@@ -182,6 +205,65 @@ export function parsePlainTextSource(
     hasStructuredMenu: false,
     warnings: [],
   };
+}
+
+type StructuredMenuItem = {
+  name: string;
+  description?: string;
+  price_text?: string;
+  price_currency?: string;
+};
+
+/**
+ * Traverse Schema.org Menu / MenuSection / MenuItem / @graph trees. Only
+ * MenuItem nodes with a source-provided name can become evidence. Do not
+ * infer currency or invent item names from generic Product/Restaurant nodes.
+ */
+export function extractStructuredMenuItems(root: unknown): StructuredMenuItem[] {
+  const items: StructuredMenuItem[] = [];
+  const seen = new Set<unknown>();
+  function walk(value: unknown, depth: number): void {
+    if (depth > 16 || items.length >= 150 || !value || typeof value !== 'object') return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const child of value) walk(child, depth + 1);
+      return;
+    }
+    const obj = value as Record<string, unknown>;
+    const types = Array.isArray(obj['@type']) ? obj['@type'] : [obj['@type']];
+    if (types.includes('MenuItem')) {
+      const name = typeof obj.name === 'string' ? obj.name.trim().slice(0, 200) : '';
+      if (name) {
+        const description =
+          typeof obj.description === 'string' ? obj.description.trim().slice(0, 2000) : '';
+        const offer = Array.isArray(obj.offers)
+          ? obj.offers.length === 1
+            ? obj.offers[0]
+            : undefined
+          : obj.offers;
+        const offerObject =
+          offer && typeof offer === 'object' ? (offer as Record<string, unknown>) : undefined;
+        const rawPrice = offerObject?.price;
+        const price =
+          typeof rawPrice === 'string' || typeof rawPrice === 'number'
+            ? String(rawPrice).trim()
+            : '';
+        const currency = offerObject?.priceCurrency;
+        const validPrice = /^\d{1,7}(?:\.\d{1,2})?$/.test(price);
+        const validCurrency = typeof currency === 'string' && /^[A-Z]{3}$/.test(currency);
+        items.push({
+          name,
+          ...(description ? { description } : {}),
+          ...(validPrice ? { price_text: price } : {}),
+          ...(validCurrency ? { price_currency: currency } : {}),
+        });
+      }
+    }
+    for (const child of Object.values(obj)) walk(child, depth + 1);
+  }
+  walk(root, 0);
+  return items;
 }
 
 function hasMenuItemEntity(value: unknown, depth = 0): boolean {

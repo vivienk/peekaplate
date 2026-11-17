@@ -9,8 +9,6 @@ import { fileURLToPath } from 'node:url';
 // The synthetic console demos are built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS), never for
 // staging or production. Agreed with Sai and Jeffin.
 const DEMOS = [
-  { page: 'owner-onboarding.html', asset: /ownerOnboarding/, label: /Synthetic demo/ },
-  { page: 'review-dishes.html', asset: /reviewDishes|menuReviewDemo/, label: /Synthetic demo/ },
   {
     page: 'first-dashboard.html',
     asset: /firstDashboard/,
@@ -18,8 +16,11 @@ const DEMOS = [
   },
   { page: 'foundations.html', asset: /foundations/, label: /Synthetic demo/ },
   { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
+  { page: 'review-dishes.html', asset: /reviewDishes|menuReviewDemo/, label: /Synthetic demo/ },
   // S4-FE-04: the owner sign-in demo answers with a synthetic service, so it never reaches staging.
   { page: 'owner-sign-in.html', asset: /ownerSignIn/, label: /Synthetic demo/ },
+  // FE-05/FE-06: the owner onboarding demo answers saves itself, so it never reaches staging.
+  { page: 'owner-onboarding.html', asset: /ownerOnboarding/, label: /Synthetic demo/ },
   // S13: the menu preview demo answers the publish request itself, so it never reaches staging. It
   // has no demo bar (Jeffin, 16 Nov), so it is identified by its screen title instead of a
   // "Synthetic demo" label; it stays preview-only, noindex and free of analytics like the others.
@@ -119,6 +120,17 @@ test('a preview build adds the demo pages, labelled synthetic, noindex and witho
   assert.notDeepEqual(analyticsCode((await pageScripts(dir, 'index.html')).join('\n')), []);
 });
 
+test('a preview build adds the menu review demo, labelled synthetic, noindex and without analytics', async (t) => {
+  const dir = await build(t, true);
+  assert.ok((await readdir(dir)).includes('review-dishes.html'));
+  const html = await readFile(join(dir, 'review-dishes.html'), 'utf8');
+  assert.match(html, /<meta name="robots" content="noindex"/);
+  const scripts = (await pageScripts(dir, 'review-dishes.html')).join('\n');
+  assert.match(scripts, /Synthetic demo/);
+  assert.match(scripts, /Illustrative sample data/);
+  assert.doesNotMatch(scripts, /posthog/i);
+});
+
 test('only the preview workflow turns the demo flag on', async () => {
   const read = (path) => readFile(new URL(`../.github/workflows/${path}`, import.meta.url), 'utf8');
   const preview = await read('deploy-preview.yml');
@@ -127,5 +139,18 @@ test('only the preview workflow turns the demo flag on', async () => {
   assert.equal(preview.match(/PEEKAPLATE_PREVIEW_DEMOS/g)?.length, 1);
   for (const other of ['deploy-staging.yml', 'ci.yml']) {
     assert.doesNotMatch(await read(other), /PEEKAPLATE_PREVIEW_DEMOS/);
+  }
+});
+
+// The FE-06.1 owner menu integration harness calls the real staging API with a pasted token. It is
+// for the local dev server only (the API allows that origin), so no build ever contains it.
+test('no console build contains the owner menu integration harness', async (t) => {
+  for (const previewDemos of [false, true]) {
+    const dir = await build(t, previewDemos);
+    const files = await readdir(dir);
+    assert.ok(!files.includes('owner-menu-harness.html'));
+    for (const asset of await readdir(join(dir, 'assets'))) assert.doesNotMatch(asset, /harness/);
+    const scripts = (await pageScripts(dir, 'index.html')).join('\n');
+    assert.doesNotMatch(scripts, /Integration harness/);
   }
 });

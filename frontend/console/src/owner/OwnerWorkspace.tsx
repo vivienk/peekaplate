@@ -21,22 +21,40 @@ import { OwnerAccountMenu } from '../onboarding/OnboardingLayout';
 import {
   createOwnerAnalysisClient,
   OwnerAnalysisAccessError,
+  OwnerAnalysisReferenceError,
 } from '../owner-dashboard/ai-preview/analysis-client';
-import { ReportData } from '../owner-dashboard/report-data';
+import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
+import { ReportView, useOwnerReport } from '../owner-dashboard/report-data';
 import { Button } from '../ui';
 import { FirstDashboardAside, FirstDashboardTopbar } from './FirstDashboard';
 import { Icon } from './icons';
+import type { MenuSnapshot } from './menu-snapshot';
 import { OwnerMenuWorkspace } from './OwnerMenuWorkspace';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
+import { fetchOwnerActions, type OwnerActionsState } from './owner-actions-api';
 import { fetchOwnerWorkspace, type WorkspaceState } from './workspace-api';
 import './owner.css';
+import '../owner-dashboard/owner-dashboard.css';
 import './workspace.css';
+
+export function ownerDashboardPages(
+  permission: string | undefined,
+  verified: boolean,
+  published: boolean | null,
+): ReadonlySet<OwnerPage> {
+  return new Set<OwnerPage>(
+    permission === 'owner' && (verified || published === true)
+      ? ['setup', 'overview', 'report', 'performance', 'menu', 'actions']
+      : ['setup', 'menu'],
+  );
+}
 
 export function OwnerWorkspace({
   auth,
   owner,
   apiBase,
   aiEnabled = false,
+  dishAssistanceEnabled = false,
   onSessionExpired,
   onSignOut,
   signingOut,
@@ -46,6 +64,7 @@ export function OwnerWorkspace({
   apiBase: string | null;
   /** Shows the #164 AI panel beside the live report. Off unless the build turns it on. */
   aiEnabled?: boolean;
+  dishAssistanceEnabled?: boolean;
   onSessionExpired: () => void;
   onSignOut: () => void;
   signingOut: boolean;
@@ -55,8 +74,14 @@ export function OwnerWorkspace({
   const [selectedId, setSelectedId] = useState('');
   const [page, setPage] = useState<OwnerPage>('setup');
   const [navigation, setNavigation] = useState(0);
+  const [reportAttempt, setReportAttempt] = useState(0);
   const [detailsRequested, setDetailsRequested] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [menuRead, setMenuRead] = useState<{ actor: string; value: MenuSnapshot } | null>(null);
+  const updateMenu = useCallback(
+    (value: MenuSnapshot | null) => setMenuRead(value ? { actor: owner.id, value } : null),
+    [owner.id],
+  );
   const [setupRead, setSetupRead] = useState<{ actor: string; value: RestaurantSetup } | null>(
     null,
   );
@@ -69,7 +94,11 @@ export function OwnerWorkspace({
   const pickerId = useId();
   // The report on screen, tagged with the restaurant it belongs to, so the AI panel never offers
   // one restaurant's dishes under another.
-  const [shown, setShown] = useState<{ scope: string; report: OwnerDishReport } | null>(null);
+  const [shown, setShown] = useState<{
+    scope: string;
+    report: OwnerDishReport;
+    reference?: string | undefined;
+  } | null>(null);
   const getAccessToken = useCallback(() => auth.accessTokenFor(owner.id), [auth, owner.id]);
 
   useEffect(() => {
@@ -92,6 +121,8 @@ export function OwnerWorkspace({
   const refresh = useCallback(() => {
     setDetailsRequested(false);
     setState({ kind: 'loading' });
+    setMenuRead(null);
+    setSetupRead(null);
     setPage('setup');
     setAttempt((value) => value + 1);
   }, []);
@@ -116,16 +147,20 @@ export function OwnerWorkspace({
           menuAdded: null,
           published: null,
         };
-  const pages = useMemo(
-    () =>
-      new Set<OwnerPage>(
-        selected?.permission === 'owner' ? ['setup', 'performance', 'menu'] : ['setup', 'menu'],
-      ),
-    [selected?.permission],
+  const menu =
+    menuRead?.actor === owner.id && menuRead.value.venueId === selected?.venueId
+      ? menuRead.value
+      : null;
+  const pages = ownerDashboardPages(
+    selected?.permission,
+    menu?.verified === true && menu.dishes.length > 0,
+    workspaceSetup.published,
   );
+  const activePage = pages.has(page) ? page : 'setup';
   const scope = selected ? `${owner.id}:${selected.venueId}` : '';
   const showReport = useCallback(
-    (report: OwnerDishReport | null) => setShown(report ? { scope, report } : null),
+    (report: OwnerDishReport | null, reference?: string) =>
+      setShown(report ? { scope, report, reference } : null),
     [scope],
   );
   const signOut = (
@@ -191,6 +226,8 @@ export function OwnerWorkspace({
         onChange={(event) => {
           if (!canLeave()) return;
           setSelectedId(event.target.value);
+          setMenuRead(null);
+          setSetupRead(null);
           setDetailsRequested(false);
           setPage('setup');
         }}
@@ -213,7 +250,10 @@ export function OwnerWorkspace({
       </main>
     );
 
-  const reportShown = page === 'performance' && shown?.scope === scope ? shown.report : null;
+  const reportShown =
+    ['overview', 'report', 'performance'].includes(activePage) && shown?.scope === scope
+      ? shown.report
+      : null;
   const aside =
     aiEnabled && selected.permission === 'owner' && reportShown ? (
       <LiveAiPanel
@@ -223,6 +263,11 @@ export function OwnerWorkspace({
         restaurantName={selected.name}
         getAccessToken={getAccessToken}
         report={reportShown}
+        reportReference={shown?.scope === scope ? shown.reference : undefined}
+        onReloadReport={() => {
+          setShown(null);
+          setReportAttempt((value) => value + 1);
+        }}
         onAccessFailure={accessFailure}
       />
     ) : (
@@ -262,9 +307,9 @@ export function OwnerWorkspace({
       <OwnerShell
         venueId={selected.venueId}
         restaurantName={workspaceSetup.restaurantName}
-        current={page}
+        current={activePage}
         available={pages}
-        lockedHint="Some screens are not connected in this workspace yet."
+        lockedHint="Verify every saved dish to open the dashboard. Publication remains a separate step."
         visible={
           new Set<OwnerPage>(['overview', 'report', 'performance', 'menu', 'actions', 'setup'])
         }
@@ -287,17 +332,46 @@ export function OwnerWorkspace({
       </OwnerShell>
     </div>
   );
-  return page === 'performance' && selected.permission === 'owner' ? (
-    renderShell(
-      <ReportData
-        presentation="performance"
-        key={`${owner.id}:${selected.venueId}`}
-        source={{ mode: 'live', apiBase, venueId: selected.venueId, getAccessToken }}
+  const navigate = (next: Page) => {
+    const target: OwnerPage =
+      next === 'perf' || next === 'data' || next === 'dish'
+        ? 'performance'
+        : next === 'welcome'
+          ? 'setup'
+          : next;
+    if (pages.has(target) && canLeave()) {
+      setPage(target);
+      setDetailsRequested(false);
+      setNavigation((value) => value + 1);
+    }
+  };
+  if (activePage === 'actions')
+    return renderShell(
+      <LiveActions
+        key={scope}
+        apiBase={apiBase}
+        venueId={selected.venueId}
+        restaurantName={workspaceSetup.restaurantName}
+        getAccessToken={getAccessToken}
+        onAccessFailure={accessFailure}
+      />,
+    );
+  if (activePage === 'overview' || activePage === 'report' || activePage === 'performance')
+    return renderShell(
+      <LiveDashboardReport
+        key={`${scope}:${reportAttempt}`}
+        page={activePage}
+        apiBase={apiBase}
+        venueId={selected.venueId}
+        restaurantName={workspaceSetup.restaurantName}
+        menu={menu?.dishes ?? []}
+        getAccessToken={getAccessToken}
         onAccessFailure={accessFailure}
         onReport={showReport}
+        go={navigate}
       />,
-    )
-  ) : (
+    );
+  return (
     <OwnerMenuWorkspace
       key={`${owner.id}:${selected.venueId}`}
       apiBase={apiBase}
@@ -305,16 +379,142 @@ export function OwnerWorkspace({
       venueId={selected.venueId}
       restaurantName={selected.name}
       canPublish={selected.permission === 'owner'}
-      section={page === 'menu' ? 'menu' : 'overview'}
+      dishAssistanceEnabled={dishAssistanceEnabled}
+      section={activePage === 'menu' ? 'menu' : 'overview'}
       navigation={navigation}
       detailsRequested={detailsRequested}
       getAccessToken={getAccessToken}
       onAccessFailure={accessFailure}
       onDirtyChange={setDirty}
       onSetupChange={updateSetup}
+      onMenuChange={updateMenu}
       renderShell={renderShell}
       accountActions={accountActions}
     />
+  );
+}
+
+const noop = () => {};
+function LiveDashboardReport({
+  page,
+  apiBase,
+  venueId,
+  restaurantName,
+  menu,
+  getAccessToken,
+  onAccessFailure,
+  onReport,
+  go,
+}: {
+  page: 'overview' | 'report' | 'performance';
+  apiBase: string;
+  venueId: string;
+  restaurantName: string;
+  menu: LiveMenuRow[];
+  getAccessToken: () => Promise<string | null>;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+  onReport: (report: OwnerDishReport | null, reference?: string) => void;
+  go: (page: Page) => void;
+}) {
+  const { state, retry } = useOwnerReport({ mode: 'live', apiBase, venueId, getAccessToken });
+  const report = state.kind === 'ready' ? state.report : null;
+  const reference = state.kind === 'ready' ? state.reference : undefined;
+  useEffect(() => {
+    onReport(report, reference);
+  }, [report, reference, onReport]);
+  useEffect(() => () => onReport(null), [onReport]);
+  useEffect(() => {
+    if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure(state.kind);
+  }, [state.kind, onAccessFailure]);
+  const reportContent = (
+    <ReportView
+      state={state}
+      onRetry={retry}
+      presentation={page === 'performance' ? 'performance' : 'data'}
+    />
+  );
+  const live = {
+    restaurantName,
+    reportContent,
+    period: report ? reportPeriod(report.report_metadata.date_window) : undefined,
+  };
+  return (
+    <div className="owner-dashboard-content">
+      {page === 'performance' ? (
+        reportContent
+      ) : page === 'report' ? (
+        <Report live={live} go={go} acts={{}} setAct={noop} />
+      ) : (
+        <Overview
+          live={{ ...live, menu }}
+          go={go}
+          acts={{}}
+          sim={{ scn: 'empty' }}
+          openDish={() => go('menu')}
+          openInsight={() => go('report')}
+        />
+      )}
+    </div>
+  );
+}
+
+function LiveActions({
+  apiBase,
+  venueId,
+  restaurantName,
+  getAccessToken,
+  onAccessFailure,
+}: {
+  apiBase: string;
+  venueId: string;
+  restaurantName: string;
+  getAccessToken: () => Promise<string | null>;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+}) {
+  const [state, setState] = useState<OwnerActionsState>({ kind: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    void attempt;
+    setState({ kind: 'loading' });
+    void fetchOwnerActions({ apiBase, venueId, getAccessToken, signal: controller.signal }).then(
+      (result) => {
+        if (controller.signal.aborted) return;
+        setState(result);
+        if (result.kind === 'signed_out' || result.kind === 'denied') onAccessFailure(result.kind);
+      },
+    );
+    return () => controller.abort();
+  }, [apiBase, venueId, getAccessToken, onAccessFailure, attempt]);
+  return (
+    <div className="owner-dashboard-content">
+      <Actions
+        acts={{}}
+        setAct={noop}
+        editDish={noop}
+        openInsight={noop}
+        sim={{ scn: 'empty' }}
+        live={{
+          restaurantName,
+          actionsStatus:
+            state.kind === 'ready' ? 'ready' : state.kind === 'loading' ? 'loading' : 'unavailable',
+          actions:
+            state.kind === 'ready'
+              ? state.actions.map((action) => ({
+                  id: action.actionId,
+                  title: action.category.replaceAll('_', ' '),
+                  text: action.note ?? 'No note recorded.',
+                  status: action.status,
+                }))
+              : [],
+        }}
+      />
+      {state.kind === 'unavailable' && (
+        <Button variant="outline" onClick={() => setAttempt((value) => value + 1)}>
+          Retry saved actions
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -382,6 +582,7 @@ export function samePeriod(
 type Reply =
   | { kind: 'loading'; scope: string }
   | { kind: 'error'; scope: string }
+  | { kind: 'reference_error'; scope: string }
   | { kind: 'result'; scope: string; result: OwnerAnalysisResult; dishName: string };
 
 function LiveAiPanel({
@@ -390,6 +591,8 @@ function LiveAiPanel({
   restaurantName,
   getAccessToken,
   report,
+  reportReference,
+  onReloadReport,
   onAccessFailure,
 }: {
   apiBase: string;
@@ -397,6 +600,8 @@ function LiveAiPanel({
   restaurantName: string;
   getAccessToken: () => Promise<string | null>;
   report: OwnerDishReport;
+  reportReference?: string | undefined;
+  onReloadReport: () => void;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
 }) {
   const ids = useId();
@@ -408,7 +613,7 @@ function LiveAiPanel({
   const dishId = dishes.some((dish) => dish.dish_id === picked)
     ? picked
     : (dishes[0]?.dish_id ?? '');
-  const scope = `${venueId}:${dishId}:${goal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}`;
+  const scope = `${venueId}:${dishId}:${goal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}:${reportReference ?? ''}`;
   const analyze = useMemo(
     () => createOwnerAnalysisClient({ baseUrl: apiBase, venueId, getAccessToken }),
     [apiBase, venueId, getAccessToken],
@@ -426,19 +631,21 @@ function LiveAiPanel({
 
   async function ask(event: FormEvent) {
     event.preventDefault();
-    if (!dishId || pending.current) return;
+    if (!dishId || !reportReference || pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
     const dishName = dishes.find((dish) => dish.dish_id === dishId)?.name ?? '';
     setReply({ kind: 'loading', scope });
     try {
-      const result = await analyze({ dishId, goal }, controller.signal);
+      const result = await analyze({ dishId, goal }, controller.signal, reportReference);
       if (!controller.signal.aborted) setReply({ kind: 'result', scope, result, dishName });
     } catch (error) {
       if (!controller.signal.aborted) {
         if (error instanceof OwnerAnalysisAccessError) {
           setReply(null);
           onAccessFailure(error.status === 401 ? 'signed_out' : 'denied');
+        } else if (error instanceof OwnerAnalysisReferenceError) {
+          setReply({ kind: 'reference_error', scope });
         } else setReply({ kind: 'error', scope });
       }
     } finally {
@@ -464,6 +671,12 @@ function LiveAiPanel({
         </div>
       </div>
       <div className="owner-ai__body" data-ai-state={shown?.kind ?? 'empty'} aria-live="polite">
+        {!reportReference && (
+          <p className="owner-muted">
+            Analysis needs a current server report reference. Reload the report; analysis stays
+            unavailable if no reference is issued.
+          </p>
+        )}
         <p className="owner-muted">
           Choose a dish for analysis from a separate authorized server-read snapshot. Its evidence
           period may differ from the report displayed here.
@@ -492,6 +705,14 @@ function LiveAiPanel({
           <p className="owner-ai__error" role="alert">
             The report could not be reviewed. Check your session or try again later.
           </p>
+        )}
+        {shown?.kind === 'reference_error' && (
+          <div role="alert">
+            <p>The report reference expired or changed. Reload the report, then ask again.</p>
+            <Button variant="outline" onClick={onReloadReport}>
+              Reload report
+            </Button>
+          </div>
         )}
         {shown?.kind === 'result' &&
           !samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
@@ -588,7 +809,7 @@ function LiveAiPanel({
           <button
             type="submit"
             className="owner-ai__send"
-            disabled={busy || dishes.length === 0}
+            disabled={busy || dishes.length === 0 || !reportReference}
             aria-label="Review report"
           >
             <Icon name="send" size={18} />

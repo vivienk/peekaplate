@@ -15,7 +15,9 @@
       "account_id": "51eda1917fd22a9478808a82d2980741",
       "workers_dev": true,
       "preview_urls": false,
-      "triggers": { "crons": ["0 */6 * * *"] },
+      "triggers": {
+        "crons": ["0 */6 * * *"]
+      },
       "vars": {
         "INGREDIENT_ARTWORK_ENABLED": "true",
         "INGREDIENT_ARTWORK_CLEANUP_DRY_RUN": "true",
@@ -25,7 +27,10 @@
         "POSTHOG_PROJECT_ID": "675372",
         "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1",
         "MENU_TOKEN_ISSUER": "https://peekaplate-api-staging.vxkong.workers.dev/",
-        "EXTRACTION_TIMEOUT_MS": "720000"
+        "EXTRACTION_TIMEOUT_MS": "720000",
+        "OWNER_AI_RESPONSES_ENABLED": "false",
+        "OWNER_AI_DISH_ASSISTANCE_ENABLED": "false",
+        "SYNTHETIC_REPORT_VENUE_IDS": "1ea97f31-bce5-4b8a-99f0-588afed9102e,f31ec4b4-59f3-49da-9b9d-408abebef143"
       },
       "hyperdrive": [
         {
@@ -44,6 +49,14 @@
         }
       ],
       "ratelimits": [
+        {
+          "name": "OWNER_AI_RATE_LIMITER",
+          "namespace_id": "9014174611503",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
+        },
         {
           "name": "OBSERVATION_RATE_LIMITER_MINUTE",
           "namespace_id": "9014174611501",

@@ -1480,4 +1480,7 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
 
+export * from './dish-assistance';
+
+export * from './owner-actions';
 export * from './restaurant-profile';

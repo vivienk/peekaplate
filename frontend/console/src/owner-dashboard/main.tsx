@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './owner-dashboard.css';
 
+document.body.classList.add('owner-dashboard-demo');
+
 // Development-only page served at /owner-dashboard.html; it is not part of the production build.
 // It rebuilds the Owner Dashboard V2 (Simplified) prototype on the light token theme with
 // fictional sample data only.

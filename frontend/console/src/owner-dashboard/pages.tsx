@@ -1,5 +1,5 @@
-// Owner Dashboard screens: welcome, overview, report, dish performance, dish detail, actions.
 import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
+// Owner Dashboard screens: welcome, overview, report, dish performance, dish detail, actions.
 import { type ReactNode, useState } from 'react';
 import type { Chat } from './chat';
 import {
@@ -53,6 +53,26 @@ export type Page =
   | 'dish';
 export type Acts = Record<string, ActionState>;
 export type SetAct = (id: string, v: ActionState) => void;
+
+/** Explicit live inputs never fall back to the prototype's restaurant or evidence. */
+export interface LiveDashboardInput {
+  restaurantName: string;
+  period?: string | undefined;
+  reportContent?: ReactNode;
+}
+export interface LiveMenuRow {
+  id: string;
+  name: string;
+  category: string;
+  priceLabel: string;
+  imageUrl?: string | null;
+}
+export interface LiveSavedAction {
+  id: string;
+  title: string;
+  text: string;
+  status: ActionState['status'] | 'active' | 'archived';
+}
 
 export function Welcome({ go }: { go: (p: Page) => void }) {
   return (
@@ -135,26 +155,29 @@ export function Overview({
   acts,
   openDish,
   openInsight,
+  live,
 }: {
   go: (p: Page) => void;
   sim: { scn: Scenario };
   acts: Acts;
   openDish: (id: string) => void;
   openInsight: (id: string) => void;
+  live?: LiveDashboardInput & { menu: readonly LiveMenuRow[] };
 }) {
-  const empty = sim.scn === 'empty';
+  const empty = !!live || sim.scn === 'empty';
   const sorted = bySort('open');
   const planned = INSIGHTS.filter((i) => acts[i.id]?.status === 'planned').length;
   return (
     <div className="stack">
       <div className="pagehead">
-        <span className="eyebrow">Overview · {REST.period}</span>
+        <span className="eyebrow">Overview · {live ? live.restaurantName : REST.period}</span>
         <h1>How your menu did this week</h1>
       </div>
       {empty ? (
         <Note icon="info">
-          No diner data yet. Your dishes are listed below with no numbers. Data appears once diners
-          use the menu.
+          {live
+            ? 'Your saved dishes are listed below. Diner measurements appear only in a validated report.'
+            : 'No diner data yet. Your dishes are listed below with no numbers. Data appears once diners use the menu.'}
         </Note>
       ) : (
         <div className="kpis">
@@ -239,33 +262,57 @@ export function Overview({
               </Btn>
             </div>
             <div className="dlist">
-              {(empty ? DISH : sorted).map((d) => (
-                <button
-                  type="button"
-                  key={d.id}
-                  className="drow"
-                  onClick={() => openDish(d.id)}
-                  aria-label={d.name + (empty ? '' : `, ${d.open} opens`)}
-                >
-                  <Thumb id={d.id} />
-                  <span className="dn">
-                    {d.name}
-                    <small>
-                      {d.cat} · {money(d.price)}
-                    </small>
-                  </span>
-                  <span className="hidem">
-                    {empty ? (
-                      <span className="muted">No data yet</span>
-                    ) : (
-                      <Spark values={d.weekly} />
-                    )}
-                  </span>
-                  <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
-                    {empty ? '' : `${d.open} opens`}
-                  </span>
-                </button>
-              ))}
+              {live && live.menu.length === 0 && (
+                <div className="empty">No saved dishes available.</div>
+              )}
+              {live
+                ? live.menu.map((d) => (
+                    <button
+                      type="button"
+                      key={d.id}
+                      className="drow"
+                      onClick={() => openDish(d.id)}
+                      aria-label={d.name}
+                    >
+                      <span className="thumb">
+                        {d.imageUrl ? <img src={d.imageUrl} alt="" /> : <Icon n="menu" />}
+                      </span>
+                      <span className="dn">
+                        {d.name}
+                        <small>
+                          {d.category} · {d.priceLabel}
+                        </small>
+                      </span>
+                      <span className="hidem muted">Open saved dishes</span>
+                    </button>
+                  ))
+                : (empty ? DISH : sorted).map((d) => (
+                    <button
+                      type="button"
+                      key={d.id}
+                      className="drow"
+                      onClick={() => openDish(d.id)}
+                      aria-label={d.name + (empty ? '' : `, ${d.open} opens`)}
+                    >
+                      <Thumb id={d.id} />
+                      <span className="dn">
+                        {d.name}
+                        <small>
+                          {d.cat} · {money(d.price)}
+                        </small>
+                      </span>
+                      <span className="hidem">
+                        {empty ? (
+                          <span className="muted">No data yet</span>
+                        ) : (
+                          <Spark values={d.weekly} />
+                        )}
+                      </span>
+                      <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
+                        {empty ? '' : `${d.open} opens`}
+                      </span>
+                    </button>
+                  ))}
             </div>
           </section>
         </div>
@@ -278,7 +325,11 @@ export function Overview({
               {!empty && <ReportVersionBadge scn={sim.scn} />}
             </div>
             {empty ? (
-              <div className="empty">The first report appears after diners use the menu.</div>
+              <div className="empty">
+                {live
+                  ? 'No validated insights are available here. Open the report to check its availability.'
+                  : 'The first report appears after diners use the menu.'}
+              </div>
             ) : sim.scn === 'B' ? (
               <p>
                 There is not enough data this week for a full report. Counts only, no suggestion.
@@ -316,7 +367,7 @@ export function Overview({
                 )}
               </div>
             )}
-            {!empty && (
+            {(!empty || live) && (
               <div className="row" style={{ marginTop: 16 }}>
                 <Btn kind="primary" size="lg" type="button" onClick={() => go('report')}>
                   Open the AI Insight Report
@@ -331,7 +382,7 @@ export function Overview({
               </div>
             </div>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span>{planned} planned</span>
+              <span>{live ? 'See saved actions' : `${planned} planned`}</span>
               <Btn kind="outlined" size="md" type="button" onClick={() => go('actions')}>
                 View actions
               </Btn>
@@ -382,10 +433,12 @@ export function Report({
   go,
   acts,
   setAct,
+  live,
 }: {
   go: (p: Page) => void;
   acts: Acts;
   setAct: SetAct;
+  live?: LiveDashboardInput;
 }) {
   const [why, setWhy] = useState(false);
   const [mode, setMode] = useState<'view' | 'edit'>('view');
@@ -416,7 +469,9 @@ export function Report({
               className="eyebrow"
               style={{ textTransform: 'none', letterSpacing: 0, fontSize: 13, fontWeight: 500 }}
             >
-              Report · 1–14 Sep 2025
+              {live
+                ? `Report · ${live.restaurantName}${live.period ? ` · ${live.period}` : ''}`
+                : 'Report · 1–14 Sep 2025'}
             </span>
             <h1>Menu activity report</h1>
           </div>
@@ -430,58 +485,82 @@ export function Report({
             Why am I seeing this?
           </Btn>
         </div>
-        {why && <EvidencePanel />}
+        {why &&
+          (live ? (
+            <div className="ins-box" role="region" aria-label="Why am I seeing this?">
+              Only validated report measurements are shown. Missing or suppressed evidence is not a
+              measured zero.
+            </div>
+          ) : (
+            <EvidencePanel />
+          ))}
       </div>
       <section className="card" aria-labelledby="rs-h">
         <div className="row" style={{ gap: 10 }}>
           <h2 id="rs-h">Summary</h2>
-          <span className="lab good">
-            <span className="dot" />
-            Evidence checked
-          </span>
+          {!live && (
+            <span className="lab good">
+              <span className="dot" />
+              Evidence checked
+            </span>
+          )}
         </div>
-        <p className="rpt-sum">
-          During 1–14 Sep 2025, diners opened dish details <B>1,494 times</B> across <B>5 dishes</B>{' '}
-          and started <B>111 comparisons</B>. Harvest Power Bowl received the most detail views (
-          <B>412</B>); Garden Avocado Salad had the most comparison participations: <B>78</B>.
-          Sample order records exist for 3 of 5 dishes; Avocado Toast and Berry Pancake Stack have
-          none (unknown).
-        </p>
+        {live ? (
+          <p className="rpt-sum">
+            {live.reportContent
+              ? 'Report availability and dish measurements are shown below. No aggregate totals or generated recommendations are inferred.'
+              : 'Report unavailable. No validated report has been loaded for this restaurant.'}
+          </p>
+        ) : (
+          <p className="rpt-sum">
+            During 1–14 Sep 2025, diners opened dish details <B>1,494 times</B> across{' '}
+            <B>5 dishes</B> and started <B>111 comparisons</B>. Harvest Power Bowl received the most
+            detail views (<B>412</B>); Garden Avocado Salad had the most comparison participations:{' '}
+            <B>78</B>. Sample order records exist for 3 of 5 dishes; Avocado Toast and Berry Pancake
+            Stack have none (unknown).
+          </p>
+        )}
       </section>
       <section className="card" aria-labelledby="rd-h">
         <h2 id="rd-h">Dish numbers</h2>
-        <div className="scrollx">
-          <table className="tbl rpt-tbl">
-            <thead>
-              <tr>
-                <th>Dish</th>
-                <th className="r">Detail views</th>
-                <th className="r">Repeat opens</th>
-                <th className="r">Comparison participations</th>
-                <th className="r">Avg. active time</th>
-                <th className="r">Ordered items</th>
-              </tr>
-            </thead>
-            <tbody>
-              {RPT_ROWS.map((r) => (
-                <tr key={r[0]}>
-                  <td>{r[0]}</td>
-                  <td className="r num">{r[1]}</td>
-                  <td className="r num">{r[2]}</td>
-                  <td className="r num">{r[3]}</td>
-                  <td className="r num">{r[4]}</td>
-                  <td className="r">
-                    {r[5] === null ? <Lab k="unk" /> : <span className="num">{r[5]}</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="rpt-note">
-          <b>Unknown outcomes:</b> Avocado Toast and Berry Pancake Stack have no sample order
-          record, so the outcome is unknown, not zero and not rejected.
-        </p>
+        {live ? (
+          (live.reportContent ?? <div className="empty">Report unavailable</div>)
+        ) : (
+          <>
+            <div className="scrollx">
+              <table className="tbl rpt-tbl">
+                <thead>
+                  <tr>
+                    <th>Dish</th>
+                    <th className="r">Detail views</th>
+                    <th className="r">Repeat opens</th>
+                    <th className="r">Comparison participations</th>
+                    <th className="r">Avg. active time</th>
+                    <th className="r">Ordered items</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {RPT_ROWS.map((r) => (
+                    <tr key={r[0]}>
+                      <td>{r[0]}</td>
+                      <td className="r num">{r[1]}</td>
+                      <td className="r num">{r[2]}</td>
+                      <td className="r num">{r[3]}</td>
+                      <td className="r num">{r[4]}</td>
+                      <td className="r">
+                        {r[5] === null ? <Lab k="unk" /> : <span className="num">{r[5]}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="rpt-note">
+              <b>Unknown outcomes:</b> Avocado Toast and Berry Pancake Stack have no sample order
+              record, so the outcome is unknown, not zero and not rejected.
+            </p>
+          </>
+        )}
       </section>
       <section
         className={`card rpt-act${a.status === 'dismissed' ? ' dismissed' : ''}`}
@@ -491,12 +570,14 @@ export function Report({
           <h2 id="ra-h">
             <Icon n="spark" s={17} /> Suggested action
           </h2>
-          <span className={`lab ${st[1]}`}>
+          <span className={`lab ${live ? 'st' : st[1]}`}>
             <span className="dot" />
-            {st[0]}
+            {live ? 'No suggestion available' : st[0]}
           </span>
         </div>
-        {mode === 'edit' ? (
+        {live ? (
+          <p className="rpt-rec">No validated suggested action is available here.</p>
+        ) : mode === 'edit' ? (
           <div className="field">
             <label htmlFor="rep-ed">Edit the wording</label>
             <textarea id="rep-ed" value={t} onChange={(e) => setT(e.target.value)} />
@@ -848,17 +929,27 @@ export function Perf({
     </th>
   );
   return (
-    <PerfFrame
-      period={REST.period}
-      description="Views, time interacting and orders, labelled by how much we know. A dish that was viewed but not ordered is not assumed to be rejected."
-      summary={
-        needle
-          ? `${sorted.length} of ${DISH.length} dishes`
-          : `${DISH.length} dishes · select a dish for details`
-      }
-      table={
-        <>
-          {' '}
+    <div className="stack">
+      <div className="pagehead">
+        <span className="eyebrow">Dish performance · {REST.period}</span>
+        <h1>What diners did with each dish</h1>
+        <p className="lede">
+          Views, time interacting and orders, labelled by how much we know. A dish that was viewed
+          but not ordered is not assumed to be rejected.
+        </p>
+      </div>
+      <section className="card" aria-labelledby="ad-h">
+        <div className="card-h">
+          <div>
+            <h3 id="ad-h">All dishes</h3>
+            <div className="sub" aria-live="polite">
+              {needle
+                ? `${sorted.length} of ${DISH.length} dishes`
+                : `${DISH.length} dishes · select a dish for details`}
+            </div>
+          </div>
+        </div>
+        <div className="scrollx dtable">
           <table className="tbl">
             <thead>
               <tr>
@@ -909,77 +1000,7 @@ export function Perf({
             </tbody>
           </table>
           {sorted.length === 0 && <div className="empty">No dishes match “{q.trim()}”.</div>}
-        </>
-      }
-      q={q}
-      setQ={setQ}
-      tab={tab}
-      setTab={setTab}
-      action={
-        <Btn
-          kind="primary"
-          size="md"
-          icon="spark"
-          disabled={!selDish}
-          title={selDish ? '' : 'Search for one dish, or open a dish, to ask about it'}
-          onClick={() => {
-            if (selDish) {
-              chat.ask(`dish:${selDish.id}`, true);
-              openChat();
-            }
-          }}
-        >
-          Ask AI about this dish
-        </Btn>
-      }
-      body={body}
-    />
-  );
-}
-
-function PerfFrame({
-  period,
-  description,
-  summary,
-  table,
-  notice,
-  q,
-  setQ,
-  tab,
-  setTab,
-  action,
-  body,
-}: {
-  period: string;
-  description: ReactNode;
-  summary: ReactNode;
-  table: ReactNode;
-  notice?: ReactNode;
-  q: string;
-  setQ: (value: string) => void;
-  tab: string;
-  setTab: (value: string) => void;
-  action?: ReactNode;
-  body: ReactNode;
-}) {
-  return (
-    <div className="performance-page stack">
-      <div className="pagehead">
-        <span className="eyebrow">Dish performance · {period}</span>
-        <h1>What diners did with each dish</h1>
-        <p className="lede">{description}</p>
-      </div>
-      {notice}
-      <section className="card" aria-labelledby="ad-h">
-        <div className="card-h">
-          <div>
-            <h2 id="ad-h">All dishes</h2>
-            <div className="sub" aria-live="polite">
-              {summary}
-            </div>
-          </div>
         </div>
-        <div className="scrollx dtable">{table}</div>
       </section>
       <div className="tabs" role="group" aria-label="Metric" style={{ margin: 0 }}>
         {TABS.map(([k, l]) => (
@@ -1019,137 +1040,24 @@ function PerfFrame({
             </button>
           )}
         </div>
-        {action}
+        <Btn
+          kind="primary"
+          size="md"
+          icon="spark"
+          disabled={!selDish}
+          title={selDish ? '' : 'Search for one dish, or open a dish, to ask about it'}
+          onClick={() => {
+            if (selDish) {
+              chat.ask(`dish:${selDish.id}`, true);
+              openChat();
+            }
+          }}
+        >
+          Ask AI about this dish
+        </Btn>
       </div>
       {body}
     </div>
-  );
-}
-
-// The live API supplies rates and averages, not the demo's opening/event counts.
-export function LivePerf({
-  report,
-  period,
-  summary,
-  notice,
-  columns,
-  display,
-}: {
-  report: OwnerDishReport;
-  period: string;
-  summary: ReactNode;
-  notice: ReactNode;
-  columns: [
-    keyof OwnerDishReport['dishes'][number]['metrics'],
-    string,
-    'count' | 'seconds' | 'rate',
-  ][];
-  display: (
-    cell: OwnerDishReport['dishes'][number]['metrics']['open_rate'],
-    kind: 'count' | 'seconds' | 'rate',
-  ) => ReactNode;
-}) {
-  const [q, setQ] = useState('');
-  const [tab, setTab] = useState('views');
-  const dishes = report.dishes.filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()));
-  const column = columns.find(
-    ([key]) => key === (tab === 'views' ? 'open_rate' : 'avg_interaction_time_seconds'),
-  );
-  const supported = tab === 'views' || tab === 'time';
-  const body =
-    supported && column ? (
-      <ChartCard
-        title={tab === 'views' ? 'Open rate' : 'Average time interacting'}
-        sub={
-          tab === 'views'
-            ? 'Share of visits that opened each dish; opening counts are unavailable.'
-            : 'Average active seconds from completed timed openings.'
-        }
-        head={['Dish', column[1]]}
-        rows={dishes.map((d) => [d.name, display(d.metrics[column[0]], column[2])])}
-      >
-        <HBars
-          legend={false}
-          max={
-            tab === 'views' ? 1 : Math.max(1, ...dishes.map((d) => d.metrics[column[0]].value ?? 0))
-          }
-          segs={[{ name: column[1], color: 'var(--pp-color-orange-600)' }]}
-          rows={dishes.map((d) => {
-            const cell = d.metrics[column[0]];
-            const visible = cell.status === 'NORMAL' || cell.status === 'VALID_ZERO';
-            return {
-              id: d.dish_id,
-              label: d.name,
-              vals: visible && cell.value !== null ? [cell.value] : [],
-              text: display(cell, column[2]),
-              ...(!visible ? { none: display(cell, column[2]) as string } : {}),
-            };
-          })}
-        />
-      </ChartCard>
-    ) : (
-      <section className="card">
-        <div className="card-h">
-          <h3>{TABS.find(([key]) => key === tab)?.[1]}</h3>
-        </div>
-        <div className="empty">
-          These measurements are not available in this report. No values are inferred.
-        </div>
-      </section>
-    );
-  return (
-    <PerfFrame
-      period={period}
-      description="Views and time interacting, labelled by how much we know. Orders and other measurements appear only when supported by the report."
-      summary={
-        <>
-          {dishes.length} of {report.dishes.length} dishes · {summary}
-        </>
-      }
-      notice={notice}
-      q={q}
-      setQ={setQ}
-      tab={tab}
-      setTab={setTab}
-      body={body}
-      table={
-        <>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Dish</th>
-                {columns.map(([key, label]) => (
-                  <th key={key} className="r">
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {dishes.map((d) => (
-                <tr key={d.dish_id}>
-                  <td>
-                    <b>{d.name}</b>
-                  </td>
-                  {columns.map(([key, , kind]) => (
-                    <td key={key} className="r num">
-                      {display(d.metrics[key], kind)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {dishes.length === 0 && (
-            <div className="empty">
-              {report.dishes.length
-                ? 'No dishes match your search.'
-                : 'Numbers will appear here once measurable report data is available.'}
-            </div>
-          )}
-        </>
-      }
-    />
   );
 }
 
@@ -1333,18 +1241,31 @@ export function Actions({
   editDish,
   sim,
   openInsight,
+  live,
 }: {
   acts: Acts;
   setAct: SetAct;
   editDish: (id: string, from?: string) => void;
   sim: { scn: Scenario };
   openInsight: (id: string) => void;
+  live?: LiveDashboardInput & {
+    actions?: readonly LiveSavedAction[];
+    actionsStatus?: 'loading' | 'unavailable' | 'ready';
+  };
 }) {
-  const list = INSIGHTS.map((i) => ({
-    i,
-    a: acts[i.id] || ({ status: 'suggested', text: i.action } as ActionState),
-  }));
+  const list = live
+    ? (live.actions ?? []).map((action) => ({
+        i: { id: action.id, title: action.title, dish: '' },
+        a: { status: action.status, text: action.text } as ActionState,
+      }))
+    : INSIGHTS.map((i) => ({
+        i,
+        a: acts[i.id] || ({ status: 'suggested', text: i.action } as ActionState),
+      }));
   const lbl: Record<string, string> = {
+    approved: 'Approved',
+    active: 'Active',
+    archived: 'Archived',
     suggested: 'Not reviewed',
     planned: 'Planned',
     done: 'Done · owner-reported',
@@ -1353,19 +1274,30 @@ export function Actions({
   return (
     <div className="stack">
       <div className="pagehead">
-        <span className="eyebrow">Actions</span>
+        <span className="eyebrow">Actions{live ? ` · ${live.restaurantName}` : ''}</span>
         <h1>What you decided to do</h1>
         <p className="lede">
           Approving an action means you plan to do it. It is not proof the action was done, and
           nothing is sent to diners.
         </p>
       </div>
-      {sim.scn === 'C' && (
+      {!live && sim.scn === 'C' && (
         <Note kind="warn" icon="warn">
           This week’s suggestions are on hold because the evidence check did not pass.
         </Note>
       )}
       <div className="stack">
+        {live && list.length === 0 && (
+          <section className="card">
+            <div className="empty">
+              {live.actionsStatus === 'loading'
+                ? 'Loading saved actions…'
+                : live.actionsStatus === 'unavailable'
+                  ? 'Saved actions unavailable. No action records could be loaded.'
+                  : 'No saved actions are available for this restaurant.'}
+            </div>
+          </section>
+        )}
         {list.map(({ i, a }) => (
           <section key={i.id} className="card">
             <div className="card-h">
@@ -1379,47 +1311,49 @@ export function Actions({
                 {lbl[a.status]}
               </span>
             </div>
-            <div className="row">
-              {a.status === 'suggested' && (
-                <Btn kind="primary" size="md" type="button" onClick={() => openInsight(i.id)}>
-                  Review in report
-                </Btn>
-              )}
-              <Btn kind="outlined" size="md" type="button" onClick={() => openInsight(i.id)}>
-                Open insight
-              </Btn>
-              {a.status === 'planned' && (
-                <>
-                  <Btn
-                    kind="primary"
-                    size="md"
-                    type="button"
-                    onClick={() => setAct(i.id, { ...a, status: 'done', date: 'Oct 11, 2026' })}
-                  >
-                    Log as done
+            {!live && (
+              <div className="row">
+                {a.status === 'suggested' && (
+                  <Btn kind="primary" size="md" type="button" onClick={() => openInsight(i.id)}>
+                    Review in report
                   </Btn>
+                )}
+                <Btn kind="outlined" size="md" type="button" onClick={() => openInsight(i.id)}>
+                  Open insight
+                </Btn>
+                {a.status === 'planned' && (
+                  <>
+                    <Btn
+                      kind="primary"
+                      size="md"
+                      type="button"
+                      onClick={() => setAct(i.id, { ...a, status: 'done', date: 'Oct 11, 2026' })}
+                    >
+                      Log as done
+                    </Btn>
+                    <Btn
+                      kind="outlined"
+                      size="md"
+                      type="button"
+                      onClick={() => editDish(i.dish, i.id)}
+                    >
+                      Edit this dish
+                    </Btn>
+                  </>
+                )}
+                {a.status === 'done' && <span className="muted">Logged {a.date}</span>}
+                {(a.status === 'planned' || a.status === 'done' || a.status === 'dismissed') && (
                   <Btn
                     kind="outlined"
                     size="md"
                     type="button"
-                    onClick={() => editDish(i.dish, i.id)}
+                    onClick={() => setAct(i.id, { ...a, status: 'suggested' })}
                   >
-                    Edit this dish
+                    Reset
                   </Btn>
-                </>
-              )}
-              {a.status === 'done' && <span className="muted">Logged {a.date}</span>}
-              {(a.status === 'planned' || a.status === 'done' || a.status === 'dismissed') && (
-                <Btn
-                  kind="outlined"
-                  size="md"
-                  type="button"
-                  onClick={() => setAct(i.id, { ...a, status: 'suggested' })}
-                >
-                  Reset
-                </Btn>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </section>
         ))}
       </div>
@@ -1439,5 +1373,220 @@ export function Actions({
         </p>
       </section>
     </div>
+  );
+}
+
+function PerfFrame({
+  period,
+  description,
+  summary,
+  table,
+  notice,
+  q,
+  setQ,
+  tab,
+  setTab,
+  action,
+  body,
+}: {
+  period: string;
+  description: ReactNode;
+  summary: ReactNode;
+  table: ReactNode;
+  notice?: ReactNode;
+  q: string;
+  setQ: (value: string) => void;
+  tab: string;
+  setTab: (value: string) => void;
+  action?: ReactNode;
+  body: ReactNode;
+}) {
+  return (
+    <div className="performance-page stack">
+      <div className="pagehead">
+        <span className="eyebrow">Dish performance · {period}</span>
+        <h1>What diners did with each dish</h1>
+        <p className="lede">{description}</p>
+      </div>
+      {notice}
+      <section className="card" aria-labelledby="ad-h">
+        <div className="card-h">
+          <div>
+            <h2 id="ad-h">All dishes</h2>
+            <div className="sub" aria-live="polite">
+              {summary}
+            </div>
+          </div>
+        </div>
+        <div className="scrollx dtable">{table}</div>
+      </section>
+      <div className="tabs" role="group" aria-label="Metric" style={{ margin: 0 }}>
+        {TABS.map(([k, l]) => (
+          <button type="button" key={k} aria-pressed={tab === k} onClick={() => setTab(k)}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="ctlrow">
+        <div className="dsearch">
+          <Icon n="search" s={16} />
+          <label className="sr" htmlFor="dish-q">
+            Search dishes
+          </label>
+          <input
+            id="dish-q"
+            type="search"
+            placeholder="Search dishes…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setQ('');
+            }}
+            autoComplete="off"
+          />
+          {q && (
+            <button
+              type="button"
+              className="dclear"
+              aria-label="Clear search"
+              onClick={() => {
+                setQ('');
+                document.getElementById('dish-q')?.focus();
+              }}
+            >
+              <Icon n="x" s={15} />
+            </button>
+          )}
+        </div>
+        {action}
+      </div>
+      {body}
+    </div>
+  );
+}
+
+export function LivePerf({
+  report,
+  period,
+  summary,
+  notice,
+  columns,
+  display,
+}: {
+  report: OwnerDishReport;
+  period: string;
+  summary: ReactNode;
+  notice: ReactNode;
+  columns: [
+    keyof OwnerDishReport['dishes'][number]['metrics'],
+    string,
+    'count' | 'seconds' | 'rate',
+  ][];
+  display: (
+    cell: OwnerDishReport['dishes'][number]['metrics']['open_rate'],
+    kind: 'count' | 'seconds' | 'rate',
+  ) => ReactNode;
+}) {
+  const [q, setQ] = useState('');
+  const [tab, setTab] = useState('views');
+  const dishes = report.dishes.filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const column = columns.find(
+    ([key]) => key === (tab === 'views' ? 'open_rate' : 'avg_interaction_time_seconds'),
+  );
+  const supported = tab === 'views' || tab === 'time';
+  const body =
+    supported && column ? (
+      <ChartCard
+        title={tab === 'views' ? 'Open rate' : 'Average time interacting'}
+        sub={
+          tab === 'views'
+            ? 'Share of visits that opened each dish; opening counts are unavailable.'
+            : 'Average active seconds from completed timed openings.'
+        }
+        head={['Dish', column[1]]}
+        rows={dishes.map((d) => [d.name, display(d.metrics[column[0]], column[2])])}
+      >
+        <HBars
+          legend={false}
+          max={
+            tab === 'views' ? 1 : Math.max(1, ...dishes.map((d) => d.metrics[column[0]].value ?? 0))
+          }
+          segs={[{ name: column[1], color: 'var(--pp-color-orange-600)' }]}
+          rows={dishes.map((d) => {
+            const cell = d.metrics[column[0]];
+            const visible = cell.status === 'NORMAL' || cell.status === 'VALID_ZERO';
+            return {
+              id: d.dish_id,
+              label: d.name,
+              vals: visible && cell.value !== null ? [cell.value] : [],
+              text: display(cell, column[2]),
+              ...(!visible ? { none: display(cell, column[2]) as string } : {}),
+            };
+          })}
+        />
+      </ChartCard>
+    ) : (
+      <section className="card">
+        <div className="card-h">
+          <h3>{TABS.find(([key]) => key === tab)?.[1]}</h3>
+        </div>
+        <div className="empty">
+          These measurements are not available in this report. No values are inferred.
+        </div>
+      </section>
+    );
+  return (
+    <PerfFrame
+      period={period}
+      description="Views and time interacting, labelled by how much we know. Orders and other measurements appear only when supported by the report."
+      summary={
+        <>
+          {dishes.length} of {report.dishes.length} dishes · {summary}
+        </>
+      }
+      notice={notice}
+      q={q}
+      setQ={setQ}
+      tab={tab}
+      setTab={setTab}
+      body={body}
+      table={
+        <>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Dish</th>
+                {columns.map(([key, label]) => (
+                  <th key={key} className="r">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dishes.map((d) => (
+                <tr key={d.dish_id}>
+                  <td>
+                    <b>{d.name}</b>
+                  </td>
+                  {columns.map(([key, , kind]) => (
+                    <td key={key} className="r num">
+                      {display(d.metrics[key], kind)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {dishes.length === 0 && (
+            <div className="empty">
+              {report.dishes.length
+                ? 'No dishes match your search.'
+                : 'Numbers will appear here once measurable report data is available.'}
+            </div>
+          )}
+        </>
+      }
+    />
   );
 }

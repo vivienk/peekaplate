@@ -21,6 +21,7 @@ import { type MenuUpload, UploadMenu } from './UploadMenu';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Owner onboarding demo root element is missing');
+document.body.classList.add('owner-dashboard-demo');
 
 // Fictional saved details for the dashboard state.
 const SAMPLE: Details = {
