@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { previewKey, privatePreviewImage, processPrivateDishPhoto, readPrivatePortion } from './owner-portion-preview';
 import {
   ApproveDraftPhotoSchema,
   CreateMenuUploadGroupSchema,
@@ -44,6 +43,12 @@ import {
   verifyOwnerDish,
   withOwnerMenuTransaction,
 } from './owner-menu';
+import {
+  previewKey,
+  privatePreviewImage,
+  processPrivateDishPhoto,
+  readPrivatePortion,
+} from './owner-portion-preview';
 import {
   readRestaurantProfile,
   readRestaurantSetup,
@@ -263,17 +268,27 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     if (!photo) throw new IngestionError('photo_not_found', 404);
     const bucket = c.env.INGESTION_REPORTS_BUCKET;
     if (!bucket?.get) throw new AuthUnavailableError();
-    return { venue, draftId, photoId, photo, bucket,
-      key: previewKey(venue, draftId, photoId, photo.source_hash) };
+    return {
+      venue,
+      draftId,
+      photoId,
+      photo,
+      bucket,
+      key: previewKey(venue, draftId, photoId, photo.source_hash),
+    };
   };
 
   app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/portion', async (c) => {
     const scope = await portionScope(c);
     try {
       const record = await processPrivateDishPhoto({
-        env: c.env, bucket: scope.bucket, venueId: scope.venue,
-        draftId: scope.draftId, photoId: scope.photoId,
-        sourceKey: scope.photo.storage_key, sourceHash: scope.photo.source_hash,
+        env: c.env,
+        bucket: scope.bucket,
+        venueId: scope.venue,
+        draftId: scope.draftId,
+        photoId: scope.photoId,
+        sourceKey: scope.photo.storage_key,
+        sourceHash: scope.photo.source_hash,
         sourceSize: scope.photo.size_bytes,
       });
       c.header('Cache-Control', 'no-store');
