@@ -410,12 +410,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f534a957cd68ccfb54de9987d59397272e11fcca7bd1c1bf46629f23dd895dc9"
+      "sourceFingerprint": "449c60ba7fff066a95a5d4a873b6fd9b522a4748c27e8584449b884c6b8a7ba5"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces have versioned private draft/photo/upload flows; owner-only staging prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are idempotent. AI trust/issuance remains gated. Artwork uses blob-locked repair before approval; OCR draft saves record per-venue ingredient placeholders (no image, no approval) listed by a staff pending route. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job including redelivery. Hosted rollout/acceptance stays separate.",
+      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces have versioned private draft/photo/upload flows; owner-only staging prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog; public reads and ingestion share exact configured staging-origin CORS. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are idempotent. AI trust/issuance remains gated. Artwork uses blob-locked repair before approval; OCR draft saves record per-venue ingredient placeholders (no image, no approval) listed by a staff pending route. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job including redelivery. Hosted rollout/acceptance stays separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -605,7 +605,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "14d6e70184d074d9ec6a221a2aea56dd253f00da9c51e0cff82210ccc707ff0f"
+      "sourceFingerprint": "6531aed5c7f44bafc169f582397c2db94b17114ff804b374cd9e6e6536bf19c7"
     },
     {
       "id": "database",
@@ -751,7 +751,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "07f8a1a338a7d063e5b93edba356b5dd1b9e4ebcc003a90703239dfed476e894"
+      "sourceFingerprint": "7d3b3ff875fe60937b7143b3882b9e46c46d54fec3a44c8e0a51bb2cf4b2ab0c"
     },
     {
       "id": "agents",

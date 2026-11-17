@@ -22,6 +22,28 @@ operator may resume only a bounded, labelled synthetic run and pause it afterwar
 
 ## Typed facts and archive recovery — November 2
 
+### Routing-staging DATA-01 preflight
+
+The `/diner/:slug` site uses
+`https://routing-staging.peekaplate-diner-staging.pages.dev`. Its observation
+preflight must allow this exact origin only when the staging Worker's
+`DINER_PUBLIC_ORIGIN` selects it. Public-menu reads and observation writes use
+the same origin rule. Production, preview and lookalike origins gain no new access;
+bearer-token verification, traffic classification and rate limits remain required.
+
+Build the existing diner with `--mode staging`, `VITE_POSTHOG_ENABLED=true`,
+`VITE_POSTHOG_ENVIRONMENT=staging`, the existing public project ingestion token
+and host, and `VITE_POSTHOG_ALLOWED_ORIGIN` set to that exact routing origin.
+Preserve the `/diner/` base and existing routing-site preparation. Record the
+resulting Pages deployment and configuration alongside the exact main commit;
+the older routing build deliberately had PostHog disabled.
+
+Before enabling Queue delivery, pin the shared coordinator's Run ID, case pack,
+tenant/publication, allowed event count and recovery procedure. Capture provider
+readback separately from HTTP delivery. The twelve DATA-01 cases remain NOT RUN
+until their own evidence is recorded. Test-class browser facts stay excluded from
+owner reports; reserved synthetic cohort checks are a separately labelled path.
+
 The follow-up implementation writes an accepted index, the shared
 `observation_event` row and its matching detail row in one transaction. A failed
 detail write rolls everything back and keeps the Queue item retryable. Rejected
