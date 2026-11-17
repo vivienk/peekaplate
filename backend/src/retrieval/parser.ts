@@ -241,9 +241,10 @@ export function extractStructuredMenuItems(root: unknown): StructuredMenuItem[] 
         const offerObject =
           offer && typeof offer === 'object' ? (offer as Record<string, unknown>) : undefined;
         const rawPrice = offerObject?.price;
-        const price = typeof rawPrice === 'string' || typeof rawPrice === 'number'
-          ? String(rawPrice).trim()
-          : '';
+        const price =
+          typeof rawPrice === 'string' || typeof rawPrice === 'number'
+            ? String(rawPrice).trim()
+            : '';
         const currency = offerObject?.priceCurrency;
         const validPrice = /^\d{1,7}(?:\.\d{1,2})?$/.test(price);
         const validCurrency = typeof currency === 'string' && /^[A-Z]{3}$/.test(currency);
