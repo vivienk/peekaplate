@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type SafeFetchResult, safeFetch } from '../retrieval/fetcher';
 import { materializeMenuUrl, selectUnambiguousMenuFile } from './intake';
 import { menuPdfFixture } from './pdf-fixture';
@@ -21,6 +21,7 @@ const fetched = (
   retrievedAt: '2026-11-12T00:00:00.000Z',
 });
 describe('materialized URL source provenance', () => {
+  beforeEach(() => vi.clearAllMocks());
   it('retains original and resolved source plus retrieval time while extracting actual file bytes', async () => {
     const original = 'https://restaurant.example/menu';
     vi.mocked(safeFetch).mockResolvedValueOnce(
