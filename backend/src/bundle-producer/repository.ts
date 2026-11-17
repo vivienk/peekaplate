@@ -136,6 +136,7 @@ export async function loadApprovedDishSources(
             ingredients: facts.ingredients,
             approvedAllergens: facts.allergens,
             approvedCategory: facts.category,
+            ...(facts.servingCount != null ? { servingCount: facts.servingCount } : {}),
             reviewState: facts.category === null ? 'incomplete' : 'corrected',
           });
           continue;

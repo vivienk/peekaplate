@@ -4485,3 +4485,17 @@ Context refresh initially rejected the expanded backend summary's length.
 Shortened that index summary without changing scope, refreshed its fingerprint,
 then passed the full check (1,962 unit and 117 script tests, lint/types/context/docs).
 
+## ERR-20261116-BACKEND-SPLIT-COMPATIBILITY
+
+Separating the existing backend from held PR213 exposed a compatibility issue
+with develop's unchanged manual-draft caller: omitted serving fields were required
+by the inferred request type and normalized away saved serving metadata. A
+focused real-database regression reproduced size/count loss. The shared request
+now accepts legacy omission; the existing locked save transaction preserves
+omitted extensions while explicit null clears them. Request hashes keep legacy
+omission distinct from clearing, and event snapshots preserve replayed values.
+Focused verification passed 16 unit tests, 23 real-database owner-menu cases
+(6.84s), console typecheck and formatter checks. A receipt assertion was corrected
+to compare its JSON wire snapshot with PostgreSQL dates; no runtime check was
+weakened. Full standalone checks are recorded on the wiring PR.
+
