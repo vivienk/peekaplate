@@ -18,6 +18,8 @@ import {
   ReviewCandidateResultSchema,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
+import type { DishDraftRow } from './ingestion/repository';
+import { reopenApprovedDraft } from './owner-menu';
 
 export type CandidateReviewEvent = {
   id: string;
@@ -610,7 +612,11 @@ export async function saveCandidateReviewCommand(
     // Match approval's draft-before-review lock order; removed work cannot be edited by a stale tab.
     const linkedDrafts = sessionResult.rows[0].job_id
       ? (
-          await client.query<{ id: string; removed_at: string | null; review_status: string }>(
+          await client.query<{
+            id: string;
+            removed_at: string | null;
+            review_status: DishDraftRow['review_status'];
+          }>(
             `SELECT id,removed_at,review_status FROM app_private.dish_drafts WHERE tenant_id=$1 AND job_id=$2 AND COALESCE(candidate_id,draft_id)=$3 ORDER BY id FOR UPDATE`,
             [venueId, sessionResult.rows[0].job_id, candidateId],
           )
@@ -618,6 +624,9 @@ export async function saveCandidateReviewCommand(
       : [];
     if (linkedDrafts.some((draft) => draft.removed_at))
       throw new ReviewCommandError('version_conflict', 409);
+    // Back/Edit after Part A preparation: correcting an approved dish reopens its draft (see
+    // reopenApprovedDraft); the canonical dish keeps its ID for the next preparation.
+    for (const draft of linkedDrafts) await reopenApprovedDraft(client, venueId, draft);
     if (input.corrected?.photo_id) {
       const photo = await client.query(
         `SELECT p.id FROM app_private.dish_draft_photo p JOIN app_private.dish_drafts d

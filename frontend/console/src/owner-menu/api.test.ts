@@ -46,6 +46,36 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('owner menu client', () => {
+  it('reads prepared preview photos only through the authenticated exact-snapshot blob route', async () => {
+    const calls: Call[] = [];
+    const origin = 'https://peekaplate-api-staging.vxkong.workers.dev';
+    const api = createOwnerMenuClient({
+      baseUrl: origin,
+      getToken: () => 'staff-token',
+      fetch: async (input, init) => {
+        calls.push({ url: String(input), init: init ?? {} });
+        return new Response(new Blob(['synthetic'], { type: 'image/png' }));
+      },
+    });
+    const asset = `${origin}/public/prepared-assets/${VENUE}/${JOB}/${'a'.repeat(64)}`;
+    const blob = await api.readPreparedPreviewAsset(VENUE, JOB, VENUE, asset);
+    expect(blob.type).toBe('image/png');
+    expect(calls[0]?.url).toBe(
+      `${origin}/venues/${VENUE}/prepared-menus/${JOB}/${VENUE}/assets/${JOB}/${'a'.repeat(64)}`,
+    );
+    expect(header(calls[0], 'Authorization')).toBe('Bearer staff-token');
+    expect(calls[0]?.init.credentials).toBe('omit');
+    expect(calls[0]?.init.cache).toBe('no-store');
+    for (const invalid of [
+      asset.replace(origin, 'https://foreign.example.test'),
+      `${asset}?token=not-sent`,
+    ])
+      await expect(api.readPreparedPreviewAsset(VENUE, JOB, VENUE, invalid)).rejects.toMatchObject({
+        code: 'invalid_request',
+      });
+    expect(calls).toHaveLength(1);
+  });
+
   it('verifies a saved dish with caller command identity and rejects a mismatched response', async () => {
     const command = { commandId: crypto.randomUUID(), expectedVersion: 1, verified: true };
     const { api, calls } = client([{ status: 200, body: { draft: { id: JOB } } }]);

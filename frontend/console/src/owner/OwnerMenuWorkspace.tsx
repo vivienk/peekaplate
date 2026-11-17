@@ -753,14 +753,16 @@ export function OwnerMenuWorkspace({
   ) : null;
   const completeVerification = () =>
     void run(async (active) => {
+      const approved = (draft: (typeof reviewDrafts)[number]) =>
+        draft.review_status === 'accepted' && draft.verification_status === 'verified';
       if (
         !isMenuReady(reviewDishes) ||
-        reviewDrafts.some((draft) => draft.review_status !== 'pending')
+        reviewDrafts.some((draft) => draft.review_status !== 'pending' && !approved(draft))
       )
         return;
       const generation = viewGeneration.current;
       setVerified(false);
-      for (const draft of reviewDrafts) {
+      for (const draft of reviewDrafts.filter((item) => !approved(item))) {
         const photoId = reviewDishes.find((dish) => dish.id === draft.id)?.photoId;
         if (photoId)
           await active.client.approveDraftPhoto(venueId, draft.id, photoId, {
@@ -1294,7 +1296,9 @@ export function OwnerMenuWorkspace({
                       <Btn
                         kind="outlined"
                         size="md"
-                        disabled={busy || !['pending', 'edited'].includes(draft.review_status)}
+                        disabled={
+                          busy || !['pending', 'edited', 'accepted'].includes(draft.review_status)
+                        }
                         onClick={() => openDraft(draft)}
                         aria-label={`Edit ${effective?.name ?? draft.name ?? 'untitled dish'}`}
                       >

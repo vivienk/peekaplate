@@ -346,6 +346,32 @@
   line-height: var(--pp-line-height-paragraph-1);
 }
 
+/* "Terms of Service" and "Privacy Policy" in the agreement: Text link Tone=Accent (color/link,
+ * Orange/800) inline in the label text, underlined so they read as links inside a sentence. Each
+ * opens its document in a pop-up (legal/LegalDialog). */
+.pp-auth-inline-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-2);
+  background: none;
+  color: var(--pp-color-orange-800);
+  font: inherit;
+  font-weight: var(--pp-font-weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.pp-auth-inline-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.pp-auth-inline-link:focus-visible {
+  outline: 2px solid var(--pp-auth-focus);
+  outline-offset: 2px;
+}
+
 .pp-auth-terms__error {
   margin-top: var(--pp-space-6);
   padding-inline-start: var(--pp-space-40);

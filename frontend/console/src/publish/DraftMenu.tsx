@@ -19,7 +19,7 @@ export function DraftMenu({
               name: string;
               description: string | null;
               price: { amount: string; currency: string };
-              images: { card: { url: string; alt: string } };
+              images: { card: { url: string; alt: string } } | null;
               ingredients: { name: string }[];
               allergens: string[] | null;
             }
@@ -63,11 +63,16 @@ export function DraftMenu({
               <article key={dish.dish_id} className="pp-draft-menu__dish">
                 {dish.complete ? (
                   <>
-                    <img
-                      src={dish.images.card.url}
-                      alt={dish.images.card.alt}
-                      referrerPolicy="no-referrer"
-                    />
+                    {dish.images ? (
+                      <img
+                        src={dish.images.card.url}
+                        alt={dish.images.card.alt}
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      // Text-only dish: the same empty image box the diner shows.
+                      <span className="pp-draft-menu__no-photo" aria-hidden="true" />
+                    )}
                     <div>
                       <h4>{dish.name}</h4>
                       <p className="pp-draft-menu__price">
