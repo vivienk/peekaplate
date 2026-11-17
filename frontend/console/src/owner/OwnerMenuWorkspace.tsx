@@ -631,7 +631,7 @@ export function OwnerMenuWorkspace({
     setUploads([]);
     if (files.length) uploadFiles(files);
   };
-  const saveDish = () =>
+  const saveDish = (stayOnEditor = false) =>
     void run(async (active) => {
       if (!editing) return;
       if (editing.form.origin === 'manual') {
@@ -724,8 +724,9 @@ export function OwnerMenuWorkspace({
       if (editing.form.origin === 'extracted' && reviewChecked)
         setReviewedIds((ids) => new Set(ids).add(editing.id));
       setNotice('Draft saved. This has not approved or published your menu.');
-      // S8: Save in the dish form returns to the review list, as Cancel does.
-      {
+      // Explicit 2.5D preparation remains on S09 while the saved photo generates.
+      // Normal Continue to review retains the authored S09 -> S10 navigation.
+      if (!stayOnEditor) {
         setEditing(null);
         setPendingPhoto(null);
         setEditBack(null);
@@ -1033,6 +1034,7 @@ export function OwnerMenuWorkspace({
           value={editing.form}
           photoUrl={photoUrl}
           portionReview={portionReview}
+          onGeneratePortion={() => saveDish(true)}
           onApprovePortion={() => {
             const id = editing.id;
             const photoId = editing.form.photoId;
