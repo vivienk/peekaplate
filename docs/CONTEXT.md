@@ -260,7 +260,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. No replacement charts, fabricated orders or automatic publication.",
+      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. Typed owner report questions select supported analysis goals. No replacement charts, fabricated orders or automatic publication.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -436,7 +436,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker preserves tenant authority, command replay and canonical observation reporting. Summary and daily openings share an authorized read-only snapshot. Protected short-lived seals verify one synthetic scenario against reconciled canonical evidence; live freshness remains unknown. Staging self-service creates only a new restaurant owned by the confirmed actor.",
+      "summary": "Worker preserves tenant authority, command replay and canonical observation reporting. Summary and daily openings share an authorized read-only snapshot. Protected short-lived seals verify one synthetic scenario against reconciled canonical evidence; live freshness remains unknown. Staging self-service creates only a new restaurant owned by the confirmed actor. Owner AI logs safe failure categories, HTTP status and allowlisted codes. Project validation matches protected provisioning.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -643,7 +643,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/synthetic-completeness.ts",
         "backend/src/owner-ai/synthetic-completeness.test.ts",
         "backend/src/owner-ai/synthetic-completeness.integration.ts",
-        "docs/owner-ai-synthetic-completeness.md"
+        "docs/owner-ai-synthetic-completeness.md",
+        "backend/src/owner-ai/provider.ts",
+        "backend/src/owner-ai/provider.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -656,7 +658,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "51f7f73addc39b629b504fa1520c42b1921ddbbca3d5ca42d775dba59baefd85"
+      "sourceFingerprint": "17efffd24597ce62c6d5bc9e54554a42fc12a53869e5cde25524b27885eb7737"
     },
     {
       "id": "database",
@@ -1019,21 +1021,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-15",
       "modules": [
-        "console",
-        "backend",
-        "contracts"
-      ],
-      "summary": "Temporary S13 uses existing onboarding composition and owner-only prepared snapshots. Preview integrity, explicit menu approval/publication, same-command retry and authoritative URL retrieval preserve existing admission and tenant boundaries.",
-      "files": [
-        "backend/src/owner-publication.ts",
-        "frontend/console/src/owner/OwnerPublish.tsx",
-        "docs/owner-publish-handoff.md"
-      ],
-      "next": "Verify the pinned staging rollout with a genuine owner session and retained labelled synthetic diner link; official S13 and automatic trusted preparation remain separate."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
         "backend"
       ],
       "summary": "Hosted prepared preview exposed Worker rejection of redirect error. Manual redirect handling rejects every 3xx without following; the network-free workerd regression reproduces the failure and verifies valid bytes plus hostile Location rejection.",
@@ -1163,6 +1150,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "Fix S13 handoff: retain preparation menu identity and load that exact snapshot in the existing PR208 MenuPreview. No screen/CSS replacement, auto-publication, or backend change.",
       "next": "Verify direct preview and safe retry on staging; provider credentials and report completeness remain separate AI gates."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "console",
+        "backend"
+      ],
+      "summary": "Promote PR233 and PR234. Typed report questions select existing analysis goals. Both Responses callers use a bounded transport and safe server diagnostics. The prepared-preview test waits for the loaded draft dish before checking the snapshot request.",
+      "files": [
+        "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "backend/src/owner-ai/provider.ts",
+        "docs/owner-ai-responses.md",
+        "tests/e2e/owner-workspace.spec.ts"
+      ],
+      "next": "Verify the pinned staging release and capture an authorized synthetic request with its safe diagnostic. Historical provider status remains unknown."
     }
   ]
 }

@@ -20,7 +20,13 @@ import { IngestionError } from '../ingestion/repository';
 import { withOwnerMenuTransaction } from '../owner-menu';
 import { configuredSyntheticReportVenues } from '../owner-report-scope';
 import { canonicalStringify, resolveEffectiveFields } from '../review-command';
-import { OWNER_ANALYSIS_MODEL } from './responses';
+import {
+  isOwnerAiProjectId,
+  logOwnerAiFailure,
+  OwnerAiProviderFailure,
+  requestOwnerAiResponse,
+} from './provider';
+import { OWNER_ANALYSIS_MODEL, ownerAiOutputText } from './responses';
 
 type Draft = {
   draft_version: number;
@@ -234,16 +240,11 @@ async function selectEvidence(
   env: Bindings,
   send: typeof fetch,
 ): Promise<Span | null> {
-  const response = await send('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    redirect: 'manual',
-    signal: AbortSignal.timeout(5_000),
-    headers: {
-      Authorization: `Bearer ${env.OWNER_AI_OPENAI_API_KEY}`,
-      'OpenAI-Project': env.OWNER_AI_OPENAI_PROJECT_ID!,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  const response = await requestOwnerAiResponse({
+    apiKey: env.OWNER_AI_OPENAI_API_KEY!,
+    projectId: env.OWNER_AI_OPENAI_PROJECT_ID!,
+    fetchImpl: send,
+    body: {
       model: OWNER_ANALYSIS_MODEL,
       store: false,
       stream: false,
@@ -283,56 +284,24 @@ async function selectEvidence(
           },
         },
       },
-    }),
+    },
   });
-  if (!response.ok || !response.body) throw new Error('provider_unavailable');
-  // Bound bytes while streaming, before buffering an untrusted provider body.
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let raw = '';
-  let bytes = 0;
   try {
-    for (;;) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > 32_768) throw new Error('provider_unavailable');
-      raw += decoder.decode(chunk.value, { stream: true });
-    }
-    raw += decoder.decode();
-  } finally {
-    await reader.cancel().catch(() => {});
-  }
-  const data = JSON.parse(raw);
-  const output = data.output?.filter((item: { type: string }) => item.type !== 'reasoning');
-  const message = output?.[0];
-  const usage = data.usage;
-  if (
-    data.status !== 'completed' ||
-    (data.model !== OWNER_ANALYSIS_MODEL && !/^gpt-6-luna-\d{4}-\d{2}-\d{2}$/.test(data.model)) ||
-    output?.length !== 1 ||
-    message?.type !== 'message' ||
-    message.role !== 'assistant' ||
-    message.status !== 'completed' ||
-    message.content?.length !== 1 ||
-    message.content[0]?.type !== 'output_text' ||
-    !usage ||
-    ![usage.input_tokens, usage.output_tokens, usage.total_tokens].every(Number.isSafeInteger) ||
-    usage.input_tokens <= 0 ||
-    usage.output_tokens <= 0 ||
-    usage.output_tokens > MAX_TOKENS ||
-    usage.total_tokens !== usage.input_tokens + usage.output_tokens
-  )
-    throw new Error('provider_unavailable');
-  const choice = choiceSchema.parse(JSON.parse(message.content[0].text));
-  if (
-    choice.selection &&
-    !sources[choice.selection.sourceIndex]?.spans.some(
-      (span) => span.start === choice.selection!.start && span.end === choice.selection!.end,
+    const choice = choiceSchema.parse(JSON.parse(ownerAiOutputText(response.data, MAX_TOKENS)));
+    if (
+      choice.selection &&
+      !sources[choice.selection.sourceIndex]?.spans.some(
+        (span) => span.start === choice.selection!.start && span.end === choice.selection!.end,
+      )
     )
-  )
-    throw new Error('provider_unavailable');
-  return choice.selection;
+      throw new Error('Invalid owner AI selection');
+    return choice.selection;
+  } catch {
+    throw new OwnerAiProviderFailure({
+      category: 'invalid_response',
+      httpStatus: response.httpStatus,
+    });
+  }
 }
 
 export function registerDishAssistanceRoutes(
@@ -419,13 +388,26 @@ export function registerDishAssistanceRoutes(
     }
     if (
       !env.OWNER_AI_OPENAI_API_KEY ||
-      !/^proj_[A-Za-z0-9]+$/.test(env.OWNER_AI_OPENAI_PROJECT_ID ?? '') ||
+      !isOwnerAiProjectId(env.OWNER_AI_OPENAI_PROJECT_ID) ||
       !env.OWNER_AI_RATE_LIMITER
-    )
+    ) {
+      logOwnerAiFailure(
+        'dish_description',
+        new OwnerAiProviderFailure({ category: 'configuration', httpStatus: null }),
+      );
       return c.json({ error: 'service_unavailable' }, 503);
-    const draft = await options.database(env, (db) =>
-      readDraft(db, actor, venue, id, input.data.expectedVersion),
-    );
+    }
+    const draft = await options
+      .database(env, (db) => readDraft(db, actor, venue, id, input.data.expectedVersion))
+      .catch((error: unknown) => {
+        if (!(error instanceof IngestionError || error instanceof CommandError)) {
+          logOwnerAiFailure('dish_description', undefined, {
+            category: 'internal',
+            httpStatus: null,
+          });
+        }
+        throw error;
+      });
     const facts = evidence(input.data, draft);
     const base = {
       schemaVersion: 'dish-assistance.v1',
@@ -449,9 +431,20 @@ export function registerDishAssistanceRoutes(
       );
     if (!facts.length) return abstain();
     try {
-      const reservation = await env.OWNER_AI_RATE_LIMITER.limit({ key: `dish:${venue}:${actor}` });
-      if (!reservation.success || (env.APP_ENV === 'local' && ++localAttempts > 10))
+      let reserved = false;
+      try {
+        reserved = (await env.OWNER_AI_RATE_LIMITER.limit({ key: `dish:${venue}:${actor}` }))
+          .success;
+      } catch {
+        throw new OwnerAiProviderFailure({ category: 'request_budget', httpStatus: null });
+      }
+      if (!reserved || (env.APP_ENV === 'local' && ++localAttempts > 10)) {
+        logOwnerAiFailure(
+          'dish_description',
+          new OwnerAiProviderFailure({ category: 'request_budget', httpStatus: null }),
+        );
         return c.json({ error: 'rate_limited' }, 429);
+      }
       const selected = await selectEvidence(facts, env, options.fetchImpl ?? fetch);
       if (!selected) return abstain();
       // Recheck current membership/version after the network wait; never return stale advice.
@@ -476,6 +469,7 @@ export function registerDishAssistanceRoutes(
       );
     } catch (error) {
       if (error instanceof IngestionError || error instanceof CommandError) throw error;
+      logOwnerAiFailure('dish_description', error, { category: 'internal', httpStatus: null });
       return c.json({ error: 'service_unavailable' }, 503);
     }
   });
