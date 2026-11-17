@@ -188,3 +188,110 @@ export async function processPrivateDishPhoto(input: {
   await bucket.put(`${key}/record.json`, JSON.stringify(record));
   return record;
 }
+
+/** Private human approval. Publication requires an independent approved dish revision. */
+export type PrivatePortionApproval = {
+  schema_version: 1;
+  status: 'approved';
+  source_sha256: string;
+  portion_sha256: string;
+  approved_by: string;
+  approved_at: string;
+};
+
+const portionHash = (portion: PublicPortion) =>
+  hash(new TextEncoder().encode(JSON.stringify(portion)));
+
+export async function readPrivatePortionApproval(
+  bucket: Bucket,
+  key: string,
+  record: PrivatePreview,
+): Promise<PrivatePortionApproval | null> {
+  if (!bucket.get) throw new Error('storage_unavailable');
+  const approval = await bucket.get(`${key}/approval.json`);
+  if (!approval) return null;
+  const bytes = await approval.arrayBuffer();
+  if (bytes.byteLength > 4096) throw new Error('invalid_approval');
+  const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
+  if (!parsed || typeof parsed !== 'object') throw new Error('invalid_approval');
+  const value = parsed as PrivatePortionApproval;
+  if (
+    value.schema_version !== 1 ||
+    value.status !== 'approved' ||
+    value.source_sha256 !== record.photo_sha256 ||
+    !record.portion ||
+    value.portion_sha256 !== portionHash(record.portion) ||
+    typeof value.approved_by !== 'string' ||
+    !id.test(value.approved_by) ||
+    !Number.isFinite(Date.parse(value.approved_at))
+  ) {
+    throw new Error('invalid_approval');
+  }
+  return value;
+}
+
+export async function approvePrivatePortion(
+  bucket: Bucket,
+  key: string,
+  actorId: string,
+): Promise<PrivatePortionApproval> {
+  if (!id.test(actorId)) throw new Error('invalid_actor');
+  const record = await readPrivatePortion(bucket, key);
+  if (!record?.portion || record.status !== 'needs_review') {
+    throw new Error('portion_not_ready');
+  }
+  const previous = await readPrivatePortionApproval(bucket, key, record);
+  if (previous) return previous;
+  if (!bucket.get) throw new Error('storage_unavailable');
+  for (const layer of record.portion.layers) {
+    const filename = layer.depth === 0 ? 'background.svg' : 'dish.webp';
+    await objectBytes(await bucket.get(`${key}/${filename}`), layer.size_bytes, layer.sha256);
+  }
+  const approval: PrivatePortionApproval = {
+    schema_version: 1,
+    status: 'approved',
+    source_sha256: record.photo_sha256,
+    portion_sha256: portionHash(record.portion),
+    approved_by: actorId,
+    approved_at: new Date().toISOString(),
+  };
+  await bucket.put(`${key}/approval.json`, JSON.stringify(approval));
+  return approval;
+}
+
+/**
+ * Trusted, authenticated export for the existing operator-owned bundle handoff.
+ * It is NOT a public menu asset. The caller must verify the approved dish revision,
+ * upload exact bytes to immutable public hosting and run the existing admission gate.
+ */
+export async function exportApprovedPrivatePortion(
+  bucket: Bucket,
+  key: string,
+): Promise<{
+  portion: PublicPortion;
+  layers: Array<{ name: string; sha256: string; size_bytes: number; base64: string }>;
+  approval: PrivatePortionApproval;
+}> {
+  const record = await readPrivatePortion(bucket, key);
+  if (!record?.portion || record.status !== 'needs_review' || !bucket.get) {
+    throw new Error('portion_not_ready');
+  }
+  const approval = await readPrivatePortionApproval(bucket, key, record);
+  if (!approval) throw new Error('portion_not_approved');
+  const layers = [];
+  for (const layer of record.portion.layers) {
+    const name = layer.depth === 0 ? 'background.svg' : 'dish.webp';
+    const bytes = await objectBytes(
+      await bucket.get(`${key}/${name}`),
+      layer.size_bytes,
+      layer.sha256,
+    );
+    layers.push({
+      name,
+      sha256: layer.sha256,
+      size_bytes: layer.size_bytes,
+      base64: Buffer.from(bytes).toString('base64'),
+    });
+  }
+  return { portion: record.portion, layers, approval };
+}
