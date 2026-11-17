@@ -58,7 +58,8 @@ body {
   color: #201a14;
   background: #ffad6a;
 }
-body:has(.pp-detail) > #consent {
+body:not(:has(#app .pp-menu)) > #consent,
+body:has(.pp-detail, .pp-picker, .pp-result) > #consent {
   display: none;
 }
 main {
