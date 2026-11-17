@@ -742,6 +742,22 @@ export function OwnerMenuWorkspace({
       )
         throw new OwnerMenuApiError(409, 'version_conflict');
       setVerified(true);
+      // Part A: the verified dishes become the menu S13 previews; publishing stays a separate,
+      // explicit owner step. A failure here never undoes the verification.
+      try {
+        const prepared = await active.client.prepareMenu(venueId);
+        if (!current(active)) return;
+        setNotice(
+          `Your menu is ready to preview: ${prepared.completeDishes} ${
+            prepared.completeDishes === 1 ? 'dish' : 'dishes'
+          } can be shown to diners. Nothing is public until you publish.`,
+        );
+      } catch {
+        if (!current(active)) return;
+        setNotice(
+          'Your dishes are verified. We couldn’t prepare the menu preview yet; open Review and publish to try again.',
+        );
+      }
     });
 
   if (!loaded)

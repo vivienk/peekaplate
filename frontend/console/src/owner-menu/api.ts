@@ -399,6 +399,16 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
         (body) => PreparedMenusSchema.parse(body).menus,
       );
     },
+    // Part A: turn the owner's verified dishes into a prepared menu for S13 (never publishes).
+    async prepareMenu(venueId: string) {
+      return request(venuePath(venueId, '/prepared-menus/prepare'), { method: 'POST' }, (body) => {
+        const menuRevisionId = field(body, 'menuRevisionId');
+        const completeDishes = field(body, 'completeDishes');
+        if (typeof menuRevisionId !== 'string' || typeof completeDishes !== 'number')
+          throw new Error('prepared menu');
+        return { menuRevisionId, completeDishes };
+      });
+    },
     async previewPreparedMenu(venueId: string, menuId: string, revisionId: string) {
       return request(
         venuePath(

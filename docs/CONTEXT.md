@@ -417,12 +417,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c0e460f406b9b33c7181de29fc3bab7d9a979205d822ed5b7732a461c8b9f4b8"
+      "sourceFingerprint": "e43fd561673e7c42a5443d8366c7536247199802a10e195ad1385d5f948f6286"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker rechecks staff/tenant authority before transactional commands and receipt replay. Owner profiles/private photos force tenant RLS; only trusted team operations can verify profiles. Serving size and corrected extracted photo/allergen fields survive approval. Reversible draft removal has its own stream/version; pending corrections lock drafts before reviews, advance content version and invalidate verification. Existing signed publication, immutable operator-admitted bundles and automatic diner links remain. Canonical observations stay separate from PostHog; reports retain cohorts, half-open windows and unknown freshness. No new runtime admission grant or provider pipeline. New profile migration and hosted release/acceptance remain pending.",
+      "summary": "Worker rechecks staff/tenant authority before transactional commands and receipt replay. Owner profiles/private photos force tenant RLS; only trusted team operations can verify profiles. Serving size and corrected extracted photo/allergen fields survive approval. Reversible draft removal has its own stream/version; pending corrections lock drafts before reviews, advance content version and invalidate verification. Existing signed publication, immutable operator-admitted bundles and automatic diner links remain. Canonical observations stay separate from PostHog; reports retain cohorts, half-open windows and unknown freshness. No new runtime admission grant or provider pipeline. New profile migration and hosted release/acceptance remain pending. Part A: owner verification prepares an S13 menu through a narrow owner-scoped admit function and immutable public bundle/photo routes; never approves or publishes.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -600,7 +600,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/restaurant-profile.ts",
         "backend/src/restaurant-profile.integration.ts",
         "migrations/20261116020000_owner_flow_profile.sql",
-        "tests/db/owner_flow_profile.sql"
+        "tests/db/owner_flow_profile.sql",
+        "backend/src/owner-prepare.ts",
+        "backend/src/owner-prepare.test.ts",
+        "backend/src/owner-prepare.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -613,7 +616,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a9e78b415c24e281cb3a135e13d7f3cbbc8ce83b42663fb28fb30ebc149a6259"
+      "sourceFingerprint": "46bd7d67b4aba62e005d1b66647882e8f0691b81c67e4dcfea79d33f93e5f7bd"
     },
     {
       "id": "database",
@@ -652,7 +655,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261113010000_menu_verification_lifecycle.sql",
         "migrations/20261114010000_restaurant_menu_links.sql",
         "tests/db/restaurant_links.sql",
-        "migrations/20261113020000_ingredient_artwork.sql"
+        "migrations/20261113020000_ingredient_artwork.sql",
+        "migrations/20261117010000_owner_prepared_menu.sql",
+        "tests/db/owner_prepared_menu.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -663,7 +668,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c7907c2e1fff93ac7a9139ed8c04850c7c51fab0884cb069158cb2eb351719f9"
+      "sourceFingerprint": "d7e3e0fd10426d601a02fe4f557cb1066879af02094f5df2b21dd39d6186acd2"
     },
     {
       "id": "measurement",

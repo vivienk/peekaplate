@@ -2229,3 +2229,97 @@ test('an unready or unavailable extraction does not hide other saved work', asyn
   ).toBeVisible();
   expect(state.drafts[venue.venueId]).toHaveLength(2);
 });
+
+// Part A: completing S10 verification prepares the menu for S13 (never publishes); a failed
+// preparation keeps the verification and says what to do next.
+for (const outcome of ['prepared', 'failed'] as const) {
+  test(`completing verification prepares the S13 menu (${outcome})`, async ({ context, page }) => {
+    const state = await fixture(context);
+    const id = crypto.randomUUID();
+    const photoId = crypto.randomUUID();
+    state.drafts[venue.venueId] = [
+      {
+        id,
+        draft_id: id,
+        job_id: null,
+        origin: 'manual',
+        draft_version: 1,
+        name: 'Fictional Lentil Soup',
+        category: 'Soup',
+        description: 'Slow cooked lentil soup with herbs.',
+        price_amount: '9.50',
+        price_currency: 'CAD',
+        ingredients: ['lentils'],
+        source_text: null,
+        review_warnings: [],
+        review_status: 'pending',
+        verification_status: 'not_verified',
+        manual_fields: {
+          name: 'Fictional Lentil Soup',
+          category: 'Soup',
+          description: 'Slow cooked lentil soup with herbs.',
+          priceAmount: '9.50',
+          priceCurrency: 'CAD',
+          servingSize: '1 bowl',
+          ingredients: { status: 'confirmed', items: ['lentils'] },
+          allergens: { status: 'confirmed', items: [] },
+          photoId,
+        },
+      },
+    ];
+    const second = structuredClone(state.drafts[venue.venueId]![0]!);
+    second.id = crypto.randomUUID();
+    second.draft_id = second.id;
+    second.name = 'Fictional Salad';
+    second.manual_fields!.name = second.name;
+    state.drafts[venue.venueId]!.push(second);
+    const prepares: string[] = [];
+    await context.route('**/venues/*/prepared-menus/prepare', async (route) => {
+      prepares.push(route.request().method());
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Headers': '*',
+            'Access-Control-Allow-Methods': 'POST',
+          },
+        });
+      const verified = state.drafts[venue.venueId]?.every(
+        (draft) => draft.verification_status === 'verified',
+      );
+      expect(verified).toBe(true);
+      return outcome === 'prepared'
+        ? route.fulfill({
+            json: {
+              menuId: id,
+              menuRevisionId: photoId,
+              completeDishes: 1,
+              diagnostics: [],
+              status: 'inserted',
+            },
+            headers: { 'Access-Control-Allow-Origin': origin },
+          })
+        : route.fulfill({
+            status: 409,
+            json: { error: 'nothing_to_prepare' },
+            headers: { 'Access-Control-Allow-Origin': origin },
+          });
+    });
+    await signIn(page, undefined, false);
+    await page.getByRole('button', { name: 'Edit: Add your menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
+    // Preparation starts right after the verified result is shown.
+    await expect.poll(() => prepares.filter((method) => method === 'POST').length).toBe(1);
+    await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
+    await expect(
+      page.getByText(
+        outcome === 'prepared'
+          ? /Your menu is ready to preview: 1 dish can be shown to diners/
+          : /Your dishes are verified\. We couldn’t prepare the menu preview yet/,
+      ),
+    ).toBeVisible();
+    expect(state.apiCalls.some((call) => /publications|\/approvals$/.test(call.path))).toBe(false);
+  });
+}
