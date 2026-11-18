@@ -26,6 +26,8 @@ test('the existing consent control gates both destinations even without PostHog 
   await hidePage(page);
   expect(await delivered(page)).toBe(0);
   await page.getByRole('button', { name: 'Yes, allow optional analytics', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Optional analytics' })).toBeHidden();
+  await page.getByRole('button', { name: 'Analytics preferences' }).click();
   await expect(page.getByRole('button', { name: 'Turn off optional analytics' })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -63,6 +65,8 @@ test('the consent control stays off when a browser privacy signal blocks the sha
   );
   const button = page.getByRole('button', { name: 'Yes, allow optional analytics', exact: true });
   await button.click();
+  await expect(button).toBeHidden();
+  await page.getByRole('button', { name: 'Analytics preferences' }).click();
   await expect(button).toHaveAttribute('aria-pressed', 'false');
   await trackMenuViewed(page);
   await hidePage(page);
