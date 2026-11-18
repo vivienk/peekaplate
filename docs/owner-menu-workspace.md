@@ -121,6 +121,18 @@ fields back with the returned `draft_version`. Stale versions and conflicting
 command reuse return 409. Save/event/projection/receipt/outbox commit together.
 Manual drafts have no fabricated extraction job or source span.
 
+Screen 9 uses one Serving size (people) field for `servingCount`, an integer from
+1–100. It replaces the duplicate People served control. Explicit saved counts,
+including unknown/null, take precedence over legacy text; only an absent count
+without calibration can recover a plain integer legacy value. Nonnumeric
+`servingSize` notes remain compatible and never become inferred people counts.
+Optional Plate size (cm) is a separate measurement control. `portionCalibration`
+stores its confirmed plate dimensions/boundary, original-photo hash and oriented
+pixel dimensions. The people count never scales these dimensions. Extracted dishes use the corresponding
+`portion_calibration` review correction. The calibration must match the saved
+serving input and selected photo before approval/publication. See the
+[full serving-size handoff](screen9-portion-publish.md#serving-size-counts-people-plate-measurements-set-ar-scale).
+
 After creating the draft, POST raw JPEG/PNG bytes to
 `/venues/:venueId/drafts/:draftId/photos` with `Content-Type` and
 `Idempotency-Key`. The response supplies `photo.id`; save it in the next draft

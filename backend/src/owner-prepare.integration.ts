@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import {
   OwnerDishFieldsSchema,
+  type PlateCalibration,
   type PublicMenuContentBundle,
   PublicPortionSchema,
 } from '@peekaplate/contracts';
@@ -246,154 +247,212 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
     await admin.end();
   });
 
-  it('includes only approved photo portions and serves layers only for the published snapshot', async () => {
-    const venue = await newVenue();
-    const draft = await manualDish(venue, full);
-    const photo = (
-      await admin.query<{ id: string; source_hash: string }>(
-        'SELECT id,source_hash FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2',
-        [venue, draft],
-      )
-    ).rows[0]!;
-    const key = previewKey(venue, draft, photo.id, photo.source_hash);
-    const layers = [
-      {
-        name: 'background.svg',
-        depth: 0,
-        bytes: new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>'),
-      },
-      { name: 'dish.webp', depth: 1, bytes: new TextEncoder().encode('synthetic captured cutout') },
-    ];
-    const portion = PublicPortionSchema.parse({
-      schema_version: 1,
-      dish_id: draft,
-      dish_revision_id: photo.id,
-      width: 128,
-      height: 128,
-      layers: layers.map((layer) => ({
-        url: `https://portion-ingestion.invalid/${layer.name}`,
-        depth: layer.depth,
-        sha256: sha(layer.bytes),
-        size_bytes: layer.bytes.byteLength,
-      })),
-    });
-    for (const layer of layers)
-      objects.set(`${key}/${layer.name}`, Uint8Array.from(layer.bytes).buffer);
-    objects.set(
-      `${key}/record.json`,
-      new TextEncoder().encode(
-        JSON.stringify({
-          status: 'needs_review',
-          photo_sha256: photo.source_hash,
-          dish_id: draft,
-          draft_revision_id: photo.id,
-          portion,
+  it.each([false, true])(
+    'includes only approved photo portions and serves immutable published measurements (calibrated %s)',
+    async (calibrated) => {
+      const venue = await newVenue();
+      const draft = await manualDish(venue, full);
+      const photo = (
+        await admin.query<{ id: string; source_hash: string }>(
+          'SELECT id,source_hash FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2',
+          [venue, draft],
+        )
+      ).rows[0]!;
+      const calibration: PlateCalibration = {
+        shape: 'round',
+        width_mm: 280,
+        depth_mm: 280,
+        source_sha256: photo.source_hash,
+        source_width_px: 2,
+        source_height_px: 3,
+        boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        confirmed: true,
+      };
+      if (calibrated) {
+        await saveOwnerDishDraft(runtime, owner, venue, draft, {
+          commandId: crypto.randomUUID(),
+          expectedVersion: await draftVersion(venue, draft),
+          fields: OwnerDishFieldsSchema.parse({
+            ...full,
+            photoId: photo.id,
+            servingSize: '2',
+            portionCalibration: calibration,
+          }),
+        });
+        await verify(venue, draft);
+      }
+      const key = previewKey(venue, draft, photo.id, photo.source_hash);
+      const layers = [
+        {
+          name: 'background.svg',
+          depth: 0,
+          bytes: new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+        },
+        {
+          name: 'dish.webp',
+          depth: 1,
+          bytes: new TextEncoder().encode('synthetic captured cutout'),
+        },
+      ];
+      const portion = PublicPortionSchema.parse({
+        schema_version: 1,
+        dish_id: draft,
+        dish_revision_id: photo.id,
+        width: 128,
+        height: 192,
+        layers: layers.map((layer) => ({
+          url: `https://portion-ingestion.invalid/${layer.name}`,
+          depth: layer.depth,
+          sha256: sha(layer.bytes),
+          size_bytes: layer.bytes.byteLength,
+        })),
+      });
+      for (const layer of layers)
+        objects.set(`${key}/${layer.name}`, Uint8Array.from(layer.bytes).buffer);
+      objects.set(
+        `${key}/record.json`,
+        new TextEncoder().encode(
+          JSON.stringify({
+            status: 'needs_review',
+            photo_sha256: photo.source_hash,
+            dish_id: draft,
+            draft_revision_id: photo.id,
+            portion,
+          }),
+        ).buffer as ArrayBuffer,
+      );
+      const withoutApproval = await prepare(venue);
+      const unapprovedDish = dishes(await bundleOf(venue, withoutApproval.menuRevisionId))[0]!;
+      expect(unapprovedDish.complete && unapprovedDish.portion).toBeUndefined();
+      await approvePrivatePortion(
+        {
+          ...storage,
+          put: async (path, value) =>
+            storage.put(
+              path,
+              typeof value === 'string'
+                ? (new TextEncoder().encode(value).buffer as ArrayBuffer)
+                : (value as ArrayBuffer),
+            ),
+        },
+        key,
+        owner,
+      );
+      const prepared = await prepare(venue);
+      const bundle = await bundleOf(venue, prepared.menuRevisionId);
+      const dish = dishes(bundle)[0]!;
+      if (!dish.complete) throw new Error('Expected complete portion dish');
+      expect(dish.portion).toMatchObject({
+        dish_id: dish.dish_id,
+        dish_revision_id: dish.dish_revision_id,
+      });
+      if (calibrated)
+        expect(dish.portion?.physical_size).toMatchObject({
+          plate: calibration,
+          serving_count: 2,
+          foreground_sha256: portion.layers[1]!.sha256,
+        });
+      else expect(dish.portion?.physical_size).toBeUndefined();
+      const foreground = dish.portion!.layers.find((layer) => layer.depth > 0)!;
+      expect(foreground.url).toBe(
+        `${origin}/public/prepared-assets/${venue}/${photo.id}/${foreground.sha256}`,
+      );
+      expect(
+        await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256),
+      ).toBeNull();
+      const [menu] = await listPreparedMenus(runtime, owner, venue);
+      const approval = await approveMenuRevision(runtime, owner, venue, {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        menuId: menu!.menuId,
+        menuRevisionId: prepared.menuRevisionId,
+        contentApprovalId: menu!.contentApprovalId,
+        assetApprovalId: menu!.assetApprovalId,
+      });
+      await publishMenu(runtime, owner, venue, {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        menuId: menu!.menuId,
+        approvalId: approval.approvalId,
+      });
+      expect(
+        (await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256))?.bytes,
+      ).toEqual(layers[1]!.bytes);
+      expect(
+        await readPreparedAsset(runtime, storage, await newVenue(), photo.id, foreground.sha256),
+      ).toBeNull();
+      await saveOwnerDishDraft(runtime, owner, venue, draft, {
+        commandId: crypto.randomUUID(),
+        expectedVersion: await draftVersion(venue, draft),
+        fields: OwnerDishFieldsSchema.parse({
+          ...full,
+          name: 'Unpublished renamed soup',
+          photoId: photo.id,
+          ...(calibrated
+            ? {
+                servingSize: '3',
+                servingCount: 3,
+                portionCalibration: calibration,
+              }
+            : {}),
         }),
-      ).buffer as ArrayBuffer,
-    );
-    const withoutApproval = await prepare(venue);
-    const unapprovedDish = dishes(await bundleOf(venue, withoutApproval.menuRevisionId))[0]!;
-    expect(unapprovedDish.complete && unapprovedDish.portion).toBeUndefined();
-    await approvePrivatePortion(
-      {
-        ...storage,
-        put: async (path, value) =>
-          storage.put(
-            path,
-            typeof value === 'string'
-              ? (new TextEncoder().encode(value).buffer as ArrayBuffer)
-              : (value as ArrayBuffer),
-          ),
-      },
-      key,
-      owner,
-    );
-    const prepared = await prepare(venue);
-    const bundle = await bundleOf(venue, prepared.menuRevisionId);
-    const dish = dishes(bundle)[0]!;
-    if (!dish.complete) throw new Error('Expected complete portion dish');
-    expect(dish.portion).toMatchObject({
-      dish_id: dish.dish_id,
-      dish_revision_id: dish.dish_revision_id,
-    });
-    expect(dish.portion?.physical_size).toBeUndefined();
-    const foreground = dish.portion!.layers.find((layer) => layer.depth > 0)!;
-    expect(foreground.url).toBe(
-      `${origin}/public/prepared-assets/${venue}/${photo.id}/${foreground.sha256}`,
-    );
-    expect(
-      await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256),
-    ).toBeNull();
-    const [menu] = await listPreparedMenus(runtime, owner, venue);
-    const approval = await approveMenuRevision(runtime, owner, venue, {
-      commandId: crypto.randomUUID(),
-      expectedVersion: 0,
-      menuId: menu!.menuId,
-      menuRevisionId: prepared.menuRevisionId,
-      contentApprovalId: menu!.contentApprovalId,
-      assetApprovalId: menu!.assetApprovalId,
-    });
-    await publishMenu(runtime, owner, venue, {
-      commandId: crypto.randomUUID(),
-      expectedVersion: 0,
-      menuId: menu!.menuId,
-      approvalId: approval.approvalId,
-    });
-    expect(
-      (await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256))?.bytes,
-    ).toEqual(layers[1]!.bytes);
-    expect(
-      await readPreparedAsset(runtime, storage, await newVenue(), photo.id, foreground.sha256),
-    ).toBeNull();
-    await saveOwnerDishDraft(runtime, owner, venue, draft, {
-      commandId: crypto.randomUUID(),
-      expectedVersion: await draftVersion(venue, draft),
-      fields: OwnerDishFieldsSchema.parse({
-        ...full,
-        name: 'Unpublished renamed soup',
-        photoId: photo.id,
-      }),
-    });
-    expect(
-      (await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256))?.bytes,
-    ).toEqual(layers[1]!.bytes);
-    await verify(venue, draft);
-    const next = await prepare(venue);
-    const nextDish = dishes(await bundleOf(venue, next.menuRevisionId))[0]!;
-    expect(nextDish.dish_revision_id).not.toBe(dish.dish_revision_id);
-    expect(
-      await readPreparedBundle(runtime, storage, venue, prepared.menuId, prepared.menuRevisionId),
-    ).not.toBeNull();
-    expect(
-      (await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256))?.bytes,
-    ).toEqual(layers[1]!.bytes);
-    const privateRecord = objects.get(`${key}/record.json`)!;
-    const staleRecord = JSON.parse(new TextDecoder().decode(privateRecord));
-    staleRecord.portion.dish_revision_id = crypto.randomUUID();
-    objects.set(
-      `${key}/record.json`,
-      Uint8Array.from(new TextEncoder().encode(JSON.stringify(staleRecord))).buffer,
-    );
-    await expect(prepare(venue)).rejects.toMatchObject({ code: 'approved_portion_unavailable' });
-    expect(
-      await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256),
-    ).toBeNull();
-    objects.set(`${key}/record.json`, privateRecord);
-    const cutout = objects.get(`${key}/dish.webp`)!;
-    objects.set(`${key}/dish.webp`, Uint8Array.from(new TextEncoder().encode('corrupt')).buffer);
-    expect(
-      await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256),
-    ).toBeNull();
-    await expect(prepare(venue)).rejects.toMatchObject({ code: 'approved_portion_unavailable' });
-    objects.set(`${key}/dish.webp`, cutout);
-    objects.delete(`${key}/approval.json`);
-    expect(
-      await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256),
-    ).toBeNull();
-    const revoked = await prepare(venue);
-    const revokedDish = dishes(await bundleOf(venue, revoked.menuRevisionId))[0]!;
-    expect(revokedDish.complete && revokedDish.portion).toBeUndefined();
-  });
+      });
+      expect(
+        (await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256))?.bytes,
+      ).toEqual(layers[1]!.bytes);
+      await verify(venue, draft);
+      const next = await prepare(venue);
+      const nextDish = dishes(await bundleOf(venue, next.menuRevisionId))[0]!;
+      expect(nextDish.dish_revision_id).not.toBe(dish.dish_revision_id);
+      if (calibrated) {
+        expect(nextDish.complete && nextDish.portion?.physical_size?.plate.width_mm).toBe(280);
+        expect(dish.portion?.physical_size?.plate.width_mm).toBe(280);
+        expect(nextDish.complete && nextDish.serving_count).toBe(3);
+        expect(nextDish.complete && nextDish.portion?.physical_size?.serving_count).toBe(3);
+        expect(dish.serving_count).toBe(2);
+        expect(dish.portion?.physical_size?.serving_count).toBe(2);
+        expect(nextDish.complete && nextDish.portion?.layers[1]?.sha256).toBe(
+          portion.layers[1]!.sha256,
+        );
+        expect(
+          JSON.parse(new TextDecoder().decode(objects.get(`${key}/record.json`))).portion
+            .physical_size,
+        ).toBeUndefined();
+      }
+      expect(
+        await readPreparedBundle(runtime, storage, venue, prepared.menuId, prepared.menuRevisionId),
+      ).not.toBeNull();
+      expect(
+        (await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256))?.bytes,
+      ).toEqual(layers[1]!.bytes);
+      const privateRecord = objects.get(`${key}/record.json`)!;
+      const staleRecord = JSON.parse(new TextDecoder().decode(privateRecord));
+      staleRecord.portion.dish_revision_id = crypto.randomUUID();
+      objects.set(
+        `${key}/record.json`,
+        Uint8Array.from(new TextEncoder().encode(JSON.stringify(staleRecord))).buffer,
+      );
+      await expect(prepare(venue)).rejects.toMatchObject({ code: 'approved_portion_unavailable' });
+      expect(
+        await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256),
+      ).toBeNull();
+      objects.set(`${key}/record.json`, privateRecord);
+      const cutout = objects.get(`${key}/dish.webp`)!;
+      objects.set(`${key}/dish.webp`, Uint8Array.from(new TextEncoder().encode('corrupt')).buffer);
+      expect(
+        await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256),
+      ).toBeNull();
+      await expect(prepare(venue)).rejects.toMatchObject({ code: 'approved_portion_unavailable' });
+      objects.set(`${key}/dish.webp`, cutout);
+      objects.delete(`${key}/approval.json`);
+      expect(
+        await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256),
+      ).toBeNull();
+      const revoked = await prepare(venue);
+      const revokedDish = dishes(await bundleOf(venue, revoked.menuRevisionId))[0]!;
+      expect(revokedDish.complete && revokedDish.portion).toBeUndefined();
+    },
+  );
 
   it('prepares canonical approved revisions with the Screen 5 logo, serving count and photos', async () => {
     const venue = await newVenue();

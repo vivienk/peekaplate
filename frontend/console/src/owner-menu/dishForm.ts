@@ -16,6 +16,7 @@ import {
   type SaveOwnerDishDraft,
 } from '@peekaplate/contracts';
 import type { DishDraft } from './api';
+import { servingCountText, servingCountValue } from './servingCount';
 
 export type ValueStatus = 'unknown' | 'proposed' | 'confirmed';
 export type AllergenCode = OwnerDishFields['allergens']['items'][number];
@@ -29,6 +30,7 @@ export type DishForm = {
   priceAmount: string;
   priceCurrency: string;
   servingCount?: string;
+  portionCalibration?: OwnerDishFields['portionCalibration'];
   ingredients: { status: ValueStatus; items: string[] };
   allergens: { status: ValueStatus; items: AllergenCode[] };
   photoId: string | null;
@@ -49,6 +51,15 @@ export type DishForm = {
     rejected: boolean;
   } | null;
 };
+
+// A confirmation describes one serving and one source photo, never future edits of either.
+export function invalidateChangedCalibration(previous: DishForm, next: DishForm): DishForm {
+  return previous.servingSize !== next.servingSize ||
+    previous.servingCount !== next.servingCount ||
+    previous.photoId !== next.photoId
+    ? { ...next, portionCalibration: null }
+    : next;
+}
 
 export const STAFF_ALLERGY_LINE = 'For allergy questions, please ask the restaurant staff.';
 
@@ -96,7 +107,14 @@ export function dishFromReviewItem(
     servingSize: text(effective.serving_size),
     priceAmount: text(effective.price_amount),
     priceCurrency: pilotPriceCurrency(effective.price_currency),
-    servingCount: effective.serving_count == null ? '' : String(effective.serving_count),
+    servingCount: servingCountText(
+      effective.serving_count,
+      effective.serving_size,
+      effective.portion_calibration,
+    ),
+    ...(effective.portion_calibration !== undefined
+      ? { portionCalibration: effective.portion_calibration }
+      : {}),
     ingredients:
       ingredients && ingredients.length > 0
         ? { status: 'proposed', items: [...ingredients] }
@@ -134,7 +152,14 @@ export function dishFromManualDraft(draft: DishDraft): DishForm {
     servingSize: text(fields.servingSize),
     priceAmount: text(fields.priceAmount),
     priceCurrency: pilotPriceCurrency(fields.priceCurrency),
-    servingCount: fields.servingCount == null ? '' : String(fields.servingCount),
+    servingCount: servingCountText(
+      fields.servingCount,
+      fields.servingSize,
+      fields.portionCalibration,
+    ),
+    ...(fields.portionCalibration !== undefined
+      ? { portionCalibration: fields.portionCalibration }
+      : {}),
     ingredients: { status: fields.ingredients.status, items: [...fields.ingredients.items] },
     allergens: { status: fields.allergens.status, items: [...fields.allergens.items] },
     photoId: fields.photoId,
@@ -173,15 +198,11 @@ export function manualSaveCommand(
       ...(form.servingCount !== undefined
         ? { servingCount: servingCountValue(form.servingCount) }
         : {}),
+      ...(form.portionCalibration !== undefined
+        ? { portionCalibration: form.portionCalibration }
+        : {}),
     },
   };
-}
-
-function servingCountValue(value: string): number | null {
-  if (!value.trim()) return null;
-  if (!/^(?:[1-9]\d?|100)$/.test(value.trim()))
-    throw new Error('Serving size must be a whole number from 1 to 100.');
-  return Number(value);
 }
 
 // The review correction for an extracted dish: only fields that differ from the current effective
@@ -219,6 +240,12 @@ export function reviewCorrection(
   )
     corrected.allergens = allergens;
   if (form.photoId !== (effective.photo_id ?? null)) corrected.photo_id = form.photoId;
+  if (
+    form.portionCalibration !== undefined &&
+    JSON.stringify(form.portionCalibration) !==
+      JSON.stringify(effective.portion_calibration ?? null)
+  )
+    corrected.portion_calibration = form.portionCalibration;
   return Object.keys(corrected).length === 0 ? null : corrected;
 }
 

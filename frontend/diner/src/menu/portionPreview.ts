@@ -63,6 +63,11 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   let visualSelect: HTMLSelectElement | undefined;
   let portalOffered = false;
   let uploadedPortion: PublicPortion | null | undefined;
+  const sizeLabel = () =>
+    approximatePortionLabel(
+      dish.servingCount,
+      !visualSelect && uploadedPortion === undefined ? dish.portion : undefined,
+    );
   let uploadAbort: AbortController | undefined;
   let releaseUpload: (() => void) | undefined;
   let uploadPhotoUrl: string | undefined;
@@ -250,7 +255,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       setState('ready');
       status.textContent =
         sampleNotice ??
-        `${approximatePortionLabel(dish.servingCount)} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`;
+        `${sizeLabel()} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`;
       const demoPortal =
         (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
         !!(visualSelect || fixtureCamera || uploadedPortion);
@@ -433,7 +438,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     status.textContent = showOriginal
       ? 'Original photo.'
       : (sampleNotice ??
-        `${approximatePortionLabel(dish.servingCount)} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`);
+        `${sizeLabel()} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`);
   };
   const motionChanged = () => {
     reset();
@@ -445,7 +450,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     ) {
       status.textContent =
         sampleNotice ??
-        `${approximatePortionLabel(dish.servingCount)} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`;
+        `${sizeLabel()} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`;
     }
   };
   const pointerup = (event: PointerEvent) => {
