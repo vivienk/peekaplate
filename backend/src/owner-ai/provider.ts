@@ -7,7 +7,7 @@ export type OwnerAiFailureCategory =
   | 'request_budget'
   | 'internal';
 
-type Operation = 'owner_analysis' | 'dish_description';
+type Operation = 'owner_analysis' | 'dish_description' | 'dish_allergens';
 type DiagnosticInput = {
   category: OwnerAiFailureCategory;
   httpStatus: number | null;
@@ -99,7 +99,12 @@ export function logOwnerAiFailure(
   },
 ): void {
   try {
-    if (operation !== 'owner_analysis' && operation !== 'dish_description') return;
+    if (
+      operation !== 'owner_analysis' &&
+      operation !== 'dish_description' &&
+      operation !== 'dish_allergens'
+    )
+      return;
     const diagnostic = sanitizeDiagnostic(
       error instanceof OwnerAiProviderFailure ? error.diagnostic : fallback,
     );

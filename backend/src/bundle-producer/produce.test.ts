@@ -747,4 +747,16 @@ it('publishes approved serving count and refuses calibration for another serving
   await expect(
     produceMenuBundle(parseRequest(input), sources({ [LEEKS]: { servingCount: 2 } }), assets()),
   ).rejects.toMatchObject({ code: 'asset_revision_mismatch' });
+  for (const servingCount of [null, undefined]) {
+    const measured = await produceMenuBundle(
+      parseRequest(input),
+      sources({ [LEEKS]: servingCount === undefined ? {} : { servingCount } }),
+      assets(),
+    );
+    const dish = measured.bundle.categories[0]!.dishes[0]!;
+    expect(dish).toMatchObject({
+      portion: { physical_size: { plate: portion.physical_size.plate } },
+    });
+    expect(dish).not.toHaveProperty('serving_count');
+  }
 });

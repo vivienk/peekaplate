@@ -22,6 +22,7 @@ type Mode =
   | 'original-missing'
   | 'branding'
   | 'measured-serving'
+  | 'measured-without-count'
   | 'mismatched-serving';
 async function openMenu(page: Page, mode: Mode = 'valid') {
   const content = JSON.parse(
@@ -33,6 +34,7 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
       const dishImages = dish.name === 'Roast Chicken' ? [images[0]!, blue] : images;
       if (mode === 'measured-serving' || mode === 'mismatched-serving')
         dish.serving_count = dish.name === 'Roast Chicken' ? 2 : 1;
+      if (mode === 'measured-without-count') delete dish.serving_count;
       dish.portion = {
         schema_version: 1,
         dish_id: mode === 'wrong-dish' ? content.menu_id : dish.dish_id,
@@ -46,9 +48,15 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
           depth,
         })),
       };
-      if (mode === 'measured-serving' || mode === 'mismatched-serving') {
+      if (
+        mode === 'measured-serving' ||
+        mode === 'mismatched-serving' ||
+        mode === 'measured-without-count'
+      ) {
         dish.portion.physical_size = {
-          serving_count: mode === 'mismatched-serving' ? 3 : dish.serving_count,
+          ...(mode === 'measured-without-count'
+            ? {}
+            : { serving_count: mode === 'mismatched-serving' ? 3 : dish.serving_count }),
           source: 'owner',
           validation_status: 'pending',
           foreground_sha256: hash(dishImages[1]!),
@@ -1236,3 +1244,35 @@ for (const matched of [true, false]) {
     }
   });
 }
+
+test('published physical serving size enables table AR when people served is unknown', async ({
+  page,
+}) => {
+  await cameraFixture(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'xr', {
+      configurable: true,
+      value: {
+        isSessionSupported: async () => true,
+        requestSession: async () => {
+          (window as any).measuredArRequested = true;
+          throw new DOMException('Synthetic unsupported device', 'NotSupportedError');
+        },
+      },
+    });
+  });
+  await openMenu(page, 'measured-without-count');
+  await page.getByRole('button', { name: 'Open Charred Leeks', exact: true }).click();
+  await expect(page.locator('.pp-detail__servings')).toHaveCount(0);
+  await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+  await expect(page.locator('.pp-portion__status')).toContainText('Plate size: 32 × 32 cm');
+  await page.getByText('Preview controls', { exact: true }).click();
+  await page.getByRole('button', { name: 'View on your table', exact: true }).click();
+  const portal = page.getByRole('dialog', { name: 'Dish on your table' });
+  await expect(portal.locator('.pp-ar__scale-status')).toHaveText(
+    'Plate size: 32 × 32 cm · camera scale is approximate',
+  );
+  await portal.getByText('Adjust view', { exact: true }).click();
+  await portal.getByRole('button', { name: 'Place measured size on table', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).measuredArRequested)).toBe(true);
+});

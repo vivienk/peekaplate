@@ -680,7 +680,7 @@ export type MenuItem = {
   name: string;
   cat: string;
   price: number | string;
-  /** Serving size from Screen 9, e.g. "1 slice" (Figma S09, required). */
+  /** Screen 9 serving size in whole people (1–100), required before review. */
   size: string;
   desc: string;
   ing: string[];

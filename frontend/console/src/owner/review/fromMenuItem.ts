@@ -3,6 +3,8 @@
 // S10 therefore shows the same dishes as the Menu screen instead of keeping its own dataset.
 // The type below is structural, so this file does not import the demo module and keeps working
 // whether or not the Screen 9 PR (#172) has added the allergen fields.
+
+import { servingCountText, servingCountValue } from '../../owner-menu/servingCount';
 import type { DishFacts, ReviewDish } from './reviewDishes';
 
 export interface DashboardMenuItem {
@@ -19,8 +21,11 @@ export interface DashboardMenuItem {
   photoId?: string | null;
   /** True when the owner confirmed the allergens, including confirming that there are none. */
   allergensConfirmed?: boolean;
-  /** Serving size, when the source has one (not in the draft contract yet). */
+  /** Legacy text, when the source has one. */
   servingSize?: string | null;
+  /** Authored Screen 9 people input. */
+  size?: string;
+  servingCount?: number | null;
   /** Recorded allergens. Added to the dashboard data by the Screen 9 PR (#172). */
   alg?: readonly string[];
   /** Allergens suggested by AI and not yet reviewed (#172). */
@@ -40,13 +45,18 @@ function factsOf(
 
 export function menuItemToReviewDish(item: DashboardMenuItem): ReviewDish {
   const price = String(item.price).trim();
+  const servingSize = item.servingSize !== undefined ? item.servingSize : item.size;
+  const count = servingCountText(item.servingCount, servingSize);
   return {
     id: item.id ?? `new-${item.name.trim() || 'dish'}`,
     name: item.name.trim() === '' ? null : item.name,
     category: item.cat.trim() === '' ? null : item.cat,
     description: item.desc?.trim() ? item.desc : null,
     photoId: item.photoId ?? null,
-    ...(item.servingSize !== undefined && { servingSize: item.servingSize }),
+    ...(servingSize !== undefined && { servingSize }),
+    ...(item.servingCount !== undefined || count !== ''
+      ? { servingCount: servingCountValue(count) }
+      : {}),
     priceAmount: price === '' ? null : price,
     ingredients: factsOf(item.ing, item.aiIng, item.aiReviewed),
     allergens:

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyManualDish } from '../../owner-menu/dishForm';
+import { confirmedCalibration } from '../../owner-menu/portionCalibration.test-helpers';
 import { dishStatus, type ReviewDish } from './reviewDishes';
 import { dishToForm, formToDish } from './reviewForm';
 
@@ -18,6 +19,18 @@ const dish = (over: Partial<ReviewDish> = {}): ReviewDish => ({
 });
 
 describe('S10 row to S09 form values', () => {
+  it('round-trips explicit photo calibration without inventing it for legacy serving labels', () => {
+    const previous = dish({ servingSize: '28 cm', portionCalibration: confirmedCalibration });
+    const form = dishToForm(previous);
+    expect(form.portionCalibration).toEqual(confirmedCalibration);
+    expect(formToDish(form, previous.id, previous)).toEqual(previous);
+    expect(formToDish({ ...form, portionCalibration: null }, previous.id, previous)).toHaveProperty(
+      'portionCalibration',
+      null,
+    );
+    expect(dishToForm(dish())).not.toHaveProperty('portionCalibration');
+  });
+
   it('round-trips people served separately from the descriptive serving size', () => {
     const previous = dish({ servingSize: '1 bowl', servingCount: 2 });
     const form = dishToForm(previous);
@@ -26,11 +39,11 @@ describe('S10 row to S09 form values', () => {
     expect(formToDish(form, previous.id, previous)).toEqual(previous);
   });
 
-  it('never infers people served from a numeric serving label', () => {
+  it('recovers a plain integer legacy serving label into canonical people metadata', () => {
     const previous = dish({ servingSize: '2' });
     const form = dishToForm(previous);
-    expect(form.servingCount).toBeUndefined();
-    expect(formToDish(form, previous.id, previous)).toEqual(previous);
+    expect(form.servingCount).toBe('2');
+    expect(formToDish(form, previous.id, previous)).toEqual({ ...previous, servingCount: 2 });
   });
 
   it('keeps a blank count unknown and rejects counts outside whole people from 1 to 100', () => {
@@ -99,7 +112,7 @@ describe('S09 form values back to an S10 row', () => {
   });
 
   it('a complete dish round-trips unchanged and is Ready', () => {
-    const previous = dish();
+    const previous = dish({ servingCount: 1 });
     const saved = formToDish(dishToForm(previous), previous.id, previous);
     expect(saved).toEqual(previous);
     expect(dishStatus(saved).ready).toBe(true);

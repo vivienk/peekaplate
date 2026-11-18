@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
-import { canonicalJson, type PublicPortion, PublicPortionSchema } from '@peekaplate/contracts';
+import {
+  canonicalJson,
+  type PlateCalibration,
+  PlateCalibrationSchema,
+  type PublicPortion,
+  PublicPortionSchema,
+} from '@peekaplate/contracts';
 
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,8 +40,7 @@ export function matchesApprovedOwnerPortion(
     reviewed &&
       reviewed.photoId === photoId &&
       reviewed.sourceHash === sourceHash &&
-      reviewed.portion === canonicalJson(portion) &&
-      !portion.physical_size,
+      reviewed.portion === canonicalJson(portion),
   );
 }
 
@@ -72,6 +77,11 @@ export function prepareApprovedPortion(
     photoId: string;
     assetBaseUrl: string;
     sourceHash?: string;
+    /** Independently approved facts, never measurements supplied by the cutout processor. */
+    portionCalibration?: PlateCalibration | null;
+    servingCount?: number | null;
+    /** Dimensions read from the exact hash-verified source bytes, after EXIF orientation. */
+    sourceDimensions?: { width: number; height: number };
     layerUrl?: (hash: string) => string;
   },
 ): PreparedApprovedPortion {
@@ -88,6 +98,9 @@ export function prepareApprovedPortion(
     throw new Error('Approved export identity or publication boundary mismatch');
   }
   const portion = PublicPortionSchema.parse(exportData.portion);
+  if (portion.physical_size) {
+    throw new Error('Private cutout metadata cannot authorize physical dimensions');
+  }
   if (portion.dish_id !== expected.draftId || portion.dish_revision_id !== expected.photoId) {
     throw new Error('Draft photo portion identity does not match the approved export');
   }
@@ -106,6 +119,18 @@ export function prepareApprovedPortion(
   }
   if (exportData.layers.length !== 2 || portion.layers.length !== 2) {
     throw new Error('S09 export requires one foreground and one background');
+  }
+  const plate = expected.portionCalibration
+    ? PlateCalibrationSchema.parse(expected.portionCalibration)
+    : undefined;
+  if (
+    plate &&
+    (!expected.sourceHash ||
+      plate.source_sha256 !== expected.sourceHash ||
+      plate.source_width_px !== expected.sourceDimensions?.width ||
+      plate.source_height_px !== expected.sourceDimensions?.height)
+  ) {
+    throw new Error('Physical dimensions do not match the approved source photo');
   }
   const files: PreparedPortionFile[] = [];
   const rewrittenLayers = [];
@@ -141,6 +166,17 @@ export function prepareApprovedPortion(
     ...portion,
     dish_id: expected.dishId,
     dish_revision_id: expected.dishRevisionId,
+    ...(plate
+      ? {
+          physical_size: {
+            plate,
+            ...(expected.servingCount != null ? { serving_count: expected.servingCount } : {}),
+            foreground_sha256: rewrittenLayers.find((layer) => layer.depth > 0)?.sha256,
+            source: 'owner',
+            validation_status: 'pending',
+          },
+        }
+      : {}),
     layers: rewrittenLayers,
   });
   const prepared = { portion: published, files };
