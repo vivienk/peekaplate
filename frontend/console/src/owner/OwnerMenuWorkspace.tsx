@@ -421,7 +421,8 @@ export function OwnerMenuWorkspace({
         if (result.status === 'failed') {
           setPortionReview({
             status: 'failed',
-            message: 'The 2.5D cutout could not be generated. The original photo is retained.',
+            message:
+              '2.5D processing failed. Please try another photo. The original photo is retained.',
           });
           return;
         }
@@ -434,7 +435,8 @@ export function OwnerMenuWorkspace({
         if (!disposed && current(active)) {
           setPortionReview({
             status: 'failed',
-            message: '2.5D processing is unavailable. The original photo is retained.',
+            message:
+              '2.5D processing failed. Please try again or use another photo. The original photo is retained.',
           });
         }
       });
