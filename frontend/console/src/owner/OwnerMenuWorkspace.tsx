@@ -943,7 +943,7 @@ export function OwnerMenuWorkspace({
                 ).id;
               }
               const fields = { ...next, photoId };
-              await active.client.saveProfile(venueId, {
+              const savedProfile = await active.client.saveProfile(venueId, {
                 commandId: command('profile', [profile?.version ?? 0, fields]),
                 expectedVersion: profile?.version ?? 0,
                 fields,
@@ -951,7 +951,11 @@ export function OwnerMenuWorkspace({
               await load(active);
               if (!current(active)) return;
               setNotice(
-                'Restaurant details saved and submitted for team verification. This does not publish your menu.',
+                savedProfile?.status === 'verified'
+                  ? 'Restaurant details saved. Verified. This does not publish your menu.'
+                  : savedProfile?.status === 'submitted'
+                    ? 'Restaurant details saved and submitted for team verification. This does not publish your menu.'
+                    : 'Restaurant details saved. Verification status unavailable.',
               );
               if (viewGeneration.current !== generation) return;
               const continueOnboarding = detailsFromSources || !editingSaved;
