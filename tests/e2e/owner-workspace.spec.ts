@@ -1672,6 +1672,28 @@ test('live Screen 9 opened from S06 goes Back to S06 and focus follows each scre
   await expect(s06).toBeFocused();
 });
 
+test('returning to the owner tab preserves the unsaved dish', async ({ context, page }) => {
+  await fixture(context);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  const name = page.getByRole('textbox', { name: /^Dish name/ });
+  await name.fill('Unsaved refocus dish');
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const channel = new BroadcastChannel('sb-auth-fixture-auth-token');
+        channel.onmessage = ({ data }) => {
+          if (data.event === 'SIGNED_IN') {
+            channel.close();
+            resolve();
+          }
+        };
+        window.dispatchEvent(new Event('visibilitychange'));
+      }),
+  );
+  await expect(name).toHaveValue('Unsaved refocus dish');
+});
+
 test('manual dish and original private photo survive save and reload', async ({
   context,
   page,
