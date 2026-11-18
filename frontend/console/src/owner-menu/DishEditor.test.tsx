@@ -306,8 +306,17 @@ describe('live Screen 9 on the authored #172 presentation', () => {
     });
     expect(html).toContain('Preparing the 2.5D preview');
     expect(html).not.toContain('src="blob:generated-cutout"');
+    // Running S07 upload bar while processing: no invented percentage.
+    expect(html).toMatch(
+      /class="pp-onboard-progress s09-25d-progress pp-onboard-progress--running"/,
+    );
+    expect(html).not.toContain('aria-valuenow');
     const unavailable = render({ portionReview: { status: 'failed' } });
     expect(unavailable).toContain('original dish photo remains the View Portion fallback');
+    expect(unavailable).toContain('>Failed</span>');
+    expect(unavailable).toContain('s09-25d-progress--failed');
+    expect(unavailable).toContain('role="alert"');
+    expect(render()).not.toContain('role="progressbar"');
   });
 
   it('uses the authored required serving field for the saved people count', () => {
