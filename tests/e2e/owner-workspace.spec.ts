@@ -1463,7 +1463,7 @@ for (const width of [1440, 390]) {
     state.venues = [];
     await page.getByRole('button', { name: 'Restaurant Setup', exact: true }).click();
     await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Name your restaurant' })).toBeVisible();
     await capture('access-denied');
   });
 }
@@ -1603,7 +1603,7 @@ test('metadata outage preserves menu work but a later sibling auth denial clears
     .toBeGreaterThan(before);
   state.venues = [];
   state.releaseSetup();
-  await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Name your restaurant' })).toBeVisible();
   await expect(page.locator('.owner-shell')).toHaveCount(0);
 });
 
@@ -1890,7 +1890,7 @@ test('revoked menu access removes saved private state and reloads memberships', 
   state.menuStatus = 403;
   state.venues = [];
   await page.getByRole('button', { name: 'Reload saved work', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Name your restaurant' })).toBeVisible();
   await expect(page.getByRole('heading', { name: venue.name })).toHaveCount(0);
 });
 
@@ -2069,9 +2069,15 @@ test('new accounts without restaurant membership see an honest empty state', asy
   const state = await fixture(context);
   state.venues = [];
   await signIn(page, undefined, false);
-  await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Name your restaurant' })).toBeVisible();
   await expect(page.locator('.owner-shell')).toHaveCount(0);
   expect(state.apiCalls.map((call) => call.path)).toEqual(['/staff/venues']);
+  await expect(page.getByLabel('Restaurant name', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
+  await page.getByLabel('Restaurant name', { exact: true }).fill('   ');
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
 });
 
 test('multiple restaurants require selection and a switch removes the old report', async ({
@@ -2132,7 +2138,7 @@ test('report revocation refreshes membership and clears private state', async ({
   state.reportStatus = 403;
   state.venues = [];
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Name your restaurant' })).toBeVisible();
   await expect(page.getByRole('table')).toHaveCount(0);
 });
 
@@ -2472,7 +2478,7 @@ test('analysis denial clears the private report and refreshes restaurant access'
   state.analysisStatus = 403;
   state.venues = [];
   await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Name your restaurant' })).toBeVisible();
   await expect(panel).toHaveCount(0);
   await expect(page.getByRole('table')).toHaveCount(0);
 });
@@ -2656,7 +2662,7 @@ test('authored S10 verifies actual saved drafts without publication and preserve
   state.venues = [];
   state.menuStatus = 403;
   await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Name your restaurant' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Menu verified' })).toHaveCount(0);
 });
 
@@ -3385,7 +3391,7 @@ test('Overview uses validated KPI cards and clears their values across restauran
   await expect(cards).toHaveCount(0);
 });
 
-test('staging creation retries the same command, opens S05 and keeps the next actor isolated', async ({
+test('staging creation retries the same command, opens the named dashboard and keeps the next actor isolated', async ({
   context,
   page,
 }) => {
@@ -3419,13 +3425,16 @@ test('staging creation retries the same command, opens S05 and keeps the next ac
     });
   });
   await signIn(page, undefined, false);
-  await page
-    .getByRole('button', { name: 'Create test restaurant (Staging testing)', exact: true })
-    .click();
-  await page.getByLabel('Test restaurant name (Staging testing)').fill(`  ${created.name}  `);
-  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await page.getByLabel('Restaurant name', { exact: true }).fill(`  ${created.name}  `);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Retry with the same name');
-  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate', exact: true })).toBeVisible();
+  await expect(page.locator('.owner-identity__name')).toHaveText(created.name);
+  await expect(page.getByRole('textbox', { name: 'Restaurant name', exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.owner-identity__name')).toHaveText(created.name);
+  await page.getByRole('button', { name: 'Start: Restaurant details', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Restaurant name', exact: true })).toBeVisible();
   expect(requests).toHaveLength(2);
   expect(requests[0]).toEqual(requests[1]);
@@ -3505,12 +3514,9 @@ test('a delayed creation response cannot select a restaurant after the actor sig
   });
   await signIn(page, undefined, false);
   await page
-    .getByRole('button', { name: 'Create test restaurant (Staging testing)', exact: true })
-    .click();
-  await page
-    .getByLabel('Test restaurant name (Staging testing)')
+    .getByLabel('Restaurant name', { exact: true })
     .fill('Delayed synthetic restaurant');
-  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect.poll(() => started).toBe(true);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await signIn(page, 'other@example.test', false);

@@ -17,6 +17,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import logo from '../auth/assets/logo.png';
+import '../auth/auth.css';
 import type { OwnerAuthRuntime, SignedInOwner } from '../auth/supabase-auth';
 import { OwnerAccountMenu } from '../onboarding/OnboardingLayout';
 import {
@@ -185,13 +187,14 @@ export function OwnerWorkspace({
       <CreateTestRestaurant
         key={`${owner.id}:${apiBase}`}
         apiBase={apiBase}
+        inline={venues.length === 0}
         getAccessToken={getAccessToken}
         canLeave={canLeave}
         onAccessFailure={accessFailure}
         onCreated={(venueId) => {
           refresh();
           setSelectedId(venueId);
-          setDetailsRequested(true);
+          setDetailsRequested(false);
           setNavigation((value) => value + 1);
         }}
       />
@@ -229,18 +232,30 @@ export function OwnerWorkspace({
     );
   if (venues.length === 0)
     return (
-      <main className="owner-workspace-state">
-        <h1>No restaurant access yet</h1>
-        <p>
-          {createRestaurant
-            ? 'Your account is ready. Create a test restaurant to start, or check access to an existing restaurant.'
-            : 'Your account is ready. Contact PeekaPlate to connect your restaurant.'}
-        </p>
-        {createRestaurant}
-        <Button variant="outline" onClick={refresh}>
-          Check access again
-        </Button>
-        {signOut}
+      <main className="pp-auth owner-name-entry">
+        <section className="pp-auth__card" aria-labelledby={`${pickerId}-title`}>
+          <p className="pp-auth__brand">
+            <img src={logo} alt="" width="32" height="32" />
+            <span>PeekaPlate</span>
+          </p>
+          <header className="pp-auth__header">
+            <h1 className="pp-auth__title" id={`${pickerId}-title`}>
+              {createRestaurant ? 'Name your restaurant' : 'No restaurant access yet'}
+            </h1>
+            <p className="pp-auth__lead">
+              {createRestaurant
+                ? 'Add a name for your dashboard. You can complete your restaurant details later.'
+                : 'Your account is ready. Contact PeekaPlate to connect your restaurant.'}
+            </p>
+          </header>
+          {createRestaurant}
+          <div className="owner-name-entry__actions">
+            <button type="button" className="pp-auth-link" onClick={refresh}>
+              Check access
+            </button>
+            {signOut}
+          </div>
+        </section>
       </main>
     );
 
@@ -424,6 +439,7 @@ export function OwnerWorkspace({
 
 function CreateTestRestaurant({
   apiBase,
+  inline = false,
   getAccessToken,
   canLeave,
   onAccessFailure,
@@ -434,6 +450,7 @@ function CreateTestRestaurant({
   canLeave: () => boolean;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
   onCreated: (venueId: string) => void;
+  inline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -480,9 +497,15 @@ function CreateTestRestaurant({
             : 'We could not confirm creation. Retry with the same name to safely check the same request.',
     );
   };
-  return open ? (
-    <form onSubmit={(event) => void create(event)} aria-label="Create test restaurant">
-      <label htmlFor={id}>Test restaurant name (Staging testing)</label>
+  return inline || open ? (
+    <form
+      className={inline ? 'pp-auth__form' : undefined}
+      onSubmit={(event) => void create(event)}
+      aria-label={inline ? 'Name your restaurant' : 'Create test restaurant'}
+    >
+      <label className={inline ? 'pp-field__label' : undefined} htmlFor={id}>
+        {inline ? 'Restaurant name' : 'Test restaurant name (Staging testing)'}
+      </label>
       <Input
         id={id}
         value={name}
@@ -492,8 +515,12 @@ function CreateTestRestaurant({
         onChange={(event) => setName(event.target.value)}
       />
       {error && <p role="alert">{error}</p>}
-      <Button type="submit" disabled={busy || !name.trim()}>
-        {busy ? 'Creating test restaurant…' : 'Create test restaurant'}
+      <Button
+        type="submit"
+        className={inline ? 'pp-auth__submit pp-auth-btn pp-auth-btn--primary' : undefined}
+        disabled={busy || !name.trim()}
+      >
+        {busy ? 'Creating restaurant…' : inline ? 'Continue' : 'Create test restaurant'}
       </Button>
     </form>
   ) : (

@@ -261,7 +261,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. Typed owner report questions select supported analysis goals. No replacement charts, fabricated orders or automatic publication.",
+      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. Typed owner report questions select supported analysis goals. No replacement charts, fabricated orders or automatic publication. Empty membership uses a branded name-only form and opens the setup dashboard after creation; S05 details remain a separate step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -432,7 +432,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "e7c60e1e4eb64e750d951e1c52ae941cac64a180c985810b496e0a6d26d24bec"
+      "sourceFingerprint": "2a26a89524c376345e2c395f10ec8953733d8c82642e8b3330bb0a327dab097e"
     },
     {
       "id": "backend",
@@ -1023,19 +1023,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-15",
       "modules": [
-        "backend"
-      ],
-      "summary": "Hosted prepared preview exposed Worker rejection of redirect error. Manual redirect handling rejects every 3xx without following; the network-free workerd regression reproduces the failure and verifies valid bytes plus hostile Location rejection.",
-      "files": [
-        "backend/src/owner-publication.ts",
-        "backend/src/owner-publication.test.ts",
-        "backend/src/owner-publication.workerd-harness.ts"
-      ],
-      "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
         "diner",
         "contracts",
         "backend"
@@ -1167,6 +1154,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-workspace.spec.ts"
       ],
       "next": "Verify the pinned staging release and capture an authorized synthetic request with its safe diagnostic. Historical provider status remains unknown."
+    },
+    {
+      "date": "2026-11-18",
+      "modules": [
+        "console"
+      ],
+      "summary": "Name-only restaurant entry reuses auth branding and existing authenticated creation. Continue opens the setup dashboard; S05 stays separate. Retry command identity, quota and actor cancellation remain unchanged.",
+      "next": "Run owner workspace browser regression and verify the staged name-entry layout before release."
     }
   ]
 }
