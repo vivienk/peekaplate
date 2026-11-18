@@ -689,9 +689,9 @@ export async function saveCandidateReviewCommand(
         currentRow?.review_status === 'corrected' || currentRow?.review_status === 'incomplete'
           ? (currentRow.corrected_fields ?? {})
           : {};
+      const priorIncomplete = (currentRow?.incomplete_fields ?? []) as ReviewEditableField[];
       if (input.action === 'correct') {
         reviewStatus = 'corrected';
-        const priorIncomplete = (currentRow?.incomplete_fields ?? []) as ReviewEditableField[];
         incompleteFields =
           input.incompleteFields ?? priorIncomplete.filter((f) => !(f in (input.corrected ?? {})));
       } else {
@@ -718,6 +718,18 @@ export async function saveCandidateReviewCommand(
         // Measurements may survive unrelated edits, never a changed photo or people count.
         // A changed legacy serving label also conservatively requires renewed confirmation.
         correctedFields.portion_calibration = null;
+      }
+      if (
+        correctedFields.serving_count === undefined &&
+        !incompleteFields.includes('serving_count') &&
+        ((priorCorrected.serving_count === undefined &&
+          priorCorrected.portion_calibration != null &&
+          correctedFields.portion_calibration == null) ||
+          priorIncomplete.includes('serving_count'))
+      ) {
+        // Preserve unknown count provenance when its calibration or incomplete marker disappears.
+        // An active incomplete field already carries that intent and cannot also be corrected.
+        correctedFields.serving_count = null;
       }
       editedFields = (Object.keys(correctedFields) as ReviewEditableField[]).sort();
     }

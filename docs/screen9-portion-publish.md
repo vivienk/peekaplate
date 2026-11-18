@@ -55,6 +55,9 @@ precedence over legacy `servingSize` text; an explicit unknown count stays unkno
 Unrelated edits preserve old descriptive text without treating `1 bowl` or
 `28 cm` as a count. A plain integer legacy value can populate the control only
 when no canonical count or plate calibration is present.
+Withdrawing or invalidating an older calibration preserves an unknown people
+count until the owner supplies one; removing the measurement must not turn an
+old numeric centimetre value into people.
 Review and explicit dish approval use the same resolution rule, including when
 an older draft goes directly from S10 to publication without reopening S09.
 

@@ -3132,12 +3132,19 @@ test('Screen 9 people count stays separate from a saved 28 cm plate and clears c
   await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
   await page.screenshot({ path: testInfo.outputPath('serving-size-mobile.png'), fullPage: true });
 
-  const savedVersion = state.drafts[venue.venueId]![0]!.draft_version;
-  await people.fill('1.5');
-  await acknowledgeDish(page);
-  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
-  await expect(page.getByText('Enter a whole number of people from 1 to 100')).toBeVisible();
-  expect(state.drafts[venue.venueId]![0]!.draft_version).toBe(savedVersion);
+  await test.step('Reject a fractional people count without saving the draft', async () => {
+    const savedVersion = state.drafts[venue.venueId]![0]!.draft_version;
+    await people.fill('1.5');
+    await acknowledgeDish(page);
+    await expect(
+      page.getByRole('button', { name: 'Continue to review', exact: true }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    // Continue is aria-disabled for invalid fields. Enter still exercises form validation;
+    // locator.click() would wait for the button to become enabled until the test times out.
+    await people.press('Enter');
+    await expect(page.getByText('Enter a whole number of people from 1 to 100')).toBeVisible();
+    expect(state.drafts[venue.venueId]![0]!.draft_version).toBe(savedVersion);
+  });
   await people.fill('2');
   await expect(plate).toHaveValue('28');
   await expect(confirm).not.toBeChecked();

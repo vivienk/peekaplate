@@ -5338,3 +5338,29 @@ completed 2,482 unit tests (five skipped), all 122 script tests, lint, strict ty
 context and documentation checks. `corepack pnpm verify build` passed, including
 the staging Worker dry-run. Browser/database CI and physical-device scale remain
 separate acceptance evidence.
+
+CI run 44214796982 passed the quality and database lanes, then the new Screen 9
+workspace browser regression exceeded its 30-second test budget while the other
+74 workspace cases passed. The fractional-count assertion attempted to click
+Continue even though that input intentionally sets the button's aria-disabled
+state. Source inspection confirms that click cannot reach the custom validation
+assertion. The test now checks the disabled state and uses the existing Enter-key
+submit path, retaining the same timeout, both save/reload flows and screenshots.
+Browser execution must confirm this correction on the next pinned commit.
+
+Independent review found that removing an older calibration could erase the only
+evidence that a bare legacy value meant centimetres. Manual and extracted saves
+left the people count absent, so later approval recovered `28` as 28 people.
+Six regressions failed through the actual save/review and approval commands,
+including photo replacement, explicit withdrawal and incomplete review markers;
+14 existing/control cases passed. The save paths now persist an explicit unknown
+count when that calibration is lost. An incomplete count stays incomplete until
+the marker is removed, then stays explicitly unknown unless a count is supplied.
+No passive migration, historical revision or replay normalization was added.
+All 20 approval cases and all 63 focused backend cases pass after the fix.
+
+The combined post-review local checks passed: `corepack pnpm check` completed
+2,490 unit tests (five skipped), all 122 script tests, strict types, formatting,
+context and documentation checks. `corepack pnpm verify build` passed the
+workspace builds and staging Worker dry-run. Current-head browser CI and the
+independent delta reviews remain required; no hosted deployment was performed.

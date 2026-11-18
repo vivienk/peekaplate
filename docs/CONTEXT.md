@@ -469,12 +469,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "e77e221e79387d68f59493dbd3c8f38eb9631b6c3194aa11e20f8b1683ae92a7"
+      "sourceFingerprint": "445fce1c3d47b9b81a8163fc253a32d981c8e57444b4a5a466b54c2dc14ece77"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker preserves staff/JWKS, tenant authority, expected versions and transactional replay/outbox. Owner extraction, verification, preparation and publication reuse approved photo/portion identities and bounded CPU cutouts. Review and approval share strict legacy people-count resolution. Serving counts remain independent of plate dimensions; count/photo changes invalidate omitted calibration. S13 binds approved calibration to exact photo bytes, EXIF-oriented dimensions and foreground hash; asset reads retain immutable snapshot calibration. Reports share actor/venue/window/digest-bound references; protected seals cover reconciled synthetic scenarios, while live freshness remains unknown. Responses selects description spans; ingredients reuse saved evidence. Staging restaurant creation is actor-owned. Develop retains order/comparison APIs. AI diagnostics expose only safe classifications, HTTP status and allowlisted codes.",
+      "summary": "Worker preserves staff/JWKS, tenant authority, expected versions and transactional replay/outbox. Owner extraction, verification, preparation and publication reuse approved photo/portion identities and bounded CPU cutouts. Review and approval share strict legacy counts; clearing old calibration preserves unknown counts. Serving counts remain independent of plate dimensions; count/photo changes invalidate omitted calibration. S13 binds approved calibration to exact photo bytes, EXIF-oriented dimensions and foreground hash; asset reads retain immutable snapshot calibration. Reports share actor/venue/window/digest-bound references; protected seals cover reconciled synthetic scenarios, while live freshness remains unknown. Responses selects description spans; ingredients reuse saved evidence. Staging restaurant creation is actor-owned. Develop retains order/comparison APIs. AI diagnostics expose only safe classifications, HTTP status and allowlisted codes.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -732,7 +732,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c9715cc7dd4e04e01c71de330765b8c927b79d089b469d842278188391b4a6eb"
+      "sourceFingerprint": "ae6bc81c625fc02933569228f0077feda66326348f7f5070971edf251613e8a1"
     },
     {
       "id": "database",
@@ -1258,7 +1258,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "diner"
       ],
-      "summary": "Correct the earlier interpretation: Serving size means people served. One count field replaces the duplicate People served input, while optional plate measurements independently authorize measured AR. Preserve canonical null/absent semantics, legacy notes, saved-photo evidence and immutable publication. Count changes require renewed calibration confirmation and never multiply dimensions.",
+      "summary": "Correct the earlier interpretation: Serving size means people served. One count field replaces the duplicate People served input, while optional plate measurements independently authorize measured AR. Preserve canonical null/absent semantics, legacy notes, saved-photo evidence and immutable publication. Clearing old calibration preserves unknown people counts. Count changes require renewed confirmation and never multiply dimensions.",
       "files": [
         "docs/screen9-portion-publish.md",
         "packages/contracts/src/portion.ts",

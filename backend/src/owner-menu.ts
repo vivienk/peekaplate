@@ -109,11 +109,11 @@ export async function saveOwnerDishDraft(
     const previous = OwnerDishFieldsSchema.parse(draft?.manual_fields ?? {});
     const servingSize =
       input.fields.servingSize === undefined ? previous.servingSize : input.fields.servingSize;
-    const servingCount =
+    const retainedServingCount =
       input.fields.servingCount === undefined ? previous.servingCount : input.fields.servingCount;
     const calibrationContextChanged =
       input.fields.photoId !== previous.photoId ||
-      (servingCount ?? null) !== (previous.servingCount ?? null) ||
+      (retainedServingCount ?? null) !== (previous.servingCount ?? null) ||
       servingSize !== previous.servingSize;
     const portionCalibration =
       input.fields.portionCalibration === undefined
@@ -123,6 +123,13 @@ export async function saveOwnerDishDraft(
             : null
           : previous.portionCalibration
         : input.fields.portionCalibration;
+    // Once measurements are withdrawn, old numeric size text must stay unknown as a people count.
+    const servingCount =
+      retainedServingCount === undefined &&
+      previous.portionCalibration != null &&
+      portionCalibration == null
+        ? null
+        : retainedServingCount;
     const fields = OwnerDishFieldsSchema.parse({
       ...input.fields,
       servingSize,
