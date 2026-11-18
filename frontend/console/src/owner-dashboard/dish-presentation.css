@@ -281,6 +281,15 @@
   gap: var(--pp-space-24);
   justify-items: start;
 }
+/* 2.5D processing bar: the S07 upload bar, full card width; red when generation fails. */
+.s09-25d-progress {
+  flex: none;
+  justify-self: stretch;
+}
+.s09-25d-progress--failed .pp-onboard-progress__fill {
+  width: 100%;
+  background: var(--pp-color-error-700); /* S07 failed bar (--pp-auth-error) */
+}
 .s09-sidecard h2 {
   margin: 0;
   font-size: var(--pp-font-size-small);
