@@ -93,9 +93,20 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
     });
   }
   const client = providerClient(true);
-  client.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')
-      clearRecovery();
+  const sessionListeners = new Set<() => void>();
+  let lastAccessToken: string | undefined;
+  client.auth.onAuthStateChange((event, session) => {
+    const token = session?.access_token;
+    if (event === 'INITIAL_SESSION') {
+      lastAccessToken = token;
+      return;
+    }
+    if (event !== 'SIGNED_OUT' && event !== 'SIGNED_IN' && event !== 'TOKEN_REFRESHED') return;
+    // Supabase re-emits SIGNED_IN with the same session when the tab regains focus.
+    if (event === 'SIGNED_IN' && token && token === lastAccessToken) return;
+    lastAccessToken = token;
+    clearRecovery();
+    for (const listener of sessionListeners) listener();
   });
 
   async function signedInOwner(): Promise<SignedInOwner | null> {
@@ -122,11 +133,10 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
   }
 
   function onSessionChange(callback: () => void) {
-    const { data } = client.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED')
-        callback();
-    });
-    return () => data.subscription.unsubscribe();
+    sessionListeners.add(callback);
+    return () => {
+      sessionListeners.delete(callback);
+    };
   }
 
   async function signOut(): Promise<boolean> {

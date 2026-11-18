@@ -124,6 +124,10 @@ jobs:
   browser:
     needs: changes
     if: needs.changes.outputs.browser == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [diner, owner, routing]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -136,9 +140,19 @@ jobs:
           node-version: 24.16.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm verify test:e2e
-      - name: Offline dish review preview
-        run: pnpm exec playwright test --config playwright.review-preview.config.ts
+      - if: matrix.suite == 'diner'
+        run: |
+          pnpm exec playwright test
+          pnpm exec playwright test --config playwright.posthog.config.ts
+      - if: matrix.suite == 'owner'
+        run: |
+          pnpm exec playwright test --config playwright.auth.config.ts
+          pnpm exec playwright test --config playwright.workspace.config.ts
+      - if: matrix.suite == 'routing'
+        run: |
+          pnpm exec playwright test --config playwright.restaurant-links.config.ts
+          pnpm exec playwright test --config playwright.portion-published.config.ts
+          pnpm exec playwright test --config playwright.review-preview.config.ts
 
   ci:
     if: always()
