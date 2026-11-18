@@ -187,6 +187,13 @@ describe('live Screen 9 on the authored #172 presentation', () => {
     expect(onReviewConfirmedChange).toHaveBeenCalledWith(false);
   });
 
+  it('marks the review tick box required with the red star only when it is required', () => {
+    expect(render({ onReviewConfirmedChange: noop })).toMatch(
+      /class="s09-check s09-req"[^>]*><input id="f-ai"[^>]*aria-required="true"/,
+    );
+    expect(render()).toMatch(/class="s09-check"[^>]*><input id="f-ai"[^>]*aria-required="false"/);
+  });
+
   it('connects the optional callbacks to the authored controls', () => {
     const suggestIngredients = vi.fn(async () => ['Carrot']);
     const suggestAllergens = vi.fn(async () => ['milk']);
