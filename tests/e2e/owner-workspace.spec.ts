@@ -3429,7 +3429,9 @@ test('staging creation retries the same command, opens the named dashboard and k
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Retry with the same name');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Welcome to PeekaPlate', exact: true }),
+  ).toBeVisible();
   await expect(page.locator('.owner-identity__name')).toHaveText(created.name);
   await expect(page.getByRole('textbox', { name: 'Restaurant name', exact: true })).toHaveCount(0);
   await page.reload();
@@ -3513,9 +3515,7 @@ test('a delayed creation response cannot select a restaurant after the actor sig
       .catch(() => {});
   });
   await signIn(page, undefined, false);
-  await page
-    .getByLabel('Restaurant name', { exact: true })
-    .fill('Delayed synthetic restaurant');
+  await page.getByLabel('Restaurant name', { exact: true }).fill('Delayed synthetic restaurant');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect.poll(() => started).toBe(true);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();

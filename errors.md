@@ -3541,3 +3541,12 @@ The combined post-review local checks passed: `corepack pnpm check` completed
 context and documentation checks. `corepack pnpm verify build` passed the
 workspace builds and staging Worker dry-run. Current-head browser CI and the
 independent delta reviews remain required; no hosted deployment was performed.
+
+## 2026-11-18 — PR246 formatting and description checks
+
+CI run 44366084370 stopped quality verification at two formatter differences in
+`tests/e2e/owner-workspace.spec.ts`. Its PR documentation check also rejected the
+missing required Outcome section. The follow-up applies the formatter output,
+refreshes the console source fingerprint, and supplies all required PR sections.
+Owner, diner and routing browser lanes passed on the initial head. Current-head
+quality and browser reruns must confirm the correction before merge.
