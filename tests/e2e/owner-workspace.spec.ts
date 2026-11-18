@@ -2519,18 +2519,19 @@ test('authored S10 verifies actual saved drafts without publication and preserve
   await expect(page.locator('.review-table')).toBeVisible();
   await expect(page.getByRole('main')).toHaveCount(1);
 
+  // The background refresh after a remove no longer locks the list (Adam's slow-delete finding):
+  // while it is still running, the next remove and Undo work straight away.
   state.delayJobs = true;
   const jobsReadsBeforeRemoval = state.jobsReads;
   await page.getByRole('button', { name: 'Remove Fictional Salad', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expect.poll(() => state.jobsReads).toBeGreaterThan(jobsReadsBeforeRemoval);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
   await expect(
     page.getByRole('button', { name: 'Remove Fictional Lentil Soup', exact: true }),
-  ).toBeDisabled();
-  await expect.poll(() => state.jobsReads).toBeGreaterThan(jobsReadsBeforeRemoval);
+  ).toBeEnabled();
   state.delayJobs = false;
   state.releaseJobs();
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Remove Fictional Salad', exact: true }),
@@ -3277,4 +3278,63 @@ test('a delayed creation response cannot select a restaurant after the actor sig
   );
   await expect(page.getByRole('option', { name: venue.name, exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Test restaurant name (Staging testing)')).toHaveCount(0);
+});
+
+test('removes several dishes in a row without waiting for each refresh', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const base = {
+    job_id: null,
+    origin: 'manual',
+    draft_version: 1,
+    category: 'Soup',
+    description: 'Synthetic dish.',
+    price_amount: '9.50',
+    price_currency: 'CAD',
+    ingredients: ['lentils'],
+    source_text: null,
+    review_warnings: [],
+    review_status: 'pending',
+    verification_status: 'not_verified',
+  };
+  state.drafts[venue.venueId] = ['Fictional One', 'Fictional Two', 'Fictional Three'].map(
+    (name) => {
+      const id = crypto.randomUUID();
+      return {
+        ...base,
+        id,
+        draft_id: id,
+        name,
+        manual_fields: {
+          name,
+          category: 'Soup',
+          description: 'Synthetic dish.',
+          priceAmount: '9.50',
+          priceCurrency: 'CAD',
+          servingSize: '1 bowl',
+          ingredients: { status: 'confirmed', items: ['lentils'] },
+          allergens: { status: 'confirmed', items: [] },
+        },
+      };
+    },
+  ) as never;
+  await signIn(page, undefined, false);
+  await page.getByRole('button', { name: 'Edit: Add your menu', exact: true }).click();
+  await expect(page.locator('.review-table')).toBeVisible();
+  // Hold every refresh: before, each remove waited for it and the next click was ignored.
+  state.delayJobs = true;
+  for (const name of ['Fictional One', 'Fictional Two']) {
+    await page.getByRole('button', { name: `Remove ${name}`, exact: true }).click();
+    await expect(page.getByRole('button', { name: `Remove ${name}`, exact: true })).toHaveCount(0);
+  }
+  await expect
+    .poll(() => state.drafts[venue.venueId]!.filter((draft) => draft.removed_at).length)
+    .toBe(2);
+  await expect(
+    page.getByRole('button', { name: 'Remove Fictional Three', exact: true }),
+  ).toBeVisible();
+  state.delayJobs = false;
+  state.releaseJobs();
 });

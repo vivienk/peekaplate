@@ -291,6 +291,12 @@
 .s09-sidecard p.pp-field__error {
   color: var(--pp-role-input-text-error);
 }
+/* Required review tick box (Adam's staging test): the same red * as the Photo heading. */
+.s09-check.s09-req > span::after {
+  content: "*" / "";
+  margin-inline-start: var(--pp-space-2);
+  color: var(--pp-role-error);
+}
 /* Required section heading (Photo): the same red * as the Input Field Default "star". */
 .s09-sidecard h2.s09-req::after {
   content: "*" / "";

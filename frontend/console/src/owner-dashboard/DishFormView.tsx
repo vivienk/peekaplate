@@ -540,11 +540,15 @@ export function DishFormView({
             )}
           </div>
           <div className="pp-field">
-            <label className="s09-check" htmlFor="f-ai">
+            <label
+              className={`s09-check${requireReviewBox || dr.aiUsed ? ' s09-req' : ''}`}
+              htmlFor="f-ai"
+            >
               <input
                 id="f-ai"
                 type="checkbox"
                 checked={dr.aiReviewed}
+                aria-required={requireReviewBox || dr.aiUsed}
                 aria-invalid={err('f-ai') ? true : undefined}
                 aria-describedby={err('f-ai') ? 'f-ai-error' : undefined}
                 onChange={(e) => set({ aiReviewed: e.target.checked })}

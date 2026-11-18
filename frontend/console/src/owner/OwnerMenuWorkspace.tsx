@@ -480,6 +480,14 @@ export function OwnerMenuWorkspace({
     }
   };
   const reload = () => void run((active) => load(active));
+  // Adam's staging test: waiting for the full reload after each remove made deletes take 5-7 s and
+  // silently ignored the next click. The removal response already carries the saved row, so the
+  // list updates at once and the rest refreshes in the background. A later command supersedes this
+  // read (readGeneration), and the server still rejects stale versions.
+  const refreshLater = (active: Active) =>
+    void load(active).catch((reason) => {
+      if (current(active)) failure(reason);
+    });
   useEffect(() => {
     if (view !== 'processing') return;
     const active = runtime.current;
@@ -947,7 +955,7 @@ export function OwnerMenuWorkspace({
               setRemoved({ draft: saved, dish, index: reviewDrafts.indexOf(draft) });
               setVerified(false);
               setDrafts((rows) => rows.map((row) => (row.id === id ? saved : row)));
-              await load(active);
+              refreshLater(active);
             })
           }
           onUndoRemove={() =>
@@ -966,7 +974,7 @@ export function OwnerMenuWorkspace({
               if (!current(active)) return;
               setRemoved(null);
               setDrafts((rows) => rows.map((row) => (row.id === draft.id ? saved : row)));
-              await load(active);
+              refreshLater(active);
             })
           }
           completing={busy}
