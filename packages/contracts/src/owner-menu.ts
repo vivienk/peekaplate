@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ServingCountSchema } from './portion';
+import { PlateCalibrationSchema, ServingCountSchema } from './portion';
 
 const text = z.string().refine((value) => !value.includes('\u0000'), 'NUL is not supported');
 export const PublicMenuAllergenCodeSchema = z.enum([
@@ -25,6 +25,7 @@ const items = <T extends z.ZodType>(item: T) =>
     .refine((value) => value.status !== 'unknown' || value.items.length === 0);
 
 export const OwnerDishFieldsSchema = z.strictObject({
+  portionCalibration: PlateCalibrationSchema.nullable().optional(),
   servingCount: ServingCountSchema.nullable().optional(),
   name: text.trim().min(1).max(160).nullable().default(null),
   category: text.trim().min(1).max(160).nullable().default(null),
@@ -61,6 +62,8 @@ export type SetDraftRemoval = z.infer<typeof SetDraftRemovalSchema>;
 
 // A reviewed revision can preserve unknowns; unknown/proposed values never become public facts.
 export const ApprovedDishFactsSchema = z.strictObject({
+  portionCalibration: PlateCalibrationSchema.nullable().optional(),
+  servingSize: text.trim().min(1).max(160).nullable().optional(),
   servingCount: ServingCountSchema.nullable().optional(),
   category: text.trim().min(1).max(160).nullable(),
   priceAmount: z

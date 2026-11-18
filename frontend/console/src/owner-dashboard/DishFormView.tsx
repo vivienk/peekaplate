@@ -1,5 +1,6 @@
 // S09 presentation extracted from #172, with the same authored markup and tokens.
 // Demo fixtures/providers are supplied by menu.tsx; the signed-in adapter supplies persisted data.
+import { parseServingCountInput } from '@peekaplate/contracts/portion';
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -41,7 +42,7 @@ export function DishFormView({
   sourceNote,
   evidence,
   photo,
-  servingCountControl,
+  portionCalibrationControl,
   portionReview,
   onApprovePortion,
   onGeneratePortion,
@@ -67,7 +68,7 @@ export function DishFormView({
   sourceNote?: ReactNode;
   evidence?: ReactNode;
   photo?: ReactNode;
-  servingCountControl?: ReactNode;
+  portionCalibrationControl?: ReactNode;
   /** Private owner-only preview, never public publication evidence. */
   portionReview?: {
     status: 'processing' | 'needs_review' | 'failed';
@@ -111,7 +112,8 @@ export function DishFormView({
       !(allowZeroPrice ? Number(d.price) >= 0 : Number(d.price) > 0)
     )
       er['f-price'] = 'Enter a valid price';
-    if (!d.size.trim()) er['f-size'] = 'Enter a serving size';
+    if (parseServingCountInput(d.size) === undefined)
+      er['f-size'] = 'Enter a whole number of people from 1 to 100';
     if (d.ing.length < 1) er['f-ing'] = 'Add at least one ingredient';
     // A photo is required (Jeffin, 14 Nov): an uploaded one or the dish's existing photo.
     if (!imageFor(d)) er['f-photo'] = 'Add a photo of the dish';
@@ -378,14 +380,20 @@ export function DishFormView({
             />
             <TextField
               id="f-size"
-              label="Serving Size"
+              label="Serving size (people)"
+              hint="How many people this dish serves: 1 for one person, 2 for two."
+              placeholder="1 or 2"
+              type="number"
+              min={1}
+              max={100}
+              step={1}
               required
               value={dr.size}
               {...errOf('f-size')}
               onChange={(e) => set({ size: e.target.value })}
             />
           </div>
-          {servingCountControl}
+          {portionCalibrationControl}
           <div className="s09-desc">
             <div className="pp-field">
               <label className="pp-field__label" htmlFor="f-desc">

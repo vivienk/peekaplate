@@ -6,7 +6,8 @@
 // plus the dish id, so the real draft data can be passed in without conversion once the API is wired.
 // Unknown or only-proposed facts are never shown as recorded.
 
-import { OwnerDishFieldsSchema } from '@peekaplate/contracts/owner-menu';
+import { type OwnerDishFields, OwnerDishFieldsSchema } from '@peekaplate/contracts/owner-menu';
+import { servingCountText } from '../../owner-menu/servingCount';
 
 export type FactStatus = 'unknown' | 'proposed' | 'confirmed';
 
@@ -26,12 +27,14 @@ export interface ReviewDish {
   allergens: DishFacts;
   photoId: string | null;
   /**
-   * Descriptive serving size (S09 requires it; S10 shows "Serving Size Missing"):
+   * Legacy serving text, retained for compatibility. Only a plain integer without calibration
+   * can supply a missing people count; descriptive labels never imply one.
    * undefined means the source does not provide it, so it is not checked; null or blank is missing.
    */
   servingSize?: string | null;
-  /** Explicit number of people served; unknown never follows from the descriptive serving label. */
+  /** Explicit people count; null suppresses any legacy numeric fallback. */
   servingCount?: number | null;
+  portionCalibration?: OwnerDishFields['portionCalibration'];
   /** Currency of priceAmount (three letters), when the source provides it. */
   priceCurrency?: string | null;
   /**
@@ -93,7 +96,11 @@ export function missingFields(dish: ReviewDish): MissingField[] {
         !OwnerDishFieldsSchema.shape.priceCurrency.safeParse(dish.priceCurrency).success))
   )
     missing.push('price');
-  if (dish.servingSize !== undefined && isBlank(dish.servingSize)) missing.push('servingSize');
+  if (
+    (dish.servingCount !== undefined || dish.servingSize !== undefined) &&
+    !servingCountText(dish.servingCount, dish.servingSize, dish.portionCalibration)
+  )
+    missing.push('servingSize');
   if (dish.ingredients.items.length === 0) missing.push('ingredients');
   if (isBlank(dish.photoId)) missing.push('photo');
   return missing;
@@ -103,7 +110,7 @@ const FIELD_LABEL: Record<MissingField, string> = {
   name: 'Name',
   price: 'Price',
   category: 'Category',
-  servingSize: 'Serving Size',
+  servingSize: 'Serving size (people)',
   description: 'Description',
   ingredients: 'Ingredients',
   allergens: 'Allergens',

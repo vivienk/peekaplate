@@ -52,7 +52,7 @@ const SAMPLE: Details = {
 const samples = () =>
   initialMenu()
     .slice(0, 3)
-    .map((dish) => ({ ...dish, size: '1 serving', status: 'draft' as const }));
+    .map((dish) => ({ ...dish, size: '1', status: 'draft' as const }));
 const toReview = (dish: MenuItem) =>
   menuItemToReviewDish({
     ...dish,

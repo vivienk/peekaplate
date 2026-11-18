@@ -3435,3 +3435,109 @@ The test read the exact snapshot request log before the request arrived. A
 temporary one-second mock delay reproduced the empty log locally. Waiting for
 the loaded dish in the draft menu passed with the delay and after removing it.
 The test still verifies the exact snapshot request and absence of publication.
+
+
+## 2026-11-17 — Screen 9 serving size did not reach physical portion placement
+
+The owner serving text survived draft saves but did not carry physical measurements
+into approved facts or the published portion. People served reached the diner only
+as a count. Five contract/diner regressions, six owner form regressions and eight
+backend regressions failed before the new measurement path was implemented.
+The focused checks now preserve confirmed photo-bound dimensions across manual
+and extracted edits, approval and immutable publication; unknown people count is
+not an invented number or a physical scale multiplier.
+
+The exact source-photo check needs EXIF-oriented dimensions. A rotation reproducer
+returned raw 80 by 40 dimensions where the rendered source was 40 by 80. A bounded
+JPEG/PNG metadata reader fixes that calibration-only path; ordinary photo reads
+remain unchanged. Ambiguous orientation evidence cannot authorize physical size.
+Published asset rereads use the immutable snapshot calibration, never the current
+draft, so later size edits do not hide an earlier publication.
+
+Local browser execution was blocked before test assertions: the pinned Chromium
+was absent, its download was incomplete, and the installed Chromium could not
+create a required socket under the host permissions. No sandbox settings were
+changed to bypass that restriction. Browser assertions and screenshots remain
+for the normal CI/browser environment. Docker/Postgres executables were also
+unavailable locally; new database integration assertions require the CI lane.
+
+The initial context refresh rejected a backend summary longer than the existing
+1,000-character bound. The summary was shortened and the renamed editor path
+corrected before refreshing fingerprints and running the combined checks.
+
+Combined local verification passed: `pnpm check` completed 2,431 unit tests
+(with five skipped) and 122 script tests, lint, types, context and docs.
+`pnpm verify build` also passed, including the staging Worker dry-run.
+Browser/database execution and real-device scale remain separate evidence.
+
+## 2026-11-17 — Serving size must count people, independently of plate measurements
+
+The first Screen 9 measurement implementation overloaded Serving Size with
+centimetres and retained a duplicate People served field. The corrected form has
+one Serving size (people) input and a separate optional Plate size (cm) control.
+The canonical count never multiplies physical dimensions. New frontend regressions
+failed before the correction; two diner-label regressions and eleven backend
+behavioral regressions also reproduced the mismatch and stale count calibration.
+
+An omitted calibration previously survived count-only changes because invalidation
+checked only the photo and legacy serving text. Both manual and extracted commands
+now invalidate it on canonical count changes, including clearing or supplying an
+unknown count. Explicitly reconfirmed photo evidence can bind the same physical
+plate to a new count. Immutable published snapshots keep their original facts.
+
+Compatibility resolution treats an explicit canonical count or null as
+authoritative. It only recovers an uncalibrated plain integer legacy value; notes,
+fractions, ranges and older calibrated numbers stay unknown. Review and explicit
+approval share that rule, so a recovered count cannot disappear between S10 and
+publication when S09 was not reopened. Passive reads do not rewrite old drafts.
+
+The new plate input initially allowed typing before saved-photo metadata loaded;
+the photo-identity remount could discard that text. A regression reproduced the
+enabled input and it now waits for the saved photo. Count edits retain typed plate
+dimensions while clearing confirmation. Local browser execution retains the host
+socket limitation recorded above; browser/database assertions require CI.
+
+The combined check then caught a demo-bundle regression after all 2,482 unit
+tests passed: the menu-review preview reached the broad contracts entry point
+through new count-helper imports, including an unrelated analytics-report schema.
+The existing no-analytics script gate failed (121 script tests passed, one failed).
+A lean `contracts/portion` export and pure console count helper removed that
+dependency. All six preview-build script tests passed afterward; the guard was
+not weakened. The schema marker did not prove analytics was executed or sent.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-18T01:09:58.691Z","exitCode":1}
+```
+
+Final local verification of the people-count correction passed: `corepack pnpm check`
+completed 2,482 unit tests (five skipped), all 122 script tests, lint, strict types,
+context and documentation checks. `corepack pnpm verify build` passed, including
+the staging Worker dry-run. Browser/database CI and physical-device scale remain
+separate acceptance evidence.
+
+CI run 44214796982 passed the quality and database lanes, then the new Screen 9
+workspace browser regression exceeded its 30-second test budget while the other
+74 workspace cases passed. The fractional-count assertion attempted to click
+Continue even though that input intentionally sets the button's aria-disabled
+state. Source inspection confirms that click cannot reach the custom validation
+assertion. The test now checks the disabled state and uses the existing Enter-key
+submit path, retaining the same timeout, both save/reload flows and screenshots.
+Browser execution must confirm this correction on the next pinned commit.
+
+Independent review found that removing an older calibration could erase the only
+evidence that a bare legacy value meant centimetres. Manual and extracted saves
+left the people count absent, so later approval recovered `28` as 28 people.
+Six regressions failed through the actual save/review and approval commands,
+including photo replacement, explicit withdrawal and incomplete review markers;
+14 existing/control cases passed. The save paths now persist an explicit unknown
+count when that calibration is lost. An incomplete count stays incomplete until
+the marker is removed, then stays explicitly unknown unless a count is supplied.
+No passive migration, historical revision or replay normalization was added.
+All 20 approval cases and all 63 focused backend cases pass after the fix.
+
+The combined post-review local checks passed: `corepack pnpm check` completed
+2,490 unit tests (five skipped), all 122 script tests, strict types, formatting,
+context and documentation checks. `corepack pnpm verify build` passed the
+workspace builds and staging Worker dry-run. Current-head browser CI and the
+independent delta reviews remain required; no hosted deployment was performed.

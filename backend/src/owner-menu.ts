@@ -107,20 +107,49 @@ export async function saveOwnerDishDraft(
     )
       throw new IngestionError('draft_not_editable', 409);
     const previous = OwnerDishFieldsSchema.parse(draft?.manual_fields ?? {});
+    const servingSize =
+      input.fields.servingSize === undefined ? previous.servingSize : input.fields.servingSize;
+    const retainedServingCount =
+      input.fields.servingCount === undefined ? previous.servingCount : input.fields.servingCount;
+    const calibrationContextChanged =
+      input.fields.photoId !== previous.photoId ||
+      (retainedServingCount ?? null) !== (previous.servingCount ?? null) ||
+      servingSize !== previous.servingSize;
+    const portionCalibration =
+      input.fields.portionCalibration === undefined
+        ? calibrationContextChanged
+          ? previous.portionCalibration === undefined
+            ? undefined
+            : null
+          : previous.portionCalibration
+        : input.fields.portionCalibration;
+    // Once measurements are withdrawn, old numeric size text must stay unknown as a people count.
+    const servingCount =
+      retainedServingCount === undefined &&
+      previous.portionCalibration != null &&
+      portionCalibration == null
+        ? null
+        : retainedServingCount;
     const fields = OwnerDishFieldsSchema.parse({
       ...input.fields,
-      servingSize:
-        input.fields.servingSize === undefined ? previous.servingSize : input.fields.servingSize,
-      servingCount:
-        input.fields.servingCount === undefined ? previous.servingCount : input.fields.servingCount,
+      servingSize,
+      ...(portionCalibration === undefined ? {} : { portionCalibration }),
+      servingCount,
     });
     if (fields.photoId !== null) {
-      const photo = await client.query(
-        'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
+      const photo = await client.query<{ id: string; source_hash: string }>(
+        'SELECT id,source_hash FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
         [venueId, draftId, fields.photoId],
       );
       if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
+      if (
+        fields.portionCalibration &&
+        photo.rows[0]?.source_hash !== fields.portionCalibration.source_sha256
+      )
+        throw new IngestionError('portion_calibration_mismatch', 409);
     }
+    if (fields.portionCalibration && !fields.photoId)
+      throw new IngestionError('portion_calibration_mismatch', 409);
     const version = input.expectedVersion + 1;
     const result = await client.query<DishDraftRow>(
       `INSERT INTO app_private.dish_drafts

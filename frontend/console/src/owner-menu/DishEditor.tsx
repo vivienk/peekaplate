@@ -1,17 +1,29 @@
 // Live values and evidence on #172's authored Screen 9; demo providers stay in menu.tsx.
 
-import { PublicMenuAllergenCodeSchema } from '@peekaplate/contracts';
+import { PublicMenuAllergenCodeSchema, parseServingCountInput } from '@peekaplate/contracts';
 import { type ReactNode, useState } from 'react';
 import { DishFormView } from '../owner-dashboard/DishFormView';
 import type { MenuItem } from '../owner-dashboard/data';
-import { allergenOutcome, type DishForm, pilotPriceCurrency, STAFF_ALLERGY_LINE } from './dishForm';
+import {
+  allergenOutcome,
+  type DishForm,
+  invalidateChangedCalibration,
+  pilotPriceCurrency,
+  STAFF_ALLERGY_LINE,
+} from './dishForm';
 import type { EvidenceExcerpt } from './evidence';
+import { PortionCalibrationEditor } from './PortionCalibrationEditor';
+import type { CalibrationPhoto } from './portionCalibration';
+import { servingCountText } from './servingCount';
 import './dishEditor.css';
 
 export type DishEditorProps = {
   value: DishForm;
   photo?: ReactNode;
   photoUrl?: string | null;
+  calibrationPhoto?: CalibrationPhoto;
+  photoPending?: boolean;
+  calibrationPhotoUnavailable?: boolean;
   /** Private generated portion preview; never grants publication authority. */
   portionReview?: {
     status: 'processing' | 'needs_review' | 'failed';
@@ -45,6 +57,9 @@ export function DishEditor({
   value,
   photo,
   photoUrl,
+  calibrationPhoto,
+  photoPending = false,
+  calibrationPhotoUnavailable = false,
   portionReview,
   onApprovePortion,
   onGeneratePortion,
@@ -65,12 +80,18 @@ export function DishEditor({
   draftDescription,
 }: DishEditorProps) {
   const [fieldError, setFieldError] = useState('');
+  const change = (next: DishForm) => onChange(invalidateChangedCalibration(value, next));
+  const measuredPhoto =
+    !photoPending && calibrationPhoto?.photoId === value.photoId ? calibrationPhoto : undefined;
+  const countText =
+    value.servingCount ?? servingCountText(undefined, value.servingSize, value.portionCalibration);
+  const countError = parseServingCountInput(countText) === undefined;
   const menu: MenuItem = {
     id: existing ? (value.source?.candidateId ?? 'saved-draft') : null,
     name: value.name,
     cat: value.category,
     price: value.priceAmount,
-    size: value.servingSize,
+    size: countText,
     desc: value.description,
     ing: value.ingredients.items,
     alg: value.allergens.items,
@@ -104,7 +125,7 @@ export function DishEditor({
           setFieldError('');
           if (dish.aiReviewed !== reviewConfirmed && dish.aiReviewed) {
             if (value.ingredients.items.length)
-              onChange({
+              change({
                 ...value,
                 aiIng: [],
                 ingredients: { ...value.ingredients, status: 'confirmed' },
@@ -118,13 +139,15 @@ export function DishEditor({
           }
           const aiIng = dish.aiIng.filter((item) => dish.ing.includes(item));
           const aiAlg = dish.aiAlg.filter((item) => dish.alg.includes(item));
-          onChange({
+          change({
             ...value,
             name: dish.name,
             category: dish.cat,
             description: dish.desc,
             priceAmount: String(dish.price),
-            servingSize: dish.size,
+            // One visible people field writes both the canonical count and legacy count text.
+            // Unrelated edits keep any old descriptive serving text unchanged.
+            ...(dish.size !== countText ? { servingSize: dish.size, servingCount: dish.size } : {}),
             aiIng,
             aiAlg,
             aiUsed: dish.aiUsed,
@@ -148,6 +171,19 @@ export function DishEditor({
         {...(portionReview ? { portionReview } : {})}
         {...(onApprovePortion ? { onApprovePortion } : {})}
         {...(onGeneratePortion ? { onGeneratePortion } : {})}
+        portionCalibrationControl={
+          <PortionCalibrationEditor
+            key={
+              measuredPhoto ? `${measuredPhoto.photoId}:${measuredPhoto.source_sha256}` : 'no-photo'
+            }
+            value={value.portionCalibration}
+            photo={measuredPhoto}
+            photoPending={photoPending}
+            photoUnavailable={calibrationPhotoUnavailable}
+            busy={busy}
+            onChange={(portionCalibration) => change({ ...value, portionCalibration })}
+          />
+        }
         imageFor={() => photoUrl ?? (value.photoId ? 'private-photo' : null)}
         onSelectPhoto={() => {}}
         photo={photo}
@@ -188,7 +224,8 @@ export function DishEditor({
         }
         cancel={onCancel}
         toReview={() => {
-          if (busy || fieldError || (onLicenseConfirmedChange && !licenseConfirmed)) return;
+          if (busy || fieldError || countError || (onLicenseConfirmedChange && !licenseConfirmed))
+            return;
           onSave();
         }}
       />
