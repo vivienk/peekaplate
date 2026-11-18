@@ -24,10 +24,11 @@ report GET when analysis and its reference signing secret are configured. It
 binds the report's exact UTC end timestamp and content digest to the authenticated
 owner, venue and synthetic source for up to 60 seconds. The frontend handoff is
 implemented by passing this same header on POST for the report currently on screen. The JSON
-request body remains `{dishId, goal}`. The header is for this exchange only.
+request body is `{dishId, goal, question?}`. The header is for this exchange only.
 
-`POST /api/v1/venues/:venueId/ai/analysis` accepts only a dish ID and one review goal
-(menu, engagement or CRM). The normal Worker verifies the signed owner session and
+`POST /api/v1/venues/:venueId/ai/analysis` accepts a dish ID, a review goal
+(menu, engagement or CRM), and an optional owner question of up to 500 characters.
+The Worker verifies the signed owner session and
 uses the existing owner report reader, which checks current owner membership and
 reads the pinned window in a tenant-scoped read-only transaction. The Worker
 recomputes the content digest before model evaluation and checks freshness against
@@ -35,7 +36,7 @@ the current request clock. A missing, expired, mismatched or changed reference
 returns `409 report_reference_unavailable`; refresh the report before requesting
 analysis again. The live panel offers Reload report on this conflict and requires
 another explicit analysis request afterward. Sending the reference does not grant owner access. The browser
-cannot provide metrics, a prompt, a model, a policy or OpenAI credentials.
+cannot provide authoritative metrics, model instructions, a model selection or OpenAI credentials.
 The existing console origin allowlist applies to both routes. GET exposes the
 reference header and POST permits it in preflight for allowed origins.
 
@@ -51,8 +52,7 @@ report construction sets freshness to unknown; this connection preserves that
 abstention rather than manufacturing fresh evidence. CRM always abstains because
 the current report has no customer-retention evidence.
 
-Only three numeric browsing rates and the goal reach OpenAI: no names, customer
-records, counts, tenant IDs, free-text summaries, raw events or order data. One
+For the original recommendation flow, three numeric browsing rates and the goal reach OpenAI. One
 fixed GPT-6 Luna request uses `/v1/responses`, `store:false`, no tools, no streaming,
 a five-second timeout and at most 128 output tokens. No retry or provider fallback
 occurs. Restricted Responses Write is sufficient; model-list access is not used.
@@ -62,6 +62,11 @@ not accepted as model-generated prose. This is a bounded review prompt, not a
 forecast, business threshold, causal claim, or automatic menu/CRM action.
 
 ## Safe provider diagnostics
+
+For a typed factual question, the model interprets the question against the authorized synthetic report.
+The server calculates the answer from the referenced report, including rankings among dishes with
+measurable values. Suppressed and unavailable cells cannot contribute numbers. Historical answers
+identify unknown freshness. Recommendations still require verified freshness.
 
 Dashboard analysis and description assistance emit an `owner_ai_failure` event
 in server logs when a configured request fails. Its only fields are `operation`,

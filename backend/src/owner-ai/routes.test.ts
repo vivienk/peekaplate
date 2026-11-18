@@ -160,6 +160,36 @@ it('denies absent authentication and revoked membership without a model call', a
   expect(s.fetchImpl).not.toHaveBeenCalled();
   expect(console.warn).not.toHaveBeenCalled();
 });
+it('accepts a bounded multibyte question only with the authenticated report reference', async () => {
+  const s = setup();
+  const body = { dishId: LOCAL_AI_DISH, goal: 'menu', question: '菜'.repeat(500) };
+  expect((await s.run(body, { [OWNER_REPORT_REFERENCE_HEADER]: 'invalid' })).status).toBe(409);
+  expect(s.readReport).not.toHaveBeenCalled();
+  expect(s.fetchImpl).not.toHaveBeenCalled();
+  s.fetchImpl.mockResolvedValue(
+    Response.json({
+      status: 'completed',
+      model: 'gpt-6-luna',
+      output: [
+        {
+          type: 'message',
+          role: 'assistant',
+          status: 'completed',
+          content: [
+            {
+              type: 'output_text',
+              text: '{"operation":"highest","metric":"save_rate","limit":1}',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 10, output_tokens: 8, total_tokens: 18 },
+    }),
+  );
+  const response = await s.run(body);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ status: 'answered', reason: 'report_fact' });
+});
 it.each(['production', '', 'staging'])(
   'fails closed in unconfigured environment %s',
   async (appEnv) => {

@@ -2,6 +2,7 @@ import type { RestaurantSetup } from '@peekaplate/contracts';
 import {
   OWNER_ANALYSIS_ACTIONS,
   OWNER_ANALYSIS_LIMITATION,
+  OWNER_QUESTION_MAX_LENGTH,
   type OwnerAnalysisRequest,
   type OwnerAnalysisResult,
 } from '@peekaplate/contracts/owner-analysis';
@@ -631,22 +632,14 @@ function LiveActions({
 // PeekaPlate AI panel in the live shell, built on Rania's "AI panel" component (Figma 2462:15103):
 // header with restaurant and report-period chips, intro text, messages, composer. Identity and
 // restaurant come only from the signed-in workspace: the token getter is bound to this owner and the
-// venue is the authorised selection. The analysis API (#164) takes a dish and a review focus rather
-// than free text, so the composer offers those two pickers in place of Figma's text box (design gap
-// flagged for Rania). Only `{ dishId, goal }` is sent; nothing is published or changed.
+// venue is the authorised selection. The composer submits an optional question with the dish
+// and review focus.
 const FOCUS_OPTIONS: { value: OwnerAnalysisRequest['goal']; label: string }[] = [
   { value: 'menu', label: 'Menu presentation' },
   { value: 'engagement', label: 'Dish engagement' },
   { value: 'crm', label: 'Customer retention (CRM)' },
 ];
 
-export function matchReportQuestion(question: string): OwnerAnalysisRequest['goal'] | null {
-  const words = question.toLowerCase();
-  if (/\b(open|engagement|attention|interaction|view)\b/.test(words)) return 'engagement';
-  if (/\b(save|bookmark|menu|presentation|describe|description)\b/.test(words)) return 'menu';
-  if (/\b(customer|retention|crm)\b/.test(words)) return 'crm';
-  return null;
-}
 const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -701,7 +694,13 @@ type Reply =
   | { kind: 'loading'; scope: string }
   | { kind: 'error'; scope: string }
   | { kind: 'reference_error'; scope: string }
-  | { kind: 'result'; scope: string; result: OwnerAnalysisResult; dishName: string };
+  | {
+      kind: 'result';
+      scope: string;
+      result: OwnerAnalysisResult;
+      dishName: string;
+      questionAsked: boolean;
+    };
 
 function LiveAiPanel({
   apiBase,
@@ -727,7 +726,7 @@ function LiveAiPanel({
   const [picked, setPicked] = useState('');
   const [goal, setGoal] = useState<OwnerAnalysisRequest['goal']>('menu');
   const [question, setQuestion] = useState('');
-  const [questionError, setQuestionError] = useState<string | null>(null);
+  const trimmedQuestion = question.trim();
   const [reply, setReply] = useState<Reply | null>(null);
   const pending = useRef<AbortController | null>(null);
   const dishId = dishes.some((dish) => dish.dish_id === picked)
@@ -752,33 +751,32 @@ function LiveAiPanel({
   async function ask(event: FormEvent) {
     event.preventDefault();
     if (!dishId || !reportReference || pending.current) return;
-    const requestGoal = question.trim() ? matchReportQuestion(question) : goal;
-    if (!requestGoal) {
-      setQuestionError('Ask about menu presentation, engagement, saves, or customer retention.');
-      return;
-    }
-    setQuestionError(null);
     const controller = new AbortController();
     pending.current = controller;
     const dishName = dishes.find((dish) => dish.dish_id === dishId)?.name ?? '';
-    const requestScope = `${venueId}:${dishId}:${requestGoal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}:${reportReference}`;
-    setReply({ kind: 'loading', scope: requestScope });
+    setReply({ kind: 'loading', scope });
     try {
       const result = await analyze(
-        { dishId, goal: requestGoal },
+        { dishId, goal, ...(trimmedQuestion ? { question: trimmedQuestion } : {}) },
         controller.signal,
         reportReference,
       );
       if (!controller.signal.aborted)
-        setReply({ kind: 'result', scope: requestScope, result, dishName });
+        setReply({
+          kind: 'result',
+          scope,
+          result,
+          dishName,
+          questionAsked: Boolean(trimmedQuestion),
+        });
     } catch (error) {
       if (!controller.signal.aborted) {
         if (error instanceof OwnerAnalysisAccessError) {
           setReply(null);
           onAccessFailure(error.status === 401 ? 'signed_out' : 'denied');
         } else if (error instanceof OwnerAnalysisReferenceError) {
-          setReply({ kind: 'reference_error', scope: requestScope });
-        } else setReply({ kind: 'error', scope: requestScope });
+          setReply({ kind: 'reference_error', scope });
+        } else setReply({ kind: 'error', scope });
       }
     } finally {
       if (pending.current === controller) pending.current = null;
@@ -823,8 +821,7 @@ function LiveAiPanel({
           <>
             <h3>No questions yet</h3>
             <p className="owner-muted">
-              Choose a dish and a focus below. Suggestions are for review only; nothing is changed
-              or sent to diners.
+              Ask about a dish in this report, or choose a focus for a suggested review.
             </p>
           </>
         )}
@@ -858,21 +855,30 @@ function LiveAiPanel({
                 return (
                   <p>
                     This analysis was calculated for {periods.analysis}, which is not exactly the
-                    report period shown here ({periods.report}). Its suggestion is not shown, so it
-                    can’t be mistaken for advice about these numbers.
+                    report period shown here ({periods.report}).
                   </p>
                 );
               })()}
               <p className="owner-muted">
-                Suggestions appear only when the analysis and the report on screen cover the same
-                period. No menu changes or customer messages are sent.
+                Answers and suggestions appear only when the analysis and the displayed report cover
+                the same period.
               </p>
             </div>
           )}
         {shown?.kind === 'result' &&
           samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
             <div className="owner-ai__answer">
-              {shown.result.status === 'review' && shown.result.metric !== null ? (
+              {shown.result.status === 'answered' ? (
+                <>
+                  <h3>Report answer</h3>
+                  <p>{shown.result.answer}</p>
+                </>
+              ) : shown.questionAsked ? (
+                <>
+                  <h3>No answer for this report</h3>
+                  <p>The report evidence could not answer this question.</p>
+                </>
+              ) : shown.result.status === 'review' && shown.result.metric !== null ? (
                 <>
                   <h3>Suggested review: {shown.dishName}</h3>
                   <p>{OWNER_ANALYSIS_ACTIONS[shown.result.metric]}</p>
@@ -900,7 +906,7 @@ function LiveAiPanel({
               <p className="owner-muted">
                 Synthetic analysis from a separate server-read snapshot.
               </p>
-              <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
+              {!shown.questionAsked && <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>}
               <p className="owner-muted">No menu changes or customer messages are sent.</p>
             </div>
           )}
@@ -913,21 +919,15 @@ function LiveAiPanel({
           id={`${ids}-question`}
           className="owner-ai__input"
           value={question}
-          onChange={(event) => {
-            const value = event.target.value;
-            setQuestion(value);
-            setQuestionError(null);
-            const matched = matchReportQuestion(value);
-            if (matched) setGoal(matched);
-          }}
-          placeholder="Ask about engagement, saves, or menu presentation"
+          onChange={(event) => setQuestion(event.target.value)}
+          maxLength={OWNER_QUESTION_MAX_LENGTH}
+          aria-describedby={`${ids}-question-disclosure`}
+          placeholder="Ask about views, opens, or saves"
           disabled={dishes.length === 0}
         />
-        {questionError && (
-          <p className="owner-ai__error" role="alert">
-            {questionError}
-          </p>
-        )}
+        <p className="owner-muted" id={`${ids}-question-disclosure`}>
+          Submitted questions and report data may be sent to OpenAI. Leave out private details.
+        </p>
         <label className="owner-visually-hidden" htmlFor={`${ids}-dish`}>
           Dish
         </label>
@@ -952,11 +952,7 @@ function LiveAiPanel({
             id={`${ids}-focus`}
             className="owner-ai__input"
             value={goal}
-            onChange={(event) => {
-              setGoal(event.target.value as OwnerAnalysisRequest['goal']);
-              setQuestion('');
-              setQuestionError(null);
-            }}
+            onChange={(event) => setGoal(event.target.value as OwnerAnalysisRequest['goal'])}
           >
             {FOCUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -968,7 +964,7 @@ function LiveAiPanel({
             type="submit"
             className="owner-ai__send"
             disabled={busy || dishes.length === 0 || !reportReference}
-            aria-label="Review report"
+            aria-label={trimmedQuestion ? 'Ask question' : 'Review report'}
           >
             <Icon name="send" size={18} />
           </button>
