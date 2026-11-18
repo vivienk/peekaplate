@@ -119,6 +119,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
     releaseAnalysis: () => {},
     // The analysis snapshot period; by default the same as the report on screen (UNEEZA_REPORT).
     analysisWindow: { start: '2026-10-19T07:00:00Z', end: '2026-10-20T07:00:00Z' },
+    analysisAnswer: factualAnswer as string | null,
   };
   // Reporting journeys start with saved, verified dishes. Empty/unverified setup tests keep
   // the default fixture; verification does not imply approval or publication.
@@ -243,11 +244,11 @@ async function fixture(context: BrowserContext, reportReady = false) {
           timeWindow: state.analysisWindow,
           ...(body.question
             ? {
-                status: 'answered',
+                status: state.analysisAnswer ? 'answered' : 'abstained',
                 metric: null,
                 value: null,
-                reason: 'report_fact',
-                answer: factualAnswer,
+                reason: state.analysisAnswer ? 'report_fact' : 'unusable_evidence',
+                ...(state.analysisAnswer ? { answer: state.analysisAnswer } : {}),
               }
             : { status: 'review', metric: 'open_rate', value: 0.5, reason: 'review_evidence' }),
           approvalRequired: true,
@@ -2323,6 +2324,8 @@ test('an owner can ask a factual question about the displayed report period', as
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
   const question = panel.getByRole('textbox', { name: 'Ask a report question' });
+  await expect(question).toHaveAttribute('maxlength', '500');
+  await expect(question).toHaveAccessibleDescription(/may be sent to OpenAI/);
   const text = 'How many impressions did this dish have?';
   await panel.getByLabel('Dish', { exact: true }).selectOption({ label: 'Soup' });
   await question.fill(`  ${text}  `);
@@ -2343,9 +2346,17 @@ test('an owner can ask a factual question about the displayed report period', as
     },
   ]);
 
+  const reportWindow = state.analysisWindow;
   state.analysisWindow = { start: '2026-11-11T12:00:00Z', end: '2026-11-12T12:00:00Z' };
   await question.press('Enter');
   await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
+  await expect(panel.getByText(factualAnswer)).toHaveCount(0);
+
+  state.analysisWindow = reportWindow;
+  state.analysisAnswer = null;
+  await question.fill('How much revenue did this dish generate?');
+  await question.press('Enter');
+  await expect(panel.getByRole('heading', { name: 'No answer for this report' })).toBeVisible();
   await expect(panel.getByText(factualAnswer)).toHaveCount(0);
 });
 

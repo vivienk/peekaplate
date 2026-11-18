@@ -694,7 +694,13 @@ type Reply =
   | { kind: 'loading'; scope: string }
   | { kind: 'error'; scope: string }
   | { kind: 'reference_error'; scope: string }
-  | { kind: 'result'; scope: string; result: OwnerAnalysisResult; dishName: string };
+  | {
+      kind: 'result';
+      scope: string;
+      result: OwnerAnalysisResult;
+      dishName: string;
+      questionAsked: boolean;
+    };
 
 function LiveAiPanel({
   apiBase,
@@ -755,7 +761,14 @@ function LiveAiPanel({
         controller.signal,
         reportReference,
       );
-      if (!controller.signal.aborted) setReply({ kind: 'result', scope, result, dishName });
+      if (!controller.signal.aborted)
+        setReply({
+          kind: 'result',
+          scope,
+          result,
+          dishName,
+          questionAsked: Boolean(trimmedQuestion),
+        });
     } catch (error) {
       if (!controller.signal.aborted) {
         if (error instanceof OwnerAnalysisAccessError) {
@@ -860,6 +873,11 @@ function LiveAiPanel({
                   <h3>Report answer</h3>
                   <p>{shown.result.answer}</p>
                 </>
+              ) : shown.questionAsked ? (
+                <>
+                  <h3>No answer for this report</h3>
+                  <p>The report evidence could not answer this question.</p>
+                </>
               ) : shown.result.status === 'review' && shown.result.metric !== null ? (
                 <>
                   <h3>Suggested review: {shown.dishName}</h3>
@@ -888,9 +906,7 @@ function LiveAiPanel({
               <p className="owner-muted">
                 Synthetic analysis from a separate server-read snapshot.
               </p>
-              {shown.result.status !== 'answered' && (
-                <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
-              )}
+              {!shown.questionAsked && <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>}
               <p className="owner-muted">No menu changes or customer messages are sent.</p>
             </div>
           )}
