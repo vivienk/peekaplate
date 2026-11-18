@@ -95,6 +95,7 @@ export function mountAnalyticsConsent(
       expand.focus();
     };
     dismiss.addEventListener('click', collapse);
+    button.addEventListener('click', collapse);
     expand.addEventListener('click', () => {
       section.hidden = false;
       expand.hidden = true;
