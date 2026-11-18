@@ -53,12 +53,16 @@ export function checkPullRequest(body) {
     throw new Error('Verification needs - PASS|FAIL|NOT RUN: `exact command`; explain NOT RUN');
 }
 
+export function isPullRequestCheckApplicable(eventName, pullRequest) {
+  return eventName === 'pull_request' && !pullRequest?.draft;
+}
+
 async function main() {
-  if (process.env.GITHUB_EVENT_NAME !== 'pull_request') {
+  const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
+  if (!isPullRequestCheckApplicable(process.env.GITHUB_EVENT_NAME, event.pull_request)) {
     console.log('PR body check not applicable to this event.');
     return;
   }
-  const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
   checkPullRequest(event.pull_request?.body);
   console.log('PR sections and verification declaration present; human review checks accuracy.');
 }
