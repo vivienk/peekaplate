@@ -156,6 +156,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
             priceAmount: '9.50',
             priceCurrency: 'USD',
             servingSize: '1 bowl',
+            servingCount: 1,
             ingredients: { status: 'confirmed', items: ['lentils'] },
             allergens: { status: 'confirmed', items: [] },
             photoId,
@@ -615,8 +616,8 @@ async function acknowledgeDish(page: Page) {
 
 // Fill the additional fields required by the authored S09, without replacing values under test.
 async function completeRequiredDish(page: Page) {
-  const serving = page.getByRole('textbox', { name: /^Serving Size/ });
-  if (!(await serving.inputValue())) await serving.fill('1 bowl');
+  const serving = page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true });
+  if (!(await serving.inputValue())) await serving.fill('1');
   const price = page.getByRole('textbox', { name: /^Price/ });
   if (!(await price.inputValue())) await price.fill('9.50');
   const category = page.getByRole('combobox', { name: 'Category' });
@@ -1698,28 +1699,29 @@ test('manual dish and original private photo survive save and reload', async ({
   expect([...state.photos.values()][0]).toEqual(original);
   expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
     allergens: { status: 'unknown', items: [] },
-    servingSize: '1 bowl',
+    servingSize: '1',
+    servingCount: 1,
   });
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Price/ })).toHaveValue('9.50');
-  await page.getByRole('spinbutton', { name: 'People served', exact: true }).fill('2');
+  await page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true }).fill('2');
   await acknowledgeDish(page);
   await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
   await expect(
     page.getByText('Draft saved. This has not approved or published your menu.'),
   ).toBeVisible();
   expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
-    servingSize: '1 bowl',
+    servingSize: '2',
     servingCount: 2,
   });
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveValue(
-    '2',
-  );
+  await expect(
+    page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true }),
+  ).toHaveValue('2');
   await expect(page.getByRole('img', { name: 'Private draft dish' })).toBeVisible();
   const license = page.getByRole('checkbox', {
     name: 'I have the right to use this photo.',
@@ -2497,6 +2499,7 @@ test('authored S10 verifies actual saved drafts without publication and preserve
         priceAmount: '9.50',
         priceCurrency: 'CAD',
         servingSize: '1 bowl',
+        servingCount: 1,
         ingredients: { status: 'confirmed', items: ['lentils'] },
         allergens: { status: 'confirmed', items: [] },
         photoId,
@@ -2879,6 +2882,7 @@ test('completing verification does not prepare or approve anything', async ({ co
         priceAmount: '9.50',
         priceCurrency: 'CAD',
         servingSize: '1 bowl',
+        servingCount: 1,
         ingredients: { status: 'confirmed', items: ['lentils'] },
         allergens: { status: 'confirmed', items: [] },
         photoId: crypto.randomUUID(),
@@ -2967,6 +2971,7 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
         priceAmount: '9.50',
         priceCurrency: 'CAD',
         servingSize: '1 bowl',
+        servingCount: 1,
         ingredients: { status: 'confirmed', items: ['lentils'] },
         allergens: { status: 'confirmed', items: [] },
         photoId,
@@ -3025,7 +3030,7 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
   expect(generations).toBe(2);
 });
 
-test('Screen 9 physical serving size binds the saved photo and clears confirmation on edits', async ({
+test('Screen 9 people count stays separate from a saved 28 cm plate and clears confirmation on edits', async ({
   context,
   page,
 }, testInfo) => {
@@ -3033,7 +3038,8 @@ test('Screen 9 physical serving size binds the saved photo and clears confirmati
   const draft = state.drafts[venue.venueId]![0]!;
   const fields = draft.manual_fields as OwnerDishFields;
   const photoId = fields.photoId!;
-  fields.servingSize = '28';
+  fields.servingSize = '1';
+  fields.servingCount = 1;
   const original = Buffer.from(
     await page.evaluate(() => {
       const canvas = document.createElement('canvas');
@@ -3081,15 +3087,17 @@ test('Screen 9 physical serving size binds the saved photo and clears confirmati
   );
   await signIn(page);
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
-  const size = page.getByRole('textbox', { name: /^Serving Size \(cm\)/ });
+  const people = page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true });
+  const plate = page.getByRole('textbox', { name: 'Plate size (cm)', exact: true });
   const confirm = page.getByRole('checkbox', {
     name: 'I measured this plate and matched its boundary to this photo.',
     exact: true,
   });
-  await expect(size).toHaveValue('28');
-  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveValue(
-    '',
-  );
+  await expect(people).toHaveValue('1');
+  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveCount(0);
+  await expect(plate).toHaveValue('');
+  await expect(confirm).toBeDisabled();
+  await plate.fill('28');
   await expect(confirm).toBeEnabled();
   await expect(confirm).not.toBeChecked();
   await confirm.check();
@@ -3099,8 +3107,8 @@ test('Screen 9 physical serving size binds the saved photo and clears confirmati
     page.getByText('Draft saved. This has not approved or published your menu.'),
   ).toBeVisible();
   expect(state.drafts[venue.venueId]![0]!.manual_fields).toMatchObject({
-    servingSize: '28',
-    servingCount: null,
+    servingSize: '1',
+    servingCount: 1,
     portionCalibration: {
       shape: 'round',
       width_mm: 280,
@@ -3116,16 +3124,41 @@ test('Screen 9 physical serving size binds the saved photo and clears confirmati
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(people).toHaveValue('1');
+  await expect(plate).toHaveValue('28');
   await expect(confirm).toBeChecked();
   await page.screenshot({ path: testInfo.outputPath('serving-size-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
   await page.screenshot({ path: testInfo.outputPath('serving-size-mobile.png'), fullPage: true });
 
-  await page.getByRole('spinbutton', { name: 'People served', exact: true }).fill('2');
+  const savedVersion = state.drafts[venue.venueId]![0]!.draft_version;
+  await people.fill('1.5');
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+  await expect(page.getByText('Enter a whole number of people from 1 to 100')).toBeVisible();
+  expect(state.drafts[venue.venueId]![0]!.draft_version).toBe(savedVersion);
+  await people.fill('2');
+  await expect(plate).toHaveValue('28');
   await expect(confirm).not.toBeChecked();
   await confirm.check();
-  await size.fill('30 × 20 cm');
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  expect(state.drafts[venue.venueId]![0]!.manual_fields).toMatchObject({
+    servingSize: '2',
+    servingCount: 2,
+    portionCalibration: { width_mm: 280, depth_mm: 280 },
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(people).toHaveValue('2');
+  await expect(plate).toHaveValue('28');
+  await expect(confirm).toBeChecked();
+  await plate.fill('30 × 20 cm');
   await expect(confirm).not.toBeChecked();
   await expect(confirm).toBeEnabled();
   await confirm.check();
@@ -3178,6 +3211,7 @@ test('a dish approved by an earlier preparation can still be edited (Back/Edit)'
         priceAmount: '9.50',
         priceCurrency: 'CAD',
         servingSize: '1 bowl',
+        servingCount: 1,
         ingredients: { status: 'confirmed', items: ['lentils'] },
         allergens: { status: 'confirmed', items: [] },
         photoId: null,

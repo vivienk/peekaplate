@@ -61,7 +61,7 @@ describe('dishStatus', () => {
   it('names the field, in yellow, when only the serving size is missing', () => {
     expect(dishStatus(dish({ servingSize: null }))).toEqual({
       ready: false,
-      label: 'Serving Size Missing',
+      label: 'Serving size (people) Missing',
       tone: 'warning',
     });
   });

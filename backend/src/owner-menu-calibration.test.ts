@@ -74,6 +74,71 @@ async function save(db: ReturnType<typeof database>, fields: Partial<OwnerDishFi
 }
 
 describe('manual owner calibration persistence', () => {
+  it.each(['2', '1 bowl', null])(
+    'stores people count independently of plate dimensions and legacy text %s',
+    async (servingSize) => {
+      const plate = { ...calibration, width_mm: 280, depth_mm: 280 };
+      const saved = await save(database(), {
+        photoId: photo,
+        servingSize,
+        servingCount: 2,
+        portionCalibration: plate,
+      });
+      expect(saved.manual_fields).toMatchObject({
+        servingSize,
+        servingCount: 2,
+        portionCalibration: plate,
+      });
+    },
+  );
+
+  it('accepts explicitly reconfirmed measurements for a new people count without scaling lengths', async () => {
+    const plate = { ...calibration, width_mm: 280, depth_mm: 280 };
+    const db = database({
+      photoId: photo,
+      servingSize: '1',
+      servingCount: 1,
+      portionCalibration: plate,
+    });
+    expect(
+      (await save(db, { photoId: photo, servingCount: 2, portionCalibration: plate }))
+        .manual_fields,
+    ).toMatchObject({ servingSize: '1', servingCount: 2, portionCalibration: plate });
+  });
+
+  it('preserves the canonical count and measurement when an unrelated legacy edit omits count', async () => {
+    const db = database({
+      photoId: photo,
+      servingSize: '2',
+      servingCount: 2,
+      portionCalibration: calibration,
+    });
+    expect((await save(db, { photoId: photo, name: 'Renamed dish' })).manual_fields).toMatchObject({
+      servingSize: '2',
+      servingCount: 2,
+      portionCalibration: calibration,
+    });
+  });
+
+  it.each([
+    [1, 2],
+    [2, null],
+    [undefined, 2],
+    [null, 2],
+  ] as const)(
+    'clears omitted calibration when the canonical people count changes from %s to %s',
+    async (previousCount, servingCount) => {
+      const db = database({
+        photoId: photo,
+        servingSize: '24',
+        ...(previousCount === undefined ? {} : { servingCount: previousCount }),
+        portionCalibration: calibration,
+      });
+      const saved = await save(db, { photoId: photo, servingCount });
+      expect(saved.manual_fields).toMatchObject({ servingCount, portionCalibration: null });
+    },
+  );
+
   it('retains omitted calibration on unrelated edits and records it in the event snapshot', async () => {
     const db = database({ photoId: photo, servingSize: '24', portionCalibration: calibration });
     const saved = await save(db, { photoId: photo, name: 'Renamed dish', servingCount: null });
@@ -86,7 +151,7 @@ describe('manual owner calibration persistence', () => {
   });
 
   it.each([{ photoId: photo, servingSize: '28' }, { photoId: id(6) }, { photoId: null }])(
-    'clears old measurement evidence when the photo or physical size changes: %j',
+    'clears old measurement evidence when the photo or legacy serving text changes: %j',
     async (fields) => {
       const db = database({ photoId: photo, servingSize: '24', portionCalibration: calibration });
       expect((await save(db, fields)).manual_fields).toMatchObject({ portionCalibration: null });
@@ -99,15 +164,11 @@ describe('manual owner calibration persistence', () => {
       hash: 'b'.repeat(64),
     },
     {
-      fields: { photoId: photo, servingSize: '28', portionCalibration: calibration },
-      hash: calibration.source_sha256,
-    },
-    {
       fields: { photoId: null, servingSize: '24', portionCalibration: calibration },
       hash: calibration.source_sha256,
     },
   ])(
-    'rejects measurements that do not match the selected photo and size before saving',
+    'rejects measurements that do not match the selected photo before saving',
     async ({ fields, hash }) => {
       const db = database({}, hash);
       await expect(save(db, fields)).rejects.toMatchObject({

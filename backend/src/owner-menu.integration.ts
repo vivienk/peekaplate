@@ -274,7 +274,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       name: 'Fictional soup',
       category: 'Soup',
       description: 'Fictional vegetables',
-      servingCount: 2,
+      servingSize: '2',
       priceAmount: '8.50',
       priceCurrency: 'USD',
       ingredients: { status: 'confirmed', items: ['Carrot'] },
@@ -342,7 +342,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(await createDishRevision(runtime, actor, venue, input)).toEqual(first);
     expect(first.facts).toBeUndefined();
   });
-  it('freezes source-bound physical dimensions in approved manual facts and clears stale preserved measurements', async () => {
+  it('freezes people count with independent photo measurements and clears measurements after count edits', async () => {
     const draftId = crypto.randomUUID();
     const fields = {
       name: 'Measured synthetic soup',
@@ -362,8 +362,8 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     );
     const calibration: PlateCalibration = {
       shape: 'round',
-      width_mm: 240,
-      depth_mm: 240,
+      width_mm: 280,
+      depth_mm: 280,
       source_sha256: photo.source_hash,
       source_width_px: 800,
       source_height_px: 600,
@@ -376,7 +376,8 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         {
           ...fields,
           photoId: photo.id,
-          servingSize: '24',
+          servingSize: '2',
+          servingCount: 2,
           portionCalibration: { ...calibration, source_sha256: 'b'.repeat(64) },
         },
         1,
@@ -384,7 +385,13 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     ).rejects.toMatchObject({ code: 'portion_calibration_mismatch' });
     await save(
       draftId,
-      { ...fields, photoId: photo.id, servingSize: '24', portionCalibration: calibration },
+      {
+        ...fields,
+        photoId: photo.id,
+        servingSize: '2',
+        servingCount: 2,
+        portionCalibration: calibration,
+      },
       1,
     );
     const approve = () =>
@@ -404,24 +411,24 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     );
     const approved = await approve();
     expect(approved.publishedRevision.facts).toMatchObject({
-      servingSize: '24',
+      servingSize: '2',
+      servingCount: 2,
       portionCalibration: calibration,
       photoId: photo.id,
     });
-    expect(approved.publishedRevision.facts).not.toHaveProperty('servingCount');
     expect(
       (await loadApprovedDishSources(runtime, venue, [approved.publishedRevision.dishId])).get(
         approved.publishedRevision.dishId,
       ),
-    ).toMatchObject({ servingSize: '24', portionCalibration: calibration });
+    ).toMatchObject({ servingCount: 2, portionCalibration: calibration });
     expect(
-      (await save(draftId, { ...fields, photoId: photo.id, servingSize: '28' }, 2)).manual_fields,
-    ).toMatchObject({ servingSize: '28', portionCalibration: null });
+      (await save(draftId, { ...fields, photoId: photo.id, servingCount: 3 }, 2)).manual_fields,
+    ).toMatchObject({ servingSize: '2', servingCount: 3, portionCalibration: null });
     expect(
       (await loadApprovedDishSources(runtime, venue, [approved.publishedRevision.dishId])).get(
         approved.publishedRevision.dishId,
       ),
-    ).toMatchObject({ servingSize: '24', portionCalibration: calibration });
+    ).toMatchObject({ servingCount: 2, portionCalibration: calibration });
   });
   it('replays an identical photo upload after approval without rewriting storage', async () => {
     const id = crypto.randomUUID();
@@ -1171,8 +1178,8 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     ).rejects.toMatchObject({ code: 'not_found' });
     const portionCalibration: PlateCalibration = {
       shape: 'round',
-      width_mm: 240,
-      depth_mm: 240,
+      width_mm: 280,
+      depth_mm: 280,
       source_sha256: photo.source_hash,
       source_width_px: 800,
       source_height_px: 600,
@@ -1184,14 +1191,15 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       expectedVersion: review.review.version,
       action: 'correct',
       corrected: {
-        serving_size: '24',
+        serving_size: '2',
         portion_calibration: portionCalibration,
         photo_id: photo.id,
         allergens: { status: 'confirmed', items: ['milk'] },
       },
     });
     expect(review.effective).toMatchObject({
-      serving_size: '24',
+      serving_size: '2',
+      serving_count: 2,
       portion_calibration: portionCalibration,
       photo_id: photo.id,
       allergens: { status: 'confirmed', items: ['milk'] },
@@ -1285,7 +1293,8 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(approved.publishedRevision.facts?.photoId).toBe(photo.id);
     expect(approved.publishedRevision.facts?.allergens).toEqual(['milk']);
     expect(approved.publishedRevision.facts?.portionCalibration).toEqual(portionCalibration);
-    expect(approved.publishedRevision.facts?.servingSize).toBe('24');
+    expect(approved.publishedRevision.facts?.servingSize).toBe('2');
+    expect(approved.publishedRevision.facts?.servingCount).toBe(2);
     await saveCandidateReviewCommand(runtime, actor, venue, extractionId, candidateId, {
       commandId: crypto.randomUUID(),
       expectedVersion: review.review.version,

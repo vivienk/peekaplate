@@ -1265,12 +1265,12 @@ test('published physical serving size enables table AR when people served is unk
   await page.getByRole('button', { name: 'Open Charred Leeks', exact: true }).click();
   await expect(page.locator('.pp-detail__servings')).toHaveCount(0);
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
-  await expect(page.locator('.pp-portion__status')).toContainText('Serving size: 32 × 32 cm');
+  await expect(page.locator('.pp-portion__status')).toContainText('Plate size: 32 × 32 cm');
   await page.getByText('Preview controls', { exact: true }).click();
   await page.getByRole('button', { name: 'View on your table', exact: true }).click();
   const portal = page.getByRole('dialog', { name: 'Dish on your table' });
   await expect(portal.locator('.pp-ar__scale-status')).toHaveText(
-    'Serving size: 32 × 32 cm · camera scale is approximate',
+    'Plate size: 32 × 32 cm · camera scale is approximate',
   );
   await portal.getByText('Adjust view', { exact: true }).click();
   await portal.getByRole('button', { name: 'Place measured size on table', exact: true }).click();

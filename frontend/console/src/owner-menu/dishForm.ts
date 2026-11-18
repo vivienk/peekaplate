@@ -16,6 +16,7 @@ import {
   type SaveOwnerDishDraft,
 } from '@peekaplate/contracts';
 import type { DishDraft } from './api';
+import { servingCountText, servingCountValue } from './servingCount';
 
 export type ValueStatus = 'unknown' | 'proposed' | 'confirmed';
 export type AllergenCode = OwnerDishFields['allergens']['items'][number];
@@ -106,7 +107,11 @@ export function dishFromReviewItem(
     servingSize: text(effective.serving_size),
     priceAmount: text(effective.price_amount),
     priceCurrency: pilotPriceCurrency(effective.price_currency),
-    servingCount: effective.serving_count == null ? '' : String(effective.serving_count),
+    servingCount: servingCountText(
+      effective.serving_count,
+      effective.serving_size,
+      effective.portion_calibration,
+    ),
     ...(effective.portion_calibration !== undefined
       ? { portionCalibration: effective.portion_calibration }
       : {}),
@@ -147,7 +152,11 @@ export function dishFromManualDraft(draft: DishDraft): DishForm {
     servingSize: text(fields.servingSize),
     priceAmount: text(fields.priceAmount),
     priceCurrency: pilotPriceCurrency(fields.priceCurrency),
-    servingCount: fields.servingCount == null ? '' : String(fields.servingCount),
+    servingCount: servingCountText(
+      fields.servingCount,
+      fields.servingSize,
+      fields.portionCalibration,
+    ),
     ...(fields.portionCalibration !== undefined
       ? { portionCalibration: fields.portionCalibration }
       : {}),
@@ -194,13 +203,6 @@ export function manualSaveCommand(
         : {}),
     },
   };
-}
-
-function servingCountValue(value: string): number | null {
-  if (!value.trim()) return null;
-  if (!/^(?:[1-9]\d?|100)$/.test(value.trim()))
-    throw new Error('People served must be a whole number from 1 to 100.');
-  return Number(value);
 }
 
 // The review correction for an extracted dish: only fields that differ from the current effective

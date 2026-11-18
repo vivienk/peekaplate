@@ -72,11 +72,11 @@ async function request(dishes: { dish_id: string; portion?: unknown }[]) {
 }
 
 describe('existing producer with owner-approved photos and the text-only fallback (Part A)', () => {
-  it('requires owner physical metadata to match the separately approved revision facts', async () => {
+  it('publishes serving size as people while keeping approved plate dimensions independent', async () => {
     const plate: PlateCalibration = {
       shape: 'round',
-      width_mm: 240,
-      depth_mm: 240,
+      width_mm: 280,
+      depth_mm: 280,
       source_sha256: hash,
       source_width_px: 800,
       source_height_px: 800,
@@ -134,6 +134,7 @@ describe('existing producer with owner-approved photos and the text-only fallbac
         assetBaseUrl: 'https://assets.example.test',
         sourceDimensions: { width: 800, height: 800 },
         portionCalibration: plate,
+        servingCount: 2,
       },
     );
     const input = await request([{ dish_id: soupId, portion: prepared.portion }]);
@@ -143,16 +144,17 @@ describe('existing producer with owner-approved photos and the text-only fallbac
         ownerPortions: new Map([[soupId, prepared]]),
         missingPhoto: 'text_only',
       });
-    const approved = source({ servingCount: null, servingSize: '24', portionCalibration: plate });
+    const approved = source({ servingCount: 2, portionCalibration: plate });
     const bundle = (await run(approved)).bundle;
     expect(bundle.categories[0]!.dishes[0]).toMatchObject({
-      portion: { physical_size: { plate } },
+      serving_count: 2,
+      portion: { physical_size: { plate, serving_count: 2 } },
     });
     for (const changed of [
       { portionCalibration: null },
-      { portionCalibration: { ...plate, width_mm: 280, depth_mm: 280 }, servingSize: '28' },
-      { servingSize: '28' },
-      { servingCount: 2 },
+      { portionCalibration: { ...plate, width_mm: 240, depth_mm: 240 } },
+      { servingCount: 3 },
+      { servingCount: null },
     ])
       await expect(run({ ...approved, ...changed })).rejects.toMatchObject({
         code: 'asset_revision_mismatch',

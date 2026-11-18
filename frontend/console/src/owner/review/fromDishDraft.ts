@@ -6,6 +6,7 @@
 import { OwnerDishFieldsSchema, type ReviewCandidateItemResponse } from '@peekaplate/contracts';
 import type { DishDraft } from '../../owner-menu/api';
 import { dishFromReviewItem, pilotPriceCurrency } from '../../owner-menu/dishForm';
+import { servingCountValue } from '../../owner-menu/servingCount';
 import type { ReviewDish } from './reviewDishes';
 
 // Draft review statuses that mean the owner has already reviewed or corrected the dish.
@@ -39,10 +40,11 @@ export function draftToReviewDish(
     }
   }
   if (extractionId && item && item.candidate.candidate_id === draft.candidate_id) {
+    const form = dishFromReviewItem(extractionId, item);
     return {
       id: draft.id,
-      ...dishFromReviewItem(extractionId, item),
-      servingCount: item.effective.serving_count ?? null,
+      ...form,
+      servingCount: servingCountValue(form.servingCount ?? ''),
       reviewed: item.review.reviewStatus === 'corrected',
     };
   }

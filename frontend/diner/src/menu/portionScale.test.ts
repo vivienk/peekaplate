@@ -86,7 +86,13 @@ it('uses confirmed physical dimensions when people served is left unknown', () =
   expect(sizeForServing({ physical_size: { ...size, serving_count: 2 } })).toBeUndefined();
   expect(sizeForServing({ physical_size: size }, 2)).toBeUndefined();
   expect(approximatePortionLabel(undefined, { physical_size: size })).toBe(
-    'Serving size: 28 × 28 cm · Approximate 2.5D preview — not actual size.',
+    'Plate size: 28 × 28 cm · Approximate 2.5D preview — not actual size.',
   );
   expect(approximatePortionLabel(2, { physical_size: size })).not.toContain('28');
+});
+
+it('labels a two-person serving separately from its 28 cm plate', () => {
+  expect(approximatePortionLabel(2, { physical_size: { ...size, serving_count: 2 } })).toBe(
+    'Serves 2 people · Plate size: 28 × 28 cm · Approximate 2.5D preview — not actual size.',
+  );
 });

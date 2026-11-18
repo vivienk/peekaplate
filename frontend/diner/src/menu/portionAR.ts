@@ -281,7 +281,7 @@ export function bindPortionAR(
       scaleStatus.textContent =
         prefix +
         (plate
-          ? `Serving size: ${plate.width_mm / 10} × ${plate.depth_mm / 10} cm · ${tracked ? '1:1 measured plate footprint; dish appearance approximate, device validation pending' : 'camera scale is approximate'}`
+          ? `Plate size: ${plate.width_mm / 10} × ${plate.depth_mm / 10} cm · ${tracked ? '1:1 measured plate footprint; dish appearance approximate, device validation pending' : 'camera scale is approximate'}`
           : 'Approximate preview · matching serving/plate measurements not supplied');
     };
     const changed = () => {

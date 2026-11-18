@@ -42,10 +42,10 @@ import {
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
+  resolveServingCount,
   type SubmitMenuIngestionRequest,
   SubmitMenuIngestionRequestSchema,
   type SubmitOrderDeletionResponse,
-  servingDimensionsMatch,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
   type UpdateOwnerInsightActionRequest,
@@ -1040,11 +1040,7 @@ export async function approveDishDraftAtomic(
     }
     const approvedPhotoId = manual?.photoId ?? corrected.photo_id ?? null;
     const portionCalibration = manual ? manual.portionCalibration : corrected.portion_calibration;
-    const servingSize = manual ? manual.servingSize : corrected.serving_size;
-    if (
-      portionCalibration &&
-      (!approvedPhotoId || !servingDimensionsMatch(servingSize, portionCalibration))
-    )
+    if (portionCalibration && !approvedPhotoId)
       throw new IngestionError('portion_calibration_mismatch', 409);
     if (approvedPhotoId) {
       const photo = await client.query<{ id: string; source_hash: string }>(
@@ -1058,13 +1054,20 @@ export async function approveDishDraftAtomic(
 
     const newDishId = options.preparedDishId ?? crypto.randomUUID();
     const revisionCommandId = crypto.randomUUID();
+    // Match the reviewed people count when legacy work is approved directly from S10.
+    // Resolution is recorded only in this new revision, never written back into old drafts.
+    const servingCount = resolveServingCount(
+      manual ? manual.servingCount : resolved.serving_count,
+      manual ? manual.servingSize : corrected.serving_size,
+      portionCalibration,
+    );
     const facts = manual
       ? {
           ...(manual.portionCalibration !== undefined
             ? { portionCalibration: manual.portionCalibration }
             : {}),
           ...(manual.servingSize !== undefined ? { servingSize: manual.servingSize } : {}),
-          ...(manual.servingCount !== undefined ? { servingCount: manual.servingCount } : {}),
+          ...(servingCount !== undefined ? { servingCount } : {}),
           category: manual.category,
           priceAmount: manual.priceAmount,
           priceCurrency: manual.priceCurrency,
@@ -1080,9 +1083,7 @@ export async function approveDishDraftAtomic(
             ...(corrected.serving_size !== undefined
               ? { servingSize: corrected.serving_size }
               : {}),
-            ...(resolved.serving_count !== undefined
-              ? { servingCount: resolved.serving_count }
-              : {}),
+            ...(servingCount !== undefined ? { servingCount } : {}),
             category: resolved.category,
             priceAmount: resolved.price_amount,
             priceCurrency: resolved.price_currency,

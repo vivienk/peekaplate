@@ -264,7 +264,7 @@ describe('serving count from Screen 9', () => {
     for (const count of ['0', '-1', '1.5', '101', 'two'])
       expect(() =>
         manualSaveCommand({ ...form, servingCount: count }, 0, crypto.randomUUID()),
-      ).toThrow(/People served/);
+      ).toThrow(/Serving size/);
   });
   it('persists an extracted count as an explicit correction, including clearing it', () => {
     const item = firstItem();
@@ -282,7 +282,7 @@ describe('serving count from Screen 9', () => {
   });
 });
 
-describe('photo-bound physical serving size from Screen 9', () => {
+describe('optional photo-bound plate size from Screen 9', () => {
   it('requires fresh confirmation for a changed photo but keeps it through unrelated text edits', () => {
     const form = {
       ...emptyManualDish(),

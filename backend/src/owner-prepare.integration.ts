@@ -260,8 +260,8 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
       ).rows[0]!;
       const calibration: PlateCalibration = {
         shape: 'round',
-        width_mm: 240,
-        depth_mm: 240,
+        width_mm: 280,
+        depth_mm: 280,
         source_sha256: photo.source_hash,
         source_width_px: 2,
         source_height_px: 3,
@@ -275,7 +275,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
           fields: OwnerDishFieldsSchema.parse({
             ...full,
             photoId: photo.id,
-            servingSize: '24',
+            servingSize: '2',
             portionCalibration: calibration,
           }),
         });
@@ -390,8 +390,9 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
           photoId: photo.id,
           ...(calibrated
             ? {
-                servingSize: '28',
-                portionCalibration: { ...calibration, width_mm: 280, depth_mm: 280 },
+                servingSize: '3',
+                servingCount: 3,
+                portionCalibration: calibration,
               }
             : {}),
         }),
@@ -405,7 +406,11 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
       expect(nextDish.dish_revision_id).not.toBe(dish.dish_revision_id);
       if (calibrated) {
         expect(nextDish.complete && nextDish.portion?.physical_size?.plate.width_mm).toBe(280);
-        expect(dish.portion?.physical_size?.plate.width_mm).toBe(240);
+        expect(dish.portion?.physical_size?.plate.width_mm).toBe(280);
+        expect(nextDish.complete && nextDish.serving_count).toBe(3);
+        expect(nextDish.complete && nextDish.portion?.physical_size?.serving_count).toBe(3);
+        expect(dish.serving_count).toBe(2);
+        expect(dish.portion?.physical_size?.serving_count).toBe(2);
         expect(nextDish.complete && nextDish.portion?.layers[1]?.sha256).toBe(
           portion.layers[1]!.sha256,
         );

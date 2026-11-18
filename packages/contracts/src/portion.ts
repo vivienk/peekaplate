@@ -3,6 +3,14 @@ import { z } from 'zod';
 // Number of people served; never a physical scale multiplier.
 export const ServingCountSchema = z.number().int().min(1).max(100);
 
+// Screen 9 serving size means people served. Units, fractions and ranges need
+// owner clarification; they never become a count or a physical scale multiplier.
+export function parseServingCountInput(value: string | null | undefined): number | undefined {
+  if (typeof value !== 'string' || !/^[1-9]\d{0,2}$/.test(value.trim())) return undefined;
+  const count = Number(value.trim());
+  return count <= 100 ? count : undefined;
+}
+
 export const PlateCalibrationSchema = z
   .strictObject({
     shape: z.enum(['round', 'rectangular']),
@@ -31,13 +39,27 @@ export const PlateCalibrationSchema = z
   });
 export type PlateCalibration = z.infer<typeof PlateCalibrationSchema>;
 
-export type ServingDimensions = Pick<PlateCalibration, 'shape' | 'width_mm' | 'depth_mm'>;
+// The review UI and explicit approval resolve the same legacy value. A stored
+// null is an intentional unknown; an older calibrated "28" may have meant cm.
+export function resolveServingCount(
+  count: number | null | undefined,
+  legacySize: string | null | undefined,
+  calibration?: PlateCalibration | null,
+): number | null | undefined {
+  if (count !== undefined) {
+    if (count === null) return null;
+    return Number.isInteger(count) && count >= 1 && count <= 100 ? count : undefined;
+  }
+  return calibration ? undefined : parseServingCountInput(legacySize);
+}
 
-// Screen 9 labels this input in cm. Text is never measurement evidence by itself:
+export type PlateDimensions = Pick<PlateCalibration, 'shape' | 'width_mm' | 'depth_mm'>;
+
+// A separate optional plate-size input uses cm. Text is never measurement evidence by itself:
 // actual-size placement also requires the confirmed boundary on the exact photo.
-export function parseServingDimensions(
+export function parsePlateDimensions(
   value: string | null | undefined,
-): ServingDimensions | undefined {
+): PlateDimensions | undefined {
   if (typeof value !== 'string' || value.length > 160) return undefined;
   const match = /^(\d{1,3}(?:\.\d)?)\s*(?:cm)?(?:\s*[x×]\s*(\d{1,3}(?:\.\d)?)\s*(?:cm)?)?$/i.exec(
     value.trim(),
@@ -51,20 +73,6 @@ export function parseServingDimensions(
     width_mm: width,
     depth_mm: depth,
   };
-}
-
-export function servingDimensionsMatch(
-  value: string | null | undefined,
-  calibration: ServingDimensions | null | undefined,
-): boolean {
-  const dimensions = parseServingDimensions(value);
-  return Boolean(
-    dimensions &&
-      calibration &&
-      dimensions.shape === calibration.shape &&
-      dimensions.width_mm === calibration.width_mm &&
-      dimensions.depth_mm === calibration.depth_mm,
-  );
 }
 
 // Public, reviewed T1 layers only. Processing manifests (needs_review) are not this contract.

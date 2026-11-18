@@ -6,7 +6,6 @@ import {
   PublicMenuContentBundleSchema,
   type PublicMenuDish,
   type PublicPortion,
-  servingDimensionsMatch,
   sha256,
   verifyPublicMenuContentBytes,
 } from '@peekaplate/contracts';
@@ -24,7 +23,6 @@ import {
 /** Approved facts for one dish, already resolved from `dish_current`, drafts and RES-01.2. */
 export type ApprovedDishSource = {
   portionCalibration?: PlateCalibration | null;
-  servingSize?: string | null;
   servingCount?: number | null;
   dishId: string;
   dishRevisionId: string;
@@ -349,7 +347,6 @@ async function buildDish(
     !asset &&
     requested.portion?.physical_size &&
     (!source.portionCalibration ||
-      !servingDimensionsMatch(source.servingSize, source.portionCalibration) ||
       canonicalJson(requested.portion.physical_size.plate) !==
         canonicalJson(source.portionCalibration))
   ) {

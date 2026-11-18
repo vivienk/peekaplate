@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactElement } from 'react';
+import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { DishFormView } from '../owner-dashboard/DishFormView';
@@ -69,10 +69,14 @@ describe('live Screen 9 on the authored #172 presentation', () => {
       render({ value: { ...value, portionCalibration: undefined }, calibrationPhoto }),
     );
     expect(unknown).not.toContain('checked');
-    expect(unknown).not.toContain('disabled');
-    const pending = confirmation(render({ value, calibrationPhoto, photoPending: true }));
+    expect(unknown).toContain('disabled');
+    const pendingHtml = render({ value, calibrationPhoto, photoPending: true });
+    const pending = confirmation(pendingHtml);
     expect(pending).not.toContain('checked');
     expect(pending).toContain('disabled');
+    expect(pendingHtml.match(/<input[^>]+id="dish-plate-size"[^>]*>/)?.[0]).toContain('disabled');
+    const loading = render({ value });
+    expect(loading.match(/<input[^>]+id="dish-plate-size"[^>]*>/)?.[0]).toContain('disabled');
     const other = confirmation(
       render({ value, calibrationPhoto: { ...calibrationPhoto, source_sha256: 'b'.repeat(64) } }),
     );
@@ -80,24 +84,26 @@ describe('live Screen 9 on the authored #172 presentation', () => {
     const legacy = confirmation(
       render({ value: { ...value, servingSize: '1 bowl' }, calibrationPhoto }),
     );
-    expect(legacy).not.toContain('checked');
-    expect(legacy).toContain('disabled');
+    expect(legacy).toContain('checked');
+    expect(legacy).not.toContain('disabled');
   });
 
-  it('uses the existing serving field for centimetres while leaving legacy text unmeasured', () => {
+  it('keeps legacy descriptive text out of both the people and plate measurement inputs', () => {
     const html = render({ value: { ...emptyManualDish(), servingSize: '1 bowl' } });
-    expect(html).toContain('Serving Size (cm)');
-    expect(html).toMatch(/id="f-size"[^>]+value="1 bowl"/);
+    expect(html).toContain('Serving size (people)');
+    expect(html).toMatch(/id="f-size"[^>]+value=""/);
+    expect(html).toMatch(/id="dish-plate-size"[^>]+value=""/);
     expect(html).toContain('Approximate until you confirm the measurements on the saved photo.');
     expect(html).not.toMatch(/type="checkbox"[^>]+checked=""/);
   });
 
-  it('clears measurement confirmation when the existing serving-size input changes', () => {
+  it('clears measurement confirmation when the serving-size people input changes', () => {
     const onChange = vi.fn();
     render({
       value: {
         ...emptyManualDish(),
-        servingSize: '28',
+        servingSize: '1',
+        servingCount: '1',
         photoId: calibrationPhotoId,
         portionCalibration: confirmedCalibration,
       },
@@ -105,30 +111,32 @@ describe('live Screen 9 on the authored #172 presentation', () => {
     });
     const props = captured.props!;
     if (props.ed.step !== 'form') throw new Error('expected authored form');
-    props.setEd({ ...props.ed, draft: { ...props.ed.draft, size: '30' } });
+    props.setEd({ ...props.ed, draft: { ...props.ed.draft, size: '2' } });
     expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ servingSize: '30', portionCalibration: null }),
+      expect.objectContaining({ servingSize: '2', servingCount: '2', portionCalibration: null }),
     );
   });
 
-  it('clears measurement confirmation when optional people served changes', () => {
+  it('keeps legacy serving text on unrelated edits without dropping the canonical people count', () => {
     const onChange = vi.fn();
     render({
       value: {
         ...emptyManualDish(),
-        servingSize: '28',
+        servingSize: '1 bowl',
         servingCount: '2',
         photoId: calibrationPhotoId,
         portionCalibration: confirmedCalibration,
       },
       onChange,
     });
-    const field = captured.props!.servingCountControl as ReactElement<
-      ComponentProps<typeof import('../foundations/TextField').TextField>
-    >;
-    field.props.onChange?.({ target: { value: '3' } } as never);
+    const props = captured.props!;
+    props.setEd({ ...props.ed, draft: { ...props.ed.draft, name: 'Renamed dish' } });
     expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ servingCount: '3', portionCalibration: null }),
+      expect.objectContaining({
+        servingSize: '1 bowl',
+        servingCount: '2',
+        portionCalibration: confirmedCalibration,
+      }),
     );
   });
 
@@ -302,17 +310,17 @@ describe('live Screen 9 on the authored #172 presentation', () => {
     expect(unavailable).toContain('original dish photo remains the View Portion fallback');
   });
 
-  it('adds optional people served without replacing the authored serving-size text', () => {
+  it('uses the authored required serving field for the saved people count', () => {
     const html = render({
       value: { ...emptyManualDish(), servingSize: '1 bowl', servingCount: '2' },
     });
-    expect(html).toMatch(/id="f-size"[^>]+value="1 bowl"/);
-    expect(html).toContain('People served');
+    expect(html).toMatch(/id="f-size"[^>]+value="2"/);
+    expect(html).toContain('Serving size (people)');
     expect(html).toMatch(/type="number"[^>]+min="1"[^>]+max="100"[^>]+step="1"/);
-    expect(html).toMatch(/id="dish-serving-count"[^>]+value="2"/);
-    const blank = render().match(/<input[^>]+id="dish-serving-count"[^>]*>/)?.[0] ?? '';
+    expect(html).not.toContain('dish-serving-count');
+    const blank = render().match(/<input[^>]+id="f-size"[^>]*>/)?.[0] ?? '';
     expect(blank).toContain('value=""');
-    expect(blank).not.toContain('required');
+    expect(blank).toContain('required');
   });
 
   it('keeps OCR evidence, actual CAD currency and unknown allergens on the authored form', () => {

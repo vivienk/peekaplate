@@ -39,11 +39,11 @@ describe('S10 row to S09 form values', () => {
     expect(formToDish(form, previous.id, previous)).toEqual(previous);
   });
 
-  it('never infers people served from a numeric serving label', () => {
+  it('recovers a plain integer legacy serving label into canonical people metadata', () => {
     const previous = dish({ servingSize: '2' });
     const form = dishToForm(previous);
-    expect(form.servingCount).toBeUndefined();
-    expect(formToDish(form, previous.id, previous)).toEqual(previous);
+    expect(form.servingCount).toBe('2');
+    expect(formToDish(form, previous.id, previous)).toEqual({ ...previous, servingCount: 2 });
   });
 
   it('keeps a blank count unknown and rejects counts outside whole people from 1 to 100', () => {
@@ -112,7 +112,7 @@ describe('S09 form values back to an S10 row', () => {
   });
 
   it('a complete dish round-trips unchanged and is Ready', () => {
-    const previous = dish();
+    const previous = dish({ servingCount: 1 });
     const saved = formToDish(dishToForm(previous), previous.id, previous);
     expect(saved).toEqual(previous);
     expect(dishStatus(saved).ready).toBe(true);

@@ -45,20 +45,30 @@ authored photo card; it must not expand at its intrinsic height. Generation,
 private review status and explicit approval stay inside this card. No separate
 editor, preview page, design token or approval path is introduced.
 
-## Serving Size supplies physical dimensions
+## Serving size counts people; plate measurements set AR scale
 
-The live S09 **Serving Size (cm)** field supplies the dimensions used by the
-published portion viewer: `28` or `28 cm` means a round 28 cm plate diameter;
-`30 x 20` or `30 × 20 cm` means a rectangular 30 by 20 cm footprint. Each
-dimension is 3–100 cm, with at most one decimal place. **People served** is a
-separate optional count and never multiplies the dimensions. Existing text such
-as `1 bowl` remains saved text until the owner supplies and confirms measurements.
+S09 has one **Serving size (people)** field: `1` means one person and `2` means
+two people. It edits the canonical `servingCount` (`serving_count` on extracted
+corrections), with integers from 1–100. There is no second People served input.
+Fractions, ranges and units are not people counts. Existing explicit counts take
+precedence over legacy `servingSize` text; an explicit unknown count stays unknown.
+Unrelated edits preserve old descriptive text without treating `1 bowl` or
+`28 cm` as a count. A plain integer legacy value can populate the control only
+when no canonical count or plate calibration is present.
+Review and explicit dish approval use the same resolution rule, including when
+an older draft goes directly from S10 to publication without reopening S09.
+
+The separate optional **Plate size (cm)** input supplies dimensions for measured
+table AR: `28` or `28 cm` means a round 28 cm diameter; `30 x 20` or
+`30 × 20 cm` means a rectangular 30 by 20 cm footprint. Each dimension is
+3–100 cm, with at most one decimal place. A two-person serving on a 28 cm plate
+keeps that 28 cm footprint; the count never multiplies the dimensions.
 
 After saving the original photo, the owner marks the outer plate boundary on
 that photo and confirms the measurement. The boundary excludes margins,
-utensils and garnish. The control derives its dimensions from Serving Size;
-there is no second width/diameter value to keep in sync. Changing the serving
-input, people count, boundary or selected photo clears the local confirmation.
+utensils and garnish. The control uses the separate Plate size input and restores
+saved dimensions from its confirmed calibration. Changing the people count,
+plate dimensions, boundary or selected photo clears the local confirmation.
 A replacement photo must finish saving before it can be calibrated. Failed
 photo loading or an invalid boundary cannot create measurement evidence.
 
@@ -80,7 +90,8 @@ not the current editable draft. Re-editing the serving size therefore cannot
 remove an earlier publication's layers. After re-verification and explicit
 publication, the new revision carries its new measurement.
 
-The diner displays the saved dimensions in View Portion and the camera portal.
+The diner displays `Serves 2 people` and separate `Plate size` dimensions in View
+Portion and the camera portal.
 On a device supporting tracked table AR, matching measurements set the plate
 footprint in metres and disable arbitrary visual resizing in measured mode.
 Both an absent people count and an absent calibration count are allowed;
@@ -182,7 +193,7 @@ Required before claiming full staging readiness:
   published asset route. The operator CLI has its own explicit hosting step.
 - Missing assets fall back to the original photo. Revision changes and
   cross-dish or cross-venue requests cannot reuse another image.
-- Confirm round and rectangular Serving Size inputs against the saved original,
+- Confirm round and rectangular Plate size inputs against the saved original,
   reopen the draft, verify and publish it, and inspect the same dimensions in
   the diner. Check both a supplied and an unknown people count.
 - Size/photo changes clear confirmation; forged hashes, dimensions or boundaries

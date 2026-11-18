@@ -178,12 +178,13 @@ The ingestion API accepts `X-Plate-Calibration` JSON; CLI accepts `--plate-calib
 
 The image frame width in world metres is `plate.width_mm / 1000 / boundary.width`; transparent margins, utensils and garnish do not define the plate width. In tracked table AR, a fixed-size circle/rectangle footprint uses the supplied real plate dimensions. The upright 2.5D card remains an approximation, particularly for angled source photos; this does not recover depth or guarantee visual accuracy. Generated 3D bounds are not treated as a calibrated plate. Physical-device validation remains pending. Plain camera mode always says approximate, regardless of owner measurements; it has no measured table distance.
 
-Original photo / Return to AR is directly available in the fullscreen portal and preserves the exact source URL. Existing Compare, back navigation, four preview states and PR147 menu photographs remain intact. No default dimensions were invented for fixtures. This original local calibration editor/private upload bridge remains DEV-only. The authenticated Screen 9 flow now separately supplies physical dimensions through its existing Serving Size field and approved publication path; see [Screen 9 serving measurements](screen9-portion-publish.md#serving-size-supplies-physical-dimensions).
+Original photo / Return to AR is directly available in the fullscreen portal and preserves the exact source URL. Existing Compare, back navigation, four preview states and PR147 menu photographs remain intact. No default dimensions were invented for fixtures. This original local calibration editor/private upload bridge remains DEV-only. The authenticated Screen 9 flow uses Serving size (people) for the count and a separate optional Plate size (cm) control for physical dimensions; see [Screen 9 serving size and plate measurements](screen9-portion-publish.md#serving-size-counts-people-plate-measurements-set-ar-scale).
 
 For published dishes, the optional people count must match the approved calibration
 when present; matching absence is allowed because measured dimensions do not
 depend on how many people eat the dish. The count never scales a length. View
-Portion and the portal display the saved centimetres while keeping camera/2.5D
+Portion and the portal label saved centimetres as Plate size alongside the people
+count while keeping camera/2.5D
 approximation labels. Only supported, tracked table AR uses the measured footprint.
 
 ## November 15 camera interaction correction

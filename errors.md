@@ -5292,3 +5292,49 @@ Combined local verification passed: `pnpm check` completed 2,431 unit tests
 (with five skipped) and 122 script tests, lint, types, context and docs.
 `pnpm verify build` also passed, including the staging Worker dry-run.
 Browser/database execution and real-device scale remain separate evidence.
+
+## 2026-11-17 — Serving size must count people, independently of plate measurements
+
+The first Screen 9 measurement implementation overloaded Serving Size with
+centimetres and retained a duplicate People served field. The corrected form has
+one Serving size (people) input and a separate optional Plate size (cm) control.
+The canonical count never multiplies physical dimensions. New frontend regressions
+failed before the correction; two diner-label regressions and eleven backend
+behavioral regressions also reproduced the mismatch and stale count calibration.
+
+An omitted calibration previously survived count-only changes because invalidation
+checked only the photo and legacy serving text. Both manual and extracted commands
+now invalidate it on canonical count changes, including clearing or supplying an
+unknown count. Explicitly reconfirmed photo evidence can bind the same physical
+plate to a new count. Immutable published snapshots keep their original facts.
+
+Compatibility resolution treats an explicit canonical count or null as
+authoritative. It only recovers an uncalibrated plain integer legacy value; notes,
+fractions, ranges and older calibrated numbers stay unknown. Review and explicit
+approval share that rule, so a recovered count cannot disappear between S10 and
+publication when S09 was not reopened. Passive reads do not rewrite old drafts.
+
+The new plate input initially allowed typing before saved-photo metadata loaded;
+the photo-identity remount could discard that text. A regression reproduced the
+enabled input and it now waits for the saved photo. Count edits retain typed plate
+dimensions while clearing confirmation. Local browser execution retains the host
+socket limitation recorded above; browser/database assertions require CI.
+
+The combined check then caught a demo-bundle regression after all 2,482 unit
+tests passed: the menu-review preview reached the broad contracts entry point
+through new count-helper imports, including an unrelated analytics-report schema.
+The existing no-analytics script gate failed (121 script tests passed, one failed).
+A lean `contracts/portion` export and pure console count helper removed that
+dependency. All six preview-build script tests passed afterward; the guard was
+not weakened. The schema marker did not prove analytics was executed or sent.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-18T01:09:58.691Z","exitCode":1}
+```
+
+Final local verification of the people-count correction passed: `corepack pnpm check`
+completed 2,482 unit tests (five skipped), all 122 script tests, lint, strict types,
+context and documentation checks. `corepack pnpm verify build` passed, including
+the staging Worker dry-run. Browser/database CI and physical-device scale remain
+separate acceptance evidence.

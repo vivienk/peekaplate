@@ -6,12 +6,13 @@ export * from './owner-workspace';
 export {
   type PlateCalibration,
   PlateCalibrationSchema,
+  type PlateDimensions,
   type PublicPortion,
   PublicPortionSchema,
-  parseServingDimensions,
+  parsePlateDimensions,
+  parseServingCountInput,
+  resolveServingCount,
   ServingCountSchema,
-  type ServingDimensions,
-  servingDimensionsMatch,
 } from './portion';
 
 import { z } from 'zod';

@@ -16,7 +16,6 @@ import {
   ResolvedCandidateFieldsSchema,
   ReviewCandidateItemResponseSchema,
   ReviewCandidateResultSchema,
-  servingDimensionsMatch,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import type { DishDraftRow } from './ingestion/repository';
@@ -713,9 +712,11 @@ export async function saveCandidateReviewCommand(
         priorCorrected.portion_calibration != null &&
         !incompleteFields.includes('portion_calibration') &&
         (correctedFields.photo_id !== priorCorrected.photo_id ||
+          (correctedFields.serving_count ?? null) !== (priorCorrected.serving_count ?? null) ||
           correctedFields.serving_size !== priorCorrected.serving_size)
       ) {
-        // An omitted measurement may survive unrelated edits, never a changed photo or size.
+        // Measurements may survive unrelated edits, never a changed photo or people count.
+        // A changed legacy serving label also conservatively requires renewed confirmation.
         correctedFields.portion_calibration = null;
       }
       editedFields = (Object.keys(correctedFields) as ReviewEditableField[]).sort();
@@ -741,11 +742,7 @@ export async function saveCandidateReviewCommand(
     const measured = reviewRecord.corrected.portion_calibration;
     if (measured) {
       const selectedPhoto = reviewRecord.corrected.photo_id;
-      if (
-        !selectedPhoto ||
-        !sessionResult.rows[0].job_id ||
-        !servingDimensionsMatch(reviewRecord.corrected.serving_size, measured)
-      )
+      if (!selectedPhoto || !sessionResult.rows[0].job_id)
         throw new ReviewCommandError('portion_calibration_mismatch', 409);
       const photo = await client.query<{ source_hash: string }>(
         `SELECT p.source_hash FROM app_private.dish_draft_photo p JOIN app_private.dish_drafts d

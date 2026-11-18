@@ -14,7 +14,7 @@ export function approximatePortionLabel(
 ) {
   const size = sizeForServing(portion ?? {}, count);
   const measurement = size
-    ? `Serving size: ${size.plate.width_mm / 10} × ${size.plate.depth_mm / 10} cm · `
+    ? `Plate size: ${size.plate.width_mm / 10} × ${size.plate.depth_mm / 10} cm · `
     : '';
   return `${count ? `Serves ${count} ${count === 1 ? 'person' : 'people'} · ` : ''}${measurement}Approximate 2.5D preview — not actual size.`;
 }

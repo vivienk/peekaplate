@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApprovedDishFactsSchema, OwnerDishFieldsSchema } from './owner-menu';
-import { parseServingDimensions, servingDimensionsMatch } from './portion';
+import { parsePlateDimensions, parseServingCountInput, resolveServingCount } from './portion';
 import {
   CandidateCorrectedFieldsSchema,
   CandidateReviewRecordSchema,
@@ -19,7 +19,51 @@ const calibration = {
   confirmed: true as const,
 };
 
-describe('Screen 9 physical serving size', () => {
+describe('Screen 9 serving size counts people', () => {
+  it.each([
+    ['1', 1],
+    ['2', 2],
+    [' 12 ', 12],
+    ['100', 100],
+  ] as const)('reads %s as %i people without creating a physical measurement', (input, count) => {
+    expect(parseServingCountInput(input)).toBe(count);
+    const saved = OwnerDishFieldsSchema.parse({ servingSize: input, servingCount: count });
+    expect(saved.servingCount).toBe(count);
+    expect(saved).not.toHaveProperty('portionCalibration');
+  });
+
+  it.each([
+    undefined,
+    null,
+    '',
+    '0',
+    '101',
+    '1/2',
+    '1 / 2',
+    '1–2',
+    '1.5',
+    '1 bowl',
+    '28 cm',
+    '1e2',
+  ])('does not invent a people count from %j', (input) =>
+    expect(parseServingCountInput(input)).toBeUndefined(),
+  );
+
+  it('resolves legacy counts consistently for review and explicit approval', () => {
+    expect(resolveServingCount(2, '1')).toBe(2);
+    expect(resolveServingCount(null, '2')).toBeNull();
+    expect(resolveServingCount(undefined, '2')).toBe(2);
+    expect(resolveServingCount(undefined, '1/2')).toBeUndefined();
+    expect(resolveServingCount(undefined, '1 bowl')).toBeUndefined();
+    expect(resolveServingCount(undefined, '28', calibration)).toBeUndefined();
+    expect(resolveServingCount(2, '28 cm', calibration)).toBe(2);
+    expect(resolveServingCount(undefined, null)).toBeUndefined();
+    expect(resolveServingCount(101, '2')).toBeUndefined();
+    expect(resolveServingCount(1.5, '2')).toBeUndefined();
+  });
+});
+
+describe('optional plate measurements are separate from serving size', () => {
   it.each([
     ['28', 'round', 280, 280],
     ['28 cm', 'round', 280, 280],
@@ -32,14 +76,11 @@ describe('Screen 9 physical serving size', () => {
   ])(
     'reads %s as physical centimetres without confirming a photo',
     (input, shape, width, depth) => {
-      expect(parseServingDimensions(input as string)).toEqual({
+      expect(parsePlateDimensions(input as string)).toEqual({
         shape,
         width_mm: width,
         depth_mm: depth,
       });
-      expect(OwnerDishFieldsSchema.parse({ servingSize: input })).not.toHaveProperty(
-        'portionCalibration',
-      );
     },
   );
 
@@ -58,15 +99,10 @@ describe('Screen 9 physical serving size', () => {
     '28 x',
     '28 x 20 x 5',
   ])('does not interpret %j as measured plate dimensions', (input) => {
-    expect(parseServingDimensions(input)).toBeUndefined();
+    expect(parsePlateDimensions(input)).toBeUndefined();
   });
 
-  it('requires the physical input and confirmed photo dimensions to agree', () => {
-    expect(servingDimensionsMatch('28 cm', calibration)).toBe(true);
-    expect(servingDimensionsMatch('32 cm', calibration)).toBe(false);
-    expect(servingDimensionsMatch('28 x 28 cm', calibration)).toBe(false);
-    expect(servingDimensionsMatch('1 bowl', calibration)).toBe(false);
-    expect(servingDimensionsMatch('28 cm', null)).toBe(false);
+  it('requires valid confirmed photo evidence for the separate measurement', () => {
     for (const change of [
       { confirmed: false },
       { source_sha256: 'not-a-photo-hash' },
@@ -79,14 +115,18 @@ describe('Screen 9 physical serving size', () => {
     }
   });
 
-  it('preserves confirmed measurements independently of the optional people count', () => {
+  it('preserves a 28 cm plate independently of a two-person serving size', () => {
     const parsed = OwnerDishFieldsSchema.parse({
-      servingSize: '28 cm',
+      servingSize: '2',
+      servingCount: 2,
       photoId,
       portionCalibration: calibration,
     });
-    expect(parsed).toMatchObject({ servingSize: '28 cm', portionCalibration: calibration });
-    expect(parsed).not.toHaveProperty('servingCount');
+    expect(parsed).toMatchObject({
+      servingSize: '2',
+      servingCount: 2,
+      portionCalibration: calibration,
+    });
   });
 
   it('preserves an explicit clear without inventing measurements for legacy text', () => {
@@ -100,7 +140,12 @@ describe('Screen 9 physical serving size', () => {
   });
 
   it('carries the same photo-bound measurement through extracted correction and response', () => {
-    const fields = { serving_size: '28 cm', photo_id: photoId, portion_calibration: calibration };
+    const fields = {
+      serving_size: '2',
+      serving_count: 2,
+      photo_id: photoId,
+      portion_calibration: calibration,
+    };
     expect(CandidateCorrectedFieldsSchema.parse(fields)).toMatchObject(fields);
     expect(CandidateReviewRecordSchema.shape.corrected.parse(fields)).toMatchObject(fields);
     expect(
@@ -125,9 +170,10 @@ describe('Screen 9 physical serving size', () => {
         ingredients: null,
         allergens: null,
         photoId,
-        servingSize: '28 cm',
+        servingSize: '2',
+        servingCount: 2,
         portionCalibration: calibration,
       }),
-    ).toMatchObject({ servingSize: '28 cm', portionCalibration: calibration });
+    ).toMatchObject({ servingSize: '2', servingCount: 2, portionCalibration: calibration });
   });
 });

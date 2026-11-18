@@ -1,8 +1,7 @@
 // Live values and evidence on #172's authored Screen 9; demo providers stay in menu.tsx.
 
-import { PublicMenuAllergenCodeSchema } from '@peekaplate/contracts';
+import { PublicMenuAllergenCodeSchema, parseServingCountInput } from '@peekaplate/contracts';
 import { type ReactNode, useState } from 'react';
-import { TextField } from '../foundations/TextField';
 import { DishFormView } from '../owner-dashboard/DishFormView';
 import type { MenuItem } from '../owner-dashboard/data';
 import {
@@ -15,6 +14,7 @@ import {
 import type { EvidenceExcerpt } from './evidence';
 import { PortionCalibrationEditor } from './PortionCalibrationEditor';
 import type { CalibrationPhoto } from './portionCalibration';
+import { servingCountText } from './servingCount';
 import './dishEditor.css';
 
 export type DishEditorProps = {
@@ -83,17 +83,15 @@ export function DishEditor({
   const change = (next: DishForm) => onChange(invalidateChangedCalibration(value, next));
   const measuredPhoto =
     !photoPending && calibrationPhoto?.photoId === value.photoId ? calibrationPhoto : undefined;
-  const countText = value.servingCount?.trim() ?? '';
-  const countError =
-    countText && !/^(?:[1-9]\d?|100)$/.test(countText)
-      ? 'Enter a whole number from 1 to 100, or leave blank if unknown.'
-      : '';
+  const countText =
+    value.servingCount ?? servingCountText(undefined, value.servingSize, value.portionCalibration);
+  const countError = parseServingCountInput(countText) === undefined;
   const menu: MenuItem = {
     id: existing ? (value.source?.candidateId ?? 'saved-draft') : null,
     name: value.name,
     cat: value.category,
     price: value.priceAmount,
-    size: value.servingSize,
+    size: countText,
     desc: value.description,
     ing: value.ingredients.items,
     alg: value.allergens.items,
@@ -147,7 +145,9 @@ export function DishEditor({
             category: dish.cat,
             description: dish.desc,
             priceAmount: String(dish.price),
-            servingSize: dish.size,
+            // One visible people field writes both the canonical count and legacy count text.
+            // Unrelated edits keep any old descriptive serving text unchanged.
+            ...(dish.size !== countText ? { servingSize: dish.size, servingCount: dish.size } : {}),
             aiIng,
             aiAlg,
             aiUsed: dish.aiUsed,
@@ -171,29 +171,11 @@ export function DishEditor({
         {...(portionReview ? { portionReview } : {})}
         {...(onApprovePortion ? { onApprovePortion } : {})}
         {...(onGeneratePortion ? { onGeneratePortion } : {})}
-        servingSizeLabel="Serving Size (cm)"
-        servingSizeHint="Measured plate diameter, or width × depth. Use 3–100 cm, with up to one decimal place."
-        servingSizePlaceholder="28 or 30 × 20"
-        servingCountControl={
-          <TextField
-            id="dish-serving-count"
-            label="People served"
-            type="number"
-            min={1}
-            max={100}
-            step={1}
-            value={value.servingCount ?? ''}
-            error={countError}
-            hint="Optional. How many people this dish serves. Physical size comes from the measurements above."
-            onChange={(event) => change({ ...value, servingCount: event.target.value })}
-          />
-        }
         portionCalibrationControl={
           <PortionCalibrationEditor
             key={
               measuredPhoto ? `${measuredPhoto.photoId}:${measuredPhoto.source_sha256}` : 'no-photo'
             }
-            servingSize={value.servingSize}
             value={value.portionCalibration}
             photo={measuredPhoto}
             photoPending={photoPending}

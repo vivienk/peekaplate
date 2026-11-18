@@ -4,7 +4,6 @@ import {
   OwnerDishFieldsSchema,
   type SaveOwnerDishDraft,
   type SetDraftRemoval,
-  servingDimensionsMatch,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { CommandError } from './dish-command';
@@ -110,9 +109,15 @@ export async function saveOwnerDishDraft(
     const previous = OwnerDishFieldsSchema.parse(draft?.manual_fields ?? {});
     const servingSize =
       input.fields.servingSize === undefined ? previous.servingSize : input.fields.servingSize;
+    const servingCount =
+      input.fields.servingCount === undefined ? previous.servingCount : input.fields.servingCount;
+    const calibrationContextChanged =
+      input.fields.photoId !== previous.photoId ||
+      (servingCount ?? null) !== (previous.servingCount ?? null) ||
+      servingSize !== previous.servingSize;
     const portionCalibration =
       input.fields.portionCalibration === undefined
-        ? input.fields.photoId !== previous.photoId || servingSize !== previous.servingSize
+        ? calibrationContextChanged
           ? previous.portionCalibration === undefined
             ? undefined
             : null
@@ -122,8 +127,7 @@ export async function saveOwnerDishDraft(
       ...input.fields,
       servingSize,
       ...(portionCalibration === undefined ? {} : { portionCalibration }),
-      servingCount:
-        input.fields.servingCount === undefined ? previous.servingCount : input.fields.servingCount,
+      servingCount,
     });
     if (fields.photoId !== null) {
       const photo = await client.query<{ id: string; source_hash: string }>(
@@ -137,10 +141,7 @@ export async function saveOwnerDishDraft(
       )
         throw new IngestionError('portion_calibration_mismatch', 409);
     }
-    if (
-      fields.portionCalibration &&
-      (!fields.photoId || !servingDimensionsMatch(fields.servingSize, fields.portionCalibration))
-    )
+    if (fields.portionCalibration && !fields.photoId)
       throw new IngestionError('portion_calibration_mismatch', 409);
     const version = input.expectedVersion + 1;
     const result = await client.query<DishDraftRow>(

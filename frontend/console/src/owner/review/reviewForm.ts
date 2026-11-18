@@ -1,9 +1,9 @@
 // Connects S10 (Menu Review) to the S09 Add/Edit dish form (owner-menu/DishEditor, FE-06.2). Both
 // sides use the same draft fields (OwnerDishFields), so nothing is converted or invented here:
 // blank text becomes missing (null), and an unknown, proposed or confirmed status is kept as it is.
-// People served, serving-size text, and explicit photo calibration remain separate facts.
-import { ServingCountSchema } from '@peekaplate/contracts';
+// The people count uses its canonical field; legacy notes and plate calibration remain separate.
 import type { AllergenCode, DishForm } from '../../owner-menu/dishForm';
+import { servingCountText, servingCountValue } from '../../owner-menu/servingCount';
 import type { ReviewDish } from './reviewDishes';
 
 const ALLERGEN_CODES: ReadonlySet<string> = new Set<AllergenCode>([
@@ -22,6 +22,7 @@ const orNull = (value: string): string | null => (value.trim() === '' ? null : v
 
 /** The S09 form opened from Edit: the dish exactly as S10 shows it. */
 export function dishToForm(dish: ReviewDish): DishForm {
+  const count = servingCountText(dish.servingCount, dish.servingSize, dish.portionCalibration);
   return {
     origin: 'manual',
     servingSize: dish.servingSize ?? '',
@@ -30,9 +31,7 @@ export function dishToForm(dish: ReviewDish): DishForm {
     description: dish.description ?? '',
     priceAmount: dish.priceAmount ?? '',
     priceCurrency: dish.priceCurrency ?? '',
-    ...(dish.servingCount !== undefined
-      ? { servingCount: dish.servingCount === null ? '' : String(dish.servingCount) }
-      : {}),
+    ...(dish.servingCount !== undefined || count !== '' ? { servingCount: count } : {}),
     ...(dish.portionCalibration !== undefined
       ? { portionCalibration: dish.portionCalibration }
       : {}),
@@ -65,8 +64,7 @@ export function formToDish(form: DishForm, id: string, previous?: ReviewDish): R
   if (priceCurrency !== undefined) dish.priceCurrency = priceCurrency;
   dish.servingSize = orNull(form.servingSize);
   if (form.servingCount !== undefined) {
-    const count = orNull(form.servingCount);
-    dish.servingCount = count === null ? null : ServingCountSchema.parse(Number(count));
+    dish.servingCount = servingCountValue(form.servingCount);
   } else if (previous?.servingCount !== undefined) dish.servingCount = previous.servingCount;
   if (form.portionCalibration !== undefined) dish.portionCalibration = form.portionCalibration;
   else if (previous?.portionCalibration !== undefined)

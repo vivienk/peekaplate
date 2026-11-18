@@ -651,6 +651,73 @@ describe('saveCandidateReviewCommand (PR #73 findings B and C)', () => {
     confirmed: true as const,
   };
 
+  it('saves the extracted serving count separately from a confirmed 28 cm plate', async () => {
+    const plate = { ...portionCalibration, width_mm: 280, depth_mm: 280 };
+    const photo = { id: id(90), sourceHash: plate.source_sha256 };
+    const db = fakeCandidateDatabase(venueId, extractionId, photo);
+    const measured = await save(db, {
+      commandId: id(35),
+      expectedVersion: 0,
+      action: 'correct',
+      corrected: {
+        photo_id: photo.id,
+        serving_size: '2',
+        serving_count: 2,
+        portion_calibration: plate,
+      },
+    });
+    expect(measured.effective).toMatchObject({
+      serving_size: '2',
+      serving_count: 2,
+      portion_calibration: plate,
+    });
+    const command: ReviewCandidateCommand = {
+      commandId: id(38),
+      expectedVersion: 1,
+      action: 'correct',
+      corrected: { serving_count: 3, portion_calibration: plate },
+    };
+    const confirmed = await save(db, command);
+    expect(confirmed.effective).toMatchObject({
+      serving_size: '2',
+      serving_count: 3,
+      portion_calibration: plate,
+    });
+    expect(await save(db, command)).toEqual(confirmed);
+    expect(replayCandidateReview(db.events)).toEqual(confirmed.review);
+  });
+
+  it.each([
+    [1, 2],
+    [2, null],
+    [undefined, 2],
+    [null, 2],
+  ] as const)(
+    'invalidates extracted measurement evidence when people count changes from %s to %s',
+    async (previousCount, serving_count) => {
+      const photo = { id: id(90), sourceHash: portionCalibration.source_sha256 };
+      const db = fakeCandidateDatabase(venueId, extractionId, photo);
+      await save(db, {
+        commandId: id(36),
+        expectedVersion: 0,
+        action: 'correct',
+        corrected: {
+          photo_id: photo.id,
+          serving_size: '24',
+          ...(previousCount === undefined ? {} : { serving_count: previousCount }),
+          portion_calibration: portionCalibration,
+        },
+      });
+      const changed = await save(db, {
+        commandId: id(37),
+        expectedVersion: 1,
+        action: 'correct',
+        corrected: { serving_count },
+      });
+      expect(changed.effective).toMatchObject({ serving_count, portion_calibration: null });
+    },
+  );
+
   it('keeps extracted-dish calibration through unrelated corrections, receipt retry and event replay', async () => {
     const photo = { id: id(90), sourceHash: portionCalibration.source_sha256 };
     const db = fakeCandidateDatabase(venueId, extractionId, photo);
@@ -661,6 +728,7 @@ describe('saveCandidateReviewCommand (PR #73 findings B and C)', () => {
       corrected: {
         photo_id: photo.id,
         serving_size: '24',
+        serving_count: 2,
         portion_calibration: portionCalibration,
       },
     };
@@ -674,12 +742,13 @@ describe('saveCandidateReviewCommand (PR #73 findings B and C)', () => {
       corrected: { name: 'Owner title' },
     });
     expect(changed.effective.portion_calibration).toEqual(portionCalibration);
+    expect(changed.effective.serving_count).toBe(2);
     expect(replayCandidateReview(db.events)).toEqual(changed.review);
     expect(changed.review.editedFields).toContain('portion_calibration');
   });
 
   it.each([{ serving_size: '28' }, { photo_id: null }])(
-    'clears extracted measurement evidence after a photo or size edit: %j',
+    'clears extracted measurement evidence after a photo or legacy serving text edit: %j',
     async (corrected) => {
       const photo = { id: id(90), sourceHash: portionCalibration.source_sha256 };
       const db = fakeCandidateDatabase(venueId, extractionId, photo);
@@ -704,11 +773,11 @@ describe('saveCandidateReviewCommand (PR #73 findings B and C)', () => {
   );
 
   it.each([
-    { servingSize: '24', sourceHash: 'b'.repeat(64) },
-    { servingSize: '28', sourceHash: portionCalibration.source_sha256 },
+    { sourceHash: 'b'.repeat(64), selected: true },
+    { sourceHash: portionCalibration.source_sha256, selected: false },
   ])(
-    'rejects extracted measurement evidence for a different source or size',
-    async ({ servingSize, sourceHash }) => {
+    'rejects extracted measurement evidence for a different or unselected source',
+    async ({ sourceHash, selected }) => {
       const photo = { id: id(90), sourceHash };
       const db = fakeCandidateDatabase(venueId, extractionId, photo);
       await expect(
@@ -717,8 +786,9 @@ describe('saveCandidateReviewCommand (PR #73 findings B and C)', () => {
           expectedVersion: 0,
           action: 'correct',
           corrected: {
-            photo_id: photo.id,
-            serving_size: servingSize,
+            photo_id: selected ? photo.id : null,
+            serving_size: '2',
+            serving_count: 2,
             portion_calibration: portionCalibration,
           },
         }),

@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. Optional summary and clipped UTC daily opening buckets preserve per-cell privacy statuses; absent measurements are not zero. Food and portion evidence remain revision-bound. Optional photo-bound plate calibration carries physical Serving Size independently of People served; legacy text alone never creates a measurement.",
+      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. Optional summary and clipped UTC daily opening buckets preserve per-cell privacy statuses; absent measurements are not zero. Food and portion evidence remain revision-bound. Serving size parses integer people counts; separate optional photo-bound plate calibration provides physical dimensions. Legacy text alone never creates measurement evidence.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "a646202eb1ba27fe14e81d9bdfd4c0a53b1dda5d562b330b1a81bbfdddee995b"
+      "sourceFingerprint": "ffb08627b76db460191ae67fec1ed6901cce6fb23c7829b68d0696641e82f3c4"
     },
     {
       "id": "tokens",
@@ -123,7 +123,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Verified portion blobs retain supported image MIME for opaque published SVG URLs; exact byte/hash and dimension checks remain. Deliberate camera entry displays approved Serving Size dimensions. Tracked table AR uses the measured footprint with matching optional counts; 2.5D and ordinary camera scale remain approximate. Consent-gated PostHog/canonical tracking remains the existing implementation; withdrawn publication denies new prepared-content reads. Consent hides only during the existing portion preview/camera state and returns on exit without resetting the choice.",
+      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Verified portion blobs retain supported image MIME for opaque published SVG URLs; exact byte/hash and dimension checks remain. Portion and camera views label Serves N people separately from Plate size in cm. Tracked table AR uses the measured footprint with matching optional counts; 2.5D and ordinary camera scale remain approximate. Consent-gated PostHog/canonical tracking remains the existing implementation; withdrawn publication denies new prepared-content reads. Consent hides only during portion preview/camera state and returns on exit without resetting the choice.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -281,12 +281,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "065f5f5bf2d9d642196c8d0270a310ca8087d63372bc9d2a5bddca26801958b6"
+      "sourceFingerprint": "62bf67dff37e7df52d5a94ef93acedb4782730a6d1361ed8f0364a9c42faf13d"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. No replacement charts, fabricated orders or automatic publication. S09 Serving Size accepts cm dimensions; confirmed boundaries bind to the authenticated saved photo, survive manual/extracted review, and clear on size/count/photo edits.",
+      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. No replacement charts, fabricated orders or automatic publication. S09 has one Serving size (people) count field and separate optional Plate size (cm). Canonical counts, including null, take precedence over legacy text. Confirmed boundaries bind to the authenticated saved photo, survive manual/extracted review, and clear on count, measurement or photo edits.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -457,7 +457,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-menu/PortionCalibrationEditor.tsx",
         "frontend/console/src/owner-menu/portionCalibration.ts",
         "frontend/console/src/owner-menu/portionCalibration.test.ts",
-        "frontend/console/src/owner-menu/portionCalibration.test-helpers.ts"
+        "frontend/console/src/owner-menu/portionCalibration.test-helpers.ts",
+        "frontend/console/src/owner-menu/servingSize.test.tsx",
+        "frontend/console/src/owner-menu/servingCount.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -467,12 +469,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7dd5f5c722aa387170bdbc8580f067a3ce3b2b429f3e19bfeddf805552dfa5b0"
+      "sourceFingerprint": "e77e221e79387d68f59493dbd3c8f38eb9631b6c3194aa11e20f8b1683ae92a7"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker preserves staff/JWKS, tenant authority, expected versions and transactional replay/outbox. Owner extraction, verification, preparation and publication reuse approved photo/portion identities and bounded CPU cutouts. S13 binds approved serving calibration to exact photo bytes, EXIF-oriented dimensions and foreground hash; asset reads retain immutable snapshot calibration across draft edits. Reports and daily summaries share an authorized snapshot with actor/venue/window/digest-bound references; protected seals cover only reconciled synthetic scenarios, while live freshness remains unknown. Responses selects description spans; ingredients reuse saved evidence. Staging restaurant creation is actor-owned. Develop retains order/comparison APIs. AI diagnostics expose only safe classifications, HTTP status and allowlisted codes; project validation matches provisioning.",
+      "summary": "Worker preserves staff/JWKS, tenant authority, expected versions and transactional replay/outbox. Owner extraction, verification, preparation and publication reuse approved photo/portion identities and bounded CPU cutouts. Review and approval share strict legacy people-count resolution. Serving counts remain independent of plate dimensions; count/photo changes invalidate omitted calibration. S13 binds approved calibration to exact photo bytes, EXIF-oriented dimensions and foreground hash; asset reads retain immutable snapshot calibration. Reports share actor/venue/window/digest-bound references; protected seals cover reconciled synthetic scenarios, while live freshness remains unknown. Responses selects description spans; ingredients reuse saved evidence. Staging restaurant creation is actor-owned. Develop retains order/comparison APIs. AI diagnostics expose only safe classifications, HTTP status and allowlisted codes.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -716,7 +718,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/photo-dimensions.ts",
         "backend/src/bundle-producer/photo-dimensions.test.ts",
         "backend/src/owner-menu-calibration.test.ts",
-        "backend/src/owner-prepare-calibration.test.ts"
+        "backend/src/owner-prepare-calibration.test.ts",
+        "backend/src/owner-approval-serving.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -729,7 +732,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "290f27506db28eb60dc35cb7cd6cc967a0afaeeb1ef5780ddedeab5d29a0ede0"
+      "sourceFingerprint": "c9715cc7dd4e04e01c71de330765b8c927b79d089b469d842278188391b4a6eb"
     },
     {
       "id": "database",
@@ -1122,21 +1125,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-16",
-      "modules": [
-        "console"
-      ],
-      "summary": "Reconcile reviewed PR201 Terms/Privacy dialogs with develop d1b5c29. Preserve authored S05–S13 styles and context, existing agreement validation and Supabase session/API flow; no backend or migration change and no persisted agreement audit added. Local PASS: 46 auth/legal units, six preview/analytics guards, 23 auth Chromium cases, lint/typecheck/context/docs. Auth/legal source remains identical to approved 8686b593; hosted authentication and legal-content approval remain separate.",
-      "files": [
-        "frontend/console/src/auth/OwnerAuth.tsx",
-        "frontend/console/src/auth/auth.css",
-        "frontend/console/src/legal/LegalDialog.tsx",
-        "scripts/console-preview-demos.test.mjs",
-        "tests/e2e/owner-auth.spec.ts"
-      ],
-      "next": "Coordinator reviews the reconciled local merge before publishing. No hosted authentication, deployment or legal audit acceptance claimed."
-    },
-    {
       "date": "2026-11-17",
       "modules": [
         "backend",
@@ -1261,6 +1249,25 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionSize.ts"
       ],
       "next": "Complete pinned checks and independent review, then human review and exact staging release. Verify round/rectangular inputs through save, review, publish and supported-device table AR; ordinary camera and 2.5D remain approximate."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "contracts",
+        "console",
+        "backend",
+        "diner"
+      ],
+      "summary": "Correct the earlier interpretation: Serving size means people served. One count field replaces the duplicate People served input, while optional plate measurements independently authorize measured AR. Preserve canonical null/absent semantics, legacy notes, saved-photo evidence and immutable publication. Count changes require renewed calibration confirmation and never multiply dimensions.",
+      "files": [
+        "docs/screen9-portion-publish.md",
+        "packages/contracts/src/portion.ts",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/owner-menu/PortionCalibrationEditor.tsx",
+        "backend/src/owner-menu.ts",
+        "frontend/diner/src/menu/portionSize.ts"
+      ],
+      "next": "Complete focused and repository checks, independently review the pinned correction, and update PR237. Human review and exact staging release remain required; physical-device scale acceptance is separate."
     }
   ]
 }

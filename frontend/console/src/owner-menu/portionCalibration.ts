@@ -1,7 +1,7 @@
 import {
   type PlateCalibration,
   PlateCalibrationSchema,
-  parseServingDimensions,
+  parsePlateDimensions,
 } from '@peekaplate/contracts';
 import { sha256Hex } from './api';
 
@@ -24,11 +24,11 @@ export function calibrationMatchesPhoto(
 }
 
 export function confirmedPhotoCalibration(
-  servingSize: string,
+  plateSize: string,
   photo: CalibrationPhoto | undefined,
   boundary: PlateCalibration['boundary'],
 ): PlateCalibration | undefined {
-  const dimensions = parseServingDimensions(servingSize);
+  const dimensions = parsePlateDimensions(plateSize);
   if (!photo || !dimensions) return undefined;
   const result = PlateCalibrationSchema.safeParse({
     ...dimensions,

@@ -1,4 +1,4 @@
-import { type PlateCalibration, parseServingDimensions } from '@peekaplate/contracts';
+import { type PlateCalibration, parsePlateDimensions } from '@peekaplate/contracts';
 import { useState } from 'react';
 import { TextField } from '../foundations/TextField';
 import {
@@ -8,7 +8,6 @@ import {
 } from './portionCalibration';
 
 type Props = {
-  servingSize: string;
   value: PlateCalibration | null | undefined;
   photo: CalibrationPhoto | undefined;
   photoPending: boolean;
@@ -24,7 +23,6 @@ const edges = [
 ] as const;
 
 export function PortionCalibrationEditor({
-  servingSize,
   value,
   photo,
   photoPending,
@@ -32,6 +30,13 @@ export function PortionCalibrationEditor({
   busy,
   onChange,
 }: Props) {
+  const [plateSize, setPlateSize] = useState(() =>
+    value
+      ? value.shape === 'round'
+        ? String(value.width_mm / 10)
+        : `${value.width_mm / 10} × ${value.depth_mm / 10}`
+      : '',
+  );
   const [boundaryInputs, setBoundaryInputs] = useState(() => {
     const boundary = calibrationMatchesPhoto(value, photo)
       ? value!.boundary
@@ -43,7 +48,7 @@ export function PortionCalibrationEditor({
       height: String(Math.round(boundary.height * 1000) / 10),
     };
   });
-  const dimensions = parseServingDimensions(servingSize);
+  const dimensions = parsePlateDimensions(plateSize);
   const validInputs = Object.values(boundaryInputs).every((input) => /^\d+(\.\d)?$/.test(input));
   const boundary = {
     x: Number(boundaryInputs.x) / 100,
@@ -51,9 +56,7 @@ export function PortionCalibrationEditor({
     width: Number(boundaryInputs.width) / 100,
     height: Number(boundaryInputs.height) / 100,
   };
-  const candidate = validInputs
-    ? confirmedPhotoCalibration(servingSize, photo, boundary)
-    : undefined;
+  const candidate = validInputs ? confirmedPhotoCalibration(plateSize, photo, boundary) : undefined;
   const confirmed = Boolean(
     value &&
       candidate &&
@@ -66,16 +69,27 @@ export function PortionCalibrationEditor({
   const boundaryError = Boolean(photo && dimensions && !candidate);
   return (
     <fieldset className="pp-serving-calibration" disabled={busy}>
-      <legend>Match the size to your photo</legend>
+      <legend>Optional plate measurement</legend>
       <p className="pp-field__hint">
         Approximate until you confirm the measurements on the saved photo.
       </p>
-      {!dimensions && servingSize.trim() && (
-        <p className="pp-field__hint">
-          Your existing serving text is kept. Enter a plate diameter or width × depth in centimetres
-          to set a physical size.
-        </p>
-      )}
+      <TextField
+        id="dish-plate-size"
+        label="Plate size (cm)"
+        disabled={!photo || photoPending}
+        value={plateSize}
+        placeholder="28 or 30 × 20"
+        hint="Optional. Measured plate diameter, or width × depth. Use 3–100 cm, with up to one decimal place."
+        error={
+          plateSize.trim() && !dimensions
+            ? 'Enter a diameter or width × depth from 3 to 100 cm.'
+            : ''
+        }
+        onChange={(event) => {
+          setPlateSize(event.target.value);
+          onChange(null);
+        }}
+      />
       {photo ? (
         <>
           <p className="pp-field__hint">
@@ -83,7 +97,7 @@ export function PortionCalibrationEditor({
             edges, leaving utensils and garnish outside it. Angled photos remain approximate.
           </p>
           <div className="pp-serving-calibration__photo">
-            <img src={photo.url} alt="Saved original photo for serving-size measurement" />
+            <img src={photo.url} alt="Saved original photo for plate measurement" />
             <div
               className="pp-serving-calibration__boundary"
               aria-hidden="true"
