@@ -63,6 +63,7 @@ for (const port of [5173, 5174]) {
     );
     await page.goto(`http://127.0.0.1:${port}`);
     await page.getByRole('button', { name: /allow optional analytics/i }).click();
+    if (port === 5173) await page.getByRole('button', { name: 'Analytics preferences' }).click();
     await expect(page.getByRole('status')).toContainText('off');
     expect(captures).toBe(0);
   });
