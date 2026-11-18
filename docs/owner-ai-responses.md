@@ -150,7 +150,18 @@ The separate [owner-flow retest](owner-flow-retest.md) documents optional S09
 assistance. Description shortening retains literal supplied evidence; ingredient
 proposals reuse persisted owner/extraction values without a provider call, recipe
 completion or allergen inference. Both require explicit owner review. The new
-ingredient integration has no hosted acceptance yet. AI credential provisioning
+ingredient integration has no hosted acceptance yet.
+
+Allergen suggestions (Vivien, Nov 17; needs Sai's sign-off) are the one model
+inference: one constrained request sends only the owner's typed dish name,
+description and ingredients plus the saved menu line for that dish (OCR extraction
+itself produces no allergen data), and the strict output schema allows only the
+nine public allergen codes. Results
+are `unverified`, not publishable and stay "Allergens not confirmed" until the
+owner ticks the review box, whose text then names allergens. An empty answer is an
+abstention, never an allergen-free claim. Published allergens therefore remain
+explicit owner assertions ([public menu](public-menu.md)), but the suggestion
+itself can be wrong, so it has no hosted or quality acceptance yet. AI credential provisioning
 and trusted report freshness remain blocked; this change does not relax the
 dashboard report's evidence gate or enable positive recommendations.
 

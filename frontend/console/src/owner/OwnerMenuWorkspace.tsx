@@ -1141,6 +1141,34 @@ export function OwnerMenuWorkspace({
                 throw new Error('No supported description suggestion');
               return result.description;
             },
+            // AI allergen guesses are proposals only: they stay unconfirmed until the owner
+            // ticks the review box, and an empty answer is never "no allergens".
+            suggestAllergens: async (name: string, ingredients: string[]) => {
+              const active = runtime.current;
+              const generation = viewGeneration.current;
+              if (!active || !current(active)) throw new Error('Workspace unavailable');
+              if (!name.trim()) throw new Error('Add the dish name first');
+              const result = await active.client.assistDish(venueId, editing.id, {
+                operation: 'allergens',
+                expectedVersion: editing.draft?.draft_version ?? 0,
+                requestId: newCommandId(),
+                facts: {
+                  name: name.trim(),
+                  ingredients: ingredients.slice(0, 100),
+                  ...(latestEditing.current?.form.description.trim() && {
+                    description: latestEditing.current.form.description.slice(0, 4000),
+                  }),
+                },
+              });
+              if (
+                !current(active) ||
+                generation !== viewGeneration.current ||
+                latestEditing.current !== editing ||
+                result.operation !== 'allergens'
+              )
+                throw new Error('Allergen suggestion is no longer current');
+              return result.allergens;
+            },
             ...(editing.draft && {
               suggestIngredients: async () => {
                 const active = runtime.current;
