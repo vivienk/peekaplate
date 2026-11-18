@@ -35,6 +35,11 @@ import {
 } from '../owner-menu/dishForm';
 import { evidenceExcerpts } from '../owner-menu/evidence';
 import { errorMessage, menuProcessingState } from '../owner-menu/jobs';
+import {
+  type CalibrationPhoto,
+  calibrationMatchesPhoto,
+  readCalibrationPhoto,
+} from '../owner-menu/portionCalibration';
 import { Button } from '../ui';
 import { FirstDashboardContent } from './FirstDashboard';
 import { type MenuSnapshot, menuSnapshot } from './menu-snapshot';
@@ -153,6 +158,10 @@ export function OwnerMenuWorkspace({
   latestEditing.current = editing;
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [calibrationPhoto, setCalibrationPhoto] = useState<
+    (CalibrationPhoto & { draftId: string }) | undefined
+  >(undefined);
+  const [calibrationPhotoUnavailable, setCalibrationPhotoUnavailable] = useState(false);
   const [portionReview, setPortionReview] = useState<
     | {
         status: 'processing' | 'needs_review' | 'failed';
@@ -381,23 +390,52 @@ export function OwnerMenuWorkspace({
     const id = editing?.form.photoId;
     let objectUrl: string | null = null;
     let disposed = false;
+    const controller = new AbortController();
     setPhotoUrl(null);
+    setCalibrationPhoto(undefined);
+    setCalibrationPhotoUnavailable(false);
     if (pendingPhoto) {
       objectUrl = URL.createObjectURL(pendingPhoto);
       setPhotoUrl(objectUrl);
     } else if (active && id && editing)
       void active.client
         .readDraftPhoto(venueId, editing.id, id)
-        .then((blob) => {
+        .then(async (blob) => {
           if (disposed || !current(active)) return;
           objectUrl = URL.createObjectURL(blob);
           setPhotoUrl(objectUrl);
+          try {
+            const source = await readCalibrationPhoto(
+              blob,
+              id,
+              objectUrl,
+              AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
+            );
+            if (disposed || !current(active)) return;
+            setCalibrationPhoto({ ...source, draftId: editing.id });
+            setEditing((latest) => {
+              if (
+                latest?.id !== editing.id ||
+                latest.form.photoId !== id ||
+                !latest.form.portionCalibration ||
+                calibrationMatchesPhoto(latest.form.portionCalibration, source)
+              )
+                return latest;
+              return { ...latest, form: { ...latest.form, portionCalibration: null } };
+            });
+          } catch {
+            if (!disposed && current(active)) setCalibrationPhotoUnavailable(true);
+          }
         })
         .catch((reason) => {
-          if (!disposed && current(active)) failure(reason);
+          if (!disposed && current(active)) {
+            setCalibrationPhotoUnavailable(true);
+            failure(reason);
+          }
         });
     return () => {
       disposed = true;
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [pendingPhoto, editing?.form.photoId, editing?.id, venueId, current, failure]);
@@ -421,7 +459,8 @@ export function OwnerMenuWorkspace({
         if (result.status === 'failed') {
           setPortionReview({
             status: 'failed',
-            message: 'The 2.5D cutout could not be generated. The original photo is retained.',
+            message:
+              '2.5D processing failed. Please try another photo. The original photo is retained.',
           });
           return;
         }
@@ -434,7 +473,8 @@ export function OwnerMenuWorkspace({
         if (!disposed && current(active)) {
           setPortionReview({
             status: 'failed',
-            message: '2.5D processing is unavailable. The original photo is retained.',
+            message:
+              '2.5D processing failed. Please try again or use another photo. The original photo is retained.',
           });
         }
       });
@@ -1109,6 +1149,34 @@ export function OwnerMenuWorkspace({
                 throw new Error('No supported description suggestion');
               return result.description;
             },
+            // AI allergen guesses are proposals only: they stay unconfirmed until the owner
+            // ticks the review box, and an empty answer is never "no allergens".
+            suggestAllergens: async (name: string, ingredients: string[]) => {
+              const active = runtime.current;
+              const generation = viewGeneration.current;
+              if (!active || !current(active)) throw new Error('Workspace unavailable');
+              if (!name.trim()) throw new Error('Add the dish name first');
+              const result = await active.client.assistDish(venueId, editing.id, {
+                operation: 'allergens',
+                expectedVersion: editing.draft?.draft_version ?? 0,
+                requestId: newCommandId(),
+                facts: {
+                  name: name.trim(),
+                  ingredients: ingredients.slice(0, 100),
+                  ...(latestEditing.current?.form.description.trim() && {
+                    description: latestEditing.current.form.description.slice(0, 4000),
+                  }),
+                },
+              });
+              if (
+                !current(active) ||
+                generation !== viewGeneration.current ||
+                latestEditing.current !== editing ||
+                result.operation !== 'allergens'
+              )
+                throw new Error('Allergen suggestion is no longer current');
+              return result.allergens;
+            },
             ...(editing.draft && {
               suggestIngredients: async () => {
                 const active = runtime.current;
@@ -1132,6 +1200,11 @@ export function OwnerMenuWorkspace({
             }),
           })}
           photoUrl={photoUrl}
+          {...(!pendingPhoto &&
+            calibrationPhoto?.draftId === editing.id &&
+            calibrationPhoto.photoId === editing.form.photoId && { calibrationPhoto })}
+          photoPending={Boolean(pendingPhoto)}
+          calibrationPhotoUnavailable={calibrationPhotoUnavailable}
           {...(portionReview ? { portionReview } : {})}
           onGeneratePortion={() => saveDish(true)}
           onApprovePortion={() => {
@@ -1184,6 +1257,11 @@ export function OwnerMenuWorkspace({
                     ['image/jpeg', 'image/png'].includes(file.type)
                   ) {
                     setPendingPhoto(file);
+                    setEditing((latest) =>
+                      latest
+                        ? { ...latest, form: { ...latest.form, portionCalibration: null } }
+                        : latest,
+                    );
                     setLicenseChecked(false);
                   } else if (file) setError('Choose a JPEG or PNG up to 12 MB.');
                 }}

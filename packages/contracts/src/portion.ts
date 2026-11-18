@@ -3,6 +3,14 @@ import { z } from 'zod';
 // Number of people served; never a physical scale multiplier.
 export const ServingCountSchema = z.number().int().min(1).max(100);
 
+// Screen 9 serving size means people served. Units, fractions and ranges need
+// owner clarification; they never become a count or a physical scale multiplier.
+export function parseServingCountInput(value: string | null | undefined): number | undefined {
+  if (typeof value !== 'string' || !/^[1-9]\d{0,2}$/.test(value.trim())) return undefined;
+  const count = Number(value.trim());
+  return count <= 100 ? count : undefined;
+}
+
 export const PlateCalibrationSchema = z
   .strictObject({
     shape: z.enum(['round', 'rectangular']),
@@ -30,6 +38,42 @@ export const PlateCalibrationSchema = z
     }
   });
 export type PlateCalibration = z.infer<typeof PlateCalibrationSchema>;
+
+// The review UI and explicit approval resolve the same legacy value. A stored
+// null is an intentional unknown; an older calibrated "28" may have meant cm.
+export function resolveServingCount(
+  count: number | null | undefined,
+  legacySize: string | null | undefined,
+  calibration?: PlateCalibration | null,
+): number | null | undefined {
+  if (count !== undefined) {
+    if (count === null) return null;
+    return Number.isInteger(count) && count >= 1 && count <= 100 ? count : undefined;
+  }
+  return calibration ? undefined : parseServingCountInput(legacySize);
+}
+
+export type PlateDimensions = Pick<PlateCalibration, 'shape' | 'width_mm' | 'depth_mm'>;
+
+// A separate optional plate-size input uses cm. Text is never measurement evidence by itself:
+// actual-size placement also requires the confirmed boundary on the exact photo.
+export function parsePlateDimensions(
+  value: string | null | undefined,
+): PlateDimensions | undefined {
+  if (typeof value !== 'string' || value.length > 160) return undefined;
+  const match = /^(\d{1,3}(?:\.\d)?)\s*(?:cm)?(?:\s*[x×]\s*(\d{1,3}(?:\.\d)?)\s*(?:cm)?)?$/i.exec(
+    value.trim(),
+  );
+  if (!match) return undefined;
+  const width = Math.round(Number(match[1]) * 10);
+  const depth = match[2] === undefined ? width : Math.round(Number(match[2]) * 10);
+  if (width < 30 || width > 1000 || depth < 30 || depth > 1000) return undefined;
+  return {
+    shape: match[2] === undefined ? 'round' : 'rectangular',
+    width_mm: width,
+    depth_mm: depth,
+  };
+}
 
 // Public, reviewed T1 layers only. Processing manifests (needs_review) are not this contract.
 // Inclusion in the approved immutable menu is the publication boundary, not a browser flag.

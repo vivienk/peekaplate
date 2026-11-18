@@ -9,7 +9,7 @@ describe('Screen 8 (Review) and Screen 9 (Saved) menu verification UI', () => {
     name: 'Avocado Toast',
     cat: 'Breakfast',
     price: 14,
-    size: '1 slice',
+    size: '1',
     desc: 'Toasted seeded bread with avocado',
     ing: ['Avocado', 'Bread'],
     aiIng: [],
@@ -78,7 +78,7 @@ describe('Screen 9 (Add dish) form', () => {
     const html = render(newDraft());
     expect(html).toContain('>Add dish</h1>');
     expect(html).toContain('Select category');
-    expect(html).toContain('Serving Size');
+    expect(html).toContain('Serving size (people)');
     expect(html).toContain('Add an allergen');
     expect(html).toContain('Allergens are hidden from diners until you approve them');
     expect(html).toContain('Continue to review');
@@ -92,7 +92,7 @@ describe('Screen 9 (Add dish) form', () => {
       name: 'Avocado Toast',
       cat: 'Breakfast',
       price: '14.00',
-      size: '1 slice',
+      size: '1',
       ing: ['Avocado', 'Maple syrup'],
       aiIng: ['Maple syrup'],
       aiUsed: true,
@@ -112,7 +112,7 @@ describe('Screen 9 (Add dish) form', () => {
       name: 'Avocado Toast',
       cat: 'Breakfast',
       price: '14.00',
-      size: '1 slice',
+      size: '1',
       ing: ['Avocado'],
     });
     expect(html).toMatch(/aria-disabled="true"[^>]*>Continue to review/);
@@ -125,7 +125,7 @@ describe('Screen 9 (Add dish) form', () => {
       name: 'Avocado Toast',
       cat: 'Breakfast',
       price: '14',
-      size: '1 slice',
+      size: '1',
       ing: ['Avocado'],
       aiUsed: true,
       aiReviewed: false,

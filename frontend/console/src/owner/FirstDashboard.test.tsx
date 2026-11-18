@@ -51,6 +51,13 @@ describe('FirstDashboard (S12 first dashboard arrival, S6-FE-14 onboarding)', ()
     expect(html).not.toContain('aria-valuenow=');
     expect(html).not.toContain('owner-dialog');
   });
+  it('never says "No dish activity yet" once the menu is published', () => {
+    const words = text(render(published));
+    expect(words).not.toContain('No dish activity yet');
+    expect(words).toContain('Dish activity');
+    expect(words).toContain('Open Dish performance to see how diners use your dishes.');
+    expect(text(render(figmaState))).toContain('No dish activity yet');
+  });
   it('uses one restaurant name everywhere and shows progress from the setup facts', () => {
     const html = render(figmaState);
     const words = text(html);

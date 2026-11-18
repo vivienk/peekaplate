@@ -88,6 +88,7 @@ export class ReviewCommandError extends Error {
       | 'command_conflict'
       | 'extraction_conflict'
       | 'invalid_candidate'
+      | 'portion_calibration_mismatch'
       | 'artifact_required'
       | 'artifact_not_found'
       | 'artifact_mismatch'
@@ -128,6 +129,9 @@ export function resolveEffectiveFields(
   corrected: CandidateReviewRecord['corrected'],
 ): ResolvedCandidateFields {
   return ResolvedCandidateFieldsSchema.parse({
+    ...(corrected.portion_calibration !== undefined
+      ? { portion_calibration: corrected.portion_calibration }
+      : {}),
     ...(corrected.serving_count !== undefined ? { serving_count: corrected.serving_count } : {}),
     name: corrected.name !== undefined ? corrected.name : candidate.original.name,
     description:
@@ -685,9 +689,9 @@ export async function saveCandidateReviewCommand(
         currentRow?.review_status === 'corrected' || currentRow?.review_status === 'incomplete'
           ? (currentRow.corrected_fields ?? {})
           : {};
+      const priorIncomplete = (currentRow?.incomplete_fields ?? []) as ReviewEditableField[];
       if (input.action === 'correct') {
         reviewStatus = 'corrected';
-        const priorIncomplete = (currentRow?.incomplete_fields ?? []) as ReviewEditableField[];
         incompleteFields =
           input.incompleteFields ?? priorIncomplete.filter((f) => !(f in (input.corrected ?? {})));
       } else {
@@ -703,6 +707,30 @@ export async function saveCandidateReviewCommand(
             value !== undefined && !incompleteFields.includes(key as ReviewEditableField),
         ),
       );
+      if (
+        input.corrected?.portion_calibration === undefined &&
+        priorCorrected.portion_calibration != null &&
+        !incompleteFields.includes('portion_calibration') &&
+        (correctedFields.photo_id !== priorCorrected.photo_id ||
+          (correctedFields.serving_count ?? null) !== (priorCorrected.serving_count ?? null) ||
+          correctedFields.serving_size !== priorCorrected.serving_size)
+      ) {
+        // Measurements may survive unrelated edits, never a changed photo or people count.
+        // A changed legacy serving label also conservatively requires renewed confirmation.
+        correctedFields.portion_calibration = null;
+      }
+      if (
+        correctedFields.serving_count === undefined &&
+        !incompleteFields.includes('serving_count') &&
+        ((priorCorrected.serving_count === undefined &&
+          priorCorrected.portion_calibration != null &&
+          correctedFields.portion_calibration == null) ||
+          priorIncomplete.includes('serving_count'))
+      ) {
+        // Preserve unknown count provenance when its calibration or incomplete marker disappears.
+        // An active incomplete field already carries that intent and cannot also be corrected.
+        correctedFields.serving_count = null;
+      }
       editedFields = (Object.keys(correctedFields) as ReviewEditableField[]).sort();
     }
 
@@ -722,6 +750,22 @@ export async function saveCandidateReviewCommand(
       reviewedAt,
       publishable: false,
     });
+
+    const measured = reviewRecord.corrected.portion_calibration;
+    if (measured) {
+      const selectedPhoto = reviewRecord.corrected.photo_id;
+      if (!selectedPhoto || !sessionResult.rows[0].job_id)
+        throw new ReviewCommandError('portion_calibration_mismatch', 409);
+      const photo = await client.query<{ source_hash: string }>(
+        `SELECT p.source_hash FROM app_private.dish_draft_photo p JOIN app_private.dish_drafts d
+         ON d.tenant_id=p.tenant_id AND d.id=p.draft_id
+         WHERE p.tenant_id=$1 AND p.id=$2 AND d.job_id=$3
+           AND COALESCE(d.candidate_id,d.draft_id)=$4 AND d.review_status='pending' AND d.removed_at IS NULL`,
+        [venueId, selectedPhoto, sessionResult.rows[0].job_id, candidateId],
+      );
+      if (photo.rowCount !== 1 || photo.rows[0]?.source_hash !== measured.source_sha256)
+        throw new ReviewCommandError('portion_calibration_mismatch', 409);
+    }
 
     const effective = resolveEffectiveFields(candidate, reviewRecord.corrected);
     const itemResponse: ReviewCandidateItemResponse = {

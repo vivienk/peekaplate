@@ -353,13 +353,17 @@ export function FirstDashboardContent({
           <span className="owner-empty__tile">
             <Icon name="activity" size={24} />
           </span>
+          {/* Setup never reads the report, so once the menu is live it points to Dish performance
+              instead of claiming there is no activity (the report there may already have data). */}
           <h2 id="owner-empty-title">
-            {setup.published === null ? 'Dish activity' : 'No dish activity yet'}
+            {setup.published === false ? 'No dish activity yet' : 'Dish activity'}
           </h2>
           <p>
             {setup.published === null
               ? 'Open Dish performance for available reports. Missing reporting status does not mean zero activity.'
-              : 'Diner activity for your dishes will appear here once your menu is published and diners start using PeekaPlate. We never show placeholder numbers.'}
+              : setup.published
+                ? 'Your menu is published. Open Dish performance to see how diners use your dishes.'
+                : 'Diner activity for your dishes will appear here once your menu is published and diners start using PeekaPlate. We never show placeholder numbers.'}
           </p>
         </section>
       </div>

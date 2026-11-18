@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DishDraft } from '../../owner-menu/api';
 import { JOB, reviewSession } from '../../owner-menu/fixtures.test-helpers';
+import { confirmedCalibration } from '../../owner-menu/portionCalibration.test-helpers';
 import { draftToReviewDish } from './fromDishDraft';
 
 const session = reviewSession();
@@ -24,6 +25,21 @@ const draft: DishDraft = {
 };
 
 describe('saved candidate corrections in the review table', () => {
+  it('retains photo calibration in both manual and extracted rows', () => {
+    const manual = draftToReviewDish({
+      ...draft,
+      origin: 'manual',
+      manual_fields: { servingSize: '28 cm', portionCalibration: confirmedCalibration },
+    });
+    expect(manual.portionCalibration).toEqual(confirmedCalibration);
+    const item = structuredClone(original);
+    item.effective.serving_size = '28 cm';
+    item.effective.portion_calibration = confirmedCalibration;
+    expect(
+      draftToReviewDish(draft, session.extractionResult.extraction_id, item).portionCalibration,
+    ).toEqual(confirmedCalibration);
+  });
+
   it('uses the same USD default as Screen 9 while retaining a known source currency', () => {
     expect(draftToReviewDish(draft).priceCurrency).toBe('USD');
     expect(draftToReviewDish({ ...draft, price_currency: 'CAD' }).priceCurrency).toBe('CAD');

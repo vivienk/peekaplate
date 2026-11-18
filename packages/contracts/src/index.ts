@@ -6,8 +6,12 @@ export * from './owner-workspace';
 export {
   type PlateCalibration,
   PlateCalibrationSchema,
+  type PlateDimensions,
   type PublicPortion,
   PublicPortionSchema,
+  parsePlateDimensions,
+  parseServingCountInput,
+  resolveServingCount,
   ServingCountSchema,
 } from './portion';
 
