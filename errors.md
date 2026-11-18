@@ -5258,3 +5258,26 @@ analysis route imported a command error with TypeScript constructor parameter
 properties. The launcher uses Node's strip-only loader. Import the same shared
 error directly and use explicit class fields so the launcher can load it. The
 launcher test verifies startup and propagation of the frontend's exit status.
+
+## November 10 evening DATA-01 acceptance synchronization
+
+Fixed develop96b8de1 includes the reviewed bundle producer, report CORS/release
+records and exact-byte diner connection/publication-suspension work. This
+forward merge resolves only shared context conflicts;
+the twelve-case acceptance plan and its PLANNED / NOT RUN status are unchanged.
+No upstream source, hosted observation or acceptance outcome is altered.
+New context records identify the exact synchronized source; refreshed hashes
+do not establish hosted readiness. Verification results belong to this new
+clean commit and are recorded in the handoff. No service, deployment, database
+or provider action is performed by this synchronization.
+
+The guarded metadata helper initially stopped before writing because the
+delivery node had changed on both sides: the acceptance summary on this branch
+and source references upstream. A context refresh attempted while markers were
+still unresolved correctly rejected the invalid JSON. The corrected merge
+retains the preparation summary, unions both path sets and preserves upstream
+module/handoff responsibilities; the validator is unchanged. Direct pinned-Node
+context/docs checks now pass for 13 modules, ten handoffs and 59 Markdown files.
+The existing pinned Biome CLI checks 346 files without fixes. The twelve-case
+acceptance section is byte-identical to its prior candidate, and all upstream
+runtime/contract sources match fixed develop96b8de1. No hosted case is executed.

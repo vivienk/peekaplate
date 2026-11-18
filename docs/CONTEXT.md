@@ -810,7 +810,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending.",
+      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending. The DATA-01 runbook records twelve dual-destination cases and partial November 16 staging evidence. Event-by-event transport and report reconciliation remain pending.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -879,7 +879,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "76014bcd73e0d2308cf7d7e0b87d1aef1114b2aec9666b1568da0d0e9b255423"
+      "sourceFingerprint": "1a3304db3260da35ab6a1bd6f1adcee2314f6b601d7c194ca472f735d5906b3f"
     },
     {
       "id": "agents",
@@ -1236,10 +1236,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-17",
       "modules": [
-        "console"
+        "console",
+        "delivery"
       ],
       "summary": "Fix S13 handoff: retain preparation menu identity and load that exact snapshot in the existing PR208 MenuPreview. No screen/CSS replacement, auto-publication, or backend change.",
-      "next": "Verify direct preview and safe retry on staging; provider credentials and report completeness remain separate AI gates."
+      "next": "Verify direct preview and safe retry on staging; provider credentials and report completeness remain separate AI gates. Reconcile the partial DATA-01 evidence per case under shared REL-02 run REL02-DATA01-20261116-055223Z and obtain independent review."
     },
     {
       "date": "2026-11-17",
