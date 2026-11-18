@@ -2,6 +2,8 @@
 import { toOwnerReport } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { CommandError } from './dish-command';
+import { verifySyntheticCompleteness } from './owner-ai/synthetic-completeness';
+import { readOwnerReportSummary } from './owner-report-summary';
 
 const REPORT_PERMISSIONS = ['owner'];
 type OwnerReportSource = 'production' | 'synthetic';
@@ -12,10 +14,20 @@ export async function readOwnerReport(
   venueId: string,
   now: Date,
   source: OwnerReportSource = 'production',
+  options: {
+    trafficClass?: 'live' | 'test';
+    includeSummary?: boolean;
+    syntheticSeal?: string;
+    validationNow?: Date;
+  } = {},
 ): Promise<unknown> {
   let started = false;
   try {
-    await client.query('BEGIN READ ONLY');
+    await client.query(
+      options.includeSummary || options.syntheticSeal
+        ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
+        : 'BEGIN READ ONLY',
+    );
     started = true;
     await client.query("SET LOCAL statement_timeout = '5s'");
     await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
@@ -34,14 +46,35 @@ export async function readOwnerReport(
     // Tenant scope is set only after the owner permission is confirmed.
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
-    const result = await client.query(OWNER_REPORT_QUERY, [
+    const query = options.trafficClass === 'test' ? TEST_OWNER_REPORT_QUERY : OWNER_REPORT_QUERY;
+    const result = await client.query(query, [
       venueId,
       new Date(now.getTime() - 24 * 60 * 60 * 1000),
       now,
     ]);
+    const summary = options.includeSummary
+      ? await readOwnerReportSummary(client, venueId, now, options.trafficClass ?? 'live')
+      : undefined;
+    const complete =
+      source === 'synthetic' &&
+      options.trafficClass === 'test' &&
+      (await verifySyntheticCompleteness(client, {
+        ...(options.syntheticSeal ? { seal: options.syntheticSeal } : {}),
+        venueId,
+        anchor: now,
+        validationNow: options.validationNow ?? new Date(),
+      }));
+    const internal = buildInternalReport(result.rows, venueId, now, source);
     await client.query('COMMIT');
     started = false;
-    return toOwnerReport(buildInternalReport(result.rows, venueId, now, source));
+    return toOwnerReport({
+      ...internal,
+      report_metadata: {
+        ...internal.report_metadata,
+        freshness: { ...internal.report_metadata.freshness, is_stale: complete ? false : null },
+      },
+      ...(summary ? { summary } : {}),
+    });
   } catch (error) {
     if (started) {
       try {
@@ -263,6 +296,10 @@ const OWNER_REPORT_QUERY = `
 `;
 
 type ReportRow = Record<string, unknown>;
+const TEST_OWNER_REPORT_QUERY = OWNER_REPORT_QUERY.replace(
+  'FROM app_private.owner_observation_v1 obs',
+  'FROM app_private.owner_test_observation_v1 obs',
+);
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
 
 function rateMetric(

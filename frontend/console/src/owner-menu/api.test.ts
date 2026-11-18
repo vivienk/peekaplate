@@ -46,6 +46,48 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('owner menu client', () => {
+  it('preserves the exact prepared menu identity for the S13 handoff', async () => {
+    const prepared = { menuId: VENUE, menuRevisionId: JOB, completeDishes: 1 };
+    const { api } = client([{ status: 200, body: prepared }]);
+    await expect(api.prepareMenu(VENUE)).resolves.toEqual(prepared);
+    const missingIdentity = client([
+      { status: 200, body: { menuRevisionId: JOB, completeDishes: 1 } },
+    ]);
+    await expect(missingIdentity.api.prepareMenu(VENUE)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
+
+  it('reads prepared preview photos only through the authenticated exact-snapshot blob route', async () => {
+    const calls: Call[] = [];
+    const origin = 'https://peekaplate-api-staging.vxkong.workers.dev';
+    const api = createOwnerMenuClient({
+      baseUrl: origin,
+      getToken: () => 'staff-token',
+      fetch: async (input, init) => {
+        calls.push({ url: String(input), init: init ?? {} });
+        return new Response(new Blob(['synthetic'], { type: 'image/png' }));
+      },
+    });
+    const asset = `${origin}/public/prepared-assets/${VENUE}/${JOB}/${'a'.repeat(64)}`;
+    const blob = await api.readPreparedPreviewAsset(VENUE, JOB, VENUE, asset);
+    expect(blob.type).toBe('image/png');
+    expect(calls[0]?.url).toBe(
+      `${origin}/venues/${VENUE}/prepared-menus/${JOB}/${VENUE}/assets/${JOB}/${'a'.repeat(64)}`,
+    );
+    expect(header(calls[0], 'Authorization')).toBe('Bearer staff-token');
+    expect(calls[0]?.init.credentials).toBe('omit');
+    expect(calls[0]?.init.cache).toBe('no-store');
+    for (const invalid of [
+      asset.replace(origin, 'https://foreign.example.test'),
+      `${asset}?token=not-sent`,
+    ])
+      await expect(api.readPreparedPreviewAsset(VENUE, JOB, VENUE, invalid)).rejects.toMatchObject({
+        code: 'invalid_request',
+      });
+    expect(calls).toHaveLength(1);
+  });
+
   it('verifies a saved dish with caller command identity and rejects a mismatched response', async () => {
     const command = { commandId: crypto.randomUUID(), expectedVersion: 1, verified: true };
     const { api, calls } = client([{ status: 200, body: { draft: { id: JOB } } }]);
@@ -253,6 +295,7 @@ describe('owner menu client', () => {
         // An unknown allergen status cannot carry items.
         fields: {
           name: 'Soup',
+          servingSize: null,
           category: null,
           description: null,
           priceAmount: null,
@@ -336,4 +379,30 @@ describe('sha256Hex', () => {
       'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
     );
   });
+});
+
+it('saves and reloads the Screen 5 profile through the authenticated versioned endpoint', async () => {
+  const profile = {
+    version: 1,
+    fields: {
+      name: 'Synthetic logo cafe',
+      city: 'Test city',
+      street: 'Test street',
+      line2: '',
+      phone: '1234567890',
+      email: '',
+      photoId: null,
+    },
+    status: 'submitted',
+  };
+  const { api, calls } = client([
+    { status: 200, body: { profile } },
+    { status: 200, body: { profile } },
+  ]);
+  const input = { commandId: crypto.randomUUID(), expectedVersion: 0, fields: profile.fields };
+  expect(await api.saveProfile(VENUE, input)).toEqual(profile);
+  expect(await api.readProfile(VENUE)).toEqual(profile);
+  expect(calls[0]?.url).toContain(`/venues/${VENUE}/profile`);
+  expect(header(calls[0], 'Authorization')).toBe('Bearer staff-token');
+  expect(JSON.parse(String(calls[0]?.init.body))).toEqual(input);
 });

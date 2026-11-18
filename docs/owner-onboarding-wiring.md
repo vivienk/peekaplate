@@ -1,6 +1,19 @@
 # Owner menu wiring from merged code
 
-This slice connects the signed-in owner shell to the existing staff-authorized
+Current composition (November 17): authored S05–S13 now include persisted
+restaurant details, saved-dish verification, server preparation, publication and
+revision-bound portion links. Ingredient assistance resurfaces persisted evidence
+as unverified proposals; it does not ask a provider to invent recipes. The new
+ingredient change has no hosted acceptance yet. AI secret provisioning and
+trusted report freshness remain separate blockers. See [owner-flow retest](owner-flow-retest.md).
+
+The November 16 [S05–S13 correction guide](owner-flow-corrections.md) records
+source PR attribution, profile/setup persistence, authored S09 adaptation,
+removal/Undo, extracted-photo fixes and the full synthetic PR-preview journey.
+Earlier sections below describe their dated release slices; they do not establish
+that this new migration or code has reached hosted staging.
+
+The initial slice described below connected the signed-in owner shell to the existing staff-authorized
 menu APIs. DES-02 guides the multi-source journey, but this is not the complete
 owner onboarding or publication flow.
 
@@ -13,7 +26,7 @@ reviewed and fixed the client boundaries, ran local checks and waited for green
 GitHub CI before merging it. This avoided writing a competing menu client.
 No other pending team PR is merged by this wiring task.
 
-## Connected flow
+## Initial client wiring flow (historical)
 
 1. Sign in, then select a restaurant returned by GET /staff/venues. Accounts
    without membership receive no restaurant authority or sample restaurant.
@@ -42,7 +55,11 @@ Unsaved dish edits warn before leaving, and late imports cannot reopen an
 abandoned screen. No new backend route, table, migration or membership grant is
 part of this narrowed slice.
 
-## Remaining boundaries
+## Boundaries at the initial client release (historical)
+
+Later S05–S13 integration supersedes the missing-profile, serving-size,
+verification, preparation and portion boundaries listed here. They explain the
+original scope, not current missing screens.
 
 - S05 restaurant-details persistence has no merged API. Its backend expansion is
   parked locally and is not included here. The workspace does not simulate saved
@@ -75,6 +92,28 @@ Record each rollout's exact commit and authenticated screen evidence on its
 release PR. Local fixture checks alone are not hosted screen acceptance.
 Deploy PR188's paired host/container before claiming hosted provider-budget
 enforcement. A zero-provider reserve probe uses its own disposable job identity.
+
+## Initial narrow staging release (historical)
+
+The release promotes the reviewed menu client (#156), merged source/draft/photo
+workspace (#190), and opt-in owner analysis connection (#164/#187). The source
+controls reuse the already merged onboarding/dish components. #156 was required
+because those controls had no shared authenticated menu client on develop before
+this integration; its verified client replaces duplicate request code.
+
+Existing main Worker bindings, hosted migrations, extraction service, diner and
+paused Queues are preserved. AI remains off by default and current unknown
+freshness continues to abstain. The release does not provision provider keys or
+a rate limiter, manufacture freshness, persist restaurant details, consolidate
+menus, or add the pending final verification/publish screen.
+
+Use [owner sign-in](https://peekaplate-console-staging.pages.dev/owner-auth).
+A confirmed account still needs server-authorized restaurant membership. The
+menu upload, saved draft/photo and correction controls appear in that workspace;
+Dish performance remains restricted to owners and its configured synthetic venue.
+The diner continues to open already published, verified links. No changes to the
+.io homepage or production domains are included. Deployment/hosted results are
+recorded on the release PR; local synthetic HTTP tests are separate evidence.
 
 ## Screen composition correction — November 15
 
@@ -111,7 +150,7 @@ without changing the demo. Browser-dropped files with no MIME use the existing
 extension policy to declare PDF/JPEG/PNG while retaining the original bytes;
 server signature/hash verification remains authoritative.
 
-## S8/S10 integration reconciliation (PR #206)
+## S8/S10 integration reconciliation (PR #206, historical)
 
 Harshita's existing review table, status pills, edit/return flow and review
 checkboxes are reused. Completing verification calls the existing authenticated
@@ -143,3 +182,25 @@ the fix and passed in 4.9 seconds afterward. Unready/failed review hydration now
 leaves other saved work usable with an explicit notice; 401/403 still clear access.
 These use the real browser/SDK with synthetic intercepted HTTP. Hosted acceptance
 requires the later reviewed staging release; this is not hosted evidence.
+
+## Review-source reconciliation with #206
+
+That correction release took Harshita's reconciled #206 controller, review
+components, dish editor and API client unchanged. It supersedes the earlier
+embedded S10 composition: Menu remains the authored management table, while the
+setup menu step opens the authored standalone review screen. Existing S13 still
+owns explicit approval/publication and the returned diner URL.
+
+The review list reads saved effective corrections, keeps other saved work usable
+when an extraction review is unavailable, and confirms persisted verification
+before reporting success. Review/photo-rights checkboxes are not inferred from a
+previous save. At that point S05 remained local-only until
+the restaurant-profile API existed, and extracted-photo verification was blocked;
+unknown facts and unsupported actions are not turned into success states.
+
+Subsequent integration connects those existing forms and photo controls to the
+profile and verification APIs; the current preparation/portion path is documented
+in [the S13 handoff](owner-publish-handoff.md).
+
+See [the preservation audit](screen-preservation-audit.md) for exact provenance,
+verification evidence and staging rollout limits.

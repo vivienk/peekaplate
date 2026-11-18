@@ -15,11 +15,13 @@ import type { RestaurantDetails as Details } from './details';
 import { MenuProcessing, type MenuProcessingState, type MenuSourceItem } from './MenuProcessing';
 import { menuFileKind } from './menu-source';
 import { OnboardingLayout } from './OnboardingLayout';
+import { OwnerJourneyDemo } from './OwnerJourneyDemo';
 import { RestaurantDetails } from './RestaurantDetails';
 import { type MenuUpload, UploadMenu } from './UploadMenu';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Owner onboarding demo root element is missing');
+document.body.classList.add('owner-dashboard-demo');
 
 // Fictional saved details for the dashboard state.
 const SAMPLE: Details = {
@@ -443,6 +445,6 @@ function useUploads(answer: string, onRequest: () => void) {
 
 createRoot(root).render(
   <StrictMode>
-    <Demo />
+    {new URLSearchParams(window.location.search).has('journey') ? <OwnerJourneyDemo /> : <Demo />}
   </StrictMode>,
 );

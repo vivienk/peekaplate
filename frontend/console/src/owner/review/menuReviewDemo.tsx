@@ -278,6 +278,7 @@ function Demo() {
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Menu review demo root element is missing');
+document.body.classList.add('owner-dashboard-demo');
 createRoot(root).render(
   <StrictMode>
     <Demo />

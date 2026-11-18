@@ -671,3 +671,80 @@ describe('derived UUIDs', () => {
     expect(value).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 });
+
+it('publishes an explicitly approved portion for the exact dish revision and binds asset approval to it', async () => {
+  const input = requestInput();
+  const portion = {
+    schema_version: 1,
+    dish_id: LEEKS,
+    dish_revision_id: id(120),
+    width: 64,
+    height: 64,
+    layers: [0, 1].map((depth) => ({
+      url: `https://assets.example.test/portion/${depth}.png`,
+      sha256: 'a'.repeat(64),
+      size_bytes: 100,
+      depth,
+    })),
+  };
+  input.categories[0]!.dishes[0]!.portion = portion;
+  const approved = await produceMenuBundle(parseRequest(input), sources(), assets());
+  expect(approved.bundle.categories[0]!.dishes[0]).toHaveProperty('portion', portion);
+  const original = await produceMenuBundle(parseRequest(requestInput()), sources(), assets());
+  expect(approved.assetManifestHash).not.toBe(original.assetManifestHash);
+  input.categories[0]!.dishes[0]!.portion = { ...portion, dish_revision_id: id(999) };
+  await expect(produceMenuBundle(parseRequest(input), sources(), assets())).rejects.toMatchObject({
+    code: 'asset_revision_mismatch',
+  });
+});
+
+it('publishes approved serving count and refuses calibration for another serving', async () => {
+  const input = requestInput();
+  const portion = {
+    schema_version: 1,
+    dish_id: LEEKS,
+    dish_revision_id: id(120),
+    width: 64,
+    height: 64,
+    physical_size: {
+      serving_count: 2,
+      source: 'owner',
+      validation_status: 'pending',
+      foreground_sha256: 'a'.repeat(64),
+      plate: {
+        shape: 'round',
+        width_mm: 280,
+        depth_mm: 280,
+        source_sha256: 'b'.repeat(64),
+        source_width_px: 64,
+        source_height_px: 64,
+        boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        confirmed: true,
+      },
+    },
+    layers: [0, 1].map((depth) => ({
+      url: `https://assets.example.test/${depth}.png`,
+      depth,
+      sha256: 'a'.repeat(64),
+      size_bytes: 100,
+    })),
+  };
+  input.categories[0]!.dishes[0]!.portion = portion;
+  const approved = await produceMenuBundle(
+    parseRequest(input),
+    sources({ [LEEKS]: { servingCount: 2 } }),
+    assets(),
+  );
+  expect(approved.bundle.categories[0]!.dishes[0]).toMatchObject({ serving_count: 2, portion });
+  for (const servingCount of [1, null])
+    await expect(
+      produceMenuBundle(parseRequest(input), sources({ [LEEKS]: { servingCount } }), assets()),
+    ).rejects.toMatchObject({ code: 'asset_revision_mismatch' });
+  input.categories[0]!.dishes[0]!.portion = {
+    ...portion,
+    physical_size: { ...portion.physical_size, serving_count: undefined },
+  };
+  await expect(
+    produceMenuBundle(parseRequest(input), sources({ [LEEKS]: { servingCount: 2 } }), assets()),
+  ).rejects.toMatchObject({ code: 'asset_revision_mismatch' });
+});

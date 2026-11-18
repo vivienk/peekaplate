@@ -460,6 +460,12 @@
   line-height: 1.75rem;
 }
 
+/* Design QA (#213, item 3): "Choose file" is always underlined so it clearly reads as a link. */
+.pp-onboard-drop__line .pp-auth-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* With the spaces either side, 2 at the sides keeps the link 6 from the words as in Figma. */
 .pp-onboard-drop__line .pp-auth-link {
   display: inline;

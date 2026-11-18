@@ -51,6 +51,9 @@ Standalone Python helpers remain optionally gated. The hosted service requires t
 
 ## Staging verification plan
 
+Use the [extraction-only main release runbook](extraction-budget-release.md) for
+the paired deployment, unchanged API/Pages baseline and non-billable probes.
+
 Before unpausing staging queues or submitting a synthetic menu:
 
 1. Deploy the updated Extraction Worker (`backend/wrangler.extraction.jsonc`) and container image to staging.

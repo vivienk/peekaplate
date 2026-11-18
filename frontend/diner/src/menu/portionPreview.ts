@@ -3,6 +3,7 @@ import { createPlateCalibration } from './portionCalibration';
 import { createPortionMotion } from './portionMotion';
 import { createPortionOrientation } from './portionOrientation';
 import type { PortionRenderer } from './portionRenderer';
+import { approximatePortionLabel } from './portionSize';
 import type { CompleteDish } from './types';
 
 // Reuses the mounted detail screen: no separate page, duplicated dish data or global asset lookup.
@@ -92,6 +93,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   let renderer: PortionRenderer | undefined;
   let local3d: ReturnType<typeof import('./portion3d').bindLocal3d> | undefined;
   let ar: ReturnType<typeof import('./portionAR').bindPortionAR> | undefined;
+  let arEntry: HTMLButtonElement | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const motion = createPortionMotion();
   let drag: { id: number; x: number; y: number } | undefined;
@@ -99,6 +101,8 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     orientation.release();
     ar?.dispose();
     ar = undefined;
+    arEntry?.remove();
+    arEntry = undefined;
     local3d?.dispose();
     local3d = undefined;
     clearTimeout(timer);
@@ -201,7 +205,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       if (
         (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
         uploadedPortion === undefined &&
-        (cameraSample || new URLSearchParams(location.search).get('scenario') === 'portion-demo')
+        (cameraSample || fixtureCamera)
       ) {
         const { originalReviewPortion } = await import('./portionDemo');
         const original = originalReviewPortion(parsed.data, visual);
@@ -246,11 +250,11 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       setState('ready');
       status.textContent =
         sampleNotice ??
-        (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate');
-      if (
+        `${approximatePortionLabel(dish.servingCount)} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`;
+      const demoPortal =
         (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-        (visualSelect || fixtureCamera || uploadedPortion)
-      ) {
+        !!(visualSelect || fixtureCamera || uploadedPortion);
+      if (demoPortal) {
         if (import.meta.env.DEV && visualSelect && uploadedPortion === undefined) {
           const module = await import('./portion3d').catch(() => null);
           if (!module) return;
@@ -262,8 +266,16 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
             compare.setAttribute('aria-pressed', 'false');
           });
         }
+      }
+      const openCamera = async (entry?: HTMLButtonElement) => {
         const arModule = await import('./portionAR').catch(() => null);
-        if (controller.signal.aborted || disposed || !arModule) return;
+        if (controller.signal.aborted || disposed) return;
+        if (!arModule) {
+          orientation.release();
+          status.textContent =
+            'Camera preview unavailable. The interactive preview is still available.';
+          return;
+        }
         ar = arModule.bindPortionAR(
           controls,
           () => stage.querySelector<HTMLImageElement>('.pp-portion__css img'),
@@ -272,11 +284,37 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
           orientation,
           renderManifest.physical_size,
           () => stage.querySelector<HTMLImageElement>('img.pp-detail__image'),
+          !sampleNotice && !visualSelect && uploadedPortion === undefined
+            ? { count: dish.servingCount }
+            : undefined,
+          entry,
         );
-        if (!portalOffered) {
+        if (entry || !portalOffered) {
           portalOffered = true;
           ar.show();
         }
+      };
+      if (demoPortal) await openCamera();
+      else {
+        const entry = document.createElement('button');
+        arEntry = entry;
+        entry.type = 'button';
+        entry.textContent = 'View on your table';
+        entry.addEventListener('click', async () => {
+          if (ar || entry.disabled) return;
+          entry.disabled = true;
+          orientation.request();
+          try {
+            await openCamera(entry);
+          } catch {
+            orientation.release();
+            status.textContent =
+              'Camera preview unavailable. The interactive preview is still available.';
+          } finally {
+            entry.disabled = false;
+          }
+        });
+        controls.append(entry);
       }
     } catch {
       if (attempt === controller && !controller.signal.aborted) fallback();
@@ -312,11 +350,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     scroll = window.scrollY;
     history.pushState({ ...history.state, ppPortion: key }, '');
     void show();
-    if (
-      (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-      (fixtureCamera || cameraSample || uploadedPortion)
-    )
-      orientation.request();
+    if (dish.portion || fixtureCamera || cameraSample || uploadedPortion) orientation.request();
   };
   const backClick = (event: Event) => {
     if (!active) return;
@@ -399,7 +433,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     status.textContent = showOriginal
       ? 'Original photo.'
       : (sampleNotice ??
-        (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate'));
+        `${approximatePortionLabel(dish.servingCount)} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`);
   };
   const motionChanged = () => {
     reset();
@@ -411,7 +445,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     ) {
       status.textContent =
         sampleNotice ??
-        (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate');
+        `${approximatePortionLabel(dish.servingCount)} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`;
     }
   };
   const pointerup = (event: PointerEvent) => {

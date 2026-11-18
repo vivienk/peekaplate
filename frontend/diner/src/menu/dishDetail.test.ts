@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderDishDetail } from './dishDetail';
+import { allergenChips, dietaryChips, renderDishDetail } from './dishDetail';
 import type { CompleteDish } from './types';
 
 const NOTE = 'For allergy questions, please ask the restaurant staff.';
@@ -34,6 +34,15 @@ const render = (allergens: string[], name = 'Leaf', icons: unknown[] = []): stri
 const count = (html: string) => html.split(NOTE).length - 1;
 
 describe('dish detail allergen note', () => {
+  it('keeps the original decorative icons alongside confirmed allergen and dietary labels', () => {
+    const dish = { allergens: ['Wheat'], dietary: ['Vegetarian'] } as CompleteDish;
+    for (const html of [allergenChips(dish), dietaryChips(dish)]) {
+      expect(html).toContain('class="pp-chip__icon"');
+      expect(html).toContain('alt="" aria-hidden="true" width="16" height="16"');
+    }
+    expect(allergenChips({ allergens: [] } as unknown as CompleteDish)).toBe('');
+    expect(dietaryChips({ dietary: [] } as unknown as CompleteDish)).toBe('');
+  });
   it('renders Figma decoration with its visible ingredient label', () => {
     const html = render([], 'Avocado');
     expect(html).toContain('class="pp-ingredient__icon"');
@@ -42,7 +51,7 @@ describe('dish detail allergen note', () => {
   });
 
   it('retains text for missing or unreviewed generated art and escapes labels', () => {
-    expect(render([], 'Coconut')).not.toContain('class="pp-ingredient__icon"');
+    expect(render([], 'Coconut')).toContain('class="pp-ingredient__icon"');
     expect(render([], 'Coconut')).toContain('class="pp-ingredient__name">Coconut</p>');
     expect(render([], '<img onerror="x">')).toContain('&lt;img onerror=&quot;x&quot;&gt;');
   });

@@ -1,6 +1,7 @@
 import { PublicPortionSchema } from '@peekaplate/contracts';
 import { expect, it } from 'vitest';
 import { portionWorldWidth } from './portionAR';
+import { approximatePortionLabel, sizeForServing } from './portionSize';
 
 const plate = {
   shape: 'round' as const,
@@ -61,4 +62,21 @@ it('binds calibration to the foreground and original photo coordinate system', (
       physical_size: { width_mm: 280, foreground_width_fraction: 0.5, source: 'owner' },
     }).success,
   ).toBe(false);
+});
+
+it('uses only the matching serving calibration and never multiplies dimensions by people', () => {
+  for (const count of [1, 2]) {
+    const calibrated = { ...size, serving_count: count };
+    expect(
+      portionWorldWidth(sizeForServing({ physical_size: calibrated }, count)) *
+        plate.boundary.width,
+    ).toBeCloseTo(0.28);
+    expect(sizeForServing({ physical_size: calibrated }, count + 1)).toBeUndefined();
+    expect(sizeForServing({ physical_size: calibrated }, undefined)).toBeUndefined();
+  }
+  expect(sizeForServing({ physical_size: size }, 1)).toBeUndefined();
+  expect(sizeForServing({}, 1)).toBeUndefined();
+  expect(approximatePortionLabel(2)).toBe(
+    'Serves 2 people · Approximate 2.5D preview — not actual size.',
+  );
 });

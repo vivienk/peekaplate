@@ -7,6 +7,7 @@ import {
   OwnerMenuApiError,
   type OwnerMenuClient,
 } from '../owner-menu/api';
+import { DraftMenu } from '../publish/DraftMenu';
 import { MenuPreview } from '../publish/MenuPreview';
 import './owner-publish.css';
 
@@ -14,11 +15,15 @@ import './owner-publish.css';
 // Confirmation 3123:12795). Presentation is the official S13 (publish/MenuPreview.tsx); the data and
 // publication logic are Sai's #197: prepared menus from the API, approval then publication with
 // stable retry IDs, and the diner link read only after publication succeeds.
-// Snapshot preparation/admission remains operator-owned. Saved draft edits are not auto-published.
+// Opening this screen (and "Prepare again") runs Part A preparation first: the owner's verified
+// dishes become a prepared snapshot through the existing approval command and producer. It is safe
+// to repeat after a failure. Preparing never publishes; publication stays this screen's explicit
+// owner step, and saved draft edits are not auto-published.
 export function OwnerPublish({
   apiBase,
   actorId,
   venueId,
+  restaurantName,
   getAccessToken,
   onAccessFailure,
   onBack,
@@ -27,6 +32,7 @@ export function OwnerPublish({
   apiBase: string;
   actorId: string;
   venueId: string;
+  restaurantName: string;
   getAccessToken: () => Promise<string | null>;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
   onBack: () => void;
@@ -40,23 +46,63 @@ export function OwnerPublish({
   );
   const [menus, setMenus] = useState<PreparedMenu[]>([]);
   const [preview, setPreview] = useState<PreparedMenuPreview | null>(null);
+  const [presentation, setPresentation] = useState<PreparedMenuPreview | null>(null);
+  const previewPhotos = useRef<string[]>([]);
+  const clearPreviewPhotos = () => {
+    for (const url of previewPhotos.current) URL.revokeObjectURL(url);
+    previewPhotos.current = [];
+  };
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [published, setPublished] = useState(false);
   const [link, setLink] = useState('');
+  const [prepareProblem, setPrepareProblem] = useState('');
 
   const failure = (reason: unknown) => {
     if (reason instanceof OwnerMenuApiError && (reason.status === 401 || reason.status === 403)) {
       setMenus([]);
       setPreview(null);
+      setPresentation(null);
+      clearPreviewPhotos();
       setLink('');
       onAccessFailure(reason.status === 401 ? 'signed_out' : 'denied');
     } else if (reason instanceof OwnerMenuApiError && reason.status === 409) {
       setPreview(null);
+      setPresentation(null);
+      clearPreviewPhotos();
       attempt.current = null;
-      setError('The menu changed. Reload prepared menus and review it again before publishing.');
+      setError('The menu changed. Prepare again and review it again before publishing.');
     } else setError('We could not complete that request. Retry, or return to your saved dishes.');
   };
+
+  // Open the exact snapshot returned by preparation, not an arbitrary historical menu.
+  // A preparation failure keeps earlier snapshots available for explicit selection.
+  async function prepareAndList(client: OwnerMenuClient, valid: () => boolean) {
+    setPrepareProblem('');
+    let prepared: Awaited<ReturnType<OwnerMenuClient['prepareMenu']>> | undefined;
+    try {
+      prepared = await client.prepareMenu(venueId);
+    } catch (reason) {
+      if (!valid()) return;
+      if (reason instanceof OwnerMenuApiError && (reason.status === 401 || reason.status === 403))
+        throw reason;
+      // 404: preparation is not available here (production keeps operator preparation).
+      if (!(reason instanceof OwnerMenuApiError && reason.status === 404))
+        setPrepareProblem(
+          reason instanceof OwnerMenuApiError && reason.code === 'menu_not_verified'
+            ? 'Some dishes changed and need verifying again. Return to your dishes and complete verification, then prepare again.'
+            : 'We couldn’t prepare your latest menu. Your verified dishes are saved; prepare again to retry.',
+        );
+    }
+    if (!valid()) return;
+    const next = await client.listPreparedMenus(venueId);
+    if (!valid()) return;
+    setMenus(next);
+    const matches = next.filter(
+      (menu) => menu.menuId === prepared?.menuId && menu.menuRevisionId === prepared.menuRevisionId,
+    );
+    if (matches.length === 1) await loadPreview(client, valid, matches[0]!);
+  }
 
   useEffect(() => {
     void actorId;
@@ -76,9 +122,10 @@ export function OwnerPublish({
     setPublished(false);
     setError('');
     attempt.current = null;
-    void current.client
-      .listPreparedMenus(venueId)
-      .then(setMenus)
+    void prepareAndList(
+      current.client,
+      () => active.current === current && !controller.signal.aborted,
+    )
       .catch((reason) => {
         if (!controller.signal.aborted) failure(reason);
       })
@@ -87,6 +134,7 @@ export function OwnerPublish({
       });
     return () => {
       controller.abort();
+      clearPreviewPhotos();
       if (active.current === current) active.current = null;
     };
   }, [apiBase, actorId, venueId, getAccessToken]);
@@ -108,22 +156,48 @@ export function OwnerPublish({
     }
   }
 
-  const open = (menu: PreparedMenu) =>
-    run(async (client, valid) => {
-      setPreview(null);
-      setLink('');
-      setPublished(false);
-      attempt.current = null;
-      const value = await client.previewPreparedMenu(venueId, menu.menuId, menu.menuRevisionId);
-      if (!valid()) return;
-      setPreview(value);
-      const isPublished = value.menu.publishedRevisionId === value.menu.menuRevisionId;
-      setPublished(isPublished);
-      if (isPublished) {
-        const url = await client.dinerLink(venueId, menu.menuId);
-        if (valid()) setLink(url);
-      }
-    });
+  async function loadPreview(client: OwnerMenuClient, valid: () => boolean, menu: PreparedMenu) {
+    setPreview(null);
+    setPresentation(null);
+    clearPreviewPhotos();
+    setLink('');
+    setPublished(false);
+    attempt.current = null;
+    const value = await client.previewPreparedMenu(venueId, menu.menuId, menu.menuRevisionId);
+    if (!valid()) return;
+    // The verified content/hash remains untouched. Only this presentation copy gets object URLs.
+    const shown = structuredClone(value);
+    try {
+      for (const category of shown.content.categories)
+        for (const dish of category.dishes) {
+          if (!dish.complete || !dish.images) continue;
+          const image = dish.images.card;
+          if (!image.url.startsWith(`${apiBase}/public/prepared-assets/`)) continue;
+          const blob = await client.readPreparedPreviewAsset(
+            venueId,
+            menu.menuId,
+            menu.menuRevisionId,
+            image.url,
+          );
+          if (!valid()) return;
+          image.url = URL.createObjectURL(blob);
+          previewPhotos.current.push(image.url);
+        }
+    } catch (error) {
+      clearPreviewPhotos();
+      throw error;
+    }
+    if (!valid()) return;
+    setPresentation(shown);
+    setPreview(value);
+    const isPublished = value.menu.publishedRevisionId === value.menu.menuRevisionId;
+    setPublished(isPublished);
+    if (isPublished) {
+      const url = await client.dinerLink(venueId, menu.menuId);
+      if (valid()) setLink(url);
+    }
+  }
+  const open = (menu: PreparedMenu) => run((client, valid) => loadPreview(client, valid, menu));
   const publish = () =>
     run(async (client, valid) => {
       if (!preview) return;
@@ -152,6 +226,22 @@ export function OwnerPublish({
   const dishes = categories.flatMap((category) => category.dishes);
   const complete = dishes.filter((dish) => dish.complete).length;
 
+  if (!preview && busy)
+    return (
+      <MenuPreview
+        layout="inline"
+        restaurantName={restaurantName}
+        dishCount={0}
+        categoryCount={0}
+        dinerUrl={null}
+        preparing
+        onBackToEdit={onBack}
+        onReviewDishes={onBack}
+        onPublish={() => {}}
+        onGoToDashboard={onDone ?? onBack}
+      />
+    );
+
   if (!preview)
     return (
       <div className="pp-onboard pp-menu-preview-inline">
@@ -166,9 +256,12 @@ export function OwnerPublish({
             Choose the prepared menu to preview. Nothing is public until you publish.
           </p>
           {error && <ErrorBanner copy={{ title: 'Something went wrong', body: error }} />}
+          {prepareProblem && (
+            <ErrorBanner copy={{ title: 'Menu not prepared yet', body: prepareProblem }} />
+          )}
           {busy ? (
             <p role="status" className="pp-menu-preview__helper">
-              Loading prepared menus…
+              Preparing your menu…
             </p>
           ) : menus.length === 0 ? (
             <p className="pp-menu-preview__helper">
@@ -194,14 +287,9 @@ export function OwnerPublish({
               variant="outlined"
               busy={busy}
               busyLabel="Loading"
-              onClick={() =>
-                void run(async (client, valid) => {
-                  const next = await client.listPreparedMenus(venueId);
-                  if (valid()) setMenus(next);
-                })
-              }
+              onClick={() => void run(prepareAndList)}
             >
-              Reload prepared menus
+              Prepare again
             </ActionButton>
           </div>
         </section>
@@ -215,7 +303,7 @@ export function OwnerPublish({
       dishCount={complete}
       categoryCount={categories.length}
       dinerUrl={link || null}
-      phoneContent={<DraftMenu preview={preview} />}
+      phoneContent={presentation && <DraftMenu preview={presentation} />}
       dishesMissingDetails={complete === 0 ? Math.max(1, dishes.length) : 0}
       notReadyBody="None of this menu’s dishes is ready to display yet. Return to your dishes, then prepare the menu again."
       publishing={busy}
@@ -234,84 +322,5 @@ export function OwnerPublish({
       onPublish={() => void publish()}
       onGoToDashboard={onDone ?? onBack}
     />
-  );
-}
-
-// The prepared menu in the phone before publishing, in the diner's menu look: category tabs, then
-// each dish with its photo, price and food information. Dishes not ready to display say so.
-function DraftMenu({ preview }: { preview: PreparedMenuPreview }) {
-  const [categoryId, setCategoryId] = useState('');
-  const categories = preview.content.categories;
-  return (
-    <div aria-label="Draft diner menu" role="region">
-      <h2>{preview.content.restaurant.name}</h2>
-      <div className="pp-draft-menu__tabs" role="group" aria-label="Menu categories">
-        <button
-          type="button"
-          className="pp-draft-menu__tab"
-          aria-pressed={!categoryId}
-          onClick={() => setCategoryId('')}
-        >
-          All
-        </button>
-        {categories.map((category) => (
-          <button
-            key={category.category_id}
-            type="button"
-            className="pp-draft-menu__tab"
-            aria-pressed={categoryId === category.category_id}
-            onClick={() => setCategoryId(category.category_id)}
-          >
-            {category.name}
-          </button>
-        ))}
-      </div>
-      {categories
-        .filter((category) => !categoryId || category.category_id === categoryId)
-        .map((category) => (
-          <section key={category.category_id} className="pp-draft-menu__section">
-            <h3>{category.name}</h3>
-            {category.dishes.map((dish) => (
-              <article key={dish.dish_id} className="pp-draft-menu__dish">
-                {dish.complete ? (
-                  <>
-                    <img
-                      src={dish.images.card.url}
-                      alt={dish.images.card.alt}
-                      referrerPolicy="no-referrer"
-                    />
-                    <div>
-                      <h4>{dish.name}</h4>
-                      <p className="pp-draft-menu__price">
-                        {new Intl.NumberFormat('en', {
-                          style: 'currency',
-                          currency: dish.price.currency,
-                        }).format(Number(dish.price.amount))}
-                      </p>
-                      {dish.description && <p>{dish.description}</p>}
-                      <details>
-                        <summary>Ingredients and allergens</summary>
-                        <p>
-                          {dish.ingredients.map((ingredient) => ingredient.name).join(', ') ||
-                            'No ingredients listed.'}
-                        </p>
-                        <p>
-                          {dish.allergens === null
-                            ? 'Allergen information not provided.'
-                            : dish.allergens.length
-                              ? `Declared allergens: ${dish.allergens.join(', ')}.`
-                              : 'No allergens declared.'}
-                        </p>
-                      </details>
-                    </div>
-                  </>
-                ) : (
-                  <p className="pp-draft-menu__missing">This dish is not ready to display.</p>
-                )}
-              </article>
-            ))}
-          </section>
-        ))}
-    </div>
   );
 }

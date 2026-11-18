@@ -30,6 +30,8 @@ export type RestaurantDetailsProps = {
   saved?: Details | undefined;
   // The saved photo's address, when there is one.
   savedPhotoUrl?: string | null | undefined;
+  // Private photo identity stays stable while its authenticated blob URL loads.
+  savedPhotoId?: string | null;
   // Save status from the caller: a request is running, or the last one failed.
   saving?: boolean;
   saveFailed?: boolean;
@@ -38,6 +40,7 @@ export type RestaurantDetailsProps = {
   onSave: (details: Details, photo: File | null) => void;
   // "Go to dashboard" (onboarding) or "Back to dashboard" (dashboard): both open S12.
   onLeave: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 const ERROR_SUMMARY = { title: 'Please correct the highlighted errors before saving.', body: '' };
@@ -52,7 +55,7 @@ export function RestaurantDetails(props: RestaurantDetailsProps) {
   const baseline = JSON.stringify([
     props.mode,
     ...Object.keys(EMPTY_DETAILS).map((field) => props.saved?.[field as DetailsField] ?? ''),
-    props.savedPhotoUrl ?? null,
+    props.savedPhotoId === undefined ? (props.savedPhotoUrl ?? '') : props.savedPhotoId,
   ]);
   return <RestaurantDetailsForm key={baseline} {...props} />;
 }
@@ -65,6 +68,7 @@ function RestaurantDetailsForm({
   saveFailed = false,
   onSave,
   onLeave,
+  onDirtyChange,
 }: RestaurantDetailsProps) {
   const original = saved ?? EMPTY_DETAILS;
   const [values, setValues] = useState<Details>(original);
@@ -78,6 +82,10 @@ function RestaurantDetailsForm({
   const errors = useMemo(() => detailsErrors(values), [values]);
   const valid = Object.keys(errors).length === 0;
   const changed = detailsChanged(values, original) || photo !== null;
+  useEffect(() => {
+    onDirtyChange?.(changed);
+    return () => onDirtyChange?.(false);
+  }, [changed, onDirtyChange]);
   // Save is available once the form is valid; from the dashboard it also needs a change (S05
   // handoff, sections 3–5).
   const ready = valid && (mode === 'onboarding' || changed);
@@ -286,7 +294,7 @@ function DetailsInput({
   );
 }
 
-// Upload photo: the 250px photo (or the placeholder) with the Outlined Medium button over it.
+// Upload logo (Vivien, #213: the restaurant photo is the logo shown in the diner header): the 250px photo (or the placeholder) with the Outlined Medium button over it.
 function PhotoPicker({
   url,
   problem,
@@ -306,13 +314,13 @@ function PhotoPicker({
         <img
           className="pp-onboard-photo__image"
           src={url ?? photoPlaceholder}
-          alt={url ? 'Restaurant photo' : ''}
+          alt={url ? 'Restaurant logo' : ''}
           width="250"
           height="250"
         />
         <div className="pp-onboard-photo__button">
           <FileButton
-            label={url ? 'Change photo' : 'Upload photo'}
+            label={url ? 'Change logo' : 'Upload logo'}
             accept={PHOTO_TYPES.join(',')}
             disabled={disabled}
             describedBy={problemId}

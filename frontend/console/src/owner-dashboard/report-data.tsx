@@ -4,6 +4,7 @@
 // from Uneeza's synthetic P0 v2 data, labelled as such.
 import { type OwnerDishReport, OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { useEffect, useState } from 'react';
+import { LivePerf } from './pages';
 import { fetchOwnerReport, type ReportState } from './report-api';
 import { Note } from './ui';
 import { UNEEZA_REPORT } from './uneeza-report';
@@ -97,7 +98,7 @@ export function reportSourceFromEnv(
 // Loads the report for one restaurant. Changing restaurant clears the old report at once, and an
 // answer for a previous restaurant or attempt is dropped, so one restaurant's numbers never show
 // under another.
-function useOwnerReport(source: ReportSource): { state: ReportState; retry: () => void } {
+export function useOwnerReport(source: ReportSource): { state: ReportState; retry: () => void } {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<ReportState>(
     source.mode === 'saved' ? { kind: 'ready', report: SAVED_REPORT } : { kind: 'loading' },
@@ -157,17 +158,26 @@ export function ReportView({
   state,
   saved = false,
   onRetry,
+  presentation = 'data',
 }: {
   state: ReportState;
   saved?: boolean;
   onRetry?: () => void;
+  presentation?: 'data' | 'performance';
 }) {
-  if (state.kind === 'ready') return <ReportTable report={state.report} saved={saved} />;
+  if (state.kind === 'ready')
+    return <ReportTable report={state.report} saved={saved} presentation={presentation} />;
   return (
     <div className="stack">
       <div className="pagehead">
-        <span className="eyebrow">Report data</span>
-        <h1>Dish report from the report API</h1>
+        <span className="eyebrow">
+          {presentation === 'performance' ? 'Dish performance' : 'Report data'}
+        </span>
+        <h1>
+          {presentation === 'performance'
+            ? 'What diners did with each dish'
+            : 'Dish report from the report API'}
+        </h1>
       </div>
       {state.kind === 'loading' ? (
         <div className="card" role="status">
@@ -194,26 +204,65 @@ export function ReportData({
   }),
   onAccessFailure,
   onReport,
+  presentation = 'data',
 }: {
   source?: ReportSource;
   onAccessFailure?: (kind: 'signed_out' | 'denied') => void;
   /** The report on screen, or null while none is (loading, failed or denied). */
-  onReport?: (report: OwnerDishReport | null) => void;
+  onReport?: (report: OwnerDishReport | null, reference?: string) => void;
+  presentation?: 'data' | 'performance';
 }) {
   const { state, retry } = useOwnerReport(source);
   useEffect(() => {
     if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure?.(state.kind);
   }, [state.kind, onAccessFailure]);
   const report = state.kind === 'ready' ? state.report : null;
+  const reference = state.kind === 'ready' ? state.reference : undefined;
   useEffect(() => {
-    onReport?.(report);
-  }, [report, onReport]);
+    onReport?.(report, reference);
+  }, [report, reference, onReport]);
   useEffect(() => () => onReport?.(null), [onReport]);
-  return <ReportView state={state} saved={source.mode === 'saved'} onRetry={retry} />;
+  return (
+    <ReportView
+      state={state}
+      saved={source.mode === 'saved'}
+      onRetry={retry}
+      presentation={presentation}
+    />
+  );
 }
 
-function ReportTable({ report: r, saved }: { report: OwnerDishReport; saved: boolean }) {
+function ReportTable({
+  report: r,
+  saved,
+  presentation,
+}: {
+  report: OwnerDishReport;
+  saved: boolean;
+  presentation: 'data' | 'performance';
+}) {
   const m = r.report_metadata;
+  if (presentation === 'performance')
+    return (
+      <LivePerf
+        report={r}
+        period={`${fmt(m.date_window.start_time)} – ${fmt(m.date_window.end_time)} (end exclusive)`}
+        summary={`${m.coverage.measurable_dishes_count} measurable · report ${m.report_status.toLowerCase()} · ${freshnessLabel(m.freshness.is_stale)}`}
+        notice={
+          saved ? (
+            <Note kind="warn">Saved copy of a report: synthetic test data. Not real diners.</Note>
+          ) : r.source === 'synthetic' ? (
+            <Note kind="warn">Synthetic test data from the report API. Not real diners.</Note>
+          ) : null
+        }
+        columns={COLUMNS}
+        display={(cell, kind) =>
+          cell.status === 'NORMAL' || cell.status === 'VALID_ZERO'
+            ? show(cell, kind)
+            : STATUS_TEXT[cell.status]
+        }
+      />
+    );
   return (
     <div className="stack">
       <div className="pagehead">

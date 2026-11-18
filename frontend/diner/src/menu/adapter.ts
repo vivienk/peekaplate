@@ -70,6 +70,11 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
     portion.data.dish_revision_id === dish.dish_revision_id
       ? { portion: portion.data }
       : {}),
+    ...(Number.isInteger(dish.serving_count) &&
+    dish.serving_count! >= 1 &&
+    dish.serving_count! <= 100
+      ? { servingCount: dish.serving_count }
+      : {}),
     kind: 'complete',
     dishId: dish.dish_id,
     dishRevisionId: dish.dish_revision_id,

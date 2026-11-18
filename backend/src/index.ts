@@ -35,6 +35,7 @@ import {
   OwnerWorkspaceResponseSchema,
   PreparedMenuPreviewSchema,
   PreparedMenusSchema,
+  type PublicMenuContentBundle,
   type PublicMenuResponse,
   PublishMenuSchema,
   RestaurantSlugSchema,
@@ -54,6 +55,7 @@ import {
   VerifyOrderDeletionRequestSchema,
   WithdrawMenuSchema,
 } from '@peekaplate/contracts';
+import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -103,6 +105,12 @@ import {
   submitOrderDataDeletionRequest as submitOrderDataDeletionRequestService,
   verifyVenueOrderDeletion as verifyVenueOrderDeletionService,
 } from './order-ingestion/service';
+
+import { registerDishAssistanceRoutes } from './owner-ai/dish-assistance';
+import {
+  mintOwnerReportReference,
+  OWNER_REPORT_REFERENCE_HEADER,
+} from './owner-ai/report-reference';
 import { registerOwnerAnalysisRoutes } from './owner-ai/routes';
 import {
   createOwnerInsightAction,
@@ -111,13 +119,24 @@ import {
   updateOwnerInsightAction,
 } from './owner-insight-actions';
 import { registerOwnerMenuRoutes } from './owner-menu-routes';
-import { fetchPreparedMenu, listPreparedMenus } from './owner-publication';
+import {
+  PREPARED_ASSET_PATH,
+  PREPARED_BUNDLE_PATH,
+  type PreparedStorage,
+  prepareOwnerMenu,
+  readPreparedAsset,
+  readPreparedBundle,
+  readPreparedLogo,
+  readPreparedPreviewAsset,
+} from './owner-prepare';
+import { fetchPreparedMenu, listPreparedMenus, type OwnHost } from './owner-publication';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
 import {
   buildOwnerReportExportFilename,
   type ExportableOwnerReport,
   serializeOwnerReportCsv,
 } from './owner-report-export';
+import { registerOwnerVenueCreation } from './owner-venue-create';
 import { listOwnerVenues } from './owner-workspace';
 import {
   createPublicMenuResponse,
@@ -147,14 +166,19 @@ import { verifyTeamCollaborator } from './team-auth';
 
 export { authorizeStaffVenue } from './staff-venue';
 
-export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = [
-  '00000000-0000-4000-8000-000000000123',
-];
+import {
+  configuredSyntheticReportVenues,
+  SYNTHETIC_REPORT_VENUE_ALLOWLIST,
+  syntheticReportTrafficClass,
+} from './owner-report-scope';
+
+export { SYNTHETIC_REPORT_VENUE_ALLOWLIST } from './owner-report-scope';
 
 export type Bindings = {
   OWNER_AI_RESPONSES_ENABLED?: string;
   OWNER_AI_OPENAI_API_KEY?: string;
   OWNER_AI_OPENAI_PROJECT_ID?: string;
+  OWNER_AI_REPORT_REFERENCE_SECRET?: string;
   OWNER_AI_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   INGREDIENT_ARTWORK_ENABLED?: string;
   APP_ENV?: string;
@@ -243,10 +267,16 @@ export type Bindings = {
   ORDER_IMPORT_HISTORICAL_DAYS?: string;
   ORDER_IMPORT_RETENTION_DAYS?: string;
   ORDER_IMPORT_GRACE_PERIOD_MS?: string;
+  /** Server-only Python 2.5D service; never exposed to the console bundle. */
+  PORTION_SERVICE_URL?: string;
+  PORTION_SERVICE_SECRET?: string;
   EXTRACTION_SERVICE_URL?: string;
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
   EXTRACTION_TIMEOUT_MS?: string;
+  OWNER_AI_DISH_ASSISTANCE_ENABLED?: string;
+  OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL?: string;
+  SYNTHETIC_REPORT_VENUE_IDS?: string;
 };
 
 type Dependencies = {
@@ -317,6 +347,38 @@ type Dependencies = {
     env: Bindings,
   ) => ReturnType<typeof listPreparedMenus>;
   fetchPreparedMenu?: typeof fetchPreparedMenu;
+  prepareOwnerMenu?: (
+    actorId: string,
+    venueId: string,
+    origin: string,
+    env: Bindings,
+  ) => ReturnType<typeof prepareOwnerMenu>;
+  readPreparedBundle?: (
+    venueId: string,
+    menuId: string,
+    revisionId: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedBundle>;
+  readPreparedAsset?: (
+    venueId: string,
+    photoId: string,
+    hash: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedAsset>;
+  readPreparedLogo?: (
+    venueId: string,
+    hash: string,
+    extension: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedLogo>;
+  readPreparedPreviewAsset?: (
+    actorId: string,
+    content: PublicMenuContentBundle,
+    origin: string,
+    assetId: string,
+    file: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedPreviewAsset>;
   issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
   readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
   submitIngestion?: (
@@ -513,6 +575,29 @@ export async function consumeJtiRateLimit(
   return { allowed: true, retryAfterSeconds: 1 };
 }
 
+// Owner-prepared menus (Part A) reuse the private ingestion bucket that already holds approved
+// dish photos; bundles live under prepared-menus/.
+function preparedStorage(env: Bindings): PreparedStorage {
+  const bucket = env.INGESTION_REPORTS_BUCKET;
+  if (!bucket?.get) throw new AuthUnavailableError();
+  return {
+    get: (key) => bucket.get!(key),
+    put: (key, bytes, options) => bucket.put(key, bytes, options),
+  };
+}
+
+function ownHost(c: { req: { url: string } }, env: Bindings): OwnHost | undefined {
+  const bucket = env.INGESTION_REPORTS_BUCKET;
+  if (!bucket?.get) return undefined;
+  return {
+    origin: new URL(c.req.url).origin,
+    read: async (key) => {
+      const object = await bucket.get!(key);
+      return object ? new Uint8Array(await object.arrayBuffer()) : null;
+    },
+  };
+}
+
 async function withDatabase<T>(env: Bindings, run: (client: Client) => Promise<T>): Promise<T> {
   const connectionString =
     env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
@@ -668,7 +753,21 @@ const dependencies: Dependencies = {
     const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await client.connect();
-      return await queryOwnerReport(client, actorId, venueId, now, source);
+      const syntheticReport =
+        source === 'synthetic' &&
+        ['local', 'staging'].includes(env.APP_ENV ?? '') &&
+        configuredSyntheticReportVenues(env).includes(venueId.toLowerCase());
+      if (!syntheticReport) throw new AuthUnavailableError();
+      return await queryOwnerReport(client, actorId, venueId, now, source, {
+        trafficClass: syntheticReportTrafficClass(venueId),
+        includeSummary: true,
+        ...(env.APP_ENV === 'staging' && env.OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL
+          ? {
+              syntheticSeal: env.OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL,
+              validationNow: new Date(),
+            }
+          : {}),
+      });
     } finally {
       await client.end();
     }
@@ -692,6 +791,41 @@ const dependencies: Dependencies = {
   listPreparedMenus: (actorId, venueId, env) =>
     withDatabase(env, (client) => listPreparedMenus(client, actorId, venueId)),
   fetchPreparedMenu,
+  prepareOwnerMenu: (actorId, venueId, origin, env) =>
+    withDatabase(env, (client) =>
+      prepareOwnerMenu(
+        client,
+        actorId,
+        venueId,
+        origin,
+        preparedStorage(env),
+        approveDishDraftAtomic,
+      ),
+    ),
+  readPreparedBundle: (venueId, menuId, revisionId, env) =>
+    withDatabase(env, (client) =>
+      readPreparedBundle(client, preparedStorage(env), venueId, menuId, revisionId),
+    ),
+  readPreparedAsset: (venueId, photoId, hash, env) =>
+    withDatabase(env, (client) =>
+      readPreparedAsset(client, preparedStorage(env), venueId, photoId, hash),
+    ),
+  readPreparedLogo: (venueId, hash, extension, env) =>
+    withDatabase(env, (client) =>
+      readPreparedLogo(client, preparedStorage(env), venueId, hash, extension),
+    ),
+  readPreparedPreviewAsset: (actorId, content, origin, assetId, file, env) =>
+    withDatabase(env, (client) =>
+      readPreparedPreviewAsset(
+        client,
+        preparedStorage(env),
+        actorId,
+        content,
+        origin,
+        assetId,
+        file,
+      ),
+    ),
   async issuePublicMenu(menu, env) {
     if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
     return createPublicMenuResponse(menu, {
@@ -744,27 +878,20 @@ export async function approveDishDraftAtomic(
     expectedReviewVersion?: number | undefined;
     extractionId?: string | undefined;
     confirmed?: true | undefined;
+    /**
+     * Part A preparation only: approve onto this stable dish ID (a new revision when it already
+     * exists, so a reopened and re-verified draft keeps its diner identity) and require the
+     * owner's persisted S11 verification. The public approve route never sets these.
+     */
+    preparedDishId?: string | undefined;
   },
 ): Promise<{ draft: DishDraftRow; publishedRevision: DishRevisionResult }> {
   let started = false;
   try {
     await client.query('BEGIN');
     started = true;
-    await client.query("SET LOCAL statement_timeout = '5s'");
-    await client.query("SET LOCAL lock_timeout = '3s'");
-    await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
+    await authorizeStaffVenue(client, actorId, venueId, true);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
-
-    const membership = await client.query<{ permission: string }>(
-      `SELECT permission
-       FROM app_private.staff_membership
-       WHERE tenant_id = $1 AND actor_id = $2
-       FOR SHARE`,
-      [venueId, actorId],
-    );
-    if (!['owner', 'editor'].includes(membership.rows[0]?.permission ?? '')) {
-      throw new CommandError('forbidden', 403);
-    }
 
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `command:${venueId}:${actorId}:${options.commandId}`,
@@ -792,6 +919,9 @@ export async function approveDishDraftAtomic(
                   : { extractionId: options.extractionId }),
                 confirmed: options.confirmed ?? false,
               }),
+          ...(options.preparedDishId === undefined
+            ? {}
+            : { preparedDishId: options.preparedDishId, requireVerified: true }),
         }),
       )
       .digest('hex');
@@ -839,9 +969,11 @@ export async function approveDishDraftAtomic(
       [venueId, draftId],
     );
     const draft = draftRes.rows[0];
-    if (!draft || draft.review_status !== 'pending') {
+    if (!draft || draft.review_status !== 'pending' || draft.removed_at) {
       throw new IngestionError('draft_not_pending_or_not_found', 404);
     }
+    if (options.preparedDishId !== undefined && draft.verification_status !== 'verified')
+      throw new IngestionError('draft_not_verified', 409);
 
     const manual =
       draft.origin === 'manual' ? OwnerDishFieldsSchema.parse(draft.manual_fields) : null;
@@ -905,18 +1037,20 @@ export async function approveDishDraftAtomic(
     ) {
       throw new IngestionError('draft_incomplete', 409);
     }
-    if (manual?.photoId) {
+    const approvedPhotoId = manual?.photoId ?? corrected.photo_id ?? null;
+    if (approvedPhotoId) {
       const photo = await client.query(
         'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
-        [venueId, draftId, manual.photoId],
+        [venueId, draftId, approvedPhotoId],
       );
       if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
     }
 
-    const newDishId = crypto.randomUUID();
+    const newDishId = options.preparedDishId ?? crypto.randomUUID();
     const revisionCommandId = crypto.randomUUID();
     const facts = manual
       ? {
+          ...(manual.servingCount !== undefined ? { servingCount: manual.servingCount } : {}),
           category: manual.category,
           priceAmount: manual.priceAmount,
           priceCurrency: manual.priceCurrency,
@@ -926,12 +1060,16 @@ export async function approveDishDraftAtomic(
         }
       : reviewed
         ? {
+            ...(resolved.serving_count !== undefined
+              ? { servingCount: resolved.serving_count }
+              : {}),
             category: resolved.category,
             priceAmount: resolved.price_amount,
             priceCurrency: resolved.price_currency,
             ingredients: resolved.ingredients,
-            allergens: null,
-            photoId: null,
+            allergens:
+              corrected.allergens?.status === 'confirmed' ? corrected.allergens.items : null,
+            photoId: approvedPhotoId,
           }
         : undefined;
     const parsedFacts = facts === undefined ? undefined : ApprovedDishFactsSchema.safeParse(facts);
@@ -1031,8 +1169,8 @@ export function createApp(services: Dependencies = dependencies) {
     '/staff/venues',
     cors({
       origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
-      allowMethods: ['GET', 'OPTIONS'],
-      allowHeaders: ['Authorization'],
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type'],
       maxAge: 86400,
     }),
   );
@@ -1052,6 +1190,11 @@ export function createApp(services: Dependencies = dependencies) {
     });
     if (!response.success) throw new AuthUnavailableError();
     return c.json(response.data);
+  });
+  registerOwnerVenueCreation(app, {
+    verify: services.verify,
+    database: withDatabase,
+    allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
   });
   app.get('/.well-known/jwks.json', async (c) => {
     if (!services.readMenuJwks) throw new AuthUnavailableError();
@@ -1084,7 +1227,7 @@ export function createApp(services: Dependencies = dependencies) {
       return next();
     if (
       c.req.method === 'POST' &&
-      /^\/venues\/[^/]+\/(?:menus\/uploads|drafts\/[^/]+\/photos)$/.test(c.req.path)
+      /^\/venues\/[^/]+\/(?:profile\/photos|menus\/uploads|drafts\/[^/]+\/photos)$/.test(c.req.path)
     )
       return next();
     if (c.req.method === 'POST' && /^\/venues\/[^/]+\/orders\/import$/.test(c.req.path)) {
@@ -1101,7 +1244,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
   app.use('/venues/*', async (c, next) => {
     if (
-      !/^\/venues\/[^/]+\/(?:prepared-menus(?:\/|$)|ingredient-icons(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+      !/^\/venues\/[^/]+\/(?:profile(?:\/|$)|setup$|prepared-menus(?:\/|$)|ingredient-icons(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
         c.req.path,
       )
     )
@@ -1114,10 +1257,26 @@ export function createApp(services: Dependencies = dependencies) {
       maxAge: 86400,
     })(c, next);
   });
+  app.use(
+    '/venues/:venueId/owner-insight-actions',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
   registerOwnerMenuRoutes(app, {
     verify: services.verify,
     authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
     database: withDatabase,
+  });
+  registerDishAssistanceRoutes(app, {
+    verify: services.verify,
+    authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
+    database: withDatabase,
+    allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
+    approvedVenues: SYNTHETIC_REPORT_VENUE_ALLOWLIST,
   });
   app.use(
     '/public/*',
@@ -1138,6 +1297,70 @@ export function createApp(services: Dependencies = dependencies) {
     if (!services.resolveRestaurantLink) throw new AuthUnavailableError();
     const scope = await services.resolveRestaurantLink(slug.data, c.env ?? {});
     return scope ? c.json(MenuScopeSchema.parse(scope)) : c.json({ error: 'not_found' }, 404);
+  });
+  // New public exposure requires the exact currently published snapshot, including its assets.
+  app.get(`${PREPARED_BUNDLE_PATH}/:venueId/:menuId/:file`, async (c) => {
+    const file = /^([0-9a-f-]{36})\.json$/i.exec(c.req.param('file'));
+    const scope = MenuScopeSchema.safeParse({
+      venueId: c.req.param('venueId'),
+      menuId: c.req.param('menuId'),
+    });
+    const revision = VenueScopeSchema.safeParse({ venueId: file?.[1] });
+    if (!scope.success || !revision.success) return c.json({ error: 'not_found' }, 404);
+    if (!services.readPreparedBundle) throw new AuthUnavailableError();
+    const bytes = await services.readPreparedBundle(
+      scope.data.venueId,
+      scope.data.menuId,
+      revision.data.venueId,
+      c.env ?? {},
+    );
+    if (!bytes) return c.json({ error: 'not_found' }, 404);
+    c.header('Cache-Control', 'no-store');
+    return c.body(Uint8Array.from(bytes).buffer, 200, {
+      'Content-Type': 'application/json',
+      'X-Content-Type-Options': 'nosniff',
+    });
+  });
+  // Exact published Screen 5 logo (registered before the photo route).
+  app.get(`${PREPARED_ASSET_PATH}/:venueId/logo/:file`, async (c) => {
+    const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+    const file = /^([0-9a-f]{64})\.(png|jpg)$/.exec(c.req.param('file'));
+    if (!venue.success || !file) return c.json({ error: 'not_found' }, 404);
+    if (!services.readPreparedLogo) throw new AuthUnavailableError();
+    const logo = await services.readPreparedLogo(
+      venue.data.venueId,
+      file[1]!,
+      file[2]!,
+      c.env ?? {},
+    );
+    if (!logo) return c.json({ error: 'not_found' }, 404);
+    c.header('Cache-Control', 'no-store');
+    return c.body(Uint8Array.from(logo.bytes).buffer, 200, {
+      'Content-Type': logo.contentType,
+      'X-Content-Type-Options': 'nosniff',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+  });
+  app.get(`${PREPARED_ASSET_PATH}/:venueId/:photoId/:hash`, async (c) => {
+    const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+    const photo = VenueScopeSchema.safeParse({ venueId: c.req.param('photoId') });
+    const hash = c.req.param('hash');
+    if (!venue.success || !photo.success || !/^[0-9a-f]{64}$/.test(hash))
+      return c.json({ error: 'not_found' }, 404);
+    if (!services.readPreparedAsset) throw new AuthUnavailableError();
+    const asset = await services.readPreparedAsset(
+      venue.data.venueId,
+      photo.data.venueId,
+      hash,
+      c.env ?? {},
+    );
+    if (!asset) return c.json({ error: 'not_found' }, 404);
+    c.header('Cache-Control', 'no-store');
+    return c.body(Uint8Array.from(asset.bytes).buffer, 200, {
+      'Content-Type': asset.contentType,
+      'X-Content-Type-Options': 'nosniff',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
   });
   app.get('/public/venues/:venueId/menus/:menuId', async (c) => {
     const scope = MenuScopeSchema.safeParse(c.req.param());
@@ -1195,6 +1418,7 @@ export function createApp(services: Dependencies = dependencies) {
       origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Authorization'],
+      exposeHeaders: [OWNER_REPORT_REFERENCE_HEADER],
       maxAge: 86400,
     }),
   );
@@ -1215,29 +1439,26 @@ export function createApp(services: Dependencies = dependencies) {
     ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
-    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
-      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
-    });
-    if (!approvedSyntheticVenue.success) {
-      return c.json({ error: 'service_unavailable' }, 503);
-    }
-    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
-      approvedSyntheticVenue.data.venueId.toLowerCase(),
-    );
-    if (
-      !isSyntheticVenue ||
-      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
-    ) {
+    if (!configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
-    const report = await services.readOwnerReport(
-      actorId,
-      approvedSyntheticVenue.data.venueId,
-      services.now?.() ?? new Date(),
-      env,
-      'synthetic',
-    );
+    const now = services.now?.() ?? new Date();
+    const venueId = scope.data.venueId.toLowerCase();
+    const report = await services.readOwnerReport(actorId, venueId, now, env, 'synthetic');
+    if (env.OWNER_AI_RESPONSES_ENABLED === 'true' && env.OWNER_AI_REPORT_REFERENCE_SECRET) {
+      try {
+        const reference = await mintOwnerReportReference(
+          OwnerDishReportSchema.parse(report),
+          { actorId, venueId },
+          env.OWNER_AI_REPORT_REFERENCE_SECRET,
+          now,
+        );
+        c.header(OWNER_REPORT_REFERENCE_HEADER, reference);
+      } catch {
+        // The owner can still read the authorized report when its optional AI reference is unavailable.
+      }
+    }
     return c.json(report);
   });
   app.use(
@@ -1266,25 +1487,13 @@ export function createApp(services: Dependencies = dependencies) {
     ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
-    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
-      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
-    });
-    if (!approvedSyntheticVenue.success) {
-      return c.json({ error: 'service_unavailable' }, 503);
-    }
-    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
-      approvedSyntheticVenue.data.venueId.toLowerCase(),
-    );
-    if (
-      !isSyntheticVenue ||
-      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
-    ) {
+    if (!configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
     const report = await services.readOwnerReport(
       actorId,
-      approvedSyntheticVenue.data.venueId,
+      scope.data.venueId.toLowerCase(),
       services.now?.() ?? new Date(),
       env,
       'synthetic',
@@ -1443,6 +1652,7 @@ export function createApp(services: Dependencies = dependencies) {
   for (const path of [
     '/venues/:venueId/prepared-menus',
     '/venues/:venueId/prepared-menus/:menuId/:revisionId',
+    '/venues/:venueId/prepared-menus/:menuId/:revisionId/assets/:assetId/:file',
   ]) {
     app.get(path, async (c) => {
       if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
@@ -1464,10 +1674,49 @@ export function createApp(services: Dependencies = dependencies) {
       );
       if (!menu) return c.json({ error: 'not_found' }, 404);
       // The database connection/authorization transaction has ended before the bounded public fetch.
-      const content = await services.fetchPreparedMenu(menu);
+      const content = await services.fetchPreparedMenu(menu, fetch, ownHost(c, c.env ?? {}));
+      const assetId = c.req.param('assetId');
+      if (assetId) {
+        if (!services.readPreparedPreviewAsset) throw new AuthUnavailableError();
+        const asset = await services.readPreparedPreviewAsset(
+          actorId,
+          content,
+          new URL(c.req.url).origin,
+          assetId,
+          c.req.param('file') ?? '',
+          c.env ?? {},
+        );
+        if (!asset) return c.json({ error: 'not_found' }, 404);
+        c.header('Cache-Control', 'no-store');
+        return c.body(Uint8Array.from(asset.bytes).buffer, 200, {
+          'Content-Type': asset.contentType,
+          'X-Content-Type-Options': 'nosniff',
+        });
+      }
       return c.json(PreparedMenuPreviewSchema.parse({ menu, content }));
     });
   }
+  // Part A: after S10/S11 verification the owner's verified dishes become a prepared menu for
+  // S13. Owner-only (checked again inside the admit function); never approves or publishes.
+  app.post('/venues/:venueId/prepared-menus/prepare', async (c) => {
+    if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
+      return c.json({ error: 'not_found' }, 404);
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+    if (!venue.success || new URL(c.req.url).search)
+      return c.json({ error: 'invalid_request' }, 400);
+    if (!services.prepareOwnerMenu) throw new AuthUnavailableError();
+    const result = await services.prepareOwnerMenu(
+      actorId,
+      venue.data.venueId,
+      new URL(c.req.url).origin,
+      c.env ?? {},
+    );
+    return c.json(result);
+  });
   app.get('/venues/:venueId/menus/:menuId/diner-link', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization))
@@ -2284,7 +2533,7 @@ export function createWorker(
       await observationQueue(batch, env);
     }
   };
-  return Object.assign(app, { queue, scheduled: handleScheduled });
+  return Object.assign(app, { queue, scheduled });
 }
 
 export {
@@ -2360,6 +2609,11 @@ export const handleScheduled = async (
 
   const hasOrderStorage = hasListAndDelete(orderStorage);
   const hasStagingStorage = hasStagingMethods(stagingStorage);
+  const stagingEnabled = [
+    env.MENU_STAGING_RETENTION_DAYS,
+    env.MENU_STAGING_REJECTED_RETENTION_DAYS,
+    env.MENU_STAGING_ORPHAN_GRACE_DAYS,
+  ].some((value) => value !== undefined);
   const hasArtworkStorage =
     env.INGREDIENT_ARTWORK_ENABLED === 'true' && hasListAndDelete(artworkStorage);
 
@@ -2453,48 +2707,35 @@ export const handleScheduled = async (
       }
     }
 
-    // Configurable staging menu photo cleanup (Category 1 promoted, Category 2 rejected, Category 3 orphan)
-    const stagingRetentionDays = env.MENU_STAGING_RETENTION_DAYS
-      ? Number.parseInt(env.MENU_STAGING_RETENTION_DAYS, 10)
-      : undefined;
-    const stagingRejectedDays = env.MENU_STAGING_REJECTED_RETENTION_DAYS
-      ? Number.parseInt(env.MENU_STAGING_REJECTED_RETENTION_DAYS, 10)
-      : undefined;
-    const stagingOrphanDays = env.MENU_STAGING_ORPHAN_GRACE_DAYS
-      ? Number.parseInt(env.MENU_STAGING_ORPHAN_GRACE_DAYS, 10)
-      : undefined;
-    const stagingDryRun = env.MENU_STAGING_CLEANUP_DRY_RUN === 'true';
-
-    if (
-      hasStagingMethods(stagingStorage) &&
-      (stagingRetentionDays !== undefined ||
-        stagingRejectedDays !== undefined ||
-        stagingOrphanDays !== undefined)
-    ) {
+    if (stagingEnabled && hasStagingStorage) {
       try {
         const { cleanupStagedMenuPhotos } = await import('./owner-menu-retention');
-        const stagingResult = await cleanupStagedMenuPhotos({
-          storage: stagingStorage,
+        await cleanupStagedMenuPhotos({
+          storage: {
+            put: stagingStorage.put.bind(stagingStorage),
+            get: stagingStorage.get.bind(stagingStorage),
+            list: stagingStorage.list.bind(stagingStorage),
+            delete: stagingStorage.delete.bind(stagingStorage),
+          },
           client,
           retentionConfig: {
-            promotedRetentionDays: stagingRetentionDays,
-            rejectedRetentionDays: stagingRejectedDays ?? 0,
-            orphanGraceDays: stagingOrphanDays ?? 0,
+            promotedRetentionDays: parseNonNegativeIntEnv(
+              env.MENU_STAGING_RETENTION_DAYS,
+              'invalid_staging_retention',
+            ),
+            rejectedRetentionDays:
+              parseNonNegativeIntEnv(
+                env.MENU_STAGING_REJECTED_RETENTION_DAYS,
+                'invalid_staging_retention',
+              ) ?? 0,
+            orphanGraceDays:
+              parseNonNegativeIntEnv(
+                env.MENU_STAGING_ORPHAN_GRACE_DAYS,
+                'invalid_staging_retention',
+              ) ?? 0,
           },
-          dryRun: stagingDryRun,
+          dryRun: env.MENU_STAGING_CLEANUP_DRY_RUN === 'true',
         });
-        if (
-          stagingResult.promotedDeleted > 0 ||
-          stagingResult.rejectedDeleted > 0 ||
-          stagingResult.orphansDeleted > 0
-        ) {
-          console.log(
-            JSON.stringify({
-              event: 'menu_staging_cleanup',
-              ...stagingResult,
-            }),
-          );
-        }
       } catch {
         console.error(JSON.stringify({ event: 'menu_staging_cleanup_error' }));
       }
@@ -2532,7 +2773,7 @@ export const handleScheduled = async (
   }
 };
 
-export const scheduled = handleScheduled;
+export const scheduled = (event: unknown, env: Bindings) => handleScheduled(event, env);
 
 const defaultApp = createApp();
 const defaultObservationQueue = createObservationQueueHandler();

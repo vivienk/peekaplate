@@ -232,6 +232,22 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
     def reply(body, status=200, **headers):
         return JSONResponse(body, status_code=status, headers={"Cache-Control": "no-store", **headers})
 
+    # The Worker retains the returned review layers. The extraction host uses
+    # this directory only for per-request scratch files.
+    portion_root = os.environ.get("PORTION_REVIEW_ROOT", "")
+    if portion_root and Path(portion_root).is_absolute():
+        from peekaplate_processing.portion_service import register_portion_routes
+        register_portion_routes(
+            app,
+            authorized=lambda request: hmac.compare_digest(
+                request.headers.get("authorization", "").encode("utf-8"),
+                ("Bearer " + settings.secret).encode("ascii"),
+            ),
+            reply=reply,
+            root=Path(portion_root),
+            retain_artifacts=False,
+        )
+
     @app.get("/health")
     def health():
         return reply({"status": "ok", "service": "menu-extraction", "environment": "staging"})

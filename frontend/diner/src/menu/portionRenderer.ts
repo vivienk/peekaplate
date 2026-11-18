@@ -36,20 +36,9 @@ export async function mount(
         signal.throwIfAborted();
         let url: string | undefined;
         try {
-          const bytes = await readLayer(layer, signal);
+          const blob = await readLayer(layer, signal);
           signal.throwIfAborted();
-          url = URL.createObjectURL(
-            new Blob([bytes], {
-              type:
-                layer.url === 'https://portion-fixtures.invalid/background.svg' ||
-                (import.meta.env.DEV &&
-                  /^https:\/\/portion-ingestion\.invalid\/portion_[a-f0-9]{32}\/background\.svg$/.test(
-                    layer.url,
-                  ))
-                  ? 'image/svg+xml'
-                  : '',
-            }),
-          );
+          url = URL.createObjectURL(blob);
           urls.add(url);
           const candidate = new Image();
           await new Promise<void>((resolve, reject) => {

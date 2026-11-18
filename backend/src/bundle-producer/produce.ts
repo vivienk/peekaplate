@@ -4,9 +4,11 @@ import {
   type PublicMenuContentBundle,
   PublicMenuContentBundleSchema,
   type PublicMenuDish,
+  type PublicPortion,
   sha256,
   verifyPublicMenuContentBytes,
 } from '@peekaplate/contracts';
+import { matchesApprovedOwnerPortion, type PreparedApprovedPortion } from './approved-portions';
 import { derivedUuid } from './ids';
 import { normalizePrice } from './price';
 import {
@@ -19,6 +21,7 @@ import {
 
 /** Approved facts for one dish, already resolved from `dish_current`, drafts and RES-01.2. */
 export type ApprovedDishSource = {
+  servingCount?: number | null;
   dishId: string;
   dishRevisionId: string;
   name: string;
@@ -29,6 +32,35 @@ export type ApprovedDishSource = {
   reviewState: 'none' | 'corrected' | 'incomplete' | 'rejected';
   approvedAllergens?: PublicMenuAllergenCode[] | null;
   approvedCategory?: string | null;
+  /** The owner-selected photo snapshotted onto this approved revision (approved facts). */
+  approvedPhotoId?: string | null;
+};
+
+/**
+ * An owner-uploaded, owner-approved dish photo for Part A preparation. It is the exact stored
+ * upload (hash-checked by the caller), bound to one approved dish revision and its selected
+ * photo ID. It is not a processed T0 asset and never a calibrated AR source.
+ */
+export type OwnerApprovedPhoto = {
+  dishId: string;
+  dishRevisionId: string;
+  photoId: string;
+  url: string;
+  sha256: string;
+  width: number;
+  height: number;
+};
+
+export type ProduceOptions = {
+  /** Owner-approved photos by dish ID, used when a dish has no T0 asset. */
+  ownerPhotos?: ReadonlyMap<string, OwnerApprovedPhoto>;
+  /** Exact validated private approval, bound to the selected photo and canonical revision. */
+  ownerPortions?: ReadonlyMap<string, PreparedApprovedPortion>;
+  /**
+   * What a dish without any photo becomes: an identity-only placeholder (operator default) or a
+   * complete text-only dish with images: null (the agreed owner fallback).
+   */
+  missingPhoto?: 'placeholder' | 'text_only';
 };
 
 /** A PR #25 T0 manifest whose webp variant files the caller has already hash-checked. */
@@ -61,6 +93,7 @@ export type ProducedMenuBundle = {
 };
 
 export type BundleProducerErrorCode =
+  | 'asset_revision_mismatch'
   | 'invalid_request'
   | 'dish_not_found'
   | 'asset_dish_mismatch'
@@ -82,7 +115,10 @@ export class BundleProducerError extends Error {
 type AssetManifestEntry = {
   dish_id: string;
   dish_revision_id: string;
-  asset_id: string;
+  // Exactly one of: a reviewed T0 asset, or an owner-approved upload (never labelled T0).
+  asset_id?: string;
+  owner_photo_id?: string;
+  portion?: PublicPortion;
   card: { url: string; sha256: string; width: number; height: number };
   detail: { url: string; sha256: string; width: number; height: number };
 };
@@ -99,6 +135,7 @@ export async function produceMenuBundle(
   request: MenuBundleRequest,
   dishes: ReadonlyMap<string, ApprovedDishSource>,
   assets: ReadonlyMap<string, VerifiedT0Asset>,
+  options: ProduceOptions = {},
 ): Promise<ProducedMenuBundle> {
   const parsedRequest = MenuBundleRequestSchema.safeParse(request);
   if (!parsedRequest.success) {
@@ -132,7 +169,7 @@ export async function produceMenuBundle(
           'invalid_request',
           `Dish ${source.dishId} category differs from its approved revision`,
         );
-      const built = await buildDish(input, requested, source, assets);
+      const built = await buildDish(input, requested, source, assets, options);
       diagnostics.push(...built.gaps.map((code) => ({ dishId: requested.dish_id, code })));
       categoryDishes.push(built.dish);
       if (built.asset) assetEntries.push(built.asset);
@@ -146,7 +183,11 @@ export async function produceMenuBundle(
 
   assetEntries.sort((left, right) => (left.dish_id < right.dish_id ? -1 : 1));
   const assetManifestHash = await sha256(
-    canonicalJson({ schema_version: 1, assets: assetEntries }),
+    canonicalJson({
+      schema_version: 1,
+      assets: assetEntries,
+      ...(input.restaurant.logo ? { restaurant_logo: input.restaurant.logo } : {}),
+    }),
   );
 
   const pending = parseBundle({
@@ -196,6 +237,7 @@ async function buildDish(
   requested: MenuBundleRequestDish,
   source: ApprovedDishSource,
   assets: ReadonlyMap<string, VerifiedT0Asset>,
+  options: ProduceOptions,
 ): Promise<{
   dish: PublicMenuDish;
   gaps: BundleDiagnosticCode[];
@@ -233,8 +275,6 @@ async function buildDish(
       : null;
   if (!ingredientNames) gaps.push('ingredients_missing');
 
-  if (requested.image_alt === null) gaps.push('alt_missing');
-
   const asset = requested.t0_asset_id ? assets.get(requested.t0_asset_id) : undefined;
   if (asset && asset.manifest.dish.dish_id !== source.dishId) {
     throw new BundleProducerError(
@@ -242,28 +282,123 @@ async function buildDish(
       `Asset ${asset.manifest.asset_id} belongs to dish ${asset.manifest.dish.dish_id}, not ${source.dishId}`,
     );
   }
-  if (!asset) gaps.push('asset_missing');
-  else if (asset.manifest.dish.revision_id !== source.dishRevisionId) {
+  const ownerPhoto = asset ? undefined : options.ownerPhotos?.get(source.dishId);
+  if (
+    ownerPhoto &&
+    (ownerPhoto.dishId !== source.dishId ||
+      ownerPhoto.dishRevisionId !== source.dishRevisionId ||
+      !source.approvedPhotoId ||
+      ownerPhoto.photoId !== source.approvedPhotoId)
+  ) {
+    throw new BundleProducerError(
+      'asset_revision_mismatch',
+      `Owner photo for dish ${source.dishId} is not the photo approved on its revision`,
+    );
+  }
+  // Flat uploads cannot authorize portions; only an exact independently approved cutout can.
+  if (
+    !asset &&
+    requested.portion &&
+    !(
+      ownerPhoto &&
+      matchesApprovedOwnerPortion(
+        options.ownerPortions?.get(source.dishId),
+        ownerPhoto.photoId,
+        ownerPhoto.sha256,
+        requested.portion,
+      )
+    )
+  ) {
+    throw new BundleProducerError(
+      'asset_revision_mismatch',
+      'A portion requires a reviewed T0 asset or exact approved owner cutout',
+    );
+  }
+  const textOnly = !asset && !ownerPhoto && options.missingPhoto === 'text_only';
+  if (requested.image_alt === null && !textOnly) gaps.push('alt_missing');
+  if (!asset && !ownerPhoto && !textOnly) gaps.push('asset_missing');
+  else if (asset && asset.manifest.dish.revision_id !== source.dishRevisionId) {
     gaps.push('asset_revision_mismatch');
   }
 
   const identity = { dish_id: source.dishId, dish_revision_id: source.dishRevisionId };
   if (
+    requested.portion &&
+    (requested.portion.dish_id !== source.dishId ||
+      requested.portion.dish_revision_id !== source.dishRevisionId)
+  ) {
+    throw new BundleProducerError(
+      'asset_revision_mismatch',
+      'Portion must belong to the approved dish revision',
+    );
+  }
+  if (
+    requested.portion?.physical_size &&
+    (source.servingCount == null ||
+      requested.portion.physical_size.serving_count !== source.servingCount)
+  ) {
+    throw new BundleProducerError(
+      'asset_revision_mismatch',
+      'Plate calibration must match the approved serving count',
+    );
+  }
+  if (
     gaps.length > 0 ||
     !price.ok ||
     !currency ||
     !ingredientNames ||
-    requested.image_alt === null ||
-    !asset
+    (requested.image_alt === null && !textOnly) ||
+    (!asset && !ownerPhoto && !textOnly)
   ) {
     return { dish: { ...identity, complete: false }, gaps, asset: null };
   }
 
-  const { manifest } = asset;
-  const card = webpVariant(manifest, 'card-480');
-  const detail = webpVariant(manifest, 'detail-1280');
-  const assetUrl = (path: string) => `${request.asset_base_url}/${manifest.asset_id}/${path}`;
   const alt = requested.image_alt;
+  let images: Extract<PublicMenuDish, { complete: true }>['images'] = null;
+  let assetEntry: AssetManifestEntry | null = null;
+  if (asset && alt !== null) {
+    const { manifest } = asset;
+    const card = webpVariant(manifest, 'card-480');
+    const detail = webpVariant(manifest, 'detail-1280');
+    const assetUrl = (path: string) => `${request.asset_base_url}/${manifest.asset_id}/${path}`;
+    images = {
+      card: { url: assetUrl(card.path), width: card.width, height: card.height, alt },
+      detail: { url: assetUrl(detail.path), width: detail.width, height: detail.height, alt },
+    };
+    assetEntry = {
+      ...identity,
+      asset_id: manifest.asset_id,
+      ...(requested.portion ? { portion: requested.portion } : {}),
+      card: {
+        url: assetUrl(card.path),
+        sha256: card.sha256,
+        width: card.width,
+        height: card.height,
+      },
+      detail: {
+        url: assetUrl(detail.path),
+        sha256: detail.sha256,
+        width: detail.width,
+        height: detail.height,
+      },
+    };
+  } else if (ownerPhoto && alt !== null) {
+    const image = { url: ownerPhoto.url, width: ownerPhoto.width, height: ownerPhoto.height, alt };
+    images = { card: image, detail: image };
+    const variant = {
+      url: ownerPhoto.url,
+      sha256: ownerPhoto.sha256,
+      width: ownerPhoto.width,
+      height: ownerPhoto.height,
+    };
+    assetEntry = {
+      ...identity,
+      owner_photo_id: ownerPhoto.photoId,
+      ...(requested.portion ? { portion: requested.portion } : {}),
+      card: variant,
+      detail: variant,
+    };
+  }
 
   const ingredients = [];
   for (const [index, name] of ingredientNames.entries()) {
@@ -278,6 +413,8 @@ async function buildDish(
     dish: {
       ...identity,
       complete: true,
+      ...(source.servingCount != null ? { serving_count: source.servingCount } : {}),
+      ...(requested.portion ? { portion: requested.portion } : {}),
       name: source.name.trim(),
       description,
       price: { amount: price.amount, currency },
@@ -285,27 +422,9 @@ async function buildDish(
       allergens:
         source.approvedAllergens === undefined ? requested.allergens : source.approvedAllergens,
       dietary: requested.dietary,
-      images: {
-        card: { url: assetUrl(card.path), width: card.width, height: card.height, alt },
-        detail: { url: assetUrl(detail.path), width: detail.width, height: detail.height, alt },
-      },
+      images,
     },
     gaps,
-    asset: {
-      ...identity,
-      asset_id: manifest.asset_id,
-      card: {
-        url: assetUrl(card.path),
-        sha256: card.sha256,
-        width: card.width,
-        height: card.height,
-      },
-      detail: {
-        url: assetUrl(detail.path),
-        sha256: detail.sha256,
-        width: detail.width,
-        height: detail.height,
-      },
-    },
+    asset: assetEntry,
   };
 }

@@ -33,6 +33,8 @@ export type MenuPreviewProps = {
   notReadyBody?: string | undefined;
   /** True while the publish request runs. */
   publishing?: boolean;
+  /** Preparation uses this same authored layout before a snapshot is available. */
+  preparing?: boolean;
   /** The last publish attempt failed; the menu is still a draft. A string replaces the body. */
   publishFailed?: boolean | string;
   /** The menu is published (the link may still be loading or need a retry). */
@@ -62,6 +64,7 @@ export function MenuPreview({
   dishesMissingDetails = 0,
   notReadyBody,
   publishing = false,
+  preparing = false,
   publishFailed = false,
   published: publishedProp,
   publishedUrl = null,
@@ -164,7 +167,11 @@ export function MenuPreview({
               {published ? 'Live — Published' : 'Preview — Not Published'}
             </span>
             <div className="pp-menu-preview__phone">
-              {phoneContent && !(published && dinerUrl) ? (
+              {preparing ? (
+                <p className="pp-menu-preview__unavailable" role="status">
+                  Preparing your menu…
+                </p>
+              ) : phoneContent && !(published && dinerUrl) ? (
                 <div className="pp-menu-preview__screen">{phoneContent}</div>
               ) : dinerUrl ? (
                 <iframe
@@ -234,7 +241,7 @@ export function MenuPreview({
                 menu; only you and your staff can see this preview.
               </p>
             )}
-            <p className="pp-menu-preview__summary">{summary}</p>
+            {!preparing && <p className="pp-menu-preview__summary">{summary}</p>}
             {panelNote && <p className="pp-menu-preview__helper">{panelNote}</p>}
           </section>
         </div>
@@ -248,11 +255,11 @@ export function MenuPreview({
                 Back to Edit
               </ActionButton>
               <ActionButton
-                busy={publishing}
-                busyLabel="Publishing"
-                blocked={notReady}
+                busy={publishing || preparing}
+                busyLabel={preparing ? 'Preparing' : 'Publishing'}
+                blocked={notReady || preparing}
                 onClick={() => {
-                  if (!notReady && !publishing) setConfirming(true);
+                  if (!notReady && !publishing && !preparing) setConfirming(true);
                 }}
               >
                 Publish Menu
@@ -311,6 +318,19 @@ function PublishConfirmDialog({
         onCancel();
       }}
     >
+      {/* Orange check (Rania's updated Publish Confirmation, Figma 3501:9485), drawn like the
+          S11 "Menu verified" icon. */}
+      <span className="pp-menu-preview__dialog-icon" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" focusable="false">
+          <path
+            d="M5 12.5l4.5 4.5L19 7.5"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
       <h2 id={`${ids}-title`}>Publish your menu?</h2>
       <p id={`${ids}-text`}>
         Your menu will be public on PeekaPlate. Anyone with the link will be able to see it.

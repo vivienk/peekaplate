@@ -26,6 +26,7 @@ const runtime = config ? connectOwnerAuth(config) : null;
 const apiBase = readWorkspaceApiBase(import.meta.env.VITE_PUBLIC_API_URL);
 // The owner AI panel stays off unless this console build turns it on (see docs/owner-ai-responses.md).
 const aiEnabled = import.meta.env.VITE_OWNER_AI_ENABLED === 'true';
+const dishAssistanceEnabled = import.meta.env.VITE_OWNER_AI_DISH_ASSISTANCE_ENABLED === 'true';
 
 function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   const [owner, setOwner] = useState<SignedInOwner | null>(null);
@@ -53,12 +54,15 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
       if (generation === identityGeneration.current) setLoading(false);
     }
   }, [auth]);
+  const sessionGeneration = identityGeneration.current;
   const sessionExpired = useCallback(() => {
+    // An old workspace can finish after a cross-tab identity change, before effect cleanup.
+    if (sessionGeneration !== identityGeneration.current) return;
     identityGeneration.current++;
     setOwner(null);
     setLoading(false);
     setMessage('Your session could not be verified. Please sign in again.');
-  }, []);
+  }, [sessionGeneration]);
   const signOut = useCallback(async () => {
     setBusy(true);
     if (await auth.signOut()) {
@@ -182,6 +186,7 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
           owner={owner}
           apiBase={apiBase}
           aiEnabled={aiEnabled}
+          dishAssistanceEnabled={dishAssistanceEnabled}
           onSessionExpired={sessionExpired}
           onSignOut={() => {
             void signOut();

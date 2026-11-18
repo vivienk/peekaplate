@@ -1,5 +1,5 @@
 import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
-import { ingredientIcon } from './icons';
+import { allergenIcon, dietaryIcon, ingredientIcon } from './icons';
 import { navButtonMarkup } from './navButton';
 import { bindPortionPreview } from './portionPreview';
 import { formatPrice } from './price';
@@ -14,12 +14,20 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// Original PR145 decoration; labels remain the source of accessible information.
+function iconMarkup(src: string | null): string {
+  return src
+    ? `<img class="pp-chip__icon" src="${escapeHtml(src)}" alt="" aria-hidden="true" width="16" height="16" />`
+    : '';
+}
+
 export function allergenChips(dish: CompleteDish): string {
   if (dish.allergens.length === 0) return '';
   return dish.allergens
     .map(
       (value) => `
         <span class="pp-chip" aria-label="Contains ${escapeHtml(value)}">
+          ${iconMarkup(allergenIcon(value))}
           <span class="pp-chip__text">${escapeHtml(value)}</span>
         </span>
       `,
@@ -33,6 +41,7 @@ export function dietaryChips(dish: CompleteDish): string {
     .map(
       (value) => `
         <span class="pp-chip" aria-label="Dietary info: ${escapeHtml(value)}">
+          ${iconMarkup(dietaryIcon(value))}
           <span class="pp-chip__text">${escapeHtml(value)}</span>
         </span>
       `,
@@ -96,6 +105,7 @@ export function renderDishDetail(
             <h2 class="pp-detail__name">${escapeHtml(dish.name)}</h2>
             <p class="pp-detail__price">${escapeHtml(formatPrice(dish.price))}</p>
           </div>
+          ${dish.servingCount ? `<p class="pp-detail__servings">Serves ${dish.servingCount} ${dish.servingCount === 1 ? 'person' : 'people'}</p>` : ''}
           <p class="pp-detail__description">${escapeHtml(dish.description)}</p>
         </div>
 

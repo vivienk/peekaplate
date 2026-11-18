@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Client } from 'pg';
 import { getDocumentProxy } from 'unpdf';
 import { withOwnerMenuTransaction } from '../owner-menu';
-import { safeFetch } from '../retrieval/fetcher';
+import { type SafeFetchResult, safeFetch } from '../retrieval/fetcher';
 import { parseHtmlSource } from '../retrieval/parser';
 import { canonicalStringify } from '../review-command';
 import {
@@ -41,16 +41,48 @@ export async function validateMenuPdf(upload: MenuUpload) {
   }
 }
 
-export async function materializeMenuUrl(url: string, key: string): Promise<MenuUpload> {
-  let source = await safeFetch(url);
-  if (source.contentType.split(';')[0]?.trim() === 'text/html') {
-    const candidates = parseHtmlSource(
-      source.content,
-      'menu-url',
-      source.finalUrl,
-    ).discoveredLinks.filter((link) => /\.(pdf|png|jpe?g)(?:[?#]|$)/i.test(new URL(link).pathname));
-    if (candidates.length !== 1) throw new IngestionError('menu_file_link_required', 422);
-    source = await safeFetch(candidates[0]!);
+/**
+ * Select a single clearly named menu file without guessing between competing
+ * menus, meal periods, languages or similarly relevant assets. The existing
+ * safeFetch guard must validate every destination and redirect.
+ */
+export function selectUnambiguousMenuFile(links: readonly string[]): string | null {
+  const candidates = [...new Set(links)].filter((link) => {
+    try {
+      return /\.(pdf|png|jpe?g)$/i.test(new URL(link).pathname);
+    } catch {
+      return false;
+    }
+  });
+  if (candidates.length === 1) return candidates[0] ?? null;
+  if (candidates.length === 0) return null;
+
+  // Match a file's name only: /menu/catering.pdf is not evidence that the
+  // catering PDF is the restaurant's main menu.
+  const explicitlyNamed = candidates.filter((link) => {
+    const encoded = new URL(link).pathname.split('/').pop() ?? '';
+    let filename = encoded;
+    try {
+      filename = decodeURIComponent(encoded);
+    } catch {
+      // Malformed percent-encoding must not break the entire URL intake.
+    }
+    return /(?:^|[-_\s])menu(?:[-_\s.]|$)/i.test(filename);
+  });
+  return explicitlyNamed.length === 1 ? (explicitlyNamed[0] ?? null) : null;
+}
+
+export async function materializeMenuUrl(
+  url: string,
+  key: string,
+  fetchedSource?: SafeFetchResult,
+): Promise<MenuUpload> {
+  let source = fetchedSource ?? (await safeFetch(url));
+  if (source.contentType.split(';')[0]?.trim().toLowerCase() === 'text/html') {
+    const candidates = parseHtmlSource(source.content, 'menu-url', source.finalUrl).discoveredLinks;
+    const selected = selectUnambiguousMenuFile(candidates);
+    if (!selected) throw new IngestionError('menu_file_link_required', 422);
+    source = await safeFetch(selected);
   }
   const upload = await readMenuUpload(
     new Request(source.finalUrl, {

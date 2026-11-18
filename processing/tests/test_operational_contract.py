@@ -712,7 +712,6 @@ class OperationalContractTests(unittest.TestCase):
         for pattern, expected in [
             (r"setInactivityTimeout\((\d[\d_]*)\)", "60_000"),
             (r"Date\.now\(\)\s*\+\s*(\d[\d_]*)", "30_000"),
-            (r"AbortSignal\.timeout\((\d[\d_]*)\)", "1_000"),
             (r"setTimeout\(resolve,\s*(\d[\d_]*)\)", "500"),
             (r"maxBundleBytes\s*=\s*(\d[\d_]*)", "32_000_000"),
             (r"Buffer\.byteLength\(publicReport,\s*'utf8'\)\s*>\s*(\d[\d_]*)", "24_000_000"),
@@ -720,6 +719,12 @@ class OperationalContractTests(unittest.TestCase):
             matches = re.findall(pattern, host_ts)
             self.assertGreaterEqual(len(matches), 1, f"Expected literal for {pattern}")
             self.assertTrue(all(m == expected for m in matches), f"Mismatch for {pattern}: {matches}")
+
+        # Health readiness and non-billable portion processing have separate deadlines.
+        readiness = host_ts.split("private async waitForReady()", 1)[1].split(
+            "private ensureBudgetSchema()", 1
+        )[0]
+        self.assertEqual(re.findall(r"AbortSignal\.timeout\((\d[\d_]*)\)", readiness), ["1_000"])
 
         readiness_sec = 30
         nominal_sum = readiness_sec + JOB_TIMEOUT_SECONDS

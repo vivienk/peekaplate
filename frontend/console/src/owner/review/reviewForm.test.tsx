@@ -18,6 +18,27 @@ const dish = (over: Partial<ReviewDish> = {}): ReviewDish => ({
 });
 
 describe('S10 row to S09 form values', () => {
+  it('round-trips people served separately from the descriptive serving size', () => {
+    const previous = dish({ servingSize: '1 bowl', servingCount: 2 });
+    const form = dishToForm(previous);
+    expect(form.servingSize).toBe('1 bowl');
+    expect(form.servingCount).toBe('2');
+    expect(formToDish(form, previous.id, previous)).toEqual(previous);
+  });
+
+  it('never infers people served from a numeric serving label', () => {
+    const previous = dish({ servingSize: '2' });
+    const form = dishToForm(previous);
+    expect(form.servingCount).toBeUndefined();
+    expect(formToDish(form, previous.id, previous)).toEqual(previous);
+  });
+
+  it('keeps a blank count unknown and rejects counts outside whole people from 1 to 100', () => {
+    expect(formToDish({ ...emptyManualDish(), servingCount: '' }, 'd1').servingCount).toBeNull();
+    for (const servingCount of ['0', '-1', '1.5', '101'])
+      expect(() => formToDish({ ...emptyManualDish(), servingCount }, 'd1')).toThrow();
+  });
+
   it('opens the form with exactly what S10 shows, and keeps each status', () => {
     const form = dishToForm(dish());
     expect(form).toMatchObject({

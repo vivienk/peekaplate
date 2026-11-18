@@ -58,6 +58,12 @@ const completeButton = (html: string) =>
   html.match(/<button[^>]*>Complete verification<\/button>/)?.[0] ?? '';
 
 describe('ReviewDishes (S10 Menu Review)', () => {
+  it('counts all saved menu dishes without describing them as newly extracted', () => {
+    expect(text(render(initialReview([dish(), noPrice])))).toContain('2 dishes in your menu');
+    expect(text(render(initialReview([dish()])))).toContain('1 dish in your menu');
+    expect(text(render(initialReview([dish()])))).not.toContain('extracted');
+  });
+
   it('shows each dish with the status and text from the design', () => {
     const words = text(render(initialReview([dish(), noPrice, noCategory])));
     expect(words).toContain('Your dishes');
