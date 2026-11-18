@@ -49,7 +49,7 @@ export function registerOwnerAnalysisRoutes(
   );
   app.use(
     route,
-    bodyLimit({ maxSize: 1024, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
+    bodyLimit({ maxSize: 4096, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
   );
   app.post(route, async (c) => {
     const env = c.env ?? {};
@@ -99,7 +99,7 @@ export function registerOwnerAnalysisRoutes(
       return c.json({ error: 'report_reference_unavailable' }, 409);
     }
     // The existing reader checks current owner membership in a tenant-scoped read-only transaction.
-    // No browser report, metrics, prompt, model, policy or credential is accepted.
+    // The optional browser question is text only. The report and model policy are server-owned.
     const report = OwnerDishReportSchema.safeParse(
       await options
         .readReport(actor, scope.data.venueId, reference?.anchor ?? now, env, 'synthetic')

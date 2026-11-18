@@ -11,6 +11,12 @@ import {
   OwnerAiProviderFailure,
   requestOwnerAiResponse,
 } from './provider';
+import {
+  ownerReportFactInput,
+  renderReportFact,
+  reportFactFormat,
+  reportFactInstructions,
+} from './report-facts';
 import { ownerReportSnapshot } from './report-reference';
 
 export const OWNER_ANALYSIS_MODEL = 'gpt-6-luna';
@@ -95,21 +101,50 @@ export async function analyzeOwnerReport(options: {
       value: null,
       reason,
     });
-  // This report has no CRM/customer/order evidence. Never infer retention from browsing.
-  if (options.request.goal === 'crm') return abstain('unsupported_goal');
+  const { question, goal } = options.request;
+  // The recommendation flow cannot infer retention from browsing.
+  if (!question && goal === 'crm') return abstain('unsupported_goal');
   const age = options.now.getTime() - Date.parse(meta.generated_at);
   if (
     meta.report_status !== 'NORMAL' ||
-    meta.freshness.is_stale !== false ||
-    dish.evidence_state !== 'NORMAL' ||
+    meta.freshness.is_stale === true ||
     age < 0 ||
-    age > 300_000 ||
     Date.parse(meta.date_window.end_time) > options.now.getTime() ||
-    keys.some((key) => !['NORMAL', 'VALID_ZERO'].includes(dish.metrics[key].status))
+    (!question &&
+      (meta.freshness.is_stale !== false ||
+        dish.evidence_state !== 'NORMAL' ||
+        age > 300_000 ||
+        keys.some((key) => !['NORMAL', 'VALID_ZERO'].includes(dish.metrics[key].status))))
   ) {
     return abstain('unusable_evidence');
   }
-  const metrics = Object.fromEntries(keys.map((key) => [key, dish.metrics[key].value]));
+  const task = question
+    ? {
+        instructions: reportFactInstructions,
+        input: JSON.stringify(ownerReportFactInput(report, dish, question)),
+        text: { format: reportFactFormat },
+      }
+    : {
+        instructions:
+          'Select one supplied browsing metric for a human to review, or abstain. These are synthetic data. Do not infer sales, customer identity, retention, revenue, causality, or industry benchmarks. A low rate alone does not prove a problem. No tools or changes are authorized.',
+        input: JSON.stringify({
+          goal,
+          metrics: Object.fromEntries(keys.map((key) => [key, dish.metrics[key].value])),
+        }),
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'owner_review_metric',
+            strict: true,
+            schema: {
+              type: 'object',
+              properties: { metric: { type: 'string', enum: [...keys, 'abstain'] } },
+              required: ['metric'],
+              additionalProperties: false,
+            },
+          },
+        },
+      };
   let httpStatus: number | null = null;
   try {
     if (!options.apiKey || !isOwnerAiProjectId(options.projectId)) {
@@ -136,28 +171,24 @@ export async function analyzeOwnerReport(options: {
         max_output_tokens: OWNER_ANALYSIS_MAX_TOKENS,
         tools: [],
         tool_choice: 'none',
-        instructions:
-          'Select one supplied browsing metric for a human to review, or abstain. These are synthetic data. Do not infer sales, customer identity, retention, revenue, causality, or industry benchmarks. A low rate alone does not prove a problem. No tools or changes are authorized.',
-        input: JSON.stringify({ goal: options.request.goal, metrics }),
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'owner_review_metric',
-            strict: true,
-            schema: {
-              type: 'object',
-              properties: { metric: { type: 'string', enum: [...keys, 'abstain'] } },
-              required: ['metric'],
-              additionalProperties: false,
-            },
-          },
-        },
+        ...task,
       },
     });
     httpStatus = response.httpStatus;
-    const choice = selectionSchema.parse(
-      JSON.parse(ownerAiOutputText(response.data, OWNER_ANALYSIS_MAX_TOKENS)),
-    );
+    const output: unknown = JSON.parse(ownerAiOutputText(response.data, OWNER_ANALYSIS_MAX_TOKENS));
+    if (question) {
+      const fact = renderReportFact(report, dish, question, output);
+      if ('reason' in fact) return abstain(fact.reason);
+      return OwnerAnalysisResultSchema.parse({
+        ...base,
+        ...fact,
+        status: 'answered',
+        metric: null,
+        value: null,
+        reason: 'report_fact',
+      });
+    }
+    const choice = selectionSchema.parse(output);
     if (choice.metric === 'abstain') return abstain('model_abstained');
     return OwnerAnalysisResultSchema.parse({
       ...base,

@@ -26,6 +26,11 @@ function reply(metric = 'save_rate') {
     usage: { input_tokens: 50, output_tokens: 8, total_tokens: 58 },
   };
 }
+function factReply(output: object) {
+  const data = reply();
+  data.output[0]!.content[0]!.text = JSON.stringify(output);
+  return Response.json(data);
+}
 function setup() {
   const fetchImpl = vi.fn(async () => Response.json(reply()));
   const reserveRequest = vi.fn(async () => true);
@@ -42,6 +47,158 @@ function setup() {
   return { input, fetchImpl, reserveRequest };
 }
 describe('owner Responses adapter', () => {
+  it('answers a ranking from the visible historical report when freshness is unknown', async () => {
+    const { input, fetchImpl, reserveRequest } = setup();
+    const report = structuredClone(input.report);
+    Object.assign(report.report_metadata.freshness, { is_stale: null });
+    report.dishes.push({
+      ...structuredClone(report.dishes[0]!),
+      dish_id: '00000000-0000-4000-8000-000000000457',
+      name: 'Rice bowl',
+    });
+    report.dishes[1]!.metrics.open_rate.value = 0.75;
+    report.dishes.push({
+      ...structuredClone(report.dishes[0]!),
+      dish_id: '00000000-0000-4000-8000-000000000458',
+      name: 'Rice rolls',
+    });
+    Object.assign(report.dishes[2]!.metrics.open_rate, { value: null, status: 'SUPPRESSED' });
+    fetchImpl.mockResolvedValue(factReply({ operation: 'highest', metric: 'open_rate', limit: 1 }));
+    const result = await analyzeOwnerReport({
+      ...input,
+      report,
+      request: { ...input.request, question: 'Which dish had the highest open rate?' },
+    });
+    expect(result).toMatchObject({
+      status: 'answered',
+      reason: 'report_fact',
+      metric: null,
+      value: null,
+      answer:
+        'Highest open rate among dishes with a reported value: Rice bowl (75%). This describes the displayed historical report. Data freshness is unverified.',
+    });
+    expect(reserveRequest).toHaveBeenCalledOnce();
+    const [, init] = (fetchImpl.mock.calls as unknown as [string, RequestInit][])[0]!;
+    const payload = JSON.parse((JSON.parse(init.body as string) as { input: string }).input);
+    expect(payload).toMatchObject({
+      question: 'Which dish had the highest open rate?',
+      report: {
+        source: 'synthetic',
+        freshness: 'unverified',
+        timeWindow: {
+          start: report.report_metadata.date_window.start_time,
+          end: report.report_metadata.date_window.end_time,
+        },
+        dishes: [
+          {
+            name: 'Synthetic development dish',
+            selected: true,
+            metrics: { open_rate: 0.5, save_rate: 0 },
+          },
+          { name: 'Rice bowl', selected: false, metrics: { open_rate: 0.75 } },
+          { name: 'Rice rolls', selected: false },
+        ],
+        dishListComplete: true,
+      },
+    });
+    expect(payload.report.dishes[2].metrics).not.toHaveProperty('open_rate');
+    expect(init.body).not.toContain('eligible_sessions');
+    expect(init.body).not.toContain(LOCAL_AI_VENUE);
+    expect(init.body).not.toContain(LOCAL_AI_DISH);
+  });
+  it('reads displayed and adjacent baseline summary figures without sending unavailable cells', async () => {
+    const { input, fetchImpl } = setup();
+    const original = input.report;
+    const current = {
+      start_time: original.report_metadata.date_window.start_time,
+      end_time: original.report_metadata.date_window.end_time,
+    };
+    const baseline = { start_time: '2026-11-10T12:00:00.000Z', end_time: current.start_time };
+    const summaryCells = {
+      menu_sessions: { value: 20, status: 'NORMAL' },
+      dish_opens: { value: 30, status: 'NORMAL' },
+      avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+      portion_previews_shown: { value: null, status: 'MISSING' },
+      verified_orders: { value: null, status: 'MISSING' },
+    };
+    const report = {
+      ...original,
+      summary: {
+        periods: { current, baseline },
+        current: summaryCells,
+        baseline: { ...summaryCells, dish_opens: { value: 25, status: 'NORMAL' } },
+      },
+    };
+    fetchImpl.mockResolvedValue(
+      factReply({ operation: 'compare', metric: 'dish_opens', limit: 1 }),
+    );
+    expect(
+      await analyzeOwnerReport({
+        ...input,
+        report,
+        request: {
+          ...input.request,
+          question: 'How did dish opens compare to the previous period?',
+        },
+      }),
+    ).toMatchObject({
+      status: 'answered',
+      answer: expect.stringContaining('30 for dish opens in the displayed period and 25'),
+    });
+    const [, init] = (fetchImpl.mock.calls as unknown as [string, RequestInit][])[0]!;
+    const payload = JSON.parse((JSON.parse(init.body as string) as { input: string }).input);
+    expect(payload.report.summary).toEqual({
+      periods: { current, baseline },
+      current: { menu_sessions: 20, dish_opens: 30 },
+      baseline: { menu_sessions: 20, dish_opens: 25 },
+    });
+  });
+  it('returns a fact only when the selected report cell exists and permits exposure', async () => {
+    const { input, fetchImpl } = setup();
+    const request = { ...input.request, question: 'What was this dish’s save rate?' };
+    fetchImpl.mockResolvedValue(
+      factReply({ operation: 'selected_dish', metric: 'save_rate', limit: 1 }),
+    );
+    expect(await analyzeOwnerReport({ ...input, request })).toMatchObject({
+      status: 'answered',
+      answer: expect.stringContaining('recorded 0% for save rate'),
+    });
+    const report = structuredClone(input.report);
+    Object.assign(report.dishes[0]!.metrics.save_rate, { value: null, status: 'SUPPRESSED' });
+    fetchImpl.mockResolvedValue(
+      factReply({ operation: 'selected_dish', metric: 'save_rate', limit: 1 }),
+    );
+    expect(await analyzeOwnerReport({ ...input, report, request })).toMatchObject({
+      status: 'abstained',
+      reason: 'unusable_evidence',
+    });
+  });
+  it('allows explicit abstention and rejects answer text supplied by the provider', async () => {
+    const { input, fetchImpl } = setup();
+    const request = { ...input.request, question: 'Why did customers spend less?' };
+    const abstention = { operation: 'abstain', metric: null, limit: 1 };
+    fetchImpl.mockResolvedValue(factReply(abstention));
+    expect(await analyzeOwnerReport({ ...input, request })).toMatchObject({
+      status: 'abstained',
+      reason: 'model_abstained',
+    });
+    fetchImpl.mockResolvedValue(factReply({ ...abstention, answer: 'invented explanation' }));
+    await expect(analyzeOwnerReport({ ...input, request })).rejects.toThrow(
+      'Owner analysis unavailable',
+    );
+  });
+  it('withholds facts from a report marked stale before reserving a provider call', async () => {
+    const { input, fetchImpl, reserveRequest } = setup();
+    Object.assign(input.report.report_metadata.freshness, { is_stale: true });
+    expect(
+      await analyzeOwnerReport({
+        ...input,
+        request: { ...input.request, question: 'Which dish had the highest save rate?' },
+      }),
+    ).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(reserveRequest).not.toHaveBeenCalled();
+  });
   it('accepts the same project ID characters as protected provisioning', async () => {
     const { input, fetchImpl } = setup();
     input.projectId = 'proj_synthetic-branch_1';

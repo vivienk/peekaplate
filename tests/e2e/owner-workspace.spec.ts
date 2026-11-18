@@ -9,6 +9,7 @@ import { JOB, reviewSession } from '../../frontend/console/src/owner-menu/fixtur
 import { OwnerDishReportSchema } from '../../packages/contracts/src/owner-report';
 
 const origin = 'http://127.0.0.1:5174';
+const factualAnswer = 'Soup had 24 impressions in this report period.';
 // Narrow main releases omit preview-only demo entries; runtime journeys still always run.
 const authoredDemoAvailable = existsSync(
   new URL('../../frontend/console/owner-onboarding.html', import.meta.url),
@@ -240,10 +241,15 @@ async function fixture(context: BrowserContext, reportReady = false) {
           source: 'synthetic',
           reportSnapshot: 'a'.repeat(64),
           timeWindow: state.analysisWindow,
-          status: 'review',
-          metric: 'open_rate',
-          value: 0.5,
-          reason: 'review_evidence',
+          ...(body.question
+            ? {
+                status: 'answered',
+                metric: null,
+                value: null,
+                reason: 'report_fact',
+                answer: factualAnswer,
+              }
+            : { status: 'review', metric: 'open_rate', value: 0.5, reason: 'review_evidence' }),
           approvalRequired: true,
           allowedEffects: [],
         },
@@ -2306,6 +2312,41 @@ test('the AI panel opens beside the live report and uses only the signed-in owne
   await page.screenshot({ path: testInfo.outputPath('owner-workspace-ai.png'), fullPage: true });
   await page.getByRole('button', { name: 'Restaurant Setup', exact: true }).click();
   await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
+});
+
+test('an owner can ask a factual question about the displayed report period', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const question = panel.getByRole('textbox', { name: 'Ask a report question' });
+  const text = 'How many impressions did this dish have?';
+  await panel.getByLabel('Dish', { exact: true }).selectOption({ label: 'Soup' });
+  await question.fill(`  ${text}  `);
+  await question.press('Enter');
+  await expect(panel.getByRole('heading', { name: 'Report answer' })).toBeVisible();
+  await expect(panel.getByText(factualAnswer)).toBeVisible();
+  await expect(panel.getByText(/Analysis evidence period:/)).toBeVisible();
+  expect(state.analyses).toEqual([
+    {
+      venueId: venue.venueId,
+      actor: ownerId,
+      body: {
+        dishId: UNEEZA_REPORT.dishes.find((dish) => dish.name === 'Soup')?.dish_id,
+        goal: 'menu',
+        question: text,
+      },
+      reference: reportReference(ownerId, venue.venueId),
+    },
+  ]);
+
+  state.analysisWindow = { start: '2026-11-11T12:00:00Z', end: '2026-11-12T12:00:00Z' };
+  await question.press('Enter');
+  await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
+  await expect(panel.getByText(factualAnswer)).toHaveCount(0);
 });
 
 test('switching restaurant clears the AI result and asks only for the new restaurant', async ({

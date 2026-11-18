@@ -57,6 +57,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-workspace.ts",
         "packages/contracts/src/owner-workspace.test.ts",
         "packages/contracts/src/owner-analysis.ts",
+        "packages/contracts/src/owner-analysis.test.ts",
         "packages/contracts/src/portion.ts",
         "packages/contracts/src/ingredient-artwork.ts",
         "packages/contracts/package.json",
@@ -75,7 +76,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "35f143b0ac52beb185a0d95029c1c0a418a2af8015f93f512acccb2d00b5d648"
+      "sourceFingerprint": "f141fab6297738ace6fc740a8dde3af8aca4d5371209478f3db9d39041a101d7"
     },
     {
       "id": "tokens",
@@ -431,7 +432,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "69603ed8350f0ad7a1fc5b2fc4e79c253f3d996f5d4b9fe2aea0bf75f38d1e63"
+      "sourceFingerprint": "7951d4ec642ddc8cf3b8bf249e65abb106475b6e89bff1822b3610274bda930a"
     },
     {
       "id": "backend",
@@ -561,6 +562,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-menu-retention.test.ts",
         "docs/fe064-staging-setup.md",
         "backend/src/owner-ai/responses.ts",
+        "backend/src/owner-ai/report-facts.ts",
         "backend/src/owner-ai/responses.test.ts",
         "backend/src/owner-ai/routes.ts",
         "backend/src/owner-ai/routes.test.ts",
@@ -658,7 +660,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "0e75f703f2610155cf4498e37c0564a761613eeb05514dcc4fcf86fbc4be28d3"
+      "sourceFingerprint": "960afacdf2c8f50192705d85c5932483d417448b55ae94e0b159b55802372a64"
     },
     {
       "id": "database",
