@@ -141,7 +141,8 @@ test('published portion offers the existing camera portal only after a deliberat
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(consent).toBeHidden();
   await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
-  await expect(consent).toBeVisible();
+  await expect(consent).toBeHidden();
+  await page.getByRole('button', { name: 'Analytics preferences' }).click();
   await expect(consentChoice).toHaveAttribute('aria-pressed', 'true');
   await consentChoice.click();
   await expect(consentChoice).toHaveAttribute('aria-pressed', 'false');
@@ -152,6 +153,7 @@ test('published portion offers the existing camera portal only after a deliberat
   await page.keyboard.press('Escape');
   await expect(consent).toBeHidden();
   await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
-  await expect(consent).toBeVisible();
+  await expect(consent).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Analytics preferences' })).toBeVisible();
   await expect(consentChoice).toHaveAttribute('aria-pressed', 'false');
 });
