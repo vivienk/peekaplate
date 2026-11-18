@@ -120,3 +120,31 @@ continuation has no hosted acceptance yet. It does not provision AI credentials,
 establish trusted report completeness/freshness, certify allergens or imply paid
 model quality. Record its exact release and authenticated screen result before
 claiming that new operation has passed on staging.
+
+## November 18 staging AI follow-up
+
+Code baseline: `main` at `b030db3`. The recorded staging Worker `285796f`
+contains the same dish-assistance route and compiled venue allowlist.
+
+| Check | Expected | Observed in staging |
+| --- | --- | --- |
+| S09 shorten saved description, suggest ingredients, and suggest allergens on the CTA's QA draft | A venue outside the approved synthetic scope is denied before any provider call. | All three controls displayed “AI suggestions are unavailable. Your dish has not changed.” The browser did not expose HTTP statuses in the captured logs. The pinned shared route returns `503 service_unavailable` for this venue; no suggestions were applied or saved. |
+| #245 open-tab question, “Which dish had the highest save rate?” | An expired signed report reference requires an explicit report reload. | After more than 80 seconds, the unchanged Nov 17 20:54 to Nov 18 20:54 UTC report displayed the expiry message and **Reload report**. The browser did not expose the HTTP status. The pinned route maps expired references to `409 report_reference_unavailable` before calling the model. |
+| #245 immediate factual questions on the five-dish report | The answer matches the displayed dish and metric and labels freshness accurately. | In the separate approved live checks, Avocado Toast had the highest save rate (46.7%) and an open rate of 73.3%. Both answers matched the displayed historical report and labelled freshness unverified. |
+
+The CTA's venue is outside the compiled list used by
+[`configuredSyntheticReportVenues`](../backend/src/owner-report-scope.ts).
+The [shared S09 route](../backend/src/owner-ai/dish-assistance.ts) checks this
+scope before selecting an assistance operation. The observed CTA's failure is
+therefore consistent with the scope gate, independent of any provider issue.
+Adding an unknown venue only to the runtime list invalidates that list. Positive
+hosted S09 acceptance should use a confirmed eligible QA venue and approved
+provider scope. Check a saved description, saved OCR-derived ingredients and
+reviewable allergen evidence, including a clear abstention for missing evidence
+and private suggestions pending owner review.
+
+The [report analysis route](../backend/src/owner-ai/routes.ts) and
+[owner panel](../frontend/console/src/owner/OwnerWorkspace.tsx) already separate
+reference expiration from generic service errors. No application change was
+needed to reproduce the expected explicit reload. The five-dish demo remained
+read-only. The scoped local route, contract and client suites passed 139 tests.
