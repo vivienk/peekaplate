@@ -521,6 +521,15 @@ export function DishFormView({
                     .then((items) => {
                       if (!stillCurrent()) return;
                       const s = items.filter((x) => !dr.alg.includes(x));
+                      if (!s.length) {
+                        // An empty AI answer is not an allergen-free claim.
+                        setSuggestionError(
+                          items.length
+                            ? 'No additional allergens were suggested. Your dish has not changed.'
+                            : 'No allergens were suggested. This does not mean the dish is allergen-free. Your dish has not changed.',
+                        );
+                        return;
+                      }
                       setAi({ alg: [...dr.alg, ...s], aiAlg: [...dr.aiAlg, ...s] });
                     })
                     .catch(
@@ -549,7 +558,13 @@ export function DishFormView({
                 aria-describedby={err('f-ai') ? 'f-ai-error' : undefined}
                 onChange={(e) => set({ aiReviewed: e.target.checked })}
               />
-              <span>I reviewed the AI-drafted text and ingredients. They are accurate.</span>
+              <span>
+                {/* Rania's wording; it names allergens only when AI suggested some, because
+                    ticking it confirms them. */}
+                {dr.aiAlg.length
+                  ? 'I reviewed the AI-drafted text, ingredients and allergens. They are accurate.'
+                  : 'I reviewed the AI-drafted text and ingredients. They are accurate.'}
+              </span>
             </label>
             {fieldErr('f-ai')}
           </div>

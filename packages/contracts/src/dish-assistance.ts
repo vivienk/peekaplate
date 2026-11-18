@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PublicMenuAllergenCodeSchema } from './owner-menu';
 
 const description = z
   .string()
@@ -16,6 +17,30 @@ export const DishAssistanceRequestSchema = z.discriminatedUnion('operation', [
     facts: z.strictObject({ description }),
   }),
   z.strictObject({ ...request, operation: z.literal('ingredients'), facts: z.strictObject({}) }),
+  // AI allergen guesses from the dish as the owner typed it. Proposals only: the owner must
+  // review them, and an empty answer never means "no allergens".
+  z.strictObject({
+    ...request,
+    operation: z.literal('allergens'),
+    facts: z.strictObject({
+      name: z
+        .string()
+        .trim()
+        .min(1)
+        .max(200)
+        .refine((value) => !value.includes('\u0000')),
+      ingredients: z
+        .array(
+          z
+            .string()
+            .trim()
+            .min(1)
+            .max(256)
+            .refine((value) => !value.includes('\u0000')),
+        )
+        .max(100),
+    }),
+  }),
 ]);
 export type DishAssistanceRequest = z.infer<typeof DishAssistanceRequestSchema>;
 const result = {
@@ -98,8 +123,30 @@ const ingredientResult = z
       ctx.addIssue({ code: 'custom', message: 'Inconsistent ingredient proposal evidence' });
     }
   });
+const allergenResult = z
+  .strictObject({
+    ...result,
+    operation: z.literal('allergens'),
+    description: z.null(),
+    allergens: z.array(PublicMenuAllergenCodeSchema).max(9),
+    evidence: z
+      .strictObject({
+        source: z.literal('model_inference'),
+        inputSha256: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .nullable(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      (value.status === 'review') !== (value.allergens.length > 0 && value.evidence !== null) ||
+      (value.status === 'abstained' && (value.allergens.length > 0 || value.evidence !== null)) ||
+      new Set(value.allergens).size !== value.allergens.length
+    )
+      ctx.addIssue({ code: 'custom', message: 'Inconsistent allergen proposal' });
+  });
 export const DishAssistanceResultSchema = z.discriminatedUnion('operation', [
   descriptionResult,
   ingredientResult,
+  allergenResult,
 ]);
 export type DishAssistanceResult = z.infer<typeof DishAssistanceResultSchema>;

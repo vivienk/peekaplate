@@ -562,3 +562,83 @@ it('bounds provider bytes and sanitizes provider/network failures', async () => 
   expect(response.status).toBe(503);
   expect(await response.text()).not.toContain('private');
 });
+
+const allergenInput = {
+  ...input,
+  operation: 'allergens',
+  facts: { name: 'Avocado toast', ingredients: ['Sourdough bread', 'Poached egg', 'Avocado'] },
+};
+it('suggests only supported allergen codes as unverified proposals after membership and version checks', async () => {
+  const s = setup();
+  s.fetchImpl.mockImplementation(async () =>
+    Response.json(provider('{"allergens":["wheat","egg","egg"]}')),
+  );
+  const response = await s.run(allergenInput);
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toMatchObject({
+    operation: 'allergens',
+    status: 'review',
+    allergens: ['egg', 'wheat'],
+    description: null,
+    evidence: { source: 'model_inference', inputSha256: expect.stringMatching(/^[a-f0-9]{64}$/) },
+    provenance: 'unverified',
+    approvalRequired: true,
+    publishable: false,
+  });
+  expect(s.query.mock.invocationCallOrder[0]).toBeLessThan(
+    s.fetchImpl.mock.invocationCallOrder[0]!,
+  );
+  const request = JSON.parse(String(s.fetchImpl.mock.calls[0]?.[1]?.body));
+  expect(request).toMatchObject({ store: false, tools: [], max_output_tokens: 256 });
+  expect(request.text.format.schema.properties.allergens.items.enum).toEqual([
+    'milk',
+    'egg',
+    'fish',
+    'crustacean shellfish',
+    'nuts',
+    'peanut',
+    'wheat',
+    'soy',
+    'sesame',
+  ]);
+  expect(JSON.parse(request.input)).toEqual(allergenInput.facts);
+  expect(s.query.mock.calls.some(([sql]) => /INSERT|UPDATE|DELETE/.test(sql))).toBe(false);
+});
+it('abstains on an empty answer instead of claiming the dish has no allergens', async () => {
+  const s = setup();
+  s.fetchImpl.mockImplementation(async () => Response.json(provider('{"allergens":[]}')));
+  expect(await (await s.run(allergenInput)).json()).toMatchObject({
+    status: 'abstained',
+    allergens: [],
+    evidence: null,
+  });
+});
+it('rejects unsupported allergen labels from the provider', async () => {
+  const s = setup();
+  s.fetchImpl.mockImplementation(async () => Response.json(provider('{"allergens":["gluten"]}')));
+  expect((await s.run(allergenInput)).status).toBe(503);
+});
+it('rechecks allergen requests after the provider wait and respects the rate budget', async () => {
+  const stale = setup();
+  stale.fetchImpl.mockImplementation(async () => {
+    stale.state.version = 2;
+    return Response.json(provider('{"allergens":["egg"]}'));
+  });
+  expect((await stale.run(allergenInput)).status).toBe(409);
+  const revoked = setup();
+  revoked.fetchImpl.mockImplementation(async () => {
+    revoked.state.permission = 'revoked';
+    return Response.json(provider('{"allergens":["egg"]}'));
+  });
+  expect((await revoked.run(allergenInput)).status).toBe(403);
+  const limited = setup();
+  limited.limit.mockResolvedValue({ success: false });
+  expect((await limited.run(allergenInput)).status).toBe(429);
+  expect(limited.fetchImpl).not.toHaveBeenCalled();
+  const blank = setup();
+  expect(
+    (await blank.run({ ...allergenInput, facts: { name: ' ', ingredients: [] } })).status,
+  ).toBe(400);
+  expect(blank.fetchImpl).not.toHaveBeenCalled();
+});
