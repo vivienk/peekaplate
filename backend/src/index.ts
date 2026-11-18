@@ -42,6 +42,7 @@ import {
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
+  resolveServingCount,
   type SubmitMenuIngestionRequest,
   SubmitMenuIngestionRequestSchema,
   type SubmitOrderDeletionResponse,
@@ -1038,19 +1039,35 @@ export async function approveDishDraftAtomic(
       throw new IngestionError('draft_incomplete', 409);
     }
     const approvedPhotoId = manual?.photoId ?? corrected.photo_id ?? null;
+    const portionCalibration = manual ? manual.portionCalibration : corrected.portion_calibration;
+    if (portionCalibration && !approvedPhotoId)
+      throw new IngestionError('portion_calibration_mismatch', 409);
     if (approvedPhotoId) {
-      const photo = await client.query(
-        'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
+      const photo = await client.query<{ id: string; source_hash: string }>(
+        'SELECT id,source_hash FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
         [venueId, draftId, approvedPhotoId],
       );
       if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
+      if (portionCalibration && photo.rows[0]?.source_hash !== portionCalibration.source_sha256)
+        throw new IngestionError('portion_calibration_mismatch', 409);
     }
 
     const newDishId = options.preparedDishId ?? crypto.randomUUID();
     const revisionCommandId = crypto.randomUUID();
+    // Match the reviewed people count when legacy work is approved directly from S10.
+    // Resolution is recorded only in this new revision, never written back into old drafts.
+    const servingCount = resolveServingCount(
+      manual ? manual.servingCount : resolved.serving_count,
+      manual ? manual.servingSize : corrected.serving_size,
+      portionCalibration,
+    );
     const facts = manual
       ? {
-          ...(manual.servingCount !== undefined ? { servingCount: manual.servingCount } : {}),
+          ...(manual.portionCalibration !== undefined
+            ? { portionCalibration: manual.portionCalibration }
+            : {}),
+          ...(manual.servingSize !== undefined ? { servingSize: manual.servingSize } : {}),
+          ...(servingCount !== undefined ? { servingCount } : {}),
           category: manual.category,
           priceAmount: manual.priceAmount,
           priceCurrency: manual.priceCurrency,
@@ -1060,9 +1077,13 @@ export async function approveDishDraftAtomic(
         }
       : reviewed
         ? {
-            ...(resolved.serving_count !== undefined
-              ? { servingCount: resolved.serving_count }
+            ...(corrected.portion_calibration !== undefined
+              ? { portionCalibration: corrected.portion_calibration }
               : {}),
+            ...(corrected.serving_size !== undefined
+              ? { servingSize: corrected.serving_size }
+              : {}),
+            ...(servingCount !== undefined ? { servingCount } : {}),
             category: resolved.category,
             priceAmount: resolved.price_amount,
             priceCurrency: resolved.price_currency,
