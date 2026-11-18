@@ -39,6 +39,8 @@ export const DishAssistanceRequestSchema = z.discriminatedUnion('operation', [
             .refine((value) => !value.includes('\u0000')),
         )
         .max(100),
+      // The description as typed; the server adds the saved menu text for this dish itself.
+      description: description.optional(),
     }),
   }),
 ]);

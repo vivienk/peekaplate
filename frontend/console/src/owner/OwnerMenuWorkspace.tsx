@@ -1112,7 +1112,13 @@ export function OwnerMenuWorkspace({
                 operation: 'allergens',
                 expectedVersion: editing.draft?.draft_version ?? 0,
                 requestId: newCommandId(),
-                facts: { name: name.trim(), ingredients: ingredients.slice(0, 100) },
+                facts: {
+                  name: name.trim(),
+                  ingredients: ingredients.slice(0, 100),
+                  ...(latestEditing.current?.form.description.trim() && {
+                    description: latestEditing.current.form.description.slice(0, 4000),
+                  }),
+                },
               });
               if (
                 !current(active) ||

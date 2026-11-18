@@ -38,6 +38,7 @@ function setup() {
     removed: null as string | null,
     missing: false,
     description: input.facts.description,
+    sourceText: null as string | null,
     ingredients: [] as string[],
     origin: 'manual',
     payload: structuredClone(extraction),
@@ -60,6 +61,7 @@ function setup() {
                 removed_at: state.removed,
                 review_status: 'pending',
                 description: state.description,
+                source_text: state.sourceText,
                 origin: state.origin,
                 manual_fields: { ingredients: { status: 'confirmed', items: state.ingredients } },
                 job_id: '44444444-4444-4444-8444-444444444444',
@@ -566,10 +568,15 @@ it('bounds provider bytes and sanitizes provider/network failures', async () => 
 const allergenInput = {
   ...input,
   operation: 'allergens',
-  facts: { name: 'Avocado toast', ingredients: ['Sourdough bread', 'Poached egg', 'Avocado'] },
+  facts: {
+    name: 'Avocado toast',
+    ingredients: ['Sourdough bread', 'Poached egg', 'Avocado'],
+    description: 'Toasted sourdough with smashed avocado.',
+  },
 };
 it('suggests only supported allergen codes as unverified proposals after membership and version checks', async () => {
   const s = setup();
+  s.state.sourceText = 'Avocado Toast - sourdough, poached egg, feta $14';
   s.fetchImpl.mockImplementation(async () =>
     Response.json(provider('{"allergens":["wheat","egg","egg"]}')),
   );
@@ -602,7 +609,13 @@ it('suggests only supported allergen codes as unverified proposals after members
     'soy',
     'sesame',
   ]);
-  expect(JSON.parse(request.input)).toEqual(allergenInput.facts);
+  // Owner-typed name, description and ingredients plus the saved menu line, nothing else.
+  expect(JSON.parse(request.input)).toEqual({
+    name: 'Avocado toast',
+    description: 'Toasted sourdough with smashed avocado.',
+    ingredients: ['Sourdough bread', 'Poached egg', 'Avocado'],
+    menuText: 'Avocado Toast - sourdough, poached egg, feta $14',
+  });
   expect(s.query.mock.calls.some(([sql]) => /INSERT|UPDATE|DELETE/.test(sql))).toBe(false);
 });
 it('abstains on an empty answer instead of claiming the dish has no allergens', async () => {

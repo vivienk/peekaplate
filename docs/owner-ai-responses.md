@@ -152,9 +152,11 @@ proposals reuse persisted owner/extraction values without a provider call, recip
 completion or allergen inference. Both require explicit owner review. The new
 ingredient integration has no hosted acceptance yet.
 
-Allergen suggestions (proposed Nov 17, needs Sai's sign-off) are the one model
-inference: one constrained request sends only the typed dish name and ingredients,
-and the strict output schema allows only the nine public allergen codes. Results
+Allergen suggestions (Vivien, Nov 17; needs Sai's sign-off) are the one model
+inference: one constrained request sends only the owner's typed dish name,
+description and ingredients plus the saved menu line for that dish (OCR extraction
+itself produces no allergen data), and the strict output schema allows only the
+nine public allergen codes. Results
 are `unverified`, not publishable and stay "Allergens not confirmed" until the
 owner ticks the review box, whose text then names allergens. An empty answer is an
 abstention, never an allergen-free claim. Published allergens therefore remain
