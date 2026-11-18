@@ -103,3 +103,20 @@
 .owner-workspace .eyebrow {
   font-size: var(--pp-font-size-small);
 }
+
+/* Name-only dashboard entry; full restaurant details stay in the existing S05 form. */
+.pp-auth.owner-name-entry {
+  justify-content: center;
+  background: var(--pp-auth-pending-surface);
+  padding: var(--pp-space-48) var(--pp-space-16);
+}
+.owner-name-entry .pp-auth__form {
+  gap: var(--pp-space-8);
+}
+.owner-name-entry__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--pp-space-16);
+  margin-top: var(--pp-space-24);
+}
