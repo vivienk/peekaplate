@@ -124,11 +124,20 @@ export function DishEditor({
           }
           setFieldError('');
           if (dish.aiReviewed !== reviewConfirmed && dish.aiReviewed) {
-            if (value.ingredients.items.length)
+            // Ticking the review box confirms what the owner reviewed: AI ingredients and,
+            // when AI suggested any, the allergens list shown above it.
+            const confirmAllergens = (value.aiAlg ?? []).length > 0;
+            if (value.ingredients.items.length || confirmAllergens)
               change({
                 ...value,
-                aiIng: [],
-                ingredients: { ...value.ingredients, status: 'confirmed' },
+                ...(value.ingredients.items.length && {
+                  aiIng: [],
+                  ingredients: { ...value.ingredients, status: 'confirmed' as const },
+                }),
+                ...(confirmAllergens && {
+                  aiAlg: [],
+                  allergens: { ...value.allergens, status: 'confirmed' as const },
+                }),
               });
             onReviewConfirmedChange?.(dish.aiReviewed);
             return;

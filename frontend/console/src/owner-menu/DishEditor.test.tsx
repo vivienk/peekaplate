@@ -222,14 +222,40 @@ describe('live Screen 9 on the authored #172 presentation', () => {
     expect(captured.props!.ed.draft.aiAlg).toEqual(['milk']);
     expect(html).toContain('Suggested by AI');
     expect(html).toContain('Allergens not confirmed');
+    // The review box names allergens whenever AI suggested some, because ticking it confirms them.
+    expect(html).toContain('I reviewed the AI-drafted text, ingredients and allergens.');
     const reviewed = captured.props!;
     reviewed.setEd({ ...reviewed.ed, draft: { ...reviewed.ed.draft, aiReviewed: true } });
     const accepted = onChange.mock.lastCall![0];
     expect(accepted.ingredients.status).toBe('confirmed');
-    expect(accepted.allergens.status).toBe('proposed');
-    render({ value: accepted, reviewConfirmed: true });
+    expect(accepted.allergens).toEqual({ status: 'confirmed', items: ['milk'] });
+    const after = render({ value: accepted, reviewConfirmed: true });
     expect(captured.props!.ed.draft.aiIng).toEqual([]);
-    expect(captured.props!.ed.draft.aiAlg).toEqual(['milk']);
+    expect(captured.props!.ed.draft.aiAlg).toEqual([]);
+    expect(after).toContain('Contains: milk');
+  });
+
+  it('keeps unreviewed AI allergens unconfirmed and the original review wording without them', () => {
+    const value = emptyManualDish();
+    const plain = render({ value, onReviewConfirmedChange: noop });
+    expect(plain).toContain('I reviewed the AI-drafted text and ingredients. They are accurate.');
+    expect(plain).not.toContain('ingredients and allergens');
+  });
+
+  it('says an empty AI allergen answer is not allergen-free and leaves the dish unchanged', async () => {
+    captured.buttons = [];
+    const onChange = vi.fn();
+    const suggestAllergens = vi.fn(async () => [] as string[]);
+    const html = () => render({ value: emptyManualDish(), onChange, suggestAllergens });
+    html();
+    captured.buttons
+      .filter((button) => button.children === 'Suggest with AI')
+      .at(-1)!
+      .onClick?.({} as never);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(suggestAllergens).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('does not turn an empty suggestion into an allergen-free claim', () => {

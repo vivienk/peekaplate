@@ -117,3 +117,34 @@ it.each([
     code: 'invalid_response',
   });
 });
+
+const allergenInput = {
+  operation: 'allergens' as const,
+  expectedVersion: 0,
+  requestId: '33333333-3333-4333-8333-333333333333',
+  facts: { name: 'Avocado toast', ingredients: ['Sourdough bread', 'Poached egg'] },
+};
+const allergenResult = {
+  ...ingredientResult,
+  operation: 'allergens',
+  ingredients: undefined,
+  allergens: ['egg', 'wheat'],
+  evidence: { source: 'model_inference', inputSha256: 'b'.repeat(64) },
+};
+it('requests AI allergen proposals with the typed dish and keeps them unverified', async () => {
+  const { ingredients: _drop, ...body } = allergenResult;
+  const s = setup(body);
+  expect(await s.api.assistDish(venue, draft, allergenInput)).toMatchObject({
+    operation: 'allergens',
+    allergens: ['egg', 'wheat'],
+    approvalRequired: true,
+    publishable: false,
+    provenance: 'unverified',
+  });
+  expect(JSON.parse(s.send.mock.calls[0]![1]!.body as string)).toEqual(allergenInput);
+});
+it('rejects AI allergen labels outside the supported codes', async () => {
+  const { ingredients: _drop, ...body } = allergenResult;
+  const s = setup({ ...body, allergens: ['gluten'] });
+  await expect(s.api.assistDish(venue, draft, allergenInput)).rejects.toThrow();
+});
