@@ -1111,7 +1111,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/review_preview_html.py",
         "processing/tests/test_review_preview.py",
         "playwright.review-preview.config.ts",
-        "tests/review-preview/review-preview.spec.ts"
+        "tests/review-preview/review-preview.spec.ts",
+        "docs/research/dish-3d-delivery.md"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md",
@@ -1120,25 +1121,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "52a001609f554356c0c489bc8dfa1ab91f690ce240e26f2e192e70dfe7cc03c7"
+      "sourceFingerprint": "d032dc3053e53c220eec1381baaa2c0902adb3adc7be50fc55440fb6e69059bb"
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console"
-      ],
-      "summary": "PR219 incorporates PR221 canonical approved-photo export and artifact lifecycle fixes, then reconciles current develop Part A without changing either authority boundary. Private owner preview approval remains separate from operator bundle hosting/admission and publication. Focused portion/retention/editor and processor service tests passed before reconciliation; current-head CI remains required.",
-      "files": [
-        "backend/src/owner-portion-preview.ts",
-        "backend/src/owner-menu-routes.ts",
-        "backend/src/owner-menu-retention.ts",
-        "docs/screen9-portion-publish.md"
-      ],
-      "next": "Finish current-head checks and human review before merge. Hosted processor integration, device acceptance and physical calibration remain unverified."
-    },
     {
       "date": "2026-11-17",
       "modules": [
@@ -1268,6 +1254,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionSize.ts"
       ],
       "next": "Complete focused and repository checks, independently review the pinned correction, and update PR237. Human review and exact staging release remain required; physical-device scale acceptance is separate."
+    },
+    {
+      "date": "2026-11-20",
+      "modules": [
+        "assets",
+        "processing",
+        "diner"
+      ],
+      "summary": "Research traced the one-photo Kaggle TRELLIS.2 workflow and proposed a capture-based route to revision-bound GLB delivery, with Beam and Runpod pilot criteria.",
+      "files": [
+        "docs/research/dish-3d-delivery.md"
+      ],
+      "next": "Verify the current 2.5D owner-to-phone path on staging. Evaluate real multi-view reconstruction separately from private generative experiments."
     }
   ]
 }

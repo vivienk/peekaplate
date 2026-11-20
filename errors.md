@@ -5364,3 +5364,8 @@ The combined post-review local checks passed: `corepack pnpm check` completed
 context and documentation checks. `corepack pnpm verify build` passed the
 workspace builds and staging Worker dry-run. Current-head browser CI and the
 independent delta reviews remain required; no hosted deployment was performed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-11-20T18:57:11.400Z","exitCode":1}
+```
