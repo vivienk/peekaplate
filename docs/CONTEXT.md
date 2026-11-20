@@ -1121,7 +1121,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "d032dc3053e53c220eec1381baaa2c0902adb3adc7be50fc55440fb6e69059bb"
+      "sourceFingerprint": "a8295ffd8707588796f0d3008b2629c49d38897aa096bed4c14cb1e6977f9652"
     }
   ],
   "handoffs": [
@@ -1262,7 +1262,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing",
         "diner"
       ],
-      "summary": "Research traced the one-photo Kaggle TRELLIS.2 workflow and proposed a capture-based route to revision-bound GLB delivery, with Beam and Runpod pilot criteria.",
+      "summary": "Research traced the one-photo Kaggle TRELLIS.2 workflow and proposed a capture-based route to revision-bound GLB delivery, with Beam and Runpod pilot criteria. The report distinguishes free manual Gemini app image generation from Studio and API access.",
       "files": [
         "docs/research/dish-3d-delivery.md"
       ],
