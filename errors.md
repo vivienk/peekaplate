@@ -5364,3 +5364,49 @@ The combined post-review local checks passed: `corepack pnpm check` completed
 context and documentation checks. `corepack pnpm verify build` passed the
 workspace builds and staging Worker dry-run. Current-head browser CI and the
 independent delta reviews remain required; no hosted deployment was performed.
+
+## 2026-11-16 direct-vision ingredient handoff
+
+The new ingredient tracer initially failed because V4Dish rejected ingredients as an extra field; the existing direct path always emitted null. The enhancement adds bounded same-description proposals and reconstructable description spans without changing the public DishDraft or V1 artifact envelope. Vision transcription remains unverified; AI-02 still abstains from allergen/diet classifications.
+
+The first integration fixture accidentally exercised run_pipeline's OCR default rather than explicitly selecting vision_v4. After selecting the intended mode, a second assertion wrongly required an empty box_evidence key that serialization is allowed to omit. Both fixture assumptions were corrected without changing transport validators or OCR evidence semantics.
+
+Observed final verification: 11 ingredient controls, 35 input-mode/fallback controls, 17 review-export controls, 15 ingredient-intelligence controls and 14 service-artifact controls passed (92 total), with network blocked. Real-menu quality and hosted acceptance remain separate.
+
+## 2026-11-17 V4 Google structured-output constraint
+
+The frozen comparison traced every Google AI Studio V4 request with the schema only in
+the system prompt and no API-level format field; saved responses arrived fenced and
+sometimes malformed, so parsing fell back to regex salvage and could drop a dish
+without a per-dish error. The request bind now sends `response_format` type
+`json_schema` (name `v4_batch`, `strict: true`) carrying the unchanged
+`V4Batch.model_json_schema()` dictionary, and the prompt's box examples use the same
+named object. SDK schema conversion was refused because it rewrites the contract by
+requiring optional fields; the schema hash is unchanged. A provider format rejection
+is surfaced as an error and never retried prompt-only. Non-Google providers keep the
+prompt-embedded schema, and the parser, attempt capture and deadlines are unchanged.
+
+No live provider request was made by this change. Offline request-seam controls and
+the authorized structured-output benchmark remain for parent execution; no accuracy
+or acceptance claim follows.
+
+## 2026-11-20 V4 price-evidence and provider extra_body regressions
+
+Review and full-suite execution on the staged V4 changes reproduced two defects:
+(1) `single_price_amount` skipped printed-text verification when `price_text` was
+absent or blank, retaining a numeric `price_amount` without printed price text;
+(2) `ModelProviderConfig.request_options` passed `extra_body=None` for Nara/generic
+providers, failing `test_nara_settings_take_precedence_without_openrouter_parameters`
+(`None != {}`). `single_price_amount` now requires matching non-empty `price_text`,
+and `request_options` / the generic fallback pass `dict(self.extra_body or {})` / `{}`.
+Regressions in `processing/tests/test_input_modes.py`, `processing/tests/test_vision_ingredients.py`,
+and `processing/tests/test_workflow.py` failed before the fixes and pass afterward.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-20T18:00:47.405Z","exitCode":1}
+```
+
+```json
+{"kind":"observation","references":{"check":"test","timestamp":"2026-11-20T18:00:47.405Z"},"status":"open","area":"local-docs-check","cause":"scripts/verify.test.mjs:62 invokes docs:check on the local working directory, which scanned gitignored local .agents/skills/* directories and reported broken template links outside tracked repository files. Zero tracked markdown files failed docs:check; the other 121/122 script tests and all Vitest unit tests passed.","followup":"Confirm docs:check and scripts/verify.test.mjs pass on a clean CI checkout without local gitignored .agents/skills/* folders."}
+```
