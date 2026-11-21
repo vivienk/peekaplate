@@ -1094,7 +1094,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "assets",
       "status": "foundation",
-      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Rejected candidates retain returned model/fidelity metadata and distinct fallback identities. Private Kaggle T4 x2 research notebook builds dual-backend TripoSR vertex-colored and Hunyuan3D-2mini geometry-only GLBs from open-weights dish fallbacks (plus preflight-gated TRELLIS.2-4B adapters) into non-publishable comparison manifests. Bundles are create-only, needs_review and publication_eligible=false. Captured-food fidelity, rights and real-device acceptance remain manual.",
+      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Private Kaggle notebook supports Stage 0 user dish photos (private dataset, up to 4) or open-weights fallbacks across flexible 1-or-2 CUDA GPUs, upgraded birefnet-general-lite cutouts, TripoSR (256, glTF +Y up/+Z front, floater pruning), Hunyuan3D-2mini (FloaterRemover/DegenerateFaceRemover/FaceReducer<=80k), sRGB GLB previews and publication_eligible=false manifests. Captured-food fidelity, rights and real-device acceptance remain manual.",
       "paths": [
         "processing/src/peekaplate_processing/assets.py",
         "processing/src/peekaplate_processing/harness.py",
@@ -1123,7 +1123,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "b73c805663413fe8d7af7d6f072371ae4a6a82b7f40dfcac320dc9a4f02aeb31"
+      "sourceFingerprint": "40029b34786ef69e136e3437e80cc021a59cd47198d614c25a895f0bd6ddf503"
     }
   ],
   "handoffs": [
@@ -1264,13 +1264,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing",
         "diner"
       ],
-      "summary": "Delivered and verified the Kaggle T4 x2 multi-model dish-to-3D notebook (TripoSR vertex-color + Hunyuan3D-2mini geometry-only GLBs from open-weights dish fallbacks, OpenRouter 429 retry handling, preflight-gated TRELLIS.2-4B adapters with Astra/Antigravity review fixes, publication_eligible=false manifest) and recorded verified Version 6 metrics alongside the capture-based GLB delivery proposal.",
+      "summary": "Upgraded the Kaggle dish-to-3D benchmark notebook for 4 real user dish photos via private dataset discovery, flexible GPU pooling, birefnet-general-lite cutouts, TripoSR 256 glTF rotation/pruning, Hunyuan3D-2mini 80k-face reduction, and sRGB Cutout+3-view preview sheets; resolved the Kaggle queue stall cleanly via Version 9 (NvidiaTeslaP100 fallback to T4 x2, 8/8 valid GLBs, publication_eligible=false).",
       "files": [
         "docs/research/dish-3d-delivery.md",
         "notebooks/dish-3d-openrouter.ipynb",
         "processing/tests/test_dish_3d_notebook.py"
       ],
-      "next": "Verify the current 2.5D owner-to-phone path on staging. Optionally run TRELLIS.2-4B on Kaggle only with an authorized HF_TOKEN for DINOv3, and evaluate real multi-view capture reconstruction separately from private generative experiments."
+      "next": "Verify the current 2.5D owner-to-phone path on staging. Optionally benchmark TRELLIS.2-4B on Kaggle only with an authorized HF_TOKEN for DINOv3, and evaluate multi-view real captures separately from private single-view experiments."
     }
   ]
 }

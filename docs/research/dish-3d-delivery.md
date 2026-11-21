@@ -125,7 +125,49 @@ Environment: `2× Tesla T4 (14.56 GiB, cc=[7, 5])`, Python `3.13.15`, PyTorch `2
 - **Post-review update (Version 7):** Applied independent Antigravity review P2/P3 fixes (seeded `TRELLIS_MODEL_REVISION` + `DINOV3_REVISION`, bounded process-group timeouts, explicit `publication_eligible: False` in `manifest.json`), verified by all offline unit checks (`test_dish_3d_notebook.py`); Version 7 was pushed to Kaggle (`QUEUED` at handoff).
 - **Private-experiment boundary ([ADR 0004](../adr/0004-visual-tiers.md)):** Fictional dish comparisons (`publication_eligible: false`) remain strictly private experiments and must never enter PeekaPlate menu publication or captured-food evidence.
 
+## 4-Dish Real-Photo Benchmark & Notebook Upgrades (2026-11-21)
+
+Upgraded [`dish-3d-openrouter.ipynb`](../../notebooks/dish-3d-openrouter.ipynb) and [`test_dish_3d_notebook.py`](../../processing/tests/test_dish_3d_notebook.py) to benchmark 4 user-supplied dish photos end-to-end in a private Kaggle run ([`yacine105/notebooke3207ed4f5`](https://www.kaggle.com/code/yacine105/notebooke3207ed4f5), `is_private: true`) backed by a private dataset (`yacine105/peekaplate-dish-test-photos`). Neither the photos nor any benchmark GLBs are committed to this repository.
+
+### Kaggle Queue Resolution & Pipeline Upgrades
+- **Queue resolution:** Cancelled stalled Version 7 and queued Version 8 (`NvidiaTeslaT4` queue), removed the hardcoded BYOD `docker_image` SHA pin from submission metadata, and pushed private Version 9 with `"machine_shape": "NvidiaTeslaP100"`. Kaggle emitted `'NvidiaTeslaP100' is retired. Sessions run on the default GPU (NvidiaTeslaT4) instead.` and scheduled Version 9 (`GPU T4 ×2`) immediately (`RUNNING` -> `COMPLETE` in `442.8s` runtime log).
+- **Stage 0 & GPU flexibility:** Added `discover_user_dish_images` (`MAX_USER_DISHES = 4`) before OpenRouter/open-weights generation, flexible `GPU_COUNT`/`MAX_GPU_WORKERS` pooling with `queue.Queue` per-GPU mutual exclusion (safe for 1 or 2 GPUs), and dynamic `TORCH_CUDA_ARCH_LIST`.
+- **Segmentation upgrade:** Switched `run_rembg_cutout.py` from `u2net` to ordered `birefnet-general-lite` -> `isnet-general-use` -> `u2net` fallback on CPU with `scipy.ndimage.binary_fill_holes`, `<0.5%` component crumb pruning, transparent-RGB zeroing, and coverage/bounding-box/edge-touch diagnostics.
+- **Mesh & preview fixes:** Upgraded `TripoSR` to `resolution=256` (`192` OOM fallback), rotated canonical vertices (`[:, [1, 2, 0]]`) into glTF `+Y` up / `+Z` front (preserving `+1` determinant / outward winding), and pruned tiny floaters via `mesh.split`. Added `FloaterRemover`, `DegenerateFaceRemover`, and `FaceReducer(max_facenum=80000)` to `Hunyuan3D-2mini`. Added linear->sRGB (`1.0 / 2.2`) gamma correction and balanced two-light shading on `COLOR_0` renders, a `Cutout (RGBA)` checkerboard column in `comparison_sheet.png`, and dish-grouped sections in `comparison_viewer.html`.
+
+### Verified Cutout Diagnostics (Version 9, `birefnet-general-lite`)
+
+| Dish Label | Input Size | Model | FG Coverage | BBox Aspect | Edge Touch | Components | Elapsed |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `01_pizza` | `554×554` | `birefnet-general-lite` | `57.52%` | `1.021` | `[]` | `1 -> 1` | `20.34s` |
+| `02_tteokbokki` | `800×560` | `birefnet-general-lite` | `43.72%` | `1.51` | `[]` | `1 -> 1` | `13.33s` |
+| `03_kimchi` | `2000×1125` | `birefnet-general-lite` | `32.66%` | `1.345` | `[]` | `1 -> 1` | `12.04s` |
+| `04_gimbap` | `739×415` | `birefnet-general-lite` | `42.77%` | `1.518` | `['top']` | `1 -> 1` | `11.77s` |
+
+### Verified 8-GLB Output Audit (Version 9, `GPU T4 ×2`)
+
+`TRELLIS.2-4B` stayed cleanly `skipped` (`missing_or_unauthorized_hf_token`) across all 4 dishes. All 26 archived artifacts + `manifest.json` inside `dish-3d-comparison.zip` matched exact SHA-256 digests (`publication_eligible: false`), with zero secret markers in `manifest.json`, `comparison_viewer.html`, or the kernel log.
+
+| Output Path | Backend (Device) | Appearance | Vertices | Faces (Raw -> Out) | Bytes | Elapsed / VRAM | Signed Vol | Extent `[X, Y, Z]` | SHA-256 (12 chars) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `01_pizza/triposr.glb` | `TripoSR` (`cuda:0`) | `vertex_color` | `58,560` | `117,120` | `2,343,376` | `10.67s` / `2.323 GiB` | `+0.050022` | `[1.006, 0.987, 0.367]` | `a1543fb2bd2d` |
+| `01_pizza/hunyuan3d_2mini.glb` | `Hunyuan3D-2mini` (`cuda:0`) | `geometry_only` | `39,994` | `227,928 -> 80,000` | `1,440,724` | `75.3s` / `4.08 GiB` | `+0.039862` | `[1.991, 1.991, 0.049]` | `adfb48cb722a` |
+| `02_tteokbokki/triposr.glb` | `TripoSR` (`cuda:1`) | `vertex_color` | `55,659` | `111,326` | `2,227,432` | `10.66s` / `2.323 GiB` | `+0.12824` | `[0.910, 0.538, 0.703]` | `93f2f4e7bf9c` |
+| `02_tteokbokki/hunyuan3d_2mini.glb` | `Hunyuan3D-2mini` (`cuda:1`) | `geometry_only` | `39,966` | `577,932 -> 80,000` | `1,440,384` | `83.13s` / `4.08 GiB` | `+1.031179` | `[1.950, 0.942, 1.992]` | `ab6101b65b5c` |
+| `03_kimchi/triposr.glb` | `TripoSR` (`cuda:1`) | `vertex_color` | `73,206` | `146,496` | `2,930,224` | `9.78s` / `2.323 GiB` | `+0.122733` | `[1.095, 0.815, 0.437]` | `e0f89bfedb1b` |
+| `03_kimchi/hunyuan3d_2mini.glb` | `Hunyuan3D-2mini` (`cuda:0`) | `geometry_only` | `40,000` | `200,692 -> 80,000` | `1,440,788` | `68.6s` / `4.08 GiB` | `+0.178133` | `[1.994, 1.412, 0.176]` | `83cee9498923` |
+| `04_gimbap/triposr.glb` | `TripoSR` (`cuda:0`) | `vertex_color` | `50,545` | `101,090` | `2,022,776` | `9.67s` / `2.323 GiB` | `+0.086465` | `[1.027, 0.706, 0.586]` | `b091963b7d4f` |
+| `04_gimbap/hunyuan3d_2mini.glb` | `Hunyuan3D-2mini` (`cuda:1`) | `geometry_only` | `39,994` | `387,412 -> 80,000` | `1,440,720` | `72.25s` / `4.08 GiB` | `+0.71537` | `[1.303, 0.780, 1.991]` | `08c577bac5b8` |
+
+### Per-Dish Visual Inspection Findings
+- **`01_pizza`:** `birefnet-general-lite` isolated the whole sliced pizza while dropping corner basil and the pizza cutter (a narrow dark pan-rim sliver remains along two arcs). Because the source is a top-down view, `Hunyuan3D-2mini` collapses into a very thin slice-gapped wafer (`Z=0.049`), while `TripoSR` correctly orients the sRGB-corrected pizza face forward (`Z=0.367`) with a synthesized thicker underside bulge.
+- **`02_tteokbokki`:** Strongest 3D reconstruction overall. The cutout separated both thin wooden skewers cleanly from the textured dark bowl; `Hunyuan3D-2mini` preserved crisp rice-cake cylinders and both skewers (`577,932 -> 80,000` faces), and `TripoSR` recovered recognizable orange glaze colors (with softer vertex-color detail; source carries a faint stock watermark so it stays strictly private/off-repo).
+- **`03_kimchi`:** Cutout preserved serrated cabbage margins plus the scalloped chili cup off the metal tray; `TripoSR` pruned `22 -> 1` floating fragments cleanly and kept readable chili-paste vs. green-leaf coloring, while `Hunyuan3D-2mini` yielded a relatively thin relief (`Z=0.176`) from the high camera angle.
+- **`04_gimbap`:** Isolated all 8 rolled pieces off the wood board (top carrot/green garnishes touch the upper image boundary `edges=['top']`); `Hunyuan3D-2mini` produced clean separated roll cylinders (`387,412 -> 80,000` faces) and `TripoSR` preserved legible filling rings (`5 -> 1` floaters pruned) with smooth synthesized nori backsides.
+
 ## Research checks
+
+- **PASS (Kaggle Version 9 live 4-dish `T4 ×2` run + local 8-GLB/ZIP/visual audit)** — Executed end-to-end on private `yacine105/notebooke3207ed4f5` (`COMPLETE`, `442.8s` log) with private `yacine105/peekaplate-dish-test-photos` (`4` photos); verified `birefnet-general-lite` cutouts, `8/8` valid GLBs (positive signed volume, `has_vertex_color=True` on all `4` `TripoSR` meshes, `80,000` decimated faces on all `4` `Hunyuan3D-2mini` meshes), exact SHA-256 + ZIP integrity across `26` archived files + `manifest.json` (`publication_eligible: false`), zero leaked secrets, and direct visual inspection of all 4 cutouts and `comparison_sheet.png`.
 
 - **PASS (Kaggle Version 6 live `T4 ×2` run + local byte/GLB audit)** — Executed end-to-end on `yacine105/notebooke3207ed4f5` (`COMPLETE`, 355.7s notebook execution); downloaded `dish-3d-comparison.zip` and `manifest.json`, verified exact SHA-256 + byte matches across all 14 packaged artifacts, passed `validate_glb()` on all 4 `.glb` files, verified 6/6 `FullPlateTest` + 12/12 `NativeAdaptersTest`/`SpaceToolsMeshContractTest` CUDA checks in the Kaggle log, visually inspected generated PNGs and `comparison_sheet.png`, and confirmed zero leaked secrets or CLIP truncation warnings.
 - **PASS** — `PYTHONPATH=processing/src:processing/tests processing/.venv/bin/python -m unittest -v test_dish_3d_notebook test_model_service test_generate_model test_portion_service`.

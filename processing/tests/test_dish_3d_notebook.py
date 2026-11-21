@@ -26,7 +26,7 @@ class Dish3DNotebookTest(unittest.TestCase):
 
     def test_notebook_hygiene_and_syntax(self):
         self.assertEqual((self.notebook['nbformat'], self.notebook['nbformat_minor']), (4, 4))
-        self.assertNotIn('/kaggle/input/', self.raw)
+        self.assertNotIn('/kaggle/input/datasets/', self.raw)
         for marker in ('AIza', 'sk-or-v1-', 'hf_'):
             # Avoid matching valid repo/code identifiers; check common token prefixes cleanly
             if marker == 'hf_':
@@ -336,6 +336,93 @@ class Dish3DNotebookTest(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
             self.assertFalse(manifest['publication_eligible'])
             self.assertEqual(manifest['runs_3d']['sd-turbo/trellis2-4b']['status'], 'failed')
+
+    def test_discover_user_dish_images_and_gpu_flexibility(self):
+        cell1_src = ''.join(self.notebook['cells'][1]['source'])
+        cell3_src = ''.join(self.notebook['cells'][3]['source'])
+        cell5_src = ''.join(self.notebook['cells'][5]['source'])
+        cell7_src = ''.join(self.notebook['cells'][7]['source'])
+        cell9_src = ''.join(self.notebook['cells'][9]['source'])
+        cell11_src = ''.join(self.notebook['cells'][11]['source'])
+        cell17_src = ''.join(self.notebook['cells'][17]['source'])
+        cell19_src = ''.join(self.notebook['cells'][19]['source'])
+
+        scope = {}
+        exec(compile(cell1_src, 'cell_1', 'exec'), scope)
+        discover = scope['discover_user_dish_images']
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            empty_in = root / 'empty_input'
+            empty_in.mkdir()
+            self.assertEqual(discover(root / 'out_empty', input_root=empty_in), {})
+
+            ds_in = root / 'input' / 'peekaplate-dish-test-photos'
+            ds_in.mkdir(parents=True)
+            names = ['01_pizza.png', '02_tteokbokki.jpg', '03_kimchi.webp', '04_gimbap.png', '05_extra.png']
+            for idx, name in enumerate(names):
+                Image.new('RGB', (20 + idx * 4, 24), (40 * idx, 120, 200)).save(ds_in / name)
+            (ds_in / 'dataset-metadata.json').write_text('{"ignored": true}', encoding='utf-8')
+            (ds_in / '.hidden.png').write_text('ignored', encoding='utf-8')
+
+            out_dir = root / 'results'
+            found = discover(out_dir, input_root=root / 'input')
+            self.assertEqual(list(found.keys()), ['01_pizza', '02_tteokbokki', '03_kimchi', '04_gimbap'])
+            for label, entry in found.items():
+                self.assertEqual(entry['image_source'], 'user-uploaded-dataset')
+                self.assertEqual(entry['image_status'], 'success')
+                self.assertTrue(entry['image_path'].is_file())
+
+            manifest_path, zip_path = scope['write_results'](out_dir, found, {}, {}, {'a': 'b'})
+            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+            self.assertFalse(manifest['publication_eligible'])
+            self.assertEqual(len(manifest['inputs']), 4)
+            with ZipFile(zip_path) as zf:
+                for entry in manifest['inputs'].values():
+                    for art in entry['artifacts']:
+                        self.assertEqual(hashlib.sha256(zf.read(art['path'])).hexdigest(), art['sha256'])
+
+        # Flexible 1-or-2 GPU execution and dynamic CUDA arch detection
+        self.assertNotIn('Select the Kaggle T4 x2 accelerator for this dual-GPU demo.', cell3_src)
+        self.assertIn('GPU_COUNT = torch.cuda.device_count()', cell3_src)
+        self.assertIn('MAX_GPU_WORKERS = max(1, min(GPU_COUNT, 2))', cell3_src)
+        self.assertIn("('scipy', 'scipy')", cell3_src)
+        self.assertIn('TORCH_CUDA_ARCH_LIST', cell11_src)
+        self.assertIn('GPU_COUNT > 1', cell17_src)
+
+        # Validate embedded worker scripts via AST and required quality upgrades
+        def extract_str_assign(cell_src, var_name):
+            tree = ast.parse(cell_src)
+            for node in tree.body:
+                if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                        and getattr(node.targets[0], 'id', None) == var_name):
+                    content = node.value.value
+                    ast.parse(content, filename=var_name)
+                    return content
+            raise AssertionError(f'Missing string assignment {var_name}')
+
+        cutout_code = extract_str_assign(cell5_src, 'cutout_worker_code')
+        for token in ('birefnet-general-lite', 'isnet-general-use', 'u2net', 'binary_fill_holes', 'fg_coverage_pct', 'edge_touch_sides'):
+            self.assertIn(token, cutout_code)
+        self.assertIn('discover_user_dish_images(RESULTS_DIR)', cell5_src)
+        self.assertIn('MAX_GPU_WORKERS', cell5_src)
+
+        triposr_code = extract_str_assign(cell7_src, 'triposr_worker_code')
+        self.assertIn("'resolution': 256", cell7_src)
+        self.assertIn('192', triposr_code)
+        self.assertIn('[:, [1, 2, 0]]', triposr_code)
+        self.assertIn('mesh.split(only_watertight=False)', triposr_code)
+        self.assertIn('MAX_GPU_WORKERS', cell7_src)
+
+        hy_code = extract_str_assign(cell9_src, 'hy_worker_code')
+        for token in ('FloaterRemover', 'DegenerateFaceRemover', 'FaceReducer'):
+            self.assertIn(token, hy_code)
+        self.assertIn("'max_faces': 80000", cell9_src)
+        self.assertIn('MAX_GPU_WORKERS', cell9_src)
+
+        ast.parse(cell19_src, filename='cell_19')
+        for token in ('1.0 / 2.2', 'Cutout (RGBA)', 'make_checkerboard', 'viewer_sections'):
+            self.assertIn(token, cell19_src)
 
 
 if __name__ == '__main__':
