@@ -234,3 +234,22 @@ and vessel-surface clicks, and verify every cutout visually.
 Related: `notebooks/dish-3d-openrouter.ipynb`, `processing/tests/test_dish_3d_notebook.py`,
 `docs/research/dish-3d-delivery.md`.
 Pattern: processing.kaggle-runtime-and-inset-corner-guards; first occurrence, no policy promotion.
+
+## LRN-20261121-INTERACTIVE-STUDIO · Ship dual HTTP and base64-embedded Three.js studios on every 3D notebook run
+
+**Logged**: 2026-11-21 · **Status**: resolved · **Area**: assets
+**Category**: best_practice
+
+Opening a local multi-file GLB viewer over `file://` triggers CORS blocks when
+fetching external `.glb` binaries, whereas HTTP serving cannot rely on external
+CDNs in restricted local environments. Every dish-3D notebook run must therefore
+emit both `comparison_viewer.html` (paired with a strict loopback `/vendor/three/`
+server mounting `three@0.182.0`) and `interactive_3d_studio.html` (embedding
+`<=35k` mobile GLBs via `base64` decoded with `GLTFLoader.parse`, plus resized
+`512px` cutouts and static fallbacks). Escape `</` inside embedded JSON script
+tags, preserve `publication_eligible=false`, keep generated binaries out of git,
+and assert template parity between `dish_3d_studio.py` and Cell 19 in unit tests.
+
+Related: `processing/src/peekaplate_processing/dish_3d_studio.py`,
+`processing/tests/test_dish_3d_studio.py`, `notebooks/dish-3d-openrouter.ipynb`.
+Pattern: assets.dual-interactive-3d-studio; first occurrence, no policy promotion.

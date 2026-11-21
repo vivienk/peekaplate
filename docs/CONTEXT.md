@@ -1094,7 +1094,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "assets",
       "status": "foundation",
-      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Private Kaggle demo supports Stage 0 photos (up to 4), GroundingDINO+SAM plate preservation, TripoSR+Hunyuan3D-2mini raw/<=35k mobile GLBs, HF 4-mode renders, comparison viewer, Docker worker blueprint and publication_eligible=false manifests. Real-device, Docker-host GPU builds and fidelity checks remain separate.",
+      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Private Kaggle demo supports Stage 0 photos (up to 4), GroundingDINO+SAM plate preservation, TripoSR+Hunyuan3D-2mini raw/<=35k mobile GLBs, HF 4-mode renders, Three.js interactive/standalone 3D studios, Docker blueprint and publication_eligible=false manifests. Real-device, Docker-host builds and fidelity checks remain separate.",
       "paths": [
         "processing/src/peekaplate_processing/assets.py",
         "processing/src/peekaplate_processing/harness.py",
@@ -1114,7 +1114,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/review-preview/review-preview.spec.ts",
         "docs/research/dish-3d-delivery.md",
         "notebooks/dish-3d-openrouter.ipynb",
-        "processing/tests/test_dish_3d_notebook.py"
+        "processing/tests/test_dish_3d_notebook.py",
+        "processing/src/peekaplate_processing/dish_3d_studio.py",
+        "processing/tests/test_dish_3d_studio.py"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md",
@@ -1123,7 +1125,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "a32fd59bcf3376ac2f7a787b81d0a9c67059b5fd13e299602dc5c2e708253c4d"
+      "sourceFingerprint": "8d7e78c07c6d31be9d1015d62593ddc0a45b889f201bb857ce1cb9c3c1eadf03"
     }
   ],
   "handoffs": [
@@ -1264,10 +1266,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing",
         "diner"
       ],
-      "summary": "Upgraded the private Kaggle dish-to-3D notebook (Version 15, NvidiaTeslaT4 latest) for ticket 86bd5m6q0: added GroundingDINO+SAM plate preservation across all 4 user dishes, Hunyuan3D-2mini transformers 5.x DINOv2 state-dict remapping, 16 raw+mobile<=35k GLBs, HF 4-mode studio strips, interactive viewer, and fail-closed Docker worker blueprint (publication_eligible=false).",
+      "summary": "Upgraded the Kaggle dish-to-3D pipeline (Version 15 verified live, plus permanent interactive Three.js 3D Studio standard for every future notebook version): added dish_3d_studio.py and Cell 19 generation of HTTP comparison_viewer.html + self-contained interactive_3d_studio.html (orbit/zoom/pan, PBR/Base Color/Clay/Normal/Wireframe, synced compare, static fallback, publication_eligible=false), verified live in browser against V15's 16 GLBs.",
       "files": [
         "docs/research/dish-3d-delivery.md",
         "notebooks/dish-3d-openrouter.ipynb",
+        "processing/src/peekaplate_processing/dish_3d_studio.py",
+        "processing/tests/test_dish_3d_studio.py",
         "processing/tests/test_dish_3d_notebook.py"
       ],
       "next": "Run `docker build` + GPU integration wiring in a container-capable CI/worker host using `results/docker_blueprint/`, keep single-photo demo outputs marked publication_eligible=false per ADR 0004, and validate any multi-view/AR staging flow separately."

@@ -245,3 +245,21 @@ docker run --rm --gpus all -v "$PWD/dish_dir:/work" peekaplate-dish3d-worker:dem
 - **Readiness Boundary (V15 Checks):**
   - **PASS** — Offline unit suite (`48` tests in `test_dish_3d_notebook`, `test_model_service`, `test_generate_model`, `test_portion_service`), Kaggle Version 15 live `T4 ×2` execution (`4/4` preserved plates visually verified, `16/16` valid GLBs, `0` leaked secrets), downloaded V15 `worker_entrypoint.py --dry-run` + fail-closed missing-`source_sha256` test, `pnpm context:check`, `checkLocalLinks`, and `git diff --check`.
   - **NOT RUN** — Full `docker build` / `--gpus all` container execution against a local NVIDIA daemon (verified via generated template + downloaded V15 `worker_entrypoint.py --dry-run` contract tests only), authorized `TRELLIS.2-4B` PBR run, multi-view capture, and hosted production publication (`publication_eligible` stays `false`).
+
+### Interactive Three.js 3D Dish Studio Standard (Required for Every Notebook Version)
+
+Added [dish_3d_studio.py](../../processing/src/peekaplate_processing/dish_3d_studio.py) and [test_dish_3d_studio.py](../../processing/tests/test_dish_3d_studio.py), and updated Cell 19 of [notebooks/dish-3d-openrouter.ipynb](../../notebooks/dish-3d-openrouter.ipynb) (`STUDIO_HTML_TEMPLATE`, synced byte-for-byte via `test_dish_3d_notebook.py`) so **every future notebook version** must emit, bundle into `dish-3d-comparison.zip`, test, and verify BOTH interactive WebGL studios:
+
+1. **`comparison_viewer.html`:** Multi-file interactive Three.js `0.182.0` studio supporting `Raw Full` and `Mobile <=35k` GLBs across `TripoSR (Color)`, `Hunyuan3D-2mini (Mesh)`, and synced **Side-by-Side Compare**, live shading modes (`Studio PBR`, `Base Color`, `Clay`, `Normal`, `Wireframe`), camera presets (`Front 3/4`, `Top`, `Side`, `Low Rim`), auto-rotate, exposure, studio backgrounds (`Dark`/`Slate`/`Light`), plate-preserving Source vs. Cutout reference, GLB downloads, and graceful no-WebGL static fallbacks (`publication_eligible=false` banner).
+2. **`interactive_3d_studio.html`:** Self-contained single-file HTML embedding the `Mobile <=35k` GLBs (`base64` decoded via `GLTFLoader.parse` — zero `file://` CORS failures in Firefox/Chrome) and resized `512px` source/cutout/fallback thumbnails (~`10.4 MiB` for Version 15).
+3. **Local Build & Loopback Server CLI:**
+
+```bash
+PYTHONPATH=processing/src processing/.venv/bin/python -m peekaplate_processing.dish_3d_studio \
+  --results-dir /path/to/results --build --serve --port 8765
+```
+
+- **Interactive Studio Verification Status:**
+  - **PASS** — `51` unit tests (`test_dish_3d_studio`, `test_dish_3d_notebook`, `test_model_service`, `test_generate_model`, `test_portion_service`), including `STUDIO_HTML_TEMPLATE == _STUDIO_HTML_TEMPLATE` parity, `</script>` XSS escaping, and traversal rejection.
+  - **PASS (Live Browser WebGL)** — Generated and served Version 15 studios via local `/vendor/three/` (`three@0.182.0`) on `127.0.0.1:8765`, verified live `WebGL2` rendering in Chromium (`comparison_viewer.html`) for `01_pizza` and `02_tteokbokki` (`Side-by-Side Sync` + `Clay`/`Studio PBR`, `0` console errors, `0` failed requests).
+  - **NOT RUN** — A new Kaggle Version 16 run pushing the embedded Cell 19 `three@0.182.0` studio template to Kaggle (the template is verified offline in `test_dish_3d_notebook.py` and rendered live locally against Version 15 artifacts).

@@ -427,9 +427,104 @@ class Dish3DNotebookTest(unittest.TestCase):
             'make_checkerboard',
             'render_hf_trellis_modes',
             'hf_modes_sheet.png',
-            'dish_panels',
+            'interactive_3d_studio.html',
+            'comparison_viewer.html',
         ):
             self.assertIn(token, cell19_src)
+
+        # Verify notebook interactive Three.js studio template matches dish_3d_studio module identically
+        from peekaplate_processing.dish_3d_studio import THREE_VERSION, _STUDIO_HTML_TEMPLATE
+        tree19_chk = ast.parse(cell19_src, filename='cell_19_studio')
+        nb_tpl = next(
+            node.value.value
+            for node in tree19_chk.body
+            if isinstance(node, ast.Assign)
+            and getattr(node.targets[0], 'id', None) == 'STUDIO_HTML_TEMPLATE'
+        )
+        self.assertEqual(nb_tpl, _STUDIO_HTML_TEMPLATE)
+        self.assertIn(f"STUDIO_THREE_VERSION = '{THREE_VERSION}'", cell19_src)
+
+        # Execute Cell 19 studio helpers + write_results together and verify both HTML files land in manifest & ZIP
+        studio_nodes = [
+            node for node in tree19_chk.body
+            if (isinstance(node, ast.Assign) and any(
+                getattr(t, 'id', None) in ('STUDIO_THREE_VERSION', 'STUDIO_THREE_CDN_BASE', 'STUDIO_HTML_TEMPLATE')
+                for t in node.targets
+            ))
+            or (isinstance(node, ast.FunctionDef) and node.name in (
+                '_studio_encode_png_data_url', '_build_notebook_studio_payload', '_render_notebook_studio'
+            ))
+        ]
+        self.assertEqual(len(studio_nodes), 6)
+        with TemporaryDirectory() as tmp19:
+            res19 = Path(tmp19) / 'results'
+            dish_dir = res19 / '01_pizza'
+            dish_dir.mkdir(parents=True)
+            Image.new('RGB', (32, 32), (210, 120, 40)).save(dish_dir / 'input_image.png')
+            Image.new('RGBA', (32, 32), (210, 120, 40, 255)).save(dish_dir / 'cutout_rgba.png')
+            Image.new('RGB', (32, 32), (100, 100, 110)).save(dish_dir / 'triposr_hf_modes.png')
+            (dish_dir / 'triposr.glb').write_bytes(b'glTF-raw')
+            (dish_dir / 'triposr_mobile.glb').write_bytes(b'glTF-mob')
+            jm19 = scope['build_job_manifest']('01_pizza', {
+                'image_path': dish_dir / 'input_image.png',
+                'image_source': 'user-uploaded-dataset',
+                'size': [32, 32],
+                'source_sha256': 'b' * 64,
+            }, {'triposr_repo': 'rev'})
+            jm19_path = dish_dir / 'job_manifest.json'
+            jm19_path.write_text(json.dumps(jm19), encoding='utf-8')
+            in19 = {
+                '01_pizza': {
+                    'label': '01_pizza',
+                    'model': 'user-photo-upload',
+                    'image_status': 'success',
+                    'image_source': 'user-uploaded-dataset',
+                    'size': [32, 32],
+                    'source_sha256': 'b' * 64,
+                    'image_path': dish_dir / 'input_image.png',
+                    'cutout_path': dish_dir / 'cutout_rgba.png',
+                    'job_manifest_path': jm19_path,
+                    'cutout_metrics': {'plate_preserved': True, 'plate_added_pct': 10.0, 'plate_method': 'grounding_dino_sam', 'fg_coverage_pct': 60.0},
+                },
+                '00_failed': {'label': '00_failed', 'image_status': 'failed'},
+            }
+            runs19 = {
+                '01_pizza/triposr': {
+                    'input_label': '01_pizza',
+                    'backend': 'TripoSR',
+                    'appearance': 'vertex_color',
+                    'device': 'cuda:0',
+                    'status': 'success',
+                    'metrics': {'vertices': 50000, 'faces': 100000, 'bytes': 8, 'has_vertex_color': True},
+                    'mobile_metrics': {'vertices': 17000, 'faces': 34000, 'bytes': 8},
+                    'mobile_glb_path': dish_dir / 'triposr_mobile.glb',
+                    'hf_modes_path': dish_dir / 'triposr_hf_modes.png',
+                    'artifact_paths': [dish_dir / 'triposr.glb', dish_dir / 'triposr_mobile.glb', dish_dir / 'triposr_hf_modes.png'],
+                }
+            }
+            ns19 = {
+                **scope,
+                'ACTIVE_LABELS': ['01_pizza', '00_failed'],
+                'RESULTS_DIR': res19,
+                'image_results': in19,
+                'RUNS_3D': runs19,
+                'ImageOps': __import__('PIL.ImageOps', fromlist=['ImageOps']),
+                'html_lib': __import__('html'),
+                're': __import__('re'),
+            }
+            exec(compile(ast.Module(body=studio_nodes, type_ignores=[]), 'cell_19_exec', 'exec'), ns19)
+            http_p = ns19['_build_notebook_studio_payload'](embed_mobile_assets=False)
+            self.assertEqual([d['label'] for d in http_p['dishes']], ['01_pizza'])
+            vp19 = res19 / 'comparison_viewer.html'
+            sp19 = res19 / 'interactive_3d_studio.html'
+            vp19.write_text(ns19['_render_notebook_studio'](http_p), encoding='utf-8')
+            sp19.write_text(ns19['_render_notebook_studio'](ns19['_build_notebook_studio_payload'](embed_mobile_assets=True)), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'publication_eligible=false'):
+                ns19['_render_notebook_studio']({'publication_eligible': True})
+            m19_path, z19_path = scope['write_results'](res19, {'01_pizza': in19['01_pizza']}, runs19, {}, {}, [vp19, sp19])
+            with ZipFile(z19_path) as zf19:
+                self.assertIn('comparison_viewer.html', zf19.namelist())
+                self.assertIn('interactive_3d_studio.html', zf19.namelist())
 
     def test_v10_plate_preservation_and_docker_contract(self):
         cell1_src = ''.join(self.notebook['cells'][1]['source'])
