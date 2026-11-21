@@ -212,3 +212,25 @@ menu/revision identity into the authored preview. Stopping at an intermediate
 historical picker hides the implemented screen; choosing the first snapshot
 can instead preview stale content. Test multiple snapshots and direct navigation,
 not only a successful manual click through an incidental wrapper.
+
+## LRN-20261121-DISH3D · Unpin Kaggle `latest` runtime, remap `transformers 5.x` DINOv2 keys, and guard inset tabletop corners
+
+**Logged**: 2026-11-21 · **Status**: resolved · **Area**: processing
+**Category**: runtime_compatibility
+
+Pushing a Kaggle notebook update without removing a legacy `"docker_image"` BYOD
+pin left jobs stuck in `QUEUED` under `"docker_image_pinning_type": "original"`.
+Setting `"docker_image_pinning_type": "latest"` with `"machine_shape": "NvidiaTeslaT4"`
+moved execution immediately to warm CUDA `13.0` / `transformers 5.20.2` runners.
+Because `transformers 5.x` changed both `GroundingDinoProcessor.post_process_grounded_object_detection`
+(`threshold` vs. `box_threshold`) and `Dinov2Model` attention/SwiGLU projection names
+(`q_proj`/`k_proj`/`v_proj`/`o_proj`, split `gate_proj`/`up_proj`, `down_proj`),
+use signature inspection plus `remap_hunyuan_conditioner_state_dict` so pinned `4.x`
+checkpoints load identically on `4.x` and `5.x`. For plate-preserving SAM selection,
+outer `8px` corner checks miss tabletop leaks that leave a thin border artifact;
+check inset corner blocks and paired vertical edges alongside directional lower-ring
+and vessel-surface clicks, and verify every cutout visually.
+
+Related: `notebooks/dish-3d-openrouter.ipynb`, `processing/tests/test_dish_3d_notebook.py`,
+`docs/research/dish-3d-delivery.md`.
+Pattern: processing.kaggle-runtime-and-inset-corner-guards; first occurrence, no policy promotion.

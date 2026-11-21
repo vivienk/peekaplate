@@ -1094,7 +1094,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "assets",
       "status": "foundation",
-      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Private Kaggle notebook supports Stage 0 user dish photos (private dataset, up to 4) or open-weights fallbacks across flexible 1-or-2 CUDA GPUs, upgraded birefnet-general-lite cutouts, TripoSR (256, glTF +Y up/+Z front, floater pruning), Hunyuan3D-2mini (FloaterRemover/DegenerateFaceRemover/FaceReducer<=80k), sRGB GLB previews and publication_eligible=false manifests. Captured-food fidelity, rights and real-device acceptance remain manual.",
+      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Private Kaggle demo supports Stage 0 photos (up to 4), GroundingDINO+SAM plate preservation, TripoSR+Hunyuan3D-2mini raw/<=35k mobile GLBs, HF 4-mode renders, comparison viewer, Docker worker blueprint and publication_eligible=false manifests. Real-device, Docker-host GPU builds and fidelity checks remain separate.",
       "paths": [
         "processing/src/peekaplate_processing/assets.py",
         "processing/src/peekaplate_processing/harness.py",
@@ -1123,7 +1123,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "40029b34786ef69e136e3437e80cc021a59cd47198d614c25a895f0bd6ddf503"
+      "sourceFingerprint": "a32fd59bcf3376ac2f7a787b81d0a9c67059b5fd13e299602dc5c2e708253c4d"
     }
   ],
   "handoffs": [
@@ -1264,13 +1264,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing",
         "diner"
       ],
-      "summary": "Upgraded the Kaggle dish-to-3D benchmark notebook for 4 real user dish photos via private dataset discovery, flexible GPU pooling, birefnet-general-lite cutouts, TripoSR 256 glTF rotation/pruning, Hunyuan3D-2mini 80k-face reduction, and sRGB Cutout+3-view preview sheets; resolved the Kaggle queue stall cleanly via Version 9 (NvidiaTeslaP100 fallback to T4 x2, 8/8 valid GLBs, publication_eligible=false).",
+      "summary": "Upgraded the private Kaggle dish-to-3D notebook (Version 15, NvidiaTeslaT4 latest) for ticket 86bd5m6q0: added GroundingDINO+SAM plate preservation across all 4 user dishes, Hunyuan3D-2mini transformers 5.x DINOv2 state-dict remapping, 16 raw+mobile<=35k GLBs, HF 4-mode studio strips, interactive viewer, and fail-closed Docker worker blueprint (publication_eligible=false).",
       "files": [
         "docs/research/dish-3d-delivery.md",
         "notebooks/dish-3d-openrouter.ipynb",
         "processing/tests/test_dish_3d_notebook.py"
       ],
-      "next": "Verify the current 2.5D owner-to-phone path on staging. Optionally benchmark TRELLIS.2-4B on Kaggle only with an authorized HF_TOKEN for DINOv3, and evaluate multi-view real captures separately from private single-view experiments."
+      "next": "Run `docker build` + GPU integration wiring in a container-capable CI/worker host using `results/docker_blueprint/`, keep single-photo demo outputs marked publication_eligible=false per ADR 0004, and validate any multi-view/AR staging flow separately."
     }
   ]
 }

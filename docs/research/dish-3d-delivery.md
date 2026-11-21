@@ -180,3 +180,68 @@ Upgraded [`dish-3d-openrouter.ipynb`](../../notebooks/dish-3d-openrouter.ipynb) 
 - **NOT RUN** — Hosted owner upload/publication, desktop and phone acceptance, live provider calls and physical tracked AR. This research verifies branch wiring and identifies acceptance work.
 - **PASS** — `PATH="$HOME/.local/bin:$PATH" corepack pnpm context:check` and targeted local Markdown link validation using `checkLocalLinks` from `scripts/check-docs.mjs`.
 - **FAIL** — `pnpm verify context:check docs:check` passed the context check, then reported missing targets in existing skill documentation. The report passed its targeted local link check.
+
+---
+
+## Verified Plate-Preserving Upgrade & Docker Worker Blueprint (Version 15, 2026-11-21)
+
+Updated [notebooks/dish-3d-openrouter.ipynb](../../notebooks/dish-3d-openrouter.ipynb) for ticket `86bd5m6q0` as a private, plate-preserving single-photo demo (`publication_eligible: false`) and reproducible GPU Docker worker blueprint, verified live on Kaggle `NvidiaTeslaT4` (`T4 ×2`).
+
+### Queue Resolution, `transformers 5.x` Compatibility & Hardening Fixes
+
+1. **Kaggle BYOD Queue Fix:** Removing stale `"docker_image"` pinning and pushing with `"docker_image_pinning_type": "latest"` + `"machine_shape": "NvidiaTeslaT4"` switched the private kernel onto Kaggle's warm CUDA `13.0` image (`Python 3.13.16`, `PyTorch 2.11.0+cu130`, `transformers 5.20.2`, `trimesh 5.2.1`, `pymeshlab 2025.7.post1`, `rembg 2.0.67`), resolving the earlier BYOD `QUEUED` stall.
+2. **GroundingDINO & Hunyuan3D-2mini under `transformers 5.20.2`:**
+   - Used `inspect.signature(dino_proc.post_process_grounded_object_detection)` to adapt `threshold` / `box_threshold` and `text_labels`.
+   - Added `remap_hunyuan_conditioner_state_dict` on `SingleImageEncoder` / `DualImageEncoder` in `hy_worker_code` to map `transformers 4.x` DINOv2 keys (`attention.attention.{query,key,value}`, `attention.output.dense`, `mlp.weights_out`, and chunk-split `mlp.weights_in` -> `gate_proj` + `up_proj`) to `transformers 5.x` (no-op on `4.x`).
+   - Hardened Cell 11/15 `TRELLIS.2-4B` gating so even when `DINOV3_OK=True` on CUDA `13.0`, it records a clean `skipped` reason (`requires_cuda_12_toolchain`) without downgrading `transformers` or aborting Cell 19 outputs.
+3. **Plate-Preserving Segmentation (`preserve_plate`):** Combines `birefnet-general-lite` food extraction with pinned Apache-2.0 `IDEA-Research/grounding-dino-tiny@a2bb814dd30d776dcf7e30523b00659f4f141c71` + `facebook/sam-vit-base@70c1a07f894ebb5b307fd9eaaee97b9dfc16068f` using two-pass vessel prompts (`PLATE_PROMPT_PASSES`), lower/lateral directional `sam_ring_points`, direct `sam_vessel_points`, solid hole-filled Pattern-A/Pattern-B scoring (`ring_contact`, `bbox_fill`), outer + inset corner checks (`count_non_food_corners`, `count_top_non_food_corners`), and paired vertical-edge tabletop guards.
+
+### Verified Plate-Preserving Cutouts (Version 15)
+
+| Dish Label | Input Size | Method | Food % | +Plate % | Total FG % | Corners Hit | Edge Touch | Elapsed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `01_pizza` | `554×554` | `grounding_dino_sam` | `57.52%` | `+4.61%` | `62.13%` | `0` | `[]` | `52.43s` |
+| `02_tteokbokki` | `800×560` | `sam_vessel_points` | `43.72%` | `+34.93%` | `78.65%` | `0` | `['left', 'right']` | `24.46s` |
+| `03_kimchi` | `2000×1125` | `grounding_dino_sam` | `32.66%` | `+11.25%` | `43.91%` | `0` | `[]` | `26.49s` |
+| `04_gimbap` | `739×415` | `sam_ring_points` | `42.77%` | `+35.00%` | `77.77%` | `0` | `['left', 'right', 'top']` | `17.42s` |
+
+### Verified 16-GLB Export Benchmark (`Raw` + `Mobile <=35k`, Version 15)
+
+All 16 GLBs passed binary `glTF` v2 validation, finite-vertex checks, positive signed volume, `<=35,500` mobile face limits (`34,000` faces across all 8 mobile GLBs), exact disk/`manifest.json`/`worker_output.json`/`dish-3d-comparison.zip` SHA-256 parity (`publication_eligible: false`), `COLOR_0` vertex colors on all 8 `TripoSR` exports, and clean zero-secret scans. `TRELLIS.2-4B` stayed `skipped` (`missing_or_unauthorized_hf_token`).
+
+| Output Path | Device | Appearance | Vertices | Faces | Bytes | Signed Vol | Extent `[X, Y, Z]` | SHA-256 (12 chars) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `01_pizza/triposr.glb` | `cuda:0` | `vertex_color` | `60,419` | `120,842` | `2,417,784` | `+0.07947` | `[1.005, 0.985, 0.428]` | `e910f3a023a0` |
+| `01_pizza/triposr_mobile.glb` | `cuda:0` | `vertex_color` | `16,998` | `34,000` | `680,940` | `+0.07943` | `[1.005, 0.985, 0.427]` | `a9ec28fc5041` |
+| `01_pizza/hunyuan3d_2mini.glb` | `cuda:0` | `geometry_only` | `39,982` | `228,962 -> 80,000` | `1,440,580` | `+0.04829` | `[1.989, 1.988, 0.049]` | `f63826287b36` |
+| `01_pizza/hunyuan3d_2mini_mobile.glb` | `cuda:0` | `geometry_only` | `16,982` | `34,000` | `612,580` | `+0.04826` | `[1.989, 1.988, 0.049]` | `e9064c259cda` |
+| `02_tteokbokki/triposr.glb` | `cuda:1` | `vertex_color` | `66,152` | `132,328` | `2,647,344` | `+0.09929` | `[1.076, 0.741, 0.433]` | `35d8ecb3e124` |
+| `02_tteokbokki/triposr_mobile.glb` | `cuda:1` | `vertex_color` | `16,989` | `34,000` | `680,796` | `+0.09926` | `[1.076, 0.741, 0.433]` | `b59821cfa333` |
+| `02_tteokbokki/hunyuan3d_2mini.glb` | `cuda:1` | `geometry_only` | `39,682` | `488,882 -> 80,000` | `1,436,976` | `+0.41760` | `[1.993, 0.561, 1.989]` | `95907cbd03aa` |
+| `02_tteokbokki/hunyuan3d_2mini_mobile.glb` | `cuda:1` | `geometry_only` | `16,682` | `34,000` | `608,976` | `+0.41744` | `[1.994, 0.561, 1.989]` | `f24b745f338f` |
+| `03_kimchi/triposr.glb` | `cuda:0` | `vertex_color` | `81,526` | `163,136` | `3,263,020` | `+0.14800` | `[1.058, 0.817, 0.555]` | `1c757a53a570` |
+| `03_kimchi/triposr_mobile.glb` | `cuda:0` | `vertex_color` | `16,965` | `34,000` | `680,408` | `+0.14792` | `[1.058, 0.817, 0.554]` | `abc29bbb55c0` |
+| `03_kimchi/hunyuan3d_2mini.glb` | `cuda:0` | `geometry_only` | `39,994` | `407,268 -> 80,000` | `1,440,716` | `+0.34658` | `[1.992, 1.547, 0.661]` | `83b5d88f42c8` |
+| `03_kimchi/hunyuan3d_2mini_mobile.glb` | `cuda:0` | `geometry_only` | `16,994` | `34,000` | `612,716` | `+0.34652` | `[1.992, 1.547, 0.661]` | `42b861f09f9a` |
+| `04_gimbap/triposr.glb` | `cuda:1` | `vertex_color` | `44,733` | `89,494` | `1,790,636` | `+0.02760` | `[0.954, 0.501, 0.544]` | `b994344a8069` |
+| `04_gimbap/triposr_mobile.glb` | `cuda:1` | `vertex_color` | `16,987` | `34,000` | `680,768` | `+0.02759` | `[0.954, 0.501, 0.544]` | `c7cdf5357240` |
+| `04_gimbap/hunyuan3d_2mini.glb` | `cuda:1` | `geometry_only` | `39,986` | `298,982 -> 80,000` | `1,440,624` | `+0.36627` | `[1.722, 0.518, 1.992]` | `44a331bb263f` |
+| `04_gimbap/hunyuan3d_2mini_mobile.glb` | `cuda:1` | `geometry_only` | `16,986` | `34,000` | `612,624` | `+0.36623` | `[1.722, 0.518, 1.992]` | `57eacadb286f` |
+
+### HF TRELLIS Studio Inspection & Docker Worker Blueprint
+
+- **Visual Outputs:** Generates `hf_modes_sheet.png` (`Normal`, `Clay`, `Base Color`, `Studio HDRI` per dish/backend), `comparison_sheet.png`, and `comparison_viewer.html` (`@google/model-viewer@4.0.0`, dish tabs, raw-vs-mobile GLB switch, auto-rotate/reset/exposure controls, and truthful `Private single-photo 3D demo` badge).
+- **Docker Worker Blueprint (`results/docker_blueprint/` inside `dish-3d-comparison.zip`):**
+  - `Dockerfile.worker.template`: non-root `worker` user (`nvidia/cuda:13.0.0-runtime-ubuntu24.04`), mounts `/var/cache/peekaplate` and `/work`, installs `requirements.lock.txt` with `--extra-index-url https://download.pytorch.org/whl/cu130`, bakes zero secrets or photos.
+  - `worker_entrypoint.py`: fails closed unless `job_manifest.json` has `publication_eligible === false` and a valid 64-char lowercase hex `source_sha256` matching the input file on disk, then emits `worker_output.json`.
+  - Next-stage Docker build/dry-run commands (after unpacking `results/docker_blueprint/`):
+
+```bash
+docker build -f Dockerfile.worker.template -t peekaplate-dish3d-worker:demo .
+docker run --rm --gpus all -v "$PWD/dish_dir:/work" peekaplate-dish3d-worker:demo \
+  --manifest /work/job_manifest.json --input-dir /work --out /work/out --dry-run
+```
+
+- **Readiness Boundary (V15 Checks):**
+  - **PASS** — Offline unit suite (`48` tests in `test_dish_3d_notebook`, `test_model_service`, `test_generate_model`, `test_portion_service`), Kaggle Version 15 live `T4 ×2` execution (`4/4` preserved plates visually verified, `16/16` valid GLBs, `0` leaked secrets), downloaded V15 `worker_entrypoint.py --dry-run` + fail-closed missing-`source_sha256` test, `pnpm context:check`, `checkLocalLinks`, and `git diff --check`.
+  - **NOT RUN** — Full `docker build` / `--gpus all` container execution against a local NVIDIA daemon (verified via generated template + downloaded V15 `worker_entrypoint.py --dry-run` contract tests only), authorized `TRELLIS.2-4B` PBR run, multi-view capture, and hosted production publication (`publication_eligible` stays `false`).
