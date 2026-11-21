@@ -279,7 +279,8 @@ function pipeline(): Pipeline {
 
 export function track(eventName: string, payload: TrackPayload): void {
   try {
-    // Live events need consent before anything happens, so a declined event uses no sequence number.
+    if (import.meta.env.MODE === 'production' && mode !== 'live') return;
+    // Apply the live privacy gate before assigning a sequence number.
     if (mode === 'live' && (liveSuspended || !isTrackingAllowed())) return;
     const now = () => Date.now();
     const uuid = () => crypto.randomUUID();

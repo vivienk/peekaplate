@@ -2,9 +2,9 @@
 
 *PeekaPlate for restaurant owners*
 
-This page explains what information PeekaPlate collects from restaurant owners and staff, what we do with it, who sees it, and what you can ask us to do. Our Terms of Service cover the rules for using PeekaPlate. The notice shown to diners on a menu is separate.
+This page explains what information PeekaPlate collects from restaurant owners and staff, what we do with it, who sees it, and what you can ask us to do. Our Terms of Service cover the rules for using PeekaPlate.
 
-**Last updated:** November 14, 2026
+**Last updated:** November 21, 2026
 
 ---
 
@@ -48,11 +48,11 @@ We do not knowingly collect information from children, and PeekaPlate is not mad
 
 ## What we record about diners for your restaurant
 
-When a diner opens your published menu and agrees, we record menu activity such as menu views, dish views, and comparisons, with the time and menu version.
+When a diner opens your production menu, we record supported activity such as menu views, dish views, and comparisons, with the time and menu version. Staging menus ask first.
 
 - We keep a **visit identifier and event identifiers.** We do not link them to a named person, and we do not collect diner names, emails, or phone numbers in this data.
 - Because the identifiers exist, we do **not** describe this data as completely anonymous.
-- The notice shown to diners on the menu explains this to them.
+- We respect the browser’s Do Not Track and Global Privacy Control signals.
 
 ## How we use your information
 

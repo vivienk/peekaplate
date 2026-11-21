@@ -15,8 +15,8 @@ import './style.css';
 import { mountMenuScreen } from './menu/menuScreen';
 
 const app = document.querySelector<HTMLElement>('#app');
-if (app) {
-  mountMenuScreen(app);
+if (app) mountMenuScreen(app);
+if (app && import.meta.env.MODE !== 'production') {
   const consentHost = document.createElement('div');
   consentHost.id = 'consent';
   document.body.append(consentHost);
@@ -27,5 +27,5 @@ if (app) {
   });
 }
 
-// PostHog for P0 tracking (S3-TRK-01): idle unless configured, live and consented.
+// PostHog for P0 tracking (S3-TRK-01): idle unless configured and live tracking is allowed.
 connectPostHogFromEnv(import.meta.env);

@@ -65,7 +65,7 @@ const payloadSchemas = new Map(
   ObservationV2Schema.options.map((option) => [option.shape.type.value, option.shape.payload]),
 );
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const PRODUCTION_DINER_ORIGIN = 'https://diner.peekaplate.app';
+export const PRODUCTION_DINER_ORIGIN = 'https://diner.peekaplate.app';
 
 export type PostHogScope = {
   venueId: string;

@@ -1,3 +1,4 @@
+import { PRODUCTION_DINER_ORIGIN } from '@peekaplate/analytics/posthog';
 import {
   type CompareAction,
   type CompareSide,
@@ -465,7 +466,9 @@ export function mountMenuScreen(container: HTMLElement): void {
   const menuViewedTrigger = createMenuViewedTrigger();
   // QR is out of scope (Nov 1), so this is always direct_link.
   const entrySource = 'direct_link' as const;
-  const canTrackUi = () => fixtureMode || (isLiveTracking() && isTrackingAllowed());
+  const production = import.meta.env.MODE === 'production';
+  const canTrackUi = () =>
+    (!production && fixtureMode) || (isLiveTracking() && isTrackingAllowed());
 
   const cleanupExposure = () => {
     exposureTimers.forEach((timer) => window.clearTimeout(timer));
@@ -1021,7 +1024,8 @@ export function mountMenuScreen(container: HTMLElement): void {
                 };
                 // Every verified load, first or re-read, re-arms the timer for the new expiry.
                 activeRefresher?.schedule(info.expiresAt);
-                if (liveTrackingOn) return;
+                if (liveTrackingOn || (production && location.origin !== PRODUCTION_DINER_ORIGIN))
+                  return;
                 liveTrackingOn = true;
                 tracking.enableLiveTracking(
                   delivery.createLiveDeliver({
@@ -1039,6 +1043,7 @@ export function mountMenuScreen(container: HTMLElement): void {
                         }
                       : undefined,
                 );
+                if (production) tracking.setTrackingAllowed(true);
               },
             });
             activeRefresher = createMenuRefresher({
