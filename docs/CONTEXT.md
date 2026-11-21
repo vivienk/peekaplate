@@ -123,7 +123,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Verified portion blobs retain supported image MIME for opaque published SVG URLs; exact byte/hash and dimension checks remain. Portion and camera views label Serves N people separately from Plate size in cm. Tracked table AR uses the measured footprint with matching optional counts; 2.5D and ordinary camera scale remain approximate. Verified menus on the exact production diner origin start PostHog and canonical tracking automatically when browser privacy signals allow it. Staging retains opt-in, which hides during portion preview/camera and returns on exit. A withdrawn publication denies new prepared-content reads. The comparison picker supports the anchor and two other dishes. Each rendered pair preserves the same comparison ID; a ready portion viewer records its own opening separately from timed detail activity.",
+      "summary": "Published menu entry verifies bundle integrity and scope. Verified portion blobs retain supported MIME and enforce byte, hash and dimension checks. Portion and camera views label serving count separately from plate size. Tracked table AR uses the measured footprint with matching optional counts; 2.5D and ordinary camera scale remain approximate. Standalone verified menus on the exact production diner origin start PostHog and canonical tracking automatically when browser privacy signals allow it. The Screen 13 phone iframe sends neither. Staging retains opt-in, which hides during portion preview/camera and returns on exit. A withdrawn publication denies new prepared-content reads. The comparison picker supports the anchor and two other dishes. Each rendered pair preserves the same comparison ID; a ready portion viewer records its own opening separately from timed detail activity.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -281,7 +281,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a7bbb331f5e92fe6caae7b216abbda7eb07de917fbcb0a776011075e9e045082"
+      "sourceFingerprint": "8f62524d2f037e2676a4baf7dc4a4c8e373ae9df871dd63093f260b05af7451d"
     },
     {
       "id": "console",
@@ -898,7 +898,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "8495e714411b7d8aed73269c8a62d741eb3856bdacf3e0d721348061d1398343"
+      "sourceFingerprint": "af7c6fa089bc147be369f9d2c8c2f4406d25cde1ab2a89400da6ba3d151f32d0"
     },
     {
       "id": "agents",
@@ -960,7 +960,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "530475ab97392f25f30100db340bb3b7380339b2d238fa168de382fcb59ba989"
+      "sourceFingerprint": "df8e4acf413c886612ec8d92f88101fe9d59bb0d0ec2c69dd611f543a35cc8a4"
     },
     {
       "id": "processing",

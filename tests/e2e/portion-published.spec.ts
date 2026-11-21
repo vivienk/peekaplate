@@ -1,10 +1,24 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+function analyticsRequests(page: Page): string[] {
+  const blockedRequests: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (
+      url.origin === 'https://us.i.posthog.com' ||
+      url.href === 'https://api.example.test/observations'
+    ) {
+      blockedRequests.push(url.origin);
+    }
+  });
+  return blockedRequests;
+}
 
 // Production bundle, demos disabled, real verifier and synthetic published capture layers.
-test('production tracks the first menu view and portions without a prompt, with camera and GPC guards', async ({
+test('production tracks standalone menu views and portions, with phone preview, camera and GPC guards', async ({
   page,
   context,
   baseURL,
@@ -155,6 +169,25 @@ test('production tracks the first menu view and portions without a prompt, with 
       path: `${evidence}/published-portion-${testInfo.project.name}-${name}.png`,
       fullPage: !name.startsWith('camera'),
     });
+  // Screen 13 embeds this same published URL in a cross-origin, script-enabled sandbox.
+  const previewPage = await context.newPage();
+  const previewRequests = analyticsRequests(previewPage);
+  await previewPage.route('https://peekaplate.app/owner-preview', (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: `<iframe src="${dinerOrigin}/diner/portion-qa" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>`,
+    }),
+  );
+  await previewPage.clock.install();
+  await previewPage.goto('https://peekaplate.app/owner-preview');
+  const phone = previewPage.frameLocator('iframe');
+  await phone.locator('.pp-card__open').first().click();
+  await phone.getByRole('button', { name: 'View Portion', exact: true }).click();
+  await expect(phone.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+  await previewPage.clock.fastForward(10_000);
+  expect(previewRequests).toEqual([]);
+  await previewPage.close();
+
   await page.goto(`${dinerOrigin}/diner/portion-qa?test_private=hidden`);
   await expect(page.locator('.pp-card__open').first()).toBeVisible();
   await expect(page.locator('#consent')).toHaveCount(0);
@@ -234,16 +267,7 @@ test('production tracks the first menu view and portions without a prompt, with 
   expect(captures).toHaveLength(2);
 
   const privacyPage = await context.newPage();
-  const blockedRequests: string[] = [];
-  privacyPage.on('request', (request) => {
-    const url = new URL(request.url());
-    if (
-      url.origin === 'https://us.i.posthog.com' ||
-      url.href === 'https://api.example.test/observations'
-    ) {
-      blockedRequests.push(url.origin);
-    }
-  });
+  const blockedRequests = analyticsRequests(privacyPage);
   await privacyPage.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', { get: () => true });
   });

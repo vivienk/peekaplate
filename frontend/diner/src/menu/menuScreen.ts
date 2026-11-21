@@ -1024,8 +1024,14 @@ export function mountMenuScreen(container: HTMLElement): void {
                 };
                 // Every verified load, first or re-read, re-arms the timer for the new expiry.
                 activeRefresher?.schedule(info.expiresAt);
-                if (liveTrackingOn || (production && location.origin !== PRODUCTION_DINER_ORIGIN))
+                // The owner’s post-publish phone preview loads this URL in an iframe.
+                if (
+                  liveTrackingOn ||
+                  (production &&
+                    (location.origin !== PRODUCTION_DINER_ORIGIN || window.top !== window))
+                ) {
                   return;
+                }
                 liveTrackingOn = true;
                 tracking.enableLiveTracking(
                   delivery.createLiveDeliver({

@@ -5389,3 +5389,13 @@ independent delta reviews remain required; no hosted deployment was performed.
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-21T18:55:18.221Z","exitCode":1}
 ```
+
+### ERR-20261121-TRACK-001 | Screen 13 preview counted as diner traffic
+
+The published phone iframe loaded on the same origin as a standalone menu and
+started production tracking. The desktop production browser regression recorded
+PostHog requests from that iframe before the fix. The verified menu now starts
+the shared analytics pipeline only in a top-level production window. Desktop
+and mobile verify that the frame can render dishes and portions with zero
+requests to either destination. The same URL in a standalone tab sends the
+menu-view and portion event IDs to both intercepted destinations.
