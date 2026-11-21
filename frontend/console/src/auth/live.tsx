@@ -15,6 +15,7 @@ import {
 const isConfirmation = isAuthCallbackPath(window.location.pathname, 'confirmation');
 const isRecovery = isAuthCallbackPath(window.location.pathname, 'recovery');
 const isCallback = isConfirmation || isRecovery;
+const production = window.location.origin === 'https://peekaplate.app';
 let confirmationCode = isCallback
   ? readConfirmationCode(window.location.href, isRecovery ? 'recovery' : 'confirmation')
   : null;
@@ -23,7 +24,9 @@ if (window.location.search || window.location.hash)
   window.history.replaceState(null, '', window.location.pathname);
 const config = readOwnerAuthConfig(import.meta.env, window.location.origin);
 const runtime = config ? connectOwnerAuth(config) : null;
-const apiBase = readWorkspaceApiBase(import.meta.env.VITE_PUBLIC_API_URL);
+const configuredApi = readWorkspaceApiBase(import.meta.env.VITE_PUBLIC_API_URL);
+const productionApi = configuredApi === 'https://api.peekaplate.app';
+const apiBase = production === productionApi ? configuredApi : null;
 // The owner AI panel stays off unless this console build turns it on (see docs/owner-ai-responses.md).
 const aiEnabled = import.meta.env.VITE_OWNER_AI_ENABLED === 'true';
 const dishAssistanceEnabled = import.meta.env.VITE_OWNER_AI_DISH_ASSISTANCE_ENABLED === 'true';
@@ -38,6 +41,7 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(!isCallback);
   const identityGeneration = useRef(0);
+  const confirmationPending = useRef<AbortController | null>(null);
   const refreshOwner = useCallback(async () => {
     const generation = ++identityGeneration.current;
     setOwner(null);
@@ -75,6 +79,7 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
 
   useEffect(() => {
     function rejectChangedCallback() {
+      confirmationPending.current?.abort();
       confirmationCode = null;
       window.history.replaceState(null, '', window.location.pathname);
       if (isCallback) setCallbackState('invalid');
@@ -155,7 +160,17 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
                   setCallbackState('recovery');
                 } else setCallbackState('invalid');
               } else {
-                const result = await auth.confirmEmail(code ?? '');
+                const controller = new AbortController();
+                confirmationPending.current = controller;
+                const result = await auth.confirmEmail(
+                  code ?? '',
+                  production ? controller.signal : undefined,
+                );
+                confirmationPending.current = null;
+                if (production && !controller.signal.aborted && result.kind === 'confirmed') {
+                  window.location.replace('/owner-auth.html');
+                  return;
+                }
                 setCallbackState(result.kind === 'confirmed' ? 'confirmed' : 'invalid');
               }
               setBusy(false);
@@ -185,6 +200,7 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
           auth={auth}
           owner={owner}
           apiBase={apiBase}
+          production={production}
           aiEnabled={aiEnabled}
           dishAssistanceEnabled={dishAssistanceEnabled}
           onSessionExpired={sessionExpired}

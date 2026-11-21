@@ -34,7 +34,10 @@ export function fieldError(field: DetailsField, raw: string): string | undefined
   const value = raw.trim();
   switch (field) {
     case 'name':
-      return value ? undefined : 'Enter your restaurant name';
+      if (!value) return 'Enter your restaurant name';
+      if (value.length > 160) return 'Use 160 characters or fewer';
+      if (/[\u0000-\u001f\u007f]/.test(value)) return 'Enter a valid restaurant name';
+      return undefined;
     case 'city':
       return value ? undefined : 'Enter your city';
     case 'street':

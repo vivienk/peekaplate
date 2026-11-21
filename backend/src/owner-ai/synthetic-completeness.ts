@@ -52,6 +52,7 @@ const detailFamily: Record<string, string> = {
   dish_activity_checkpoint: 'activity',
   dish_detail_closed: 'closing',
   dish_compared: 'comparison',
+  dish_portion_opened: 'portion_opening',
   dish_saved: 'save',
   dish_unsaved: 'save',
   shortlist_viewed: 'shortlist_view',

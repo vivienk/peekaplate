@@ -14,10 +14,10 @@ const venue = {
   name: 'Synthetic restaurant',
   permission: 'owner',
 };
-function fixture() {
+function fixture(productionOrigin?: string) {
   const state = { failure: '' };
   const query = vi.fn(async (sql: string, _params?: unknown[]) => {
-    if (sql.includes('create_owner_venue')) {
+    if (sql.includes('create_owner_venue') || sql.includes('create_first_owner_venue')) {
       if (state.failure)
         throw Object.assign(new Error('Private database detail'), { code: state.failure });
       return { rows: [{ venue }] };
@@ -39,12 +39,14 @@ function fixture() {
       return work({ query } as unknown as Client);
     },
     allowedOrigins: ['https://console.example.test'],
+    ...(productionOrigin ? { productionOrigin } : {}),
   });
   const run = (
     body: unknown = { commandId, name: venue.name },
     env = 'staging',
     headers: Record<string, string> = {},
     suffix = '',
+    ownerWorkflowEnabled = 'true',
   ) =>
     app.request(
       `/staff/venues${suffix}`,
@@ -57,7 +59,7 @@ function fixture() {
         },
         body: JSON.stringify(body),
       },
-      { APP_ENV: env },
+      { APP_ENV: env, OWNER_WORKFLOW_ENABLED: ownerWorkflowEnabled },
     );
   return { state, query, verify, database, run };
 }
@@ -93,6 +95,32 @@ it('is absent outside staging/local even for oversized or authorized requests', 
   expect((await s.run(undefined, '')).status).toBe(404);
   expect(s.verify).not.toHaveBeenCalled();
   expect(s.database).not.toHaveBeenCalled();
+});
+it('restricts production to its console and uses the first-restaurant command', async () => {
+  const productionOrigin = 'https://peekaplate.app';
+  const s = fixture(productionOrigin);
+  expect((await s.run(undefined, 'production')).status).toBe(403);
+  expect(
+    (await s.run(undefined, 'production', { Origin: productionOrigin }, '', 'false')).status,
+  ).toBe(404);
+  expect(
+    (await s.run(undefined, 'production', { Origin: 'https://console.example.test' })).status,
+  ).toBe(403);
+  expect((await s.run(undefined, 'staging', { Origin: productionOrigin })).status).toBe(403);
+  expect(s.database).not.toHaveBeenCalled();
+  const headers = { Origin: productionOrigin };
+  const response = await s.run(undefined, 'production', headers);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ venue });
+  expect(s.query).toHaveBeenCalledWith(
+    'SELECT app_private.create_first_owner_venue($1::uuid,$2::text) AS venue',
+    [commandId, venue.name],
+  );
+  s.state.failure = 'P0004';
+  const duplicate = await s.run(undefined, 'production', headers);
+  expect(duplicate.status).toBe(409);
+  expect(await duplicate.json()).toEqual({ error: 'command_conflict' });
+  expect(s.query).toHaveBeenLastCalledWith('ROLLBACK');
 });
 it.each([
   { commandId, name: 'Cafe', actorId: actor },

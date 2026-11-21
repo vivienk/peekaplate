@@ -3,12 +3,11 @@
 // details" and a text-style "Replace" at its foot; Dietary & Allergen Info) that each show the two
 // dishes side by side with a divider, so every row lines up. "Back to Menu" leaves Compare. The screen itself sends nothing: the caller fires dish_compared
 // when a valid comparison is displayed.
-import { completeDishes } from '../menu/adapter';
 import { allergenIcon, dietaryIcon } from '../menu/icons';
 import { navButtonMarkup } from '../menu/navButton';
 import { formatPrice } from '../menu/price';
 import type { CompleteDish, Menu } from '../menu/types';
-import type { CompareSide, Comparison } from './comparison';
+import { type CompareSide, type Comparison, comparisonDishes } from './comparison';
 
 export const COMPARE_STAFF_LINE = 'For allergy questions, please ask the restaurant staff.';
 
@@ -20,25 +19,20 @@ export type CompareSideView = {
   hasDietary: boolean;
 };
 
-// Both sides of a displayable comparison, first then other, or null when either dish is no longer
-// complete on the menu or both sides are the same dish (a failed comparison shows no result).
-export function compareView(
-  menu: Menu,
-  comparison: Comparison,
-): [CompareSideView, CompareSideView] | null {
-  const byId = new Map(completeDishes(menu).map((dish) => [dish.dishId, dish]));
-  const first = byId.get(comparison.firstDishId);
-  const other = byId.get(comparison.otherDishId);
-  if (!first || !other || first.dishId === other.dishId) return null;
-  const view = (side: CompareSide, dish: CompleteDish): CompareSideView => ({
+// The displayed dishes in order, or null if the comparison is no longer valid.
+export function compareView(menu: Menu, comparison: Comparison): CompareSideView[] | null {
+  const shown = comparisonDishes(menu, comparison);
+  if (!shown.length) return null;
+  return shown.map(({ side, dish }) => ({
     side,
     dish,
     ingredientNames: dish.ingredients.map((ingredient) => ingredient.name),
     hasAllergens: dish.allergens.length > 0,
     hasDietary: dish.dietary.length > 0,
-  });
-  return [view('first', first), view('other', other)];
+  }));
 }
+
+const divider = '<div class="pp-compare__divider" aria-hidden="true"></div>';
 
 export type CompareResultOptions = {
   menu: Menu;
@@ -92,7 +86,7 @@ function sectionMarkup(
         </div>
       `,
     )
-    .join('<div class="pp-compare__divider" aria-hidden="true"></div>');
+    .join(divider);
   return `
     <section class="pp-compare__section pp-compare__section--${key}" aria-labelledby="pp-compare-${key}">
       <h3 class="pp-compare__label" id="pp-compare-${key}">${title}</h3>
@@ -145,7 +139,7 @@ export function renderCompareResult(
   if (!view) return false;
 
   container.innerHTML = `
-    <div class="pp-compare">
+    <div class="pp-compare" data-dish-count="${view.length}">
       <header class="pp-detail__topbar pp-compare__topbar">
         ${navButtonMarkup('back', 'pp-detail__back pp-compare__close', 'Close compare')}
         <h1 class="pp-detail__title" tabindex="-1">Compare</h1>
@@ -154,9 +148,7 @@ export function renderCompareResult(
       ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
 
       <div class="pp-compare__pair pp-compare__header">
-        ${headerCell(view[0])}
-        <div class="pp-compare__divider" aria-hidden="true"></div>
-        ${headerCell(view[1])}
+        ${view.map(headerCell).join(divider)}
       </div>
 
       ${sectionMarkup('description', 'Description', view, (v) => `<p class="pp-compare__description">${escapeHtml(v.dish.description)}</p>`)}
@@ -168,9 +160,7 @@ export function renderCompareResult(
           `<p class="pp-compare__ingredient-names">${v.ingredientNames.map(escapeHtml).join(', ')}</p>`,
         // Figma places View details / Replace at the foot of the Key ingredients section.
         `<div class="pp-compare__pair pp-compare__action-row">
-          ${actionsCell(view[0])}
-          <div class="pp-compare__divider" aria-hidden="true"></div>
-          ${actionsCell(view[1])}
+          ${view.map(actionsCell).join(divider)}
         </div>`,
       )}
       ${sectionMarkup('dietary', 'Dietary &amp; Allergen Info', view, (v) => dietaryAllergenCell(v.dish))}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTestRestaurant, fetchOwnerWorkspace, readWorkspaceApiBase } from './workspace-api';
+import { createRestaurant, fetchOwnerWorkspace, readWorkspaceApiBase } from './workspace-api';
 
 const apiBase = 'https://peekaplate-api-staging.vxkong.workers.dev';
 const actorId = '11111111-1111-4111-8111-111111111111';
@@ -11,7 +11,7 @@ const venue = {
 const signal = new AbortController().signal;
 const commandId = '33333333-3333-4333-8333-333333333333';
 
-describe('test restaurant creation', () => {
+describe('restaurant creation client', () => {
   const options = {
     apiBase,
     getAccessToken: async () => 'synthetic-token',
@@ -21,7 +21,7 @@ describe('test restaurant creation', () => {
   };
   it('sends only the stable command and trimmed name using authenticated transport', async () => {
     const send = vi.fn(async () => Response.json({ venue }));
-    expect(await createTestRestaurant({ ...options, fetch: send })).toEqual({
+    expect(await createRestaurant({ ...options, fetch: send })).toEqual({
       kind: 'created',
       venue,
     });
@@ -44,7 +44,7 @@ describe('test restaurant creation', () => {
   it('does not send after cancellation during token lookup or to an unsupported origin', async () => {
     const send = vi.fn();
     const controller = new AbortController();
-    await createTestRestaurant({
+    await createRestaurant({
       ...options,
       signal: controller.signal,
       getAccessToken: async () => {
@@ -54,7 +54,7 @@ describe('test restaurant creation', () => {
       fetch: send,
     });
     expect(
-      await createTestRestaurant({ ...options, apiBase: 'https://evil.test', fetch: send }),
+      await createRestaurant({ ...options, apiBase: 'https://evil.test', fetch: send }),
     ).toEqual({ kind: 'unavailable' });
     expect(send).not.toHaveBeenCalled();
   });
@@ -66,18 +66,18 @@ describe('test restaurant creation', () => {
     [503, 'unavailable'],
   ] as const)('preserves creation failure %s', async (status, kind) => {
     expect(
-      await createTestRestaurant({ ...options, fetch: async () => new Response('{}', { status }) }),
+      await createRestaurant({ ...options, fetch: async () => new Response('{}', { status }) }),
     ).toEqual({ kind });
   });
   it('rejects invented permissions and invalid input before sending', async () => {
     expect(
-      await createTestRestaurant({
+      await createRestaurant({
         ...options,
         fetch: async () => Response.json({ venue: { ...venue, permission: 'editor' } }),
       }),
     ).toEqual({ kind: 'invalid' });
     const send = vi.fn();
-    expect(await createTestRestaurant({ ...options, name: ' ', fetch: send })).toEqual({
+    expect(await createRestaurant({ ...options, name: ' ', fetch: send })).toEqual({
       kind: 'invalid',
     });
     expect(send).not.toHaveBeenCalled();
@@ -85,9 +85,10 @@ describe('test restaurant creation', () => {
 });
 
 describe('owner workspace client', () => {
-  it('only accepts the exact configured local/staging API origin', () => {
+  it('only accepts exact configured API origins', () => {
     expect(readWorkspaceApiBase(apiBase)).toBe(apiBase);
     expect(readWorkspaceApiBase('http://127.0.0.1:8787/')).toBe('http://127.0.0.1:8787');
+    expect(readWorkspaceApiBase('https://api.peekaplate.app')).toBe('https://api.peekaplate.app');
     for (const value of [
       undefined,
       `${apiBase}.evil.test`,

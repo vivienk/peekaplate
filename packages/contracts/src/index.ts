@@ -725,6 +725,10 @@ const dishCompared = observationBase.extend({
       message: 'Compared dishes must be different',
     }),
 });
+const dishPortionOpened = observationBase.extend({
+  type: z.literal('dish_portion_opened'),
+  payload: z.strictObject(dishReference),
+});
 const dishSaved = observationBase.extend({
   type: z.literal('dish_saved'),
   payload: z.strictObject({
@@ -756,6 +760,7 @@ export const ObservationV2Schema = z.discriminatedUnion('type', [
   dishActivityCheckpoint,
   dishDetailClosed,
   dishCompared,
+  dishPortionOpened,
   dishSaved,
   dishUnsaved,
   shortlistViewed,
@@ -768,6 +773,7 @@ export const ObservationTypeSchema = z.enum([
   'dish_detail_closed',
   'dish_activity_checkpoint',
   'dish_compared',
+  'dish_portion_opened',
   'dish_saved',
   'dish_unsaved',
   'shortlist_viewed',

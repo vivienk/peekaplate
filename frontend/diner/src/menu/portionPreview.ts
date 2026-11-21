@@ -7,7 +7,11 @@ import { approximatePortionLabel } from './portionSize';
 import type { CompleteDish } from './types';
 
 // Reuses the mounted detail screen: no separate page, duplicated dish data or global asset lookup.
-export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): () => void {
+export function bindPortionPreview(
+  container: HTMLElement,
+  dish: CompleteDish,
+  onPortionShown?: () => void,
+): () => void {
   const root = container.querySelector<HTMLElement>('.pp-detail');
   const open = container.querySelector<HTMLButtonElement>('.pp-detail__portion');
   const back = container.querySelector<HTMLButtonElement>('.pp-detail__back');
@@ -55,6 +59,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   const key = crypto.randomUUID();
   instructions.id = `portion-instructions-${key}`;
   let showOriginal = false;
+  let shown = false;
   let visual: 'cutout' | 'generated' =
     (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
     new URLSearchParams(location.search).get('demoVisual') === 'cutout'
@@ -163,7 +168,10 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   photoObserver.observe(stage, { childList: true });
   const show = async (retrying = false) => {
     if ((active && !retrying) || disposed) return;
-    if (!active) returnBackLabel = back.getAttribute('aria-label');
+    if (!active) {
+      returnBackLabel = back.getAttribute('aria-label');
+      shown = false;
+    }
     stop();
     active = true;
     closing = false;
@@ -253,6 +261,10 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       );
       stage.setAttribute('aria-describedby', instructions.id);
       setState('ready');
+      if (!shown && !sampleNotice && dish.portion) {
+        shown = true;
+        onPortionShown?.();
+      }
       status.textContent =
         sampleNotice ??
         `${sizeLabel()} ${reduced.matches ? 'Motion is reduced.' : 'Drag to tilt the plate.'}`;

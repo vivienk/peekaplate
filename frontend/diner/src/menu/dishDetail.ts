@@ -73,6 +73,7 @@ export function renderDishDetail(
   // Detail opened from a Compare result (DIN-02.4): Back returns to that result, and the Compare
   // button is hidden because the diner is already comparing.
   fromCompare = false,
+  onPortionShown?: () => void,
 ): () => void {
   const image = dish.images?.detail ?? dish.images?.card;
   const imageMarkup = image
@@ -188,5 +189,5 @@ export function renderDishDetail(
       handleFailure();
     }
   }
-  return bindPortionPreview(container, dish);
+  return bindPortionPreview(container, dish, onPortionShown);
 }

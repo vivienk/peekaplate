@@ -6,6 +6,7 @@ import {
   type ObservationReceipt,
   type ObservationReceiptBatch,
   ObservationReceiptBatchSchema,
+  ObservationTypeSchema,
   type ObservationV2,
   ObservationV2Schema,
   sha256,
@@ -13,17 +14,7 @@ import {
 import type { MenuAuthority } from './menu-token';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ALLOWED_TYPES = new Set([
-  'menu_viewed',
-  'dish_viewed',
-  'dish_detail_opened',
-  'dish_detail_closed',
-  'dish_activity_checkpoint',
-  'dish_compared',
-  'dish_saved',
-  'dish_unsaved',
-  'shortlist_viewed',
-]);
+const ALLOWED_TYPES = new Set<string>(ObservationTypeSchema.options);
 
 export type ObservationIngestServices = {
   enqueue(message: ObservationQueueEnvelope): Promise<void>;

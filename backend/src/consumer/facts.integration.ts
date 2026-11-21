@@ -105,7 +105,7 @@ afterAll(async () => {
   await admin.end();
 });
 
-it('persists all nine typed event families atomically and keeps test traffic out of owner views', async () => {
+it('persists all typed event families atomically and keeps test traffic out of owner views', async () => {
   const messages: unknown[] = [];
   await ingestObservations(
     events,
@@ -139,6 +139,7 @@ it('persists all nine typed event families atomically and keeps test traffic out
     'activity',
     'closing',
     'comparison',
+    'portion_opening',
     'save',
     'shortlist_view',
   ]) {
@@ -155,6 +156,32 @@ it('persists all nine typed event families atomically and keeps test traffic out
       ])
     ).rowCount,
   ).toBe(0);
+});
+
+it('projects live portion opens once, scoped to the authorized venue and publication', async () => {
+  const envelope = await message('dish_portion_opened', 'live');
+  expect((await consumer.processMessage(envelope)).status).toBe('acknowledged');
+  expect((await consumer.processMessage(envelope)).status).toBe('acknowledged');
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    const own = await client.query('SELECT * FROM app_private.owner_portion_opening_v1');
+    expect(own.rows).toEqual([
+      expect.objectContaining({
+        tenant_id: tenantId,
+        authorized_publication_id: publicationId,
+        event_id: envelope.eventId,
+        dish_id: envelope.payload.dish_id,
+        dish_revision_id: envelope.payload.dish_revision_id,
+      }),
+    ]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [crypto.randomUUID()]);
+    expect((await client.query('SELECT * FROM app_private.owner_portion_opening_v1')).rows).toEqual(
+      [],
+    );
+  } finally {
+    await client.query('ROLLBACK');
+  }
 });
 
 it('backfills old accepted rows idempotently from the original archive and keeps their test class', async () => {

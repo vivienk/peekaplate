@@ -79,6 +79,10 @@ export async function insertObservationFacts(client: Client, record: CanonicalOb
       table = 'comparison';
       fields = event.payload;
       break;
+    case 'dish_portion_opened':
+      table = 'portion_opening';
+      fields = event.payload;
+      break;
     case 'dish_saved': {
       const { save_surface, ...payload } = event.payload;
       table = 'save';

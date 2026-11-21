@@ -2,7 +2,9 @@ import {
   type CompareAction,
   type CompareSide,
   type Comparison,
-  dishComparedPayload,
+  comparisonDishes,
+  dishComparedPayloads,
+  MAX_COMPARE_CHOICES,
   replaceExclusions,
   replaceSide,
   startComparison,
@@ -623,7 +625,7 @@ export function mountMenuScreen(container: HTMLElement): void {
   ) => {
     if (!currentMenu || !saveState) return;
     const menu = currentMenu;
-    const dish = completeDishes(menu).find((dish) => dish.dishId === requestedDish.dishId);
+    const dish = completeDishById(menu, requestedDish.dishId);
     if (!dish) {
       if (compareBack) leaveCompare();
       else if (from === 'saved_screen') showSaved();
@@ -639,6 +641,14 @@ export function mountMenuScreen(container: HTMLElement): void {
       menu.notice,
       compareBack ? undefined : () => showPicker(dish, from),
       Boolean(compareBack),
+      () => {
+        if (!canTrackUi()) return;
+        track('dish_portion_opened', {
+          publication_revision_id: menu.publicationRevisionId,
+          dish_id: dish.dishId,
+          dish_revision_id: dish.dishRevisionId,
+        });
+      },
     );
     if (fromSaved && !compareBack) {
       container.querySelector('.pp-detail__back')?.setAttribute('aria-label', 'Back to Saved');
@@ -729,13 +739,14 @@ export function mountMenuScreen(container: HTMLElement): void {
     switchScreen('compare');
     renderComparePicker(container, {
       menu,
-      keptDish: dish,
+      keptDishes: [dish],
+      selectionLimit: MAX_COMPARE_CHOICES,
       onClose: () => {
         showDetail(dish, from, true);
         container.querySelector<HTMLElement>('.pp-detail__compare')?.focus();
       },
-      onConfirm: (pickedDishId) => {
-        const comparison = startComparison(menu, dish.dishId, pickedDishId, newComparisonId);
+      onConfirm: (pickedDishIds) => {
+        const comparison = startComparison(menu, dish.dishId, pickedDishIds, newComparisonId);
         if (comparison) showResult(comparison, 'start');
       },
     });
@@ -784,8 +795,14 @@ export function mountMenuScreen(container: HTMLElement): void {
     window.scrollTo(0, focus ? compareScroll : 0);
     if (!action || !canTrackUi()) return;
     try {
-      const payload = dishComparedPayload(menu, comparison, action, state.isSaveAvailable());
-      if (payload) track('dish_compared', payload);
+      for (const payload of dishComparedPayloads(
+        menu,
+        comparison,
+        action,
+        state.isSaveAvailable(),
+        focus?.side,
+      ))
+        track('dish_compared', payload);
     } catch {}
   };
 
@@ -793,9 +810,10 @@ export function mountMenuScreen(container: HTMLElement): void {
   const showReplacePicker = (comparison: Comparison, side: CompareSide) => {
     if (!currentMenu) return;
     const menu = currentMenu;
-    const keptId = side === 'first' ? comparison.otherDishId : comparison.firstDishId;
-    const keptDish = completeDishById(menu, keptId);
-    if (!keptDish) {
+    const keptDishes = comparisonDishes(menu, comparison)
+      .filter((entry) => entry.side !== side)
+      .map((entry) => entry.dish);
+    if (!keptDishes.length) {
       leaveCompare();
       return;
     }
@@ -803,12 +821,14 @@ export function mountMenuScreen(container: HTMLElement): void {
     switchScreen('compare');
     renderComparePicker(container, {
       menu,
-      keptDish,
+      keptDishes,
+      selectionLimit: 1,
       exclude: replaceExclusions(comparison),
       confirmLabel: 'Replace Dish',
       title: 'Replace Dish',
       onClose: () => showResult(comparison, undefined, back),
-      onConfirm: (pickedDishId) => {
+      onConfirm: ([pickedDishId]) => {
+        if (!pickedDishId) return;
         const next = replaceSide(menu, comparison, side, pickedDishId);
         if (next !== comparison) showResult(next, 'replace', back);
       },
@@ -1011,6 +1031,13 @@ export function mountMenuScreen(container: HTMLElement): void {
                     token: () => menuToken,
                     canSend: () => !controller.signal.aborted && tracking.isLiveTracking(),
                   }),
+                  () =>
+                    menuToken && !controller.signal.aborted
+                      ? {
+                          venueId: route.venueId,
+                          publicationRevisionId: menuToken.publicationRevisionId,
+                        }
+                      : undefined,
                 );
               },
             });

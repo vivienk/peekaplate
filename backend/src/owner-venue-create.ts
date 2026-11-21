@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AuthUnavailableError } from './auth';
 import { CommandError } from './command-error';
 import type { Bindings } from './index';
+import { ownerWorkflowAvailable } from './owner-workflow-environment';
 
 const inputSchema = z.strictObject({
   commandId: z.uuid(),
@@ -26,6 +27,7 @@ export async function createOwnerVenue(
   client: Client,
   actor: string,
   input: Creation,
+  firstOnly = false,
 ): Promise<OwnerVenue> {
   await client.query('BEGIN');
   try {
@@ -34,7 +36,9 @@ export async function createOwnerVenue(
     await client.query("SELECT set_config('app.actor_id', $1, true)", [actor]);
     await client.query("SELECT set_config('app.tenant_id', '', true)");
     const result = await client.query<{ venue: unknown }>(
-      'SELECT app_private.create_owner_venue($1::uuid,$2::text) AS venue',
+      firstOnly
+        ? 'SELECT app_private.create_first_owner_venue($1::uuid,$2::text) AS venue'
+        : 'SELECT app_private.create_owner_venue($1::uuid,$2::text) AS venue',
       [input.commandId, input.name],
     );
     const venue = OwnerVenueSchema.parse(result.rows[0]?.venue);
@@ -44,7 +48,7 @@ export async function createOwnerVenue(
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     const code = (error as { code?: unknown } | null)?.code;
-    if (code === 'P0003') throw new CommandError('command_conflict', 409);
+    if (code === 'P0003' || code === 'P0004') throw new CommandError('command_conflict', 409);
     if (code === '42501') throw new CommandError('forbidden', 403);
     if (code === 'P0001') throw new RestaurantLimitError('restaurant_limit_reached');
     throw error;
@@ -57,6 +61,7 @@ export function registerOwnerVenueCreation(
     verify(authorization: string, env: Bindings): Promise<string>;
     database<T>(env: Bindings, work: (client: Client) => Promise<T>): Promise<T>;
     allowedOrigins: readonly string[];
+    productionOrigin?: string;
   },
 ) {
   const limit = bodyLimit({
@@ -65,7 +70,8 @@ export function registerOwnerVenueCreation(
   });
   app.use('/staff/venues', async (c, next) => {
     if (c.req.method !== 'POST') return next();
-    if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
+    const stage = c.env?.APP_ENV ?? '';
+    if (!ownerWorkflowAvailable(c.env) || (stage === 'production' && !services.productionOrigin))
       return c.json({ error: 'not_found' }, 404);
     return limit(c, next);
   });
@@ -75,7 +81,12 @@ export function registerOwnerVenueCreation(
       return c.json({ error: 'unauthorized' }, 401);
     const actor = await services.verify(authorization, c.env);
     const origin = c.req.header('Origin');
-    if (origin && !services.allowedOrigins.includes(origin))
+    const production = c.env.APP_ENV === 'production';
+    if (
+      production
+        ? origin !== services.productionOrigin
+        : origin && !services.allowedOrigins.includes(origin)
+    )
       return c.json({ error: 'forbidden' }, 403);
     if (
       new URL(c.req.url).search ||
@@ -87,7 +98,7 @@ export function registerOwnerVenueCreation(
     try {
       return c.json({
         venue: await services.database(c.env, (client) =>
-          createOwnerVenue(client, actor, input.data),
+          createOwnerVenue(client, actor, input.data, production),
         ),
       });
     } catch (error) {

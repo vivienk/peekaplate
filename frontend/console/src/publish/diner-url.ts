@@ -2,6 +2,9 @@
 // shows the same PR's diner preview, staging shows the staging diner and a local console shows the
 // local diner dev server. Anything else shows no diner rather than guessing an address.
 export function dinerPreviewUrl(location: { protocol: string; hostname: string }): string | null {
+  if (location.protocol === 'https:' && location.hostname === 'peekaplate.app') {
+    return 'https://diner.peekaplate.app/diner/';
+  }
   const pr = /^pr-(\d+)\.peekaplate-console-preview\.pages\.dev$/.exec(location.hostname);
   if (location.protocol === 'https:' && pr) {
     return `https://pr-${pr[1]}.peekaplate-diner-preview.pages.dev/`;

@@ -4,8 +4,8 @@
 // - Explicit events only: autocapture, pageviews, replay, surveys, flags, heatmaps, web vitals,
 //   exceptions and external script loading are all off.
 // - Approved properties only: POSTHOG_PROPERTIES below, after the payload passes the shared
-//   observation.v2 payload schema. Never the canonical envelope (session_id, producer_id,
-//   local_sequence), the menu token, URLs or referrers.
+//   observation.v2 payload schema. Production may add public venue and publication IDs.
+//   Never send session_id, producer_id, local_sequence, menu tokens, URLs or referrers.
 // - Identity: a separate random visit ID held in memory, never the canonical session_id. event_id
 //   is the only reconciliation key; it becomes the PostHog event uuid.
 // - Same gate as canonical: consent first, browser privacy signals respected, nothing in fixture
@@ -55,6 +55,7 @@ export const POSTHOG_PROPERTIES: Readonly<Record<P0EventName, readonly string[]>
     'compare_action',
     'save_available',
   ],
+  dish_portion_opened: dish,
   dish_saved: [...dish, 'save_origin', 'save_surface', 'shortlist_size'],
   dish_unsaved: [...dish, 'unsave_surface', 'shortlist_size'],
   shortlist_viewed: ['shortlist_size'],
@@ -64,6 +65,12 @@ const payloadSchemas = new Map(
   ObservationV2Schema.options.map((option) => [option.shape.type.value, option.shape.payload]),
 );
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PRODUCTION_DINER_ORIGIN = 'https://diner.peekaplate.app';
+
+export type PostHogScope = {
+  venueId: string;
+  publicationRevisionId: string;
+};
 
 // __loaded is the SDK's own send gate: every request path (capture, batch queue, retry queue and
 // unload beacons) is dropped while it is false. Checked against the pinned 1.444.4 SDK in
@@ -253,12 +260,25 @@ export function createPostHogAdapter(env: AnalyticsEnvironment, runtime: Runtime
   function capturePostHog(
     type: P0EventName,
     payload: Readonly<Record<string, unknown>>,
-    ids: { eventId: string },
+    ids: { eventId: string; scope?: PostHogScope },
   ): void {
     try {
       if (!allowed()) return;
       const properties = toPostHogProperties(type, payload, ids.eventId);
       if (!properties) return;
+      const scope = ids.scope;
+      if (
+        environment === 'production' &&
+        runtime.origin === PRODUCTION_DINER_ORIGIN &&
+        scope &&
+        typeof scope.venueId === 'string' &&
+        typeof scope.publicationRevisionId === 'string' &&
+        UUID.test(scope.venueId) &&
+        UUID.test(scope.publicationRevisionId)
+      ) {
+        properties.venue_id = scope.venueId.toLowerCase();
+        properties.publication_revision_id = scope.publicationRevisionId.toLowerCase();
+      }
       const eventId = properties.event_id as string;
       if (seen.has(eventId)) return;
       if (seen.size >= MAX_SEEN) seen.clear();

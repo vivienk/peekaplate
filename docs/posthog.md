@@ -142,3 +142,9 @@ References: [PostHog capture API](https://posthog.com/docs/api/capture), [anonym
 ## Consent-listener ordering
 
 The shared dispatch synchronizes the adapter from the current consent gate immediately before capture. A screen may emit its initial menu view from an earlier-registered consent listener; that event must reach both destinations. The real-adapter unit regression checks initial consent and re-consent with matching event IDs, and the SDK browser test uses the same screen-before-adapter order. Privacy signals, fixture mode and publication suspension keep their existing gates. Hosted destination persistence remains a separate acceptance check.
+
+## Published diner actions
+
+- `dish_portion_opened` fires once each time a published 2.5D preview successfully renders. Loading, a photo fallback, switching preview controls and opening the camera portal generate no additional portion open. The existing `dish_activity_checkpoint` still measures cumulative active time.
+- `dish_compared` fires after Compare displays the result. A diner can compare the starting dish with up to two choices. Each newly displayed anchor/choice pair gets one row in both destinations under the same `comparison_id`. Count distinct `comparison_id` values filtered to `compare_action = 'start'` for total completed comparisons. Raw event counts measure displayed pairs. Replacing records only affected pairs. Returning from details or cancelling Replace creates no new pair.
+- These actions follow the existing optional diner consent gate. PostHog receives the allowlisted properties and event ID. On the production diner origin it can receive the public venue and publication UUIDs for a matching verified delivery. These client dimensions support internal filtering. The canonical path derives venue and publication authority from the verified menu token and persists a separately typed portion-opening observation.

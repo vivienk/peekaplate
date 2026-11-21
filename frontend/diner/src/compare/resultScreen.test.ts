@@ -24,7 +24,7 @@ describe('compareView', () => {
       ['first', 'Avocado Toast'],
       ['other', 'Harvest Power Bowl'],
     ]);
-    expect(view?.[1].ingredientNames).toEqual([
+    expect(view?.[1]?.ingredientNames).toEqual([
       'Quinoa',
       'Grilled chicken',
       'Sweet potato',

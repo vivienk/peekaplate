@@ -61,14 +61,19 @@ function fakeSdk() {
 }
 
 function setup(
-  overrides: { privacy?: boolean; live?: boolean; env?: Record<string, unknown> } = {},
+  overrides: {
+    privacy?: boolean;
+    live?: boolean;
+    env?: Record<string, unknown>;
+    origin?: string;
+  } = {},
 ) {
   const fake = fakeSdk();
   const loadSdk = vi.fn(async () => fake.sdk);
   const adapter = createPostHogAdapter(
     { ...env, ...overrides.env },
     {
-      origin,
+      origin: overrides.origin ?? origin,
       privacySignal: () => overrides.privacy ?? false,
       isLive: () => overrides.live ?? true,
       loadSdk,
@@ -82,6 +87,23 @@ const sdkEvent = (properties: Record<string, unknown>) =>
   ({ uuid: uuid(1), event: 'menu_viewed', properties }) as PostHogEvent;
 
 describe('PostHog SDK adapter', () => {
+  it('maps a successful portion open separately, with only approved dish identifiers', () => {
+    const portion = { dish_id: uuid(400), dish_revision_id: uuid(401) };
+    expect(toPostHogProperties('dish_portion_opened', portion, uuid(1))).toEqual({
+      event_id: uuid(1),
+      ...portion,
+    });
+    expect(
+      toPostHogProperties('dish_portion_opened', { ...portion, active_ms: 1000 }, uuid(1)),
+    ).toBeNull();
+    expect(
+      toPostHogProperties(
+        'dish_portion_opened',
+        { ...portion, url: 'https://example.test/?private' },
+        uuid(1),
+      ),
+    ).toBeNull();
+  });
   it('does nothing, and never downloads the SDK, before consent', async () => {
     const { adapter, loadSdk, flush } = setup();
     adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
@@ -123,6 +145,50 @@ describe('PostHog SDK adapter', () => {
     expect(sent?.name).toBe('menu_viewed');
     expect(sent?.props).toEqual({ event_id: uuid(1), entry_source: 'direct_link' });
     expect(sent?.options).toEqual({ uuid: uuid(1), send_instantly: true });
+  });
+
+  it('adds only valid public scope on the configured production diner origin', async () => {
+    const productionOrigin = 'https://diner.peekaplate.app';
+    const production = {
+      MODE: 'production',
+      VITE_POSTHOG_ENVIRONMENT: 'production',
+      VITE_POSTHOG_ALLOWED_ORIGIN: productionOrigin,
+    };
+    const scope = {
+      venueId: uuid(10),
+      publicationRevisionId: uuid(20),
+      fullUrl: 'https://diner.peekaplate.app/diner/private-slug?token=secret',
+    };
+    const ids = { eventId: uuid(1), scope };
+    const live = setup({ origin: productionOrigin, env: production });
+    live.adapter.setConsent(true);
+    live.adapter.capturePostHog('menu_viewed', menuViewed, ids);
+    live.adapter.capturePostHog('menu_viewed', menuViewed, {
+      eventId: uuid(2),
+      scope: { ...scope, publicationRevisionId: scope.fullUrl },
+    });
+    await live.flush();
+    expect(live.fake.captured.map(({ props }) => props)).toEqual([
+      {
+        ...menuViewed,
+        event_id: uuid(1),
+        venue_id: uuid(10),
+        publication_revision_id: uuid(20),
+      },
+      { ...menuViewed, event_id: uuid(2) },
+    ]);
+
+    for (const configured of [
+      setup(),
+      setup({ env: { ...production, VITE_POSTHOG_ALLOWED_ORIGIN: origin } }),
+    ]) {
+      configured.adapter.setConsent(true);
+      configured.adapter.capturePostHog('menu_viewed', menuViewed, ids);
+      await configured.flush();
+      expect(configured.fake.captured.map(({ props }) => props)).toEqual([
+        { ...menuViewed, event_id: uuid(1) },
+      ]);
+    }
   });
 
   it('rejects payloads outside the shared contract, including envelope fields and the menu token', async () => {
