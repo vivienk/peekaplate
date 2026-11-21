@@ -16,6 +16,7 @@ const isConfirmation = isAuthCallbackPath(window.location.pathname, 'confirmatio
 const isRecovery = isAuthCallbackPath(window.location.pathname, 'recovery');
 const isCallback = isConfirmation || isRecovery;
 const production = window.location.origin === 'https://peekaplate.app';
+const automaticConfirmation = production && isConfirmation;
 let confirmationCode = isCallback
   ? readConfirmationCode(window.location.href, isRecovery ? 'recovery' : 'confirmation')
   : null;
@@ -35,7 +36,13 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   const [owner, setOwner] = useState<SignedInOwner | null>(null);
   const [message, setMessage] = useState('');
   const [callbackState, setCallbackState] = useState(
-    isCallback ? (confirmationCode ? 'ready' : 'invalid') : 'none',
+    isCallback
+      ? confirmationCode
+        ? automaticConfirmation
+          ? 'confirming'
+          : 'ready'
+        : 'invalid'
+      : 'none',
   );
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -93,6 +100,31 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   }, []);
 
   useEffect(() => {
+    const code = confirmationCode;
+    if (!automaticConfirmation || !code) return;
+    const controller = new AbortController();
+    confirmationPending.current = controller;
+    // Let effect cleanup cancel a discarded mount before the one-use code is exchanged.
+    queueMicrotask(async () => {
+      if (controller.signal.aborted) return;
+      confirmationCode = null;
+      const result = await auth.confirmEmail(code, controller.signal);
+      if (controller.signal.aborted) return;
+      if (result.kind === 'confirmed') window.location.replace('/owner-auth');
+      else setCallbackState('invalid');
+    });
+    window.addEventListener(
+      'pagehide',
+      () => {
+        controller.abort();
+        setCallbackState('invalid');
+      },
+      { signal: controller.signal },
+    );
+    return () => controller.abort();
+  }, [auth]);
+
+  useEffect(() => {
     const restore = !isCallback || callbackState === 'none';
     const unsubscribe = auth.onSessionChange(() => {
       identityGeneration.current++;
@@ -110,6 +142,13 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
     await refreshOwner();
     setCallbackState('none');
   }
+
+  if (callbackState === 'confirming')
+    return (
+      <main>
+        <p role="status">Confirming your email…</p>
+      </main>
+    );
 
   if (isRecovery && (callbackState === 'recovery' || callbackState === 'invalid'))
     return (
@@ -160,17 +199,7 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
                   setCallbackState('recovery');
                 } else setCallbackState('invalid');
               } else {
-                const controller = new AbortController();
-                confirmationPending.current = controller;
-                const result = await auth.confirmEmail(
-                  code ?? '',
-                  production ? controller.signal : undefined,
-                );
-                confirmationPending.current = null;
-                if (production && !controller.signal.aborted && result.kind === 'confirmed') {
-                  window.location.replace('/owner-auth.html');
-                  return;
-                }
+                const result = await auth.confirmEmail(code ?? '');
                 setCallbackState(result.kind === 'confirmed' ? 'confirmed' : 'invalid');
               }
               setBusy(false);

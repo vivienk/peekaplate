@@ -5399,3 +5399,22 @@ the shared analytics pipeline only in a top-level production window. Desktop
 and mobile verify that the frame can render dishes and portions with zero
 requests to either destination. The same URL in a standalone tab sends the
 menu-view and portion event IDs to both intercepted destinations.
+
+### ERR-20261121-AUTH-001 | Production signup confirmation required a second click
+
+Opening the signup email landed on a callback with a Continue button before
+the owner could sign in. The existing browser case required that extra click.
+Production now exchanges the code automatically and returns to the owner
+sign-in entry after verification. The browser regression checks an invalid
+link followed by a valid one, exactly one successful exchange, URL scrubbing
+and interruption during verification. It uses the Supabase SDK with fixture
+HTTP responses.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-21T21:16:32.061Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test","timestamp":"2026-11-21T21:16:32.061Z","exitCode":1},"status":"resolved","cause":"The local Workerd SQLite fixture reported SQLITE_IOERR_TRUNCATE and timed out during the full run.","fix":"Reran the affected suite in isolation and repeated the complete check without changing the fixture.","regression":"The eight isolated cases and the subsequent pnpm check passed."}
+```

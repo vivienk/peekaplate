@@ -89,9 +89,10 @@ PR preview builds force the connection off even if ambient config is present.
   that requested them. Use the newest link if several requests were made. A new
   device, blocked storage, expired/reused code or wrong flow must fail safely.
 - Callback pages remove query/fragment credentials from the address bar before
-  starting provider requests, use `no-referrer`, and contain no analytics. A user
-  selects Continue before exchanging a confirmation code. Arbitrary `next` URLs,
-  duplicate codes and implicit token fragments are rejected.
+  starting provider requests, use `no-referrer`, and contain no analytics.
+  Production signup confirmation automatically exchanges the email code in the
+  browser that started signup. Staging and local callbacks still use Continue.
+  Arbitrary `next` URLs, duplicate codes and implicit token fragments are rejected.
 - Confirmation verifies the user with Supabase, ends its callback session and
   returns to sign-in. It never accepts a pre-existing session as confirmation.
 - Sign-out ends this device's refresh session. Already-issued access JWTs can

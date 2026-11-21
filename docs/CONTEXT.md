@@ -286,7 +286,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. No replacement charts, fabricated orders or automatic publication. S09 has one Serving size (people) count field and separate optional Plate size (cm). Canonical counts, including null, take precedence over legacy text. Confirmed boundaries bind to the authenticated saved photo, survive manual/extracted review, and clear on count, measurement or photo edits. The isolated production entry uses the authored Screen 5 for first-restaurant creation and sends successful email verification directly to sign-in. Staging and local retain their test-restaurant entry.",
+      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Test-restaurant creation is staging-only. No replacement charts, fabricated orders or automatic publication. S09 has one Serving size (people) count field and separate optional Plate size (cm). Canonical counts, including null, take precedence over legacy text. Confirmed boundaries bind to the authenticated saved photo, survive manual/extracted review, and clear on count, measurement or photo edits. Production confirms valid signup links automatically in the signup browser and returns to sign-in. The authenticated production entry uses the authored Screen 5 for first-restaurant creation. Staging and local retain their test-restaurant entry and explicit confirmation step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -469,7 +469,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "177236d125dcb5e2a2c5311581953085d1f22898ed71009097c3446f80afcff9"
+      "sourceFingerprint": "1dfa5aafa8bea604bd2cbab20be0c6fc6392668b8dc12b21d37ba5132adbc86b"
     },
     {
       "id": "backend",
