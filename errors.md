@@ -5452,3 +5452,14 @@ non-success statuses without forwarding the private key.
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-21T22:20:19.851Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-21T22:31:50.163Z","exitCode":1}
+```
+
+The first local database check overlapped an owner browser suite on port 5174.
+The second overlapped the unit suite and hit the 15-second owner summary fixture
+deadline. The following database-only `pnpm verify test:db` passed all 199
+integration tests and the local Worker demo. Run these suites separately on this
+workstation. No test deadline or database behavior was changed.

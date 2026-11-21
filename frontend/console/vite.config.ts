@@ -2,7 +2,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
-import { PRODUCTION_OWNER_API_ORIGIN } from './src/owner/api-origin.ts';
+import { PRODUCTION_OWNER_API_ORIGIN, readWorkspaceApiBase } from './src/owner/api-origin.ts';
 import { OWNER_AUTH_PATH, OWNER_PAGE_PATHS, ownerPageForPath } from './src/owner/routes.ts';
 
 // The synthetic demos (foundations, owner sign-in and the owner dashboard) are built only for PR
@@ -59,7 +59,10 @@ export default defineConfig(({ command, mode }) => ({
   plugins: [
     react(),
     !includeDemos &&
-      ownerRoutes(loadEnv(mode, page('.')).VITE_PUBLIC_API_URL === PRODUCTION_OWNER_API_ORIGIN),
+      ownerRoutes(
+        readWorkspaceApiBase(loadEnv(mode, page('.')).VITE_PUBLIC_API_URL) ===
+          PRODUCTION_OWNER_API_ORIGIN,
+      ),
   ],
   build: {
     rollupOptions: {

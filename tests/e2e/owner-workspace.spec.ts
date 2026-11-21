@@ -2353,10 +2353,16 @@ test('the typed AI question displays its matching focus and rejects a different 
   await panel.getByRole('button', { name: 'Review report' }).click();
   await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
   expect(state.analyses[0]?.body).toMatchObject({ goal: 'engagement' });
-  await question.fill('How was engagement yesterday?');
-  await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(panel.getByRole('alert')).toContainText('Date-specific questions are unavailable');
-  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toHaveCount(0);
+  for (const unsupported of [
+    'How was engagement yesterday?',
+    'Show engagement on Monday',
+    'Show menu engagement on November 18',
+  ]) {
+    await question.fill(unsupported);
+    await panel.getByRole('button', { name: 'Review report' }).click();
+    await expect(panel.getByRole('alert')).toContainText('The review uses the displayed dish');
+    await expect(panel.getByRole('heading', { name: 'Suggested review' })).toHaveCount(0);
+  }
   expect(state.analyses).toHaveLength(1);
 });
 

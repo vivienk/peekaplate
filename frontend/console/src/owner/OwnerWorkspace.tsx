@@ -804,8 +804,7 @@ function LiveActions({
 // header with restaurant and report-period chips, intro text, messages, composer. Identity and
 // restaurant come only from the signed-in workspace: the token getter is bound to this owner and the
 // venue is the authorised selection. The analysis API (#164) takes a dish and a review focus rather
-// than free text, so the composer offers those two pickers in place of Figma's text box (design gap
-// flagged for Rania). Only `{ dishId, goal }` is sent; nothing is published or changed.
+// than free text, so typed questions can only select a focus for the displayed report.
 const FOCUS_OPTIONS: { value: OwnerAnalysisRequest['goal']; label: string }[] = [
   { value: 'menu', label: 'Menu presentation' },
   { value: 'engagement', label: 'Dish engagement' },
@@ -813,11 +812,24 @@ const FOCUS_OPTIONS: { value: OwnerAnalysisRequest['goal']; label: string }[] = 
 ];
 
 export function matchReportQuestion(question: string): OwnerAnalysisRequest['goal'] | null {
-  const words = question.toLowerCase();
-  if (/\b(open|engagement|attention|interaction|view)\b/.test(words)) return 'engagement';
-  if (/\b(save|bookmark|menu|presentation|describe|description)\b/.test(words)) return 'menu';
-  if (/\b(customer|retention|crm)\b/.test(words)) return 'crm';
-  return null;
+  const text = question
+    .trim()
+    .toLowerCase()
+    .replace(/[?.!]$/, '')
+    .trim();
+  switch (text) {
+    case 'dish engagement':
+    case 'how is engagement for this dish':
+      return 'engagement';
+    case 'menu presentation':
+    case 'dish saves':
+      return 'menu';
+    case 'customer retention':
+    case 'how can i improve customer retention':
+      return 'crm';
+    default:
+      return null;
+  }
 }
 const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -925,18 +937,10 @@ function LiveAiPanel({
   async function ask(event: FormEvent) {
     event.preventDefault();
     if (!dishId || !reportReference || pending.current) return;
-    if (
-      /\b(today|yesterday|tomorrow|last (week|month|\d+ days?)|previous (day|week|month))\b/i.test(
-        question,
-      )
-    ) {
-      setQuestionError(
-        'Ask about the displayed report period. Date-specific questions are unavailable.',
-      );
-      return;
-    }
     if (!requestGoal) {
-      setQuestionError('Ask about menu presentation, engagement, saves, or customer retention.');
+      setQuestionError(
+        'Use the focus menu or type “Dish engagement”, “Menu presentation”, “Dish saves”, or “Customer retention”. The review uses the displayed dish and report period.',
+      );
       return;
     }
     setQuestionError(null);
@@ -1105,7 +1109,7 @@ function LiveAiPanel({
             pending.current = null;
             setReply(null);
           }}
-          placeholder="Ask about engagement, saves, or menu presentation"
+          placeholder="Type a review focus, e.g. Dish engagement"
           disabled={dishes.length === 0}
         />
         {questionError && (

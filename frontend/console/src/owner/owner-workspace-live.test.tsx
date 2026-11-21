@@ -28,9 +28,11 @@ describe('live workspace dashboard admission', () => {
 
 describe('typed report questions', () => {
   it('maps only supported report intents before a request is made', () => {
-    expect(matchReportQuestion('Which dish gets the most attention?')).toBe('engagement');
-    expect(matchReportQuestion('Why do diners save this dish?')).toBe('menu');
-    expect(matchReportQuestion('What is customer retention?')).toBe('crm');
+    expect(matchReportQuestion('How is engagement for this dish?')).toBe('engagement');
+    expect(matchReportQuestion('Dish saves')).toBe('menu');
+    expect(matchReportQuestion('Customer retention')).toBe('crm');
+    expect(matchReportQuestion('Which dish gets the most attention?')).toBeNull();
+    expect(matchReportQuestion('Show engagement on Monday')).toBeNull();
     expect(matchReportQuestion('Tell me a joke')).toBeNull();
   });
 });
