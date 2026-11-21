@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c22710350fc06ee49c8d978ada71df54421d2ab77a76bd46585c9c2322229f36"
+      "sourceFingerprint": "1a1d9cda9499ce63b51c70f8d496937c20788f269407a79e3d82e828bdb8bdd5"
     },
     {
       "id": "tokens",
@@ -123,7 +123,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Existing published-menu entry, hash/identity checks, generated restaurant URL, menu/detail/Save/Compare and portion/camera screens. Verified portion blobs retain supported image MIME for opaque published SVG URLs; exact byte/hash and dimension checks remain. Portion and camera views label Serves N people separately from Plate size in cm. Tracked table AR uses the measured footprint with matching optional counts; 2.5D and ordinary camera scale remain approximate. Consent-gated PostHog/canonical tracking remains the existing implementation; withdrawn publication denies new prepared-content reads. Consent hides only during portion preview/camera state and returns on exit without resetting the choice.",
+      "summary": "Published menu entry verifies bundle integrity and scope. Verified portion blobs retain supported MIME and enforce byte, hash and dimension checks. Portion and camera views label serving count separately from plate size. Tracked table AR uses the measured footprint with matching optional counts; 2.5D and ordinary camera scale remain approximate. Standalone verified menus on the exact production diner origin start PostHog and canonical tracking automatically when browser privacy signals allow it. The Screen 13 phone iframe sends neither. Staging retains opt-in, which hides during portion preview/camera and returns on exit. A withdrawn publication denies new prepared-content reads. The comparison picker supports the anchor and two other dishes. Each rendered pair preserves the same comparison ID; a ready portion viewer records its own opening separately from timed detail activity.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -281,12 +281,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "0a7354862f2f4e3915272b4fc3ae094e255f4447b92a43cecf03f4f0ca0ba590"
+      "sourceFingerprint": "8f62524d2f037e2676a4baf7dc4a4c8e373ae9df871dd63093f260b05af7451d"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. No replacement charts, fabricated orders or automatic publication. S09 has one Serving size (people) count field and separate optional Plate size (cm). Canonical counts, including null, take precedence over legacy text. Confirmed boundaries bind to the authenticated saved photo, survive manual/extracted review, and clear on count, measurement or photo edits.",
+      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Restaurant creation is staging-only. No replacement charts, fabricated orders or automatic publication. S09 has one Serving size (people) count field and separate optional Plate size (cm). Canonical counts, including null, take precedence over legacy text. Confirmed boundaries bind to the authenticated saved photo, survive manual/extracted review, and clear on count, measurement or photo edits. The isolated production entry uses the authored Screen 5 for first-restaurant creation and sends successful email verification directly to sign-in. Staging and local retain their test-restaurant entry.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -469,12 +469,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c514d625b99ea8fb5e92706e5d5167f7019c36a0a357b9f1d12eff29c0a2fa13"
+      "sourceFingerprint": "177236d125dcb5e2a2c5311581953085d1f22898ed71009097c3446f80afcff9"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker preserves staff/JWKS, tenant authority, expected versions and transactional replay/outbox. Owner extraction, verification, preparation and publication reuse approved photo/portion identities and bounded CPU cutouts. Review and approval share strict legacy counts; clearing old calibration preserves unknown counts. Serving counts remain independent of plate dimensions; count/photo changes invalidate omitted calibration. S13 binds approved calibration to exact photo bytes, EXIF-oriented dimensions and foreground hash; asset reads retain immutable snapshot calibration. Reports share actor/venue/window/digest-bound references; protected seals cover reconciled synthetic scenarios, while live freshness remains unknown. Responses selects description spans; ingredients reuse saved evidence. Staging restaurant creation is actor-owned. Develop retains order/comparison APIs. AI diagnostics expose only safe classifications, HTTP status and allowlisted codes.",
+      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Owner AI uses checked report references and currently gates to approved synthetic reports; its diagnostic path and private portion processing remain separate. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. Hosted production binding and provider compatibility still require verification.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -719,7 +719,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/photo-dimensions.test.ts",
         "backend/src/owner-menu-calibration.test.ts",
         "backend/src/owner-prepare-calibration.test.ts",
-        "backend/src/owner-approval-serving.test.ts"
+        "backend/src/owner-approval-serving.test.ts",
+        "backend/src/extraction-capability.test.ts",
+        "backend/src/owner-workflow-environment.ts",
+        "backend/wrangler.production.jsonc",
+        "backend/wrangler.extraction.production.jsonc"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -732,12 +736,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "2a4fd1d82b983ee7a7fac536dba3a5a4a39c8e7b0a3272e251b80d3d50b7a95e"
+      "sourceFingerprint": "adf8e58549c0b49c2a0fc76e826c2a9bf674a8f8fbdf2bd6150e82180f6a1753"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private commands/events/outbox, memberships and projections retain tenant RLS and restricted runtime grants. Canonical observations preserve replay/conflict/backfill safeguards and separate live/test invoker views; PostHog stays isolated. Publication bundles use immutable identities and exact approved portion references. Owner actions retain revision authority; order imports keep reviewed mappings and operator checks. Profile/private-photo/removal, artwork/OCR and unique-slug migrations remain immutable. The forward owner-venue-creation function provides restricted actor-bound idempotent creation and quotas. Real PostgreSQL tests cover summary windows, privacy, weighted timing, class isolation, owner actions, preparation and existing published assets. Hosted execution and synthetic completeness evidence remain separate.",
+      "summary": "Private commands/events/outbox, memberships and projections retain tenant RLS and restricted runtime grants. Canonical observations preserve replay/conflict/backfill safeguards and separate live/test invoker views; PostHog stays isolated. Publication bundles use immutable identities and exact approved portion references. Owner actions retain revision authority; order imports keep reviewed mappings and operator checks. Profile/private-photo/removal, artwork/OCR and unique-slug migrations remain immutable. The forward owner-venue-creation function provides restricted actor-bound idempotent creation and quotas. Real PostgreSQL tests cover summary windows, privacy, weighted timing, class isolation, owner actions, preparation and existing published assets. Hosted execution and synthetic completeness evidence remain separate. Forward migrations add one first-owner restaurant allocation under the verified actor and an independent tenant-scoped portion opening fact.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -782,7 +786,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner-test-observations.sql",
         "migrations/20261117170000_owner_venue_creation.sql",
         "tests/db/owner-venue-creation.sql",
-        "backend/src/owner-report-summary.integration.ts"
+        "backend/src/owner-report-summary.integration.ts",
+        "migrations/20261121100000_first_owner_venue.sql",
+        "migrations/20261121110000_observation_portion_opening.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -793,7 +799,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "89126fabffbaae9e191224be731be8f78cd5b1cdbbafbf932ed390b45a8663e2"
+      "sourceFingerprint": "ace8065acd82be3d69181f2686e61c29f379984047a712caffe6ed37196201e8"
     },
     {
       "id": "measurement",
@@ -822,7 +828,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending.",
+      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending. The production preparation uses separate Pages, Queues and R2 configuration during the Meta freeze. Production database provisioning, domain cutover and hosted acceptance remain pending.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -880,7 +886,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/screen-preservation-audit.md",
         "playwright.portion-published.config.ts",
         "scripts/staging-secrets.mjs",
-        "scripts/staging-secrets.test.mjs"
+        "scripts/staging-secrets.test.mjs",
+        "docs/production-release.md"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -891,7 +898,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "20daa305156bfd8125c9aff3856bdea15ad940f40d10546378191929c9373180"
+      "sourceFingerprint": "af7c6fa089bc147be369f9d2c8c2f4406d25cde1ab2a89400da6ba3d151f32d0"
     },
     {
       "id": "agents",
@@ -924,7 +931,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Diner uses TRK-01's gate. Canonical owner facts and reporting remain planned.",
+      "summary": "Staging uses opt-in for PostHog and canonical capture. Its restricted hourly export verified eight raw copies and four deduplicated events. The collaborator inspection API returns redacted diagnostics with outsider denial verified; operations.md records the checks. The shared PostHog adapter uses an allowlist, a separate random visit ID, and the event ID as SDK uuid. Production verified menus on the exact diner origin start capture without a prompt. The shared gate respects browser privacy signals and suspends capture when the publication is withdrawn. Desktop and mobile browser tests intercept both destinations, match the first menu view by event ID and exercise Global Privacy Control. Hosted production ingestion and the live reporting source remain unverified.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",
@@ -953,7 +960,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "fee510a7106ac1855a2bc75303f52932fefb97a7004e7c23e0239408a7677c39"
+      "sourceFingerprint": "df8e4acf413c886612ec8d92f88101fe9d59bb0d0ec2c69dd611f543a35cc8a4"
     },
     {
       "id": "processing",
@@ -1127,21 +1134,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-17",
       "modules": [
-        "backend",
-        "console"
-      ],
-      "summary": "PR219 incorporates PR221 canonical approved-photo export and artifact lifecycle fixes, then reconciles current develop Part A without changing either authority boundary. Private owner preview approval remains separate from operator bundle hosting/admission and publication. Focused portion/retention/editor and processor service tests passed before reconciliation; current-head CI remains required.",
-      "files": [
-        "backend/src/owner-portion-preview.ts",
-        "backend/src/owner-menu-routes.ts",
-        "backend/src/owner-menu-retention.ts",
-        "docs/screen9-portion-publish.md"
-      ],
-      "next": "Finish current-head checks and human review before merge. Hosted processor integration, device acceptance and physical calibration remain unverified."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
         "backend"
       ],
       "summary": "PR222 creates pending structured website dishes and server-built evidence-bound review sessions without providers or publication. Review fixes reject competing offers and reuse the first fetched source for file fallback. Reconciled merged PR219 through documentation/ledger conflicts only; owner routes merge without manual runtime changes.",
@@ -1268,6 +1260,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionSize.ts"
       ],
       "next": "Complete focused and repository checks, independently review the pinned correction, and update PR237. Human review and exact staging release remain required; physical-device scale acceptance is separate."
+    },
+    {
+      "date": "2026-11-21",
+      "modules": [
+        "console",
+        "diner",
+        "backend",
+        "database",
+        "delivery"
+      ],
+      "summary": "The production candidate reuses the owner and diner paths with production-specific origins, first-owner onboarding, three-dish comparison and separate portion opening evidence. Synthetic report seals reconcile the typed portion fact alongside legacy event families.",
+      "files": [
+        "docs/production-release.md",
+        "backend/src/owner-workflow-environment.ts",
+        "backend/wrangler.production.jsonc"
+      ],
+      "next": "Keep Meta staging frozen. Verify the production database, bindings, reviewed analytics authority, protected email/OCR/publish flow and rollback before attaching domains."
     }
   ]
 }

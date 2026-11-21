@@ -52,6 +52,7 @@ const detailFamily: Record<string, string> = {
   dish_activity_checkpoint: 'activity',
   dish_detail_closed: 'closing',
   dish_compared: 'comparison',
+  dish_portion_opened: 'portion_opening',
   dish_saved: 'save',
   dish_unsaved: 'save',
   shortlist_viewed: 'shortlist_view',
@@ -64,7 +65,7 @@ SELECT to_jsonb(i) AS index, to_jsonb(e) AS event,
   jsonb_strip_nulls(jsonb_build_object(
     'menu_view',to_jsonb(m), 'exposure',to_jsonb(x), 'opening',to_jsonb(o),
     'activity',to_jsonb(a), 'closing',to_jsonb(c), 'comparison',to_jsonb(p),
-    'save',to_jsonb(s), 'shortlist_view',to_jsonb(v))) AS details
+    'portion_opening',to_jsonb(po), 'save',to_jsonb(s), 'shortlist_view',to_jsonb(v))) AS details
 FROM app_private.observation_index i
 LEFT JOIN app_private.observation_event e USING (tenant_id,event_id)
 LEFT JOIN app_private.observation_menu_view m USING (tenant_id,event_id)
@@ -73,6 +74,7 @@ LEFT JOIN app_private.observation_opening o USING (tenant_id,event_id)
 LEFT JOIN app_private.observation_activity a USING (tenant_id,event_id)
 LEFT JOIN app_private.observation_closing c USING (tenant_id,event_id)
 LEFT JOIN app_private.observation_comparison p USING (tenant_id,event_id)
+LEFT JOIN app_private.observation_portion_opening po USING (tenant_id,event_id)
 LEFT JOIN app_private.observation_save s USING (tenant_id,event_id)
 LEFT JOIN app_private.observation_shortlist_view v USING (tenant_id,event_id)
 WHERE i.tenant_id=$1 AND i.occurred_at >= $2 AND i.occurred_at < $3

@@ -12,8 +12,12 @@
 //   delivered, independently, to the canonical outbox (POST /observations, sent by TRK-01.3) and to
 //   PostHog through Jeffin's adapter, connected by connectPostHogFromEnv (Sai with Vivien, 3 Nov).
 import type { AnalyticsEnvironment } from '@peekaplate/analytics';
-import type { P0EventName } from '@peekaplate/analytics/event-names';
-import { createPostHogAdapter, type PostHogSdk } from '@peekaplate/analytics/posthog';
+import {
+  type CapturePostHog,
+  createPostHogAdapter,
+  type PostHogScope,
+  type PostHogSdk,
+} from '@peekaplate/analytics/posthog';
 import { browserBatchTriggers, createBatcher, type Deliver } from './batcher';
 import { isTrackingAllowed, onTrackingAllowedChange, readPrivacySignal } from './consent';
 import { buildEnvelope, type Envelope } from './envelope';
@@ -99,6 +103,7 @@ const holdDeliver: Deliver = async () => [];
 let mode: 'fixture' | 'live' = 'fixture';
 let liveSuspended = false;
 let liveDeliver: Deliver = holdDeliver;
+let getPostHogScope: (() => PostHogScope | undefined) | undefined;
 let identity: Identity | null = null;
 const pipelines: Partial<Record<'fixture' | 'live', Pipeline>> = {};
 let clearing: Promise<void> = Promise.resolve();
@@ -135,14 +140,10 @@ const consentedDeliver: Deliver = async (batch) =>
   isLiveTracking() && isTrackingAllowed() ? liveDeliver(batch) : [];
 
 // The PostHog side of the shared dispatch. Jeffin's adapter (packages/analytics,
-// createPostHogAdapter) returns exactly this shape. It gets only the event type, the validated
-// payload and the event_id: never the envelope's session or producer IDs, and never the menu token.
+// createPostHogAdapter) returns exactly this shape. The event ID and optional public menu scope
+// accompany the validated payload. Session/producer IDs and the menu token stay canonical only.
 export type PostHogSink = {
-  capturePostHog(
-    type: P0EventName,
-    payload: Readonly<Record<string, unknown>>,
-    ids: { eventId: string },
-  ): void;
+  capturePostHog: CapturePostHog;
   setConsent(allowed: boolean): void;
 };
 
@@ -199,16 +200,25 @@ function captureToPostHog(envelope: Envelope) {
   try {
     // A screen's consent listener can emit before the adapter's listener runs.
     postHog?.setConsent(isTrackingAllowed() && !liveSuspended);
-    postHog?.capturePostHog(envelope.type, envelope.payload, { eventId: envelope.event_id });
+    if (!postHog) return;
+    const scope = getPostHogScope?.();
+    postHog.capturePostHog(envelope.type, envelope.payload, {
+      eventId: envelope.event_id,
+      ...(scope?.publicationRevisionId === envelope.publication_revision_id ? { scope } : {}),
+    });
   } catch {}
 }
 
 // Called once a live published menu is loaded (DIN-03) and, in TRK-01.3, with the token-bound
 // sender. Fixture builds never call it, so they never send.
-export function enableLiveTracking(deliver: Deliver = holdDeliver): void {
+export function enableLiveTracking(
+  deliver: Deliver = holdDeliver,
+  scope?: () => PostHogScope | undefined,
+): void {
   mode = 'live';
   liveSuspended = false;
   liveDeliver = deliver;
+  getPostHogScope = scope;
   try {
     postHog?.setConsent(isTrackingAllowed());
   } catch {}
@@ -269,7 +279,8 @@ function pipeline(): Pipeline {
 
 export function track(eventName: string, payload: TrackPayload): void {
   try {
-    // Live events need consent before anything happens, so a declined event uses no sequence number.
+    if (import.meta.env.MODE === 'production' && mode !== 'live') return;
+    // Apply the live privacy gate before assigning a sequence number.
     if (mode === 'live' && (liveSuspended || !isTrackingAllowed())) return;
     const now = () => Date.now();
     const uuid = () => crypto.randomUUID();

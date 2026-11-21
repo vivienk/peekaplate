@@ -1156,6 +1156,10 @@ main:has(> .pp-compare) {
   box-shadow: inset 0 0 0 1px var(--pp-role-outline);
 }
 
+.pp-picker__kept + .pp-picker__kept {
+  margin-top: 8px;
+}
+
 .pp-picker__kept-image {
   display: block;
   flex: none;
@@ -1514,6 +1518,26 @@ main:has(> .pp-compare) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
   column-gap: 12px;
+}
+
+.pp-compare[data-dish-count="3"] .pp-compare__pair {
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr);
+  column-gap: 4px;
+}
+
+.pp-compare[data-dish-count="3"] .pp-compare__view {
+  padding: 4px 6px;
+  justify-content: center;
+}
+
+.pp-compare[data-dish-count="3"] .pp-compare__view span {
+  display: none;
+}
+
+.pp-compare[data-dish-count="3"] .pp-compare__replace {
+  max-width: 100%;
+  padding-inline: 4px;
+  overflow-wrap: anywhere;
 }
 
 .pp-compare__divider {

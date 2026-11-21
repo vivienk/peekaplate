@@ -53,6 +53,7 @@ import {
   readPrivatePortion,
   readPrivatePortionApproval,
 } from './owner-portion-preview';
+import { ownerWorkflowAvailable } from './owner-workflow-environment';
 import {
   readRestaurantProfile,
   readRestaurantSetup,
@@ -68,8 +69,7 @@ type Services = {
 };
 export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, services: Services) {
   const identity = async (c: Context<{ Bindings: Bindings }>) => {
-    if (!['staging', 'local'].includes(c.env?.APP_ENV ?? ''))
-      throw new IngestionError('not_found', 404);
+    if (!ownerWorkflowAvailable(c.env)) throw new IngestionError('not_found', 404);
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization))
       throw new IngestionError('unauthorized', 401);

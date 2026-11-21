@@ -36,7 +36,7 @@ test('Compare on a dish detail opens the picker with that dish as Keeping', asyn
   await openPicker(page);
   await expect(page.getByRole('heading', { level: 1, name: 'Compare Dish' })).toBeFocused();
   await expect(page.locator('.pp-picker__kept-name')).toHaveText('Avocado Toast');
-  await expect(page.getByText('Choose a dish to compare')).toBeVisible();
+  await expect(page.getByText('Choose up to two dishes to compare')).toBeVisible();
 
   // The kept dish and incomplete dishes are not options.
   await expect(optionNames(page)).toHaveText([
@@ -95,7 +95,7 @@ test('searching away the selected dish clears the selection', async ({ page }) =
   await expect(page.locator('.pp-picker__option--selected')).toHaveCount(0);
 });
 
-test('one dish is selected at a time, with the orange border and check', async ({ page }) => {
+test('two dishes may be selected, each with the orange border and check', async ({ page }) => {
   await openPicker(page);
   const bowl = page.getByRole('button', { name: 'Compare with Harvest Power Bowl' });
   const salad = page.getByRole('button', { name: 'Compare with Garden Avocado Salad' });
@@ -108,19 +108,29 @@ test('one dish is selected at a time, with the orange border and check', async (
   await expect(page.locator('.pp-picker__option--selected .pp-picker__check')).toBeVisible();
   await expectCheckOnPhotoCorner(page);
 
-  // Tapping the card body selects too, and replaces the previous choice.
+  // Tapping the card body adds a second choice.
   await page.locator('.pp-picker__option', { hasText: 'Garden Avocado Salad' }).click({
     position: { x: 20, y: 100 },
   });
   await expect(salad).toHaveAttribute('aria-pressed', 'true');
-  await expect(bowl).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.locator('.pp-picker__option--selected')).toHaveCount(1);
+  await expect(bowl).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.pp-picker__option--selected')).toHaveCount(2);
+  const salmon = page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' });
+  await expect(salmon).toBeDisabled();
+  await expect(
+    page.getByText('Two dishes selected. Deselect one to change your choices.'),
+  ).toBeVisible();
+  await page.locator('.pp-picker__option', { hasText: 'Salmon Poke Bowl' }).click({
+    position: { x: 20, y: 100 },
+  });
+  await expect(salmon).toHaveAttribute('aria-pressed', 'false');
+  await bowl.click();
   await expectCheckOnPhotoCorner(page);
   // Cards alternate the photo side: Salmon Poke Bowl has its photo on the right, and its check
   // must sit on that photo's outer corner as well, not over the middle of the card.
-  await page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' }).click();
-  await expectCheckOnPhotoCorner(page);
   await salad.click();
+  await salmon.click();
+  await expectCheckOnPhotoCorner(page);
 
   // Compare is enabled once a dish is selected (the result is covered in compare-result.spec.ts).
   await expect(page.locator('.pp-picker__confirm')).toBeEnabled();

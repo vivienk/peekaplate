@@ -1,6 +1,6 @@
 // The P0 event allowlist, shared by the diner tracking layer and the PostHog adapter (single source,
 // per Sai, 4 Nov). Any other name is dropped locally and nothing is sent: no events for search,
-// toasts, chips, placeholders or the Portion control. Kept free of other imports, so importing it
+// toasts, chips, placeholders or an unsuccessful portion preview. Kept free of imports, so importing it
 // never pulls in PostHog or contract code.
 export const P0_EVENT_NAMES = [
   'menu_viewed',
@@ -8,6 +8,7 @@ export const P0_EVENT_NAMES = [
   'dish_detail_opened',
   'dish_activity_checkpoint',
   'dish_compared',
+  'dish_portion_opened',
   'dish_saved',
   'dish_unsaved',
   'shortlist_viewed',

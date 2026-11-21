@@ -6,7 +6,7 @@ import type {
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { AddMenuLink } from '../onboarding/AddMenuLink';
 import { ChooseMenuSource, type MenuSource } from '../onboarding/ChooseMenuSource';
-import type { RestaurantDetails as Details } from '../onboarding/details';
+import { type RestaurantDetails as Details, EMPTY_DETAILS } from '../onboarding/details';
 import { MenuProcessing } from '../onboarding/MenuProcessing';
 import { menuFileKind } from '../onboarding/menu-source';
 import { OnboardingLayout } from '../onboarding/OnboardingLayout';
@@ -47,6 +47,7 @@ import { OwnerPublish } from './OwnerPublish';
 import { draftToReviewDish } from './review/fromDishDraft';
 import { ReviewDishes } from './review/MenuReview';
 import { initialReview, isMenuReady } from './review/reviewDishes';
+import { restaurantDetailsSavedMessage, restaurantDetailsSaver } from './workspace-api';
 import '../onboarding/onboarding.css';
 import './review/review.css';
 import { useHeadingFocus } from '../onboarding/useHeadingFocus';
@@ -86,6 +87,8 @@ export function OwnerMenuWorkspace({
   section,
   navigation,
   detailsRequested = false,
+  offerInitialDetails = false,
+  firstProfileStatus,
   getAccessToken,
   onAccessFailure,
   onDirtyChange,
@@ -103,6 +106,8 @@ export function OwnerMenuWorkspace({
   section: 'overview' | 'menu';
   navigation: number;
   detailsRequested?: boolean;
+  offerInitialDetails?: boolean;
+  firstProfileStatus?: RestaurantProfile['status'] | undefined;
   getAccessToken: () => Promise<string | null>;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
   onDirtyChange: (dirty: boolean) => void;
@@ -131,7 +136,9 @@ export function OwnerMenuWorkspace({
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(
+    firstProfileStatus ? restaurantDetailsSavedMessage(firstProfileStatus) : '',
+  );
   const [view, setRawView] = useState<
     | 'overview'
     | 'details'
@@ -144,8 +151,8 @@ export function OwnerMenuWorkspace({
     | 'edit'
     | 'processing'
     | 'publish'
-  >('overview');
-  useHeadingFocus(view);
+  >(firstProfileStatus ? 'sources' : 'overview');
+  useHeadingFocus(firstProfileStatus && !loaded ? 'loading' : view);
   const viewGeneration = useRef(0);
   const setView = useCallback((next: typeof view) => {
     viewGeneration.current++;
@@ -189,7 +196,9 @@ export function OwnerMenuWorkspace({
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [setup, setSetup] = useState<RestaurantSetup | null>(null);
   const [profileUnavailable, setProfileUnavailable] = useState(false);
-  const profilePhotoAttempt = useRef<{ file: File; key: string } | null>(null);
+  const [saveDetails] = useState(restaurantDetailsSaver);
+  const initialDetails = useRef(offerInitialDetails && !firstProfileStatus && !detailsRequested);
+  const initialNavigation = useRef(navigation);
   const [detailsPhotoUrl, setDetailsPhotoUrl] = useState<string | null>(null);
   // S9: dishes the owner reviewed in this session, and the state of the "I have reviewed" checkbox.
   const [reviewedIds, setReviewedIds] = useState<ReadonlySet<string>>(new Set());
@@ -319,6 +328,18 @@ export function OwnerMenuWorkspace({
       setReviewUnavailable(unavailable);
       setJobs(nextJobs);
       setDrafts(nextDrafts);
+      if (initialDetails.current) {
+        initialDetails.current = false;
+        const saved = metadata?.[1];
+        if (
+          !metadata?.[0] &&
+          saved?.detailsStatus === 'missing' &&
+          !saved.menuAdded &&
+          !saved.published &&
+          !nextJobs.length
+        )
+          setView('details');
+      }
       onMenuChange?.(
         menuSnapshot(
           venueId,
@@ -330,7 +351,7 @@ export function OwnerMenuWorkspace({
       setLoaded(true);
       return nextDrafts;
     },
-    [venueId, current, command, onSetupChange, onMenuChange],
+    [venueId, current, command, onSetupChange, onMenuChange, setView],
   );
   useEffect(() => {
     void actorId;
@@ -355,12 +376,22 @@ export function OwnerMenuWorkspace({
     };
   }, [actorId, apiBase, getAccessToken, load, current, failure, clearSelection]);
   useEffect(() => {
-    setView(detailsRequested ? 'details' : section === 'menu' ? 'list' : 'overview');
+    if (initialNavigation.current !== navigation || section !== 'overview' || detailsRequested)
+      initialDetails.current = false;
+    setView(
+      detailsRequested
+        ? 'details'
+        : firstProfileStatus
+          ? 'sources'
+          : section === 'menu'
+            ? 'list'
+            : 'overview',
+    );
     setEditing(null);
     setPendingPhoto(null);
     setEditBack(null);
     setVerified(false);
-  }, [section, navigation, detailsRequested, setView]);
+  }, [section, navigation, detailsRequested, firstProfileStatus, setView]);
 
   useEffect(() => {
     const active = runtime.current;
@@ -888,14 +919,22 @@ export function OwnerMenuWorkspace({
       setVerified(true);
     });
 
-  if (!loaded)
-    return renderShell(
+  if (!loaded) {
+    const loading = (
       <section>
         <h1>Opening your menu workspace</h1>
         <p role={error ? 'alert' : 'status'}>{error ?? 'Loading saved sources and dishes…'}</p>
         {error && <Button onClick={reload}>Try again</Button>}
-      </section>,
+      </section>
     );
+    return firstProfileStatus ? (
+      <OnboardingLayout restaurantName={shownName} accountActions={accountActions}>
+        {loading}
+      </OnboardingLayout>
+    ) : (
+      renderShell(loading)
+    );
+  }
   const activeJobs = jobs.filter((job) => ['queued', 'running'].includes(job.status));
   const item = editing?.session?.items.find(
     (value) => value.candidate.candidate_id === editing.form.source?.candidateId,
@@ -907,7 +946,10 @@ export function OwnerMenuWorkspace({
           onDirtyChange={setDetailsDirty}
           key={`${venueId}:${profile?.version ?? 0}:${navigation}`}
           mode={details && !detailsFromSources ? 'dashboard' : 'onboarding'}
-          saved={details ?? undefined}
+          saved={
+            details ??
+            (offerInitialDetails ? { ...EMPTY_DETAILS, name: restaurantName } : undefined)
+          }
           savedPhotoUrl={detailsPhotoUrl}
           savedPhotoId={profile?.fields.photoId ?? null}
           saving={busy}
@@ -930,29 +972,10 @@ export function OwnerMenuWorkspace({
               return;
             }
             void run(async (active) => {
-              let photoId = profile?.fields.photoId ?? null;
-              if (photo) {
-                if (profilePhotoAttempt.current?.file !== photo)
-                  profilePhotoAttempt.current = { file: photo, key: newIdempotencyKey() };
-                photoId = (
-                  await active.client.uploadProfilePhoto(
-                    venueId,
-                    photo,
-                    profilePhotoAttempt.current.key,
-                  )
-                ).id;
-              }
-              const fields = { ...next, photoId };
-              await active.client.saveProfile(venueId, {
-                commandId: command('profile', [profile?.version ?? 0, fields]),
-                expectedVersion: profile?.version ?? 0,
-                fields,
-              });
+              const savedProfile = await saveDetails(active.client, venueId, next, photo, profile);
               await load(active);
               if (!current(active)) return;
-              setNotice(
-                'Restaurant details saved and submitted for team verification. This does not publish your menu.',
-              );
+              setNotice(restaurantDetailsSavedMessage(savedProfile?.status));
               if (viewGeneration.current !== generation) return;
               const continueOnboarding = detailsFromSources || !editingSaved;
               setDetailsFromSources(false);

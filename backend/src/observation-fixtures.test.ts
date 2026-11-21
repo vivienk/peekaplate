@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
-import { ObservationV2Schema } from '@peekaplate/contracts';
+import { ObservationTypeSchema, ObservationV2Schema } from '@peekaplate/contracts';
 import { expect, it, vi } from 'vitest';
 import { ingestObservations } from './observation-ingest';
 
@@ -18,11 +18,11 @@ const fixtures = JSON.parse(
     expected_statuses: string[][];
   }[];
 };
-it('validates all nine shared P0 examples and negative counterparts', () => {
-  expect(fixtures.valid_events).toHaveLength(9);
+it('validates the shared example and negative counterpart for each observation type', () => {
+  expect(fixtures.valid_events).toHaveLength(ObservationTypeSchema.options.length);
   expect(
-    new Set(fixtures.valid_events.map((event) => ObservationV2Schema.parse(event).type)).size,
-  ).toBe(9);
+    new Set(fixtures.valid_events.map((event) => ObservationV2Schema.parse(event).type)),
+  ).toEqual(new Set(ObservationTypeSchema.options));
   for (const fixture of fixtures.invalid_events)
     expect(ObservationV2Schema.safeParse(fixture.event).success, fixture.name).toBe(false);
 });

@@ -1,4 +1,4 @@
-import type { RestaurantSetup } from '@peekaplate/contracts';
+import type { OwnerVenue, RestaurantProfile, RestaurantSetup } from '@peekaplate/contracts';
 import {
   OWNER_ANALYSIS_ACTIONS,
   OWNER_ANALYSIS_LIMITATION,
@@ -17,7 +17,10 @@ import {
   useState,
 } from 'react';
 import type { OwnerAuthRuntime, SignedInOwner } from '../auth/supabase-auth';
-import { OwnerAccountMenu } from '../onboarding/OnboardingLayout';
+import type { RestaurantDetails as Details } from '../onboarding/details';
+import { OnboardingLayout, OwnerAccountMenu } from '../onboarding/OnboardingLayout';
+import { RestaurantDetails } from '../onboarding/RestaurantDetails';
+import { focusScreenHeading } from '../onboarding/useHeadingFocus';
 import {
   createOwnerAnalysisClient,
   OwnerAnalysisAccessError,
@@ -25,6 +28,7 @@ import {
 } from '../owner-dashboard/ai-preview/analysis-client';
 import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
 import { ReportView, useOwnerReport } from '../owner-dashboard/report-data';
+import { createOwnerMenuClient, newCommandId, OwnerMenuApiError } from '../owner-menu/api';
 import { Button, Input } from '../ui';
 import { FirstDashboardAside, FirstDashboardTopbar } from './FirstDashboard';
 import { Icon } from './icons';
@@ -33,9 +37,10 @@ import { OwnerMenuWorkspace } from './OwnerMenuWorkspace';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
 import { fetchOwnerActions, type OwnerActionsState } from './owner-actions-api';
 import {
-  createTestRestaurant,
+  createRestaurant,
   fetchOwnerWorkspace,
   readWorkspaceApiBase,
+  restaurantDetailsSaver,
   type WorkspaceState,
 } from './workspace-api';
 import './owner.css';
@@ -58,6 +63,7 @@ export function OwnerWorkspace({
   auth,
   owner,
   apiBase,
+  production = false,
   aiEnabled = false,
   dishAssistanceEnabled = false,
   onSessionExpired,
@@ -67,6 +73,7 @@ export function OwnerWorkspace({
   auth: OwnerAuthRuntime;
   owner: SignedInOwner;
   apiBase: string | null;
+  production?: boolean;
   /** Shows the #164 AI panel beside the live report. Off unless the build turns it on. */
   aiEnabled?: boolean;
   dishAssistanceEnabled?: boolean;
@@ -79,6 +86,11 @@ export function OwnerWorkspace({
   const [selectedId, setSelectedId] = useState('');
   const [page, setPage] = useState<OwnerPage>('setup');
   const [navigation, setNavigation] = useState(0);
+  const [firstProfile, setFirstProfile] = useState<{
+    venueId: string;
+    status: RestaurantProfile['status'];
+    navigation: number;
+  } | null>(null);
   const [reportAttempt, setReportAttempt] = useState(0);
   const [detailsRequested, setDetailsRequested] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -125,6 +137,7 @@ export function OwnerWorkspace({
 
   const refresh = useCallback(() => {
     setDetailsRequested(false);
+    setFirstProfile(null);
     setState({ kind: 'loading' });
     setMenuRead(null);
     setSetupRead(null);
@@ -141,7 +154,7 @@ export function OwnerWorkspace({
   const venues = state.kind === 'ready' ? state.venues : [];
   const selected =
     venues.find((venue) => venue.venueId === selectedId) ??
-    (!selectedId && venues.length === 1 ? venues[0] : undefined);
+    (production || (!selectedId && venues.length === 1) ? venues[0] : undefined);
   const workspaceSetup =
     setupRead?.actor === owner.id && setupRead.value.venueId === selected?.venueId
       ? setupRead.value
@@ -179,8 +192,8 @@ export function OwnerWorkspace({
       Sign out
     </Button>
   );
-  const createRestaurant =
-    apiBase && readWorkspaceApiBase(apiBase) ? (
+  const testRestaurant =
+    !production && apiBase && readWorkspaceApiBase(apiBase) ? (
       <CreateTestRestaurant
         key={`${owner.id}:${apiBase}`}
         apiBase={apiBase}
@@ -226,16 +239,33 @@ export function OwnerWorkspace({
         {signOut}
       </main>
     );
+  if (venues.length === 0 && production)
+    return (
+      <FirstRestaurant
+        apiBase={apiBase}
+        actorId={owner.id}
+        getAccessToken={getAccessToken}
+        onAccessFailure={accessFailure}
+        onDiscovered={(venues) => setState({ kind: 'ready', venues })}
+        onSaved={(venue, profile) => {
+          setFirstProfile({ venueId: venue.venueId, status: profile.status, navigation });
+          setSelectedId(venue.venueId);
+          setState({ kind: 'ready', venues: [venue] });
+        }}
+        onDirtyChange={setDirty}
+        accountActions={signOut}
+      />
+    );
   if (venues.length === 0)
     return (
       <main className="owner-workspace-state">
         <h1>No restaurant access yet</h1>
         <p>
-          {createRestaurant
+          {testRestaurant
             ? 'Your account is ready. Create a test restaurant to start, or check access to an existing restaurant.'
             : 'Your account is ready. Contact PeekaPlate to connect your restaurant.'}
         </p>
-        {createRestaurant}
+        {testRestaurant}
         <Button variant="outline" onClick={refresh}>
           Check access again
         </Button>
@@ -243,31 +273,32 @@ export function OwnerWorkspace({
       </main>
     );
 
-  const picker = (
-    <div className="owner-workspace-picker">
-      <label htmlFor={pickerId}>Restaurant</label>
-      <select
-        id={pickerId}
-        value={selected?.venueId ?? ''}
-        onChange={(event) => {
-          if (!canLeave()) return;
-          setSelectedId(event.target.value);
-          setMenuRead(null);
-          setSetupRead(null);
-          setDetailsRequested(false);
-          setPage('setup');
-        }}
-      >
-        {!selected && <option value="">Choose a restaurant</option>}
-        {venues.map((venue) => (
-          <option key={venue.venueId} value={venue.venueId}>
-            {venue.name}
-          </option>
-        ))}
-      </select>
-      {createRestaurant}
-    </div>
-  );
+  const picker =
+    production && venues.length === 1 ? null : (
+      <div className="owner-workspace-picker">
+        <label htmlFor={pickerId}>Restaurant</label>
+        <select
+          id={pickerId}
+          value={selected?.venueId ?? ''}
+          onChange={(event) => {
+            if (!canLeave()) return;
+            setSelectedId(event.target.value);
+            setMenuRead(null);
+            setSetupRead(null);
+            setDetailsRequested(false);
+            setPage('setup');
+          }}
+        >
+          {!selected && <option value="">Choose a restaurant</option>}
+          {venues.map((venue) => (
+            <option key={venue.venueId} value={venue.venueId}>
+              {venue.name}
+            </option>
+          ))}
+        </select>
+        {testRestaurant}
+      </div>
+    );
   if (!selected)
     return (
       <main className="owner-workspace-state">
@@ -324,9 +355,11 @@ export function OwnerWorkspace({
         Refresh access
       </Button>
       {signOut}
-      <small className="owner-workspace-design-note">
-        (Account placement awaiting design review)
-      </small>
+      {!production && (
+        <small className="owner-workspace-design-note">
+          (Account placement awaiting design review)
+        </small>
+      )}
     </>
   );
   const renderShell = (content: ReactNode) => (
@@ -410,6 +443,12 @@ export function OwnerWorkspace({
       section={activePage === 'menu' ? 'menu' : 'overview'}
       navigation={navigation}
       detailsRequested={detailsRequested}
+      offerInitialDetails={production && selected.permission === 'owner' && activePage === 'setup'}
+      firstProfileStatus={
+        firstProfile?.venueId === selected.venueId && firstProfile.navigation === navigation
+          ? firstProfile.status
+          : undefined
+      }
       getAccessToken={getAccessToken}
       onAccessFailure={accessFailure}
       onDirtyChange={setDirty}
@@ -418,6 +457,92 @@ export function OwnerWorkspace({
       renderShell={renderShell}
       accountActions={accountActions}
     />
+  );
+}
+
+function FirstRestaurant({
+  apiBase,
+  actorId,
+  getAccessToken,
+  onAccessFailure,
+  onDiscovered,
+  onSaved,
+  onDirtyChange,
+  accountActions,
+}: {
+  apiBase: string;
+  actorId: string;
+  getAccessToken: () => Promise<string | null>;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+  onDiscovered: (venues: OwnerVenue[]) => void;
+  onSaved: (venue: OwnerVenue, profile: RestaurantProfile) => void;
+  onDirtyChange: (dirty: boolean) => void;
+  accountActions: ReactNode;
+}) {
+  const pending = useRef<AbortController | null>(null);
+  const creation = useRef<{ name: string; commandId: string; venue?: OwnerVenue } | null>(null);
+  const [saveDetails] = useState(restaurantDetailsSaver);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    focusScreenHeading();
+    return () => pending.current?.abort();
+  }, []);
+
+  async function save(details: Details, photo: File | null) {
+    if (pending.current) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    pending.current = controller;
+    setBusy(true);
+    setFailed(false);
+    const attempt = (creation.current ??= { name: details.name, commandId: newCommandId() });
+    async function checkMembership() {
+      const result = await fetchOwnerWorkspace({ apiBase, actorId, getAccessToken, signal });
+      if (signal.aborted) return;
+      if (result.kind === 'ready' && result.venues.length) onDiscovered(result.venues);
+      else if (result.kind === 'signed_out') onAccessFailure('signed_out');
+      else setFailed(true);
+    }
+    try {
+      if (!attempt.venue) {
+        const result = await createRestaurant({ apiBase, getAccessToken, signal, ...attempt });
+        if (signal.aborted) return;
+        if (result.kind === 'conflict') return await checkMembership();
+        if (result.kind === 'signed_out' || result.kind === 'denied')
+          return onAccessFailure(result.kind);
+        if (result.kind !== 'created') return setFailed(true);
+        attempt.venue = result.venue;
+      }
+      const client = createOwnerMenuClient({ baseUrl: apiBase, getToken: getAccessToken, signal });
+      const profile = await saveDetails(client, attempt.venue.venueId, details, photo, null);
+      if (signal.aborted) return;
+      if (profile) onSaved(attempt.venue, profile);
+      else setFailed(true);
+    } catch (reason) {
+      if (signal.aborted) return;
+      if (reason instanceof OwnerMenuApiError) {
+        if (reason.status === 401 || reason.status === 403)
+          return onAccessFailure(reason.status === 401 ? 'signed_out' : 'denied');
+        if (reason.status === 409) return await checkMembership();
+      }
+      setFailed(true);
+    } finally {
+      pending.current = null;
+      if (!signal.aborted) setBusy(false);
+    }
+  }
+
+  return (
+    <OnboardingLayout accountActions={accountActions}>
+      <RestaurantDetails
+        mode="onboarding"
+        saving={busy}
+        saveFailed={failed}
+        onSave={(details, photo) => void save(details, photo)}
+        onDirtyChange={onDirtyChange}
+      />
+    </OnboardingLayout>
   );
 }
 
@@ -452,7 +577,7 @@ function CreateTestRestaurant({
     pending.current = controller;
     setBusy(true);
     setError('');
-    const result = await createTestRestaurant({
+    const result = await createRestaurant({
       apiBase,
       ...command.current,
       getAccessToken,

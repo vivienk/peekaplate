@@ -39,7 +39,7 @@ export type RestaurantDetailsProps = {
   // S06 (onboarding) or S12 (dashboard).
   onSave: (details: Details, photo: File | null) => void;
   // "Go to dashboard" (onboarding) or "Back to dashboard" (dashboard): both open S12.
-  onLeave: () => void;
+  onLeave?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 };
 
@@ -194,9 +194,11 @@ function RestaurantDetailsForm({
         </div>
       </div>
       <div className="pp-onboard__actions">
-        <ActionButton variant="outlined" onClick={onLeave}>
-          {mode === 'onboarding' ? 'Go to dashboard' : 'Back to dashboard'}
-        </ActionButton>
+        {onLeave && (
+          <ActionButton variant="outlined" onClick={onLeave}>
+            {mode === 'onboarding' ? 'Go to dashboard' : 'Back to dashboard'}
+          </ActionButton>
+        )}
         <SubmitButton busy={saving} blocked={!ready} label="Save" busyLabel="Saving…" />
       </div>
     </form>

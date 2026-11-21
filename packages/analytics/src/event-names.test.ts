@@ -5,7 +5,7 @@ import { P0_EVENT_NAMES as FROM_POSTHOG } from './posthog';
 
 describe('P0 event names', () => {
   it('accepts exactly the eight P0 names', () => {
-    expect(P0_EVENT_NAMES).toHaveLength(8);
+    expect(P0_EVENT_NAMES).toHaveLength(9);
     for (const name of P0_EVENT_NAMES) expect(isAllowedEvent(name)).toBe(true);
   });
 

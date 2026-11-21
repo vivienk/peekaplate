@@ -18,6 +18,7 @@ export default defineConfig({
       VITE_OWNER_AUTH_ENABLED: 'true',
       VITE_SUPABASE_URL: 'https://auth-fixture.supabase.co',
       VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic_fixture_only',
+      VITE_PUBLIC_API_URL: 'https://api.peekaplate.app',
     },
   },
 });

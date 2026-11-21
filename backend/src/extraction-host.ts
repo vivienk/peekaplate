@@ -6,6 +6,7 @@ import { type ExtractionSource, readExtractionCapability } from './extraction-ca
 type Stub = { fetch(request: Request): Promise<Response> };
 export type ExtractionHostEnv = {
   APP_ENV: string;
+  EXTRACTION_PRODUCTION_ENABLED?: string;
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
   EXTRACTION_SOURCE_ORIGIN: string;
@@ -465,10 +466,12 @@ async function retainArtifacts(
 
 export default {
   async fetch(request: Request, env: ExtractionHostEnv): Promise<Response> {
+    const environment = env.APP_ENV;
     const secret = env.EXTRACTION_SERVICE_SECRET;
     const signingSecret = env.EXTRACTION_SOURCE_SIGNING_SECRET;
     if (
-      env.APP_ENV !== 'staging' ||
+      (environment !== 'staging' &&
+        !(environment === 'production' && env.EXTRACTION_PRODUCTION_ENABLED === 'true')) ||
       !secret ||
       secret.length < 48 ||
       !signingSecret ||
@@ -476,6 +479,8 @@ export default {
       signingSecret === secret
     )
       return json('not_configured', 503);
+    const containerName =
+      environment === 'production' ? 'production-extractor' : 'staging-extractor';
     const supplied = new TextEncoder().encode(request.headers.get('authorization') ?? '');
     const expected = new TextEncoder().encode(`Bearer ${secret}`);
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
@@ -497,7 +502,7 @@ export default {
         if (!photo.byteLength) return json('empty_photo', 400);
         const headers = new Headers(request.headers);
         headers.delete('Content-Length');
-        const response = await env.EXTRACTOR.getByName('staging-extractor').fetch(
+        const response = await env.EXTRACTOR.getByName(containerName).fetch(
           new Request(url, { method: 'POST', headers, body: photo, signal, redirect: 'manual' }),
         );
         const bytes = await readPortionBytes(response.body, maxPortionResponseBytes, signal);
@@ -514,6 +519,8 @@ export default {
         const scope = await readExtractionCapability(
           request.headers.get('x-source-capability') ?? '',
           signingSecret,
+          undefined,
+          environment,
         );
         if (
           !scope ||
@@ -564,6 +571,8 @@ export default {
         const scope = await readExtractionCapability(
           request.headers.get('x-source-capability') ?? '',
           signingSecret,
+          undefined,
+          environment,
         );
         if (
           !scope ||
@@ -573,7 +582,7 @@ export default {
         )
           return json('forbidden', 403);
         const body = await request.text();
-        return await env.EXTRACTOR.getByName('staging-extractor').fetch(
+        return await env.EXTRACTOR.getByName(containerName).fetch(
           new Request('http://extractor/_budget/reserve', {
             method: 'POST',
             headers: {
@@ -593,6 +602,8 @@ export default {
           const scope = await readExtractionCapability(
             request.headers.get('x-source-capability') ?? '',
             signingSecret,
+            undefined,
+            environment,
           );
           if (
             !scope ||
@@ -607,10 +618,10 @@ export default {
           const forwarded = new Request(request);
           forwarded.headers.set('X-Source-Hash', scope.sourceHash);
           forwarded.headers.set('X-Extraction-Artifact-Bundle', '1');
-          const response = await env.EXTRACTOR.getByName('staging-extractor').fetch(forwarded);
+          const response = await env.EXTRACTOR.getByName(containerName).fetch(forwarded);
           return await retainArtifacts(response, env, scope);
         }
-        return await env.EXTRACTOR.getByName('staging-extractor').fetch(request);
+        return await env.EXTRACTOR.getByName(containerName).fetch(request);
       }
       return json('not_found', 404);
     } catch {

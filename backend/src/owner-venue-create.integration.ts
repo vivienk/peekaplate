@@ -89,6 +89,57 @@ describe.skipIf(!runtimeUrl || !adminUrl)(
       }
     });
 
+    it('serializes first-restaurant creation from independent tabs and replays only the committed command', async () => {
+      const second = new Client({ connectionString: runtimeUrl });
+      await second.connect();
+      try {
+        const actor = crypto.randomUUID();
+        const other = crypto.randomUUID();
+        const inputs = ['First tab', 'Second tab'].map((name) => ({
+          name,
+          commandId: crypto.randomUUID(),
+        }));
+        const results = await Promise.allSettled([
+          createOwnerVenue(runtime, actor, inputs[0]!, true),
+          createOwnerVenue(second, actor, inputs[1]!, true),
+        ]);
+        const [venue] = await listOwnerVenues(runtime, actor);
+        expect(venue).toBeDefined();
+        const committed = inputs.find((input) => input.name === venue?.name)!;
+        expect(results).toContainEqual({ status: 'fulfilled', value: venue });
+        expect(results).toContainEqual({
+          status: 'rejected',
+          reason: expect.objectContaining({ status: 409 }),
+        });
+        expect(await listOwnerVenues(runtime, actor)).toEqual([venue]);
+        expect(await listOwnerVenues(runtime, other)).toEqual([]);
+        expect(await createOwnerVenue(runtime, actor, committed, true)).toEqual(venue);
+        await expect(
+          createOwnerVenue(runtime, actor, { ...committed, name: 'Changed name' }, true),
+        ).rejects.toMatchObject({ status: 409 });
+
+        await admin.query(
+          "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES($1,$2,'viewer')",
+          [venue?.venueId, other],
+        );
+        await expect(createOwnerVenue(runtime, other, committed, true)).rejects.toMatchObject({
+          status: 409,
+        });
+        await admin.query(
+          'DELETE FROM app_private.staff_membership WHERE tenant_id=$1 AND actor_id=$2',
+          [venue?.venueId, actor],
+        );
+        await expect(createOwnerVenue(runtime, actor, committed, true)).rejects.toMatchObject({
+          status: 403,
+        });
+        await expect(
+          createOwnerVenue(runtime, actor, { ...committed, commandId: crypto.randomUUID() }, true),
+        ).rejects.toMatchObject({ status: 409 });
+      } finally {
+        await second.end();
+      }
+    });
+
     it('bounds rolling-day creations while replay remains available at the limit', async () => {
       const actor = crypto.randomUUID();
       const command = crypto.randomUUID();

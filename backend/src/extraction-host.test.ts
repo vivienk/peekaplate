@@ -217,6 +217,19 @@ function runtime(running = false, overrides: Partial<ExtractionHostEnv> = {}) {
   return { actor, container, fetch, ctx };
 }
 
+describe('production extraction host', () => {
+  it('requires activation and credentials before reaching the separate production container', async () => {
+    const { env, request, forward } = setup();
+    env.APP_ENV = 'production';
+    expect((await host.fetch(request('/health'), env)).status).toBe(503);
+    env.EXTRACTION_PRODUCTION_ENABLED = 'true';
+    expect((await host.fetch(request('/health', 'wrong-test-key'), env)).status).toBe(401);
+    expect(forward).not.toHaveBeenCalled();
+    expect((await host.fetch(request('/health'), env)).status).toBe(200);
+    expect(env.EXTRACTOR.getByName).toHaveBeenCalledWith('production-extractor');
+  });
+});
+
 describe('direct Container startup', () => {
   afterEach(() => vi.useRealTimers());
 

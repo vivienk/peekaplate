@@ -5364,3 +5364,38 @@ The combined post-review local checks passed: `corepack pnpm check` completed
 context and documentation checks. `corepack pnpm verify build` passed the
 workspace builds and staging Worker dry-run. Current-head browser CI and the
 independent delta reviews remain required; no hosted deployment was performed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-21T18:41:26.560Z","exitCode":1}
+```
+{"id":"ERR-20261121-CLOUD-001","status":"resolved","area":"pages-deployment-routing","cause":"Agent-mode Wrangler delegated new production Pages project creation to ordinary Worker upload.","prevention":"Apply the verified Pages creation opt-out in ERR-20261018-CLOUD-004. Confirm concrete project type, bindings and exact deployment target.","regression":"Cloudflare lists both intended Pages projects; the two newly uploaded, unrouted Workers were removed. No production domain or Meta staging deployment was changed."}
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-21T18:45:29.985Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-21T18:47:43.156Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-21T18:47:43.156Z","exitCode":1},"status":"resolved","cause":"Generated Wrangler and browser outputs were inside the lint scope.","fix":"Moved the generated output directories out of the candidate worktree.","regression":"pnpm check passed lint, typecheck, unit and script tests, context and documentation links after moving the artifacts."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-21T18:55:18.221Z","exitCode":1}
+```
+
+### ERR-20261121-TRACK-001 | Screen 13 preview counted as diner traffic
+
+The published phone iframe loaded on the same origin as a standalone menu and
+started production tracking. The desktop production browser regression recorded
+PostHog requests from that iframe before the fix. The verified menu now starts
+the shared analytics pipeline only in a top-level production window. Desktop
+and mobile verify that the frame can render dishes and portions with zero
+requests to either destination. The same URL in a standalone tab sends the
+menu-view and portion event IDs to both intercepted destinations.

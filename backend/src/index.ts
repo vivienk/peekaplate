@@ -138,6 +138,11 @@ import {
   serializeOwnerReportCsv,
 } from './owner-report-export';
 import { registerOwnerVenueCreation } from './owner-venue-create';
+import {
+  ownerWorkflowAvailable,
+  PRODUCTION_DINER_ORIGIN,
+  PRODUCTION_OWNER_ORIGIN,
+} from './owner-workflow-environment';
 import { listOwnerVenues } from './owner-workspace';
 import {
   createPublicMenuResponse,
@@ -183,6 +188,7 @@ export type Bindings = {
   OWNER_AI_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   INGREDIENT_ARTWORK_ENABLED?: string;
   APP_ENV?: string;
+  OWNER_WORKFLOW_ENABLED?: string;
   DINER_PUBLIC_ORIGIN?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
@@ -521,6 +527,7 @@ export const DINER_CORS_ALLOWED_ORIGINS = [
 ] as const;
 
 function allowedDinerOrigin(origin: string, env: Bindings | undefined) {
+  if (env?.APP_ENV === 'production') return origin === PRODUCTION_DINER_ORIGIN ? origin : undefined;
   return DINER_CORS_ALLOWED_ORIGINS.some((allowed) => allowed === origin) ||
     (env?.APP_ENV === 'staging' &&
       env.DINER_PUBLIC_ORIGIN === 'https://routing-staging.peekaplate-diner-staging.pages.dev' &&
@@ -532,7 +539,7 @@ function allowedDinerOrigin(origin: string, env: Bindings | undefined) {
 function dinerLinkResponse(link: { path: string }, env: Bindings) {
   const origin =
     env.APP_ENV === 'production'
-      ? 'https://peekaplate.app'
+      ? PRODUCTION_DINER_ORIGIN
       : env.APP_ENV === 'local'
         ? 'http://127.0.0.1:5186'
         : env.APP_ENV === 'staging' &&
@@ -556,6 +563,14 @@ export const CONSOLE_REPORT_CORS_ALLOWED_ORIGINS = [
   'https://peekaplate-console-staging.pages.dev',
   'http://127.0.0.1:5174',
 ] as const;
+
+function ownerConsoleOrigin(origin: string, env: Bindings | undefined) {
+  if (env?.APP_ENV === 'production')
+    return ownerWorkflowAvailable(env) && origin === PRODUCTION_OWNER_ORIGIN ? origin : undefined;
+  return CONSOLE_REPORT_CORS_ALLOWED_ORIGINS.some((allowed) => allowed === origin)
+    ? origin
+    : undefined;
+}
 
 /**
  * Native rate limiting for token-scoped observation ingestion.
@@ -1189,7 +1204,7 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/staff/venues',
     cors({
-      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) => ownerConsoleOrigin(origin, c.env),
       allowMethods: ['GET', 'POST', 'OPTIONS'],
       allowHeaders: ['Authorization', 'Content-Type'],
       maxAge: 86400,
@@ -1197,8 +1212,7 @@ export function createApp(services: Dependencies = dependencies) {
   );
   app.get('/staff/venues', async (c) => {
     const env = c.env ?? {};
-    if (!['local', 'staging'].includes(env.APP_ENV ?? ''))
-      return c.json({ error: 'not_found' }, 404);
+    if (!ownerWorkflowAvailable(env)) return c.json({ error: 'not_found' }, 404);
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization))
       return c.json({ error: 'unauthorized' }, 401);
@@ -1216,6 +1230,7 @@ export function createApp(services: Dependencies = dependencies) {
     verify: services.verify,
     database: withDatabase,
     allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
+    productionOrigin: PRODUCTION_OWNER_ORIGIN,
   });
   app.get('/.well-known/jwks.json', async (c) => {
     if (!services.readMenuJwks) throw new AuthUnavailableError();
@@ -1271,7 +1286,7 @@ export function createApp(services: Dependencies = dependencies) {
     )
       return next();
     return cors({
-      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      origin: (origin, context) => ownerConsoleOrigin(origin, context.env),
       allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
       allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
       exposeHeaders: ['Location'],
@@ -1676,8 +1691,7 @@ export function createApp(services: Dependencies = dependencies) {
     '/venues/:venueId/prepared-menus/:menuId/:revisionId/assets/:assetId/:file',
   ]) {
     app.get(path, async (c) => {
-      if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
-        return c.json({ error: 'not_found' }, 404);
+      if (!ownerWorkflowAvailable(c.env)) return c.json({ error: 'not_found' }, 404);
       const authorization = c.req.header('Authorization');
       if (!authorization || !/^Bearer \S+$/i.test(authorization))
         return c.json({ error: 'unauthorized' }, 401);
@@ -1720,8 +1734,7 @@ export function createApp(services: Dependencies = dependencies) {
   // Part A: after S10/S11 verification the owner's verified dishes become a prepared menu for
   // S13. Owner-only (checked again inside the admit function); never approves or publishes.
   app.post('/venues/:venueId/prepared-menus/prepare', async (c) => {
-    if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
-      return c.json({ error: 'not_found' }, 404);
+    if (!ownerWorkflowAvailable(c.env)) return c.json({ error: 'not_found' }, 404);
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization))
       return c.json({ error: 'unauthorized' }, 401);
@@ -1889,8 +1902,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
 
   app.post('/venues/:venueId/menus/uploads', async (c) => {
-    if (c.env?.APP_ENV !== 'staging' && c.env?.APP_ENV !== 'local')
-      return c.json({ error: 'not_found' }, 404);
+    if (!ownerWorkflowAvailable(c.env)) return c.json({ error: 'not_found' }, 404);
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization))
       return c.json({ error: 'unauthorized' }, 401);
@@ -2482,6 +2494,7 @@ export async function handleQueueBatch(
       (env.EXTRACTION_SERVICE_URL
         ? createHttpPythonExtractor({
             serviceUrl: env.EXTRACTION_SERVICE_URL,
+            environment: env.APP_ENV === 'production' ? 'production' : 'staging',
             ...(env.EXTRACTION_SERVICE_SECRET !== undefined
               ? { authToken: env.EXTRACTION_SERVICE_SECRET }
               : {}),

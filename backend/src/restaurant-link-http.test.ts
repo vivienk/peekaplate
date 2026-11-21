@@ -22,6 +22,44 @@ describe('restaurant link HTTP boundary', () => {
     });
     expect(denied.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
+  it('uses the dedicated production diner origin for lookups and observation preflights', async () => {
+    const app = createApp({
+      verify: vi.fn(),
+      execute: vi.fn(),
+      resolveRestaurantLink: async () => scope,
+    });
+    const env = { APP_ENV: 'production' };
+    const origin = 'https://diner.peekaplate.app';
+    for (const [path, method] of [
+      ['/public/restaurants/noka_ramen', 'GET'],
+      ['/observations', 'OPTIONS'],
+    ] as const) {
+      const allowed = await app.request(
+        path,
+        {
+          method,
+          headers: { Origin: origin, 'Access-Control-Request-Method': 'POST' },
+        },
+        env,
+      );
+      expect(allowed.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+      for (const blocked of [
+        'https://peekaplate.app',
+        'https://diner.peekaplate.app.example.test',
+      ]) {
+        const denied = await app.request(
+          path,
+          {
+            method,
+            headers: { Origin: blocked, 'Access-Control-Request-Method': 'POST' },
+          },
+          env,
+        );
+        expect(denied.headers.get('Access-Control-Allow-Origin')).toBeNull();
+      }
+    }
+  });
+
   it('rejects invalid/reserved slugs and returns the same missing state', async () => {
     const resolver = vi.fn(async () => undefined);
     const app = createApp({ verify: vi.fn(), execute: vi.fn(), resolveRestaurantLink: resolver });
@@ -54,5 +92,14 @@ describe('restaurant link HTTP boundary', () => {
       url: `${env.DINER_PUBLIC_ORIGIN}/diner/noka_ramen`,
     });
     expect(readDinerLink).toHaveBeenCalledWith('owner-actor', scope.venueId, scope.menuId, env);
+    const production = await app.request(
+      path,
+      { headers: { Authorization: 'Bearer synthetic-staff-token' } },
+      { APP_ENV: 'production' },
+    );
+    expect(await production.json()).toEqual({
+      path: '/diner/noka_ramen',
+      url: 'https://diner.peekaplate.app/diner/noka_ramen',
+    });
   });
 });
