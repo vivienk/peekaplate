@@ -42,11 +42,10 @@ async function provider(
       return;
     }
     const path = new URL(request.url()).pathname.split('/').at(-1)!;
-    calls.push({
-      url: request.url(),
-      body: request.postDataJSON() as Record<string, unknown> | null,
-    });
-    const answer = overrides[`${path}:${request.method()}`] ??
+    const body = request.postDataJSON() as Record<string, unknown> | null;
+    calls.push({ url: request.url(), body });
+    const answer = overrides[`${path}:${body?.auth_code}`] ??
+      overrides[`${path}:${request.method()}`] ??
       overrides[path] ?? {
         body:
           path === 'token'
@@ -91,7 +90,13 @@ test('production confirms to sign-in, opens S05, resumes saves and retains the a
   page,
 }) => {
   await page.route(`${productionOrigin}/**`, serveConsole);
-  const calls = await provider(page, {}, productionOrigin);
+  const calls = await provider(
+    page,
+    {
+      'token:synthetic-rejected': { status: 400, body: { code: 'flow_state_not_found' } },
+    },
+    productionOrigin,
+  );
   const venue = {
     venueId: '30224700-944a-48af-8c6d-d1d7578b229a',
     name: 'Riverview Cafe',
@@ -161,11 +166,23 @@ test('production confirms to sign-in, opens S05, resumes saves and retains the a
   });
 
   await signup(page, productionOrigin);
-  await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-production-code`);
-  await expect(page).toHaveURL(`${productionOrigin}/auth-confirm.html`);
-  expect(calls.some((call) => call.body?.auth_code)).toBe(false);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page).toHaveURL(`${productionOrigin}/owner-auth.html`);
+  await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-rejected`);
+  await expect(
+    page.getByRole('heading', { name: 'This confirmation link cannot be used' }),
+  ).toBeVisible();
+  const verification = Promise.withResolvers<void>();
+  await page.route('https://auth-fixture.supabase.co/auth/v1/user', async (route) => {
+    await verification.promise;
+    await route.fallback();
+  });
+  await page.goto(`${productionOrigin}/auth-confirm?code=synthetic-production-code`);
+  await expect(page).toHaveURL(`${productionOrigin}/auth-confirm`);
+  await expect(page.getByRole('status')).toHaveText('Confirming your email…');
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toHaveCount(0);
+  verification.resolve();
+  await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
+  expect(await page.evaluate(() => localStorage.getItem('sb-auth-fixture-auth-token'))).toBeNull();
+  expect(creationRequests).toHaveLength(0);
   await page.getByLabel('Email address').fill(email);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
@@ -231,9 +248,9 @@ test('production confirms to sign-in, opens S05, resumes saves and retains the a
     { expectedVersion: 0, fields: details, commandId: expect.any(String) },
     profileRequests[0],
   ]);
-  expect(calls.filter((call) => call.body?.auth_code === 'synthetic-production-code')).toHaveLength(
-    1,
-  );
+  const exchanges = calls.filter((call) => call.body?.auth_code === 'synthetic-production-code');
+  expect(exchanges).toHaveLength(1);
+  expect(exchanges[0]?.body?.code_verifier).toEqual(expect.stringMatching(/\S+/));
   expect(calls.filter((call) => new URL(call.url).pathname.endsWith('/logout'))).toHaveLength(1);
 
   venues.push(otherVenue);
@@ -247,7 +264,6 @@ test('production confirms to sign-in, opens S05, resumes saves and retains the a
   await expect(page.getByRole('heading', { name: 'Restaurant Details' })).toBeVisible();
   await expect(page.getByLabel('Restaurant name')).toHaveValue(otherVenue.name);
   await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-production-code`);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'This confirmation link cannot be used' }),
   ).toBeVisible();
@@ -256,32 +272,44 @@ test('production confirms to sign-in, opens S05, resumes saves and retains the a
   expect(creationRequests).toHaveLength(2);
 });
 
-test('leaving production confirmation mid-verification still requires sign-in', async ({
-  page,
-}) => {
-  await page.route(`${productionOrigin}/**`, serveConsole);
-  await provider(page, {}, productionOrigin);
-  await signup(page, productionOrigin);
-  await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-interrupted`);
-  const verification = page.waitForRequest('https://auth-fixture.supabase.co/auth/v1/user');
-  await page.route('https://auth-fixture.supabase.co/auth/v1/user', async (route) => {
-    // The client must stay unsigned even if the tab leaves before user verification resolves.
-    await route.abort('failed');
+for (const transition of ['popstate', 'back-forward cache'] as const) {
+  test(`interrupting production confirmation with ${transition} still requires sign-in`, async ({
+    page,
+  }) => {
+    await page.route(`${productionOrigin}/**`, serveConsole);
+    await provider(page, {}, productionOrigin);
+    await signup(page, productionOrigin);
+    const response = Promise.withResolvers<void>();
+    const verification = page.waitForRequest('https://auth-fixture.supabase.co/auth/v1/user');
+    await page.route('https://auth-fixture.supabase.co/auth/v1/user', async (route) => {
+      await response.promise;
+      await route.fallback();
+    });
+    await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-interrupted`);
+    await verification;
+    await page.evaluate((event) => {
+      if (event === 'popstate') window.dispatchEvent(new PopStateEvent('popstate'));
+      else {
+        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+      }
+    }, transition);
+    response.resolve();
+    await expect(
+      page.getByRole('heading', { name: 'This confirmation link cannot be used' }),
+    ).toBeVisible();
+    const saved = await page.evaluate(() => localStorage.getItem('sb-auth-fixture-auth-token'));
+    expect(saved).toBeNull();
+    await page.goto(`${productionOrigin}/owner-auth.html`);
+    await expect(page.getByLabel('Email address')).toBeVisible();
   });
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await verification;
-  const saved = await page.evaluate(() => localStorage.getItem('sb-auth-fixture-auth-token'));
-  expect(saved).toBeNull();
-  await page.goto(`${productionOrigin}/owner-auth.html`);
-  await expect(page.getByLabel('Email address')).toBeVisible();
-});
+}
 
 test('production confirmation discards a recovery-purpose exchange', async ({ page }) => {
   await page.route(`${productionOrigin}/**`, serveConsole);
   const calls = await provider(page, {}, productionOrigin);
   await recoveryEmail(page, productionOrigin);
   await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-recovery-on-confirmation`);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'This confirmation link cannot be used' }),
   ).toBeVisible();

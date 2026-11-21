@@ -69,26 +69,18 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
     recovery?.abort.abort();
     recovery = null;
   }
-  function providerClient(persistent: boolean, signal?: AbortSignal, confirmation = false) {
+  function providerClient(persistent: boolean, signal?: AbortSignal, verifier?: string) {
     const storageKey = 'peekaplate-owner-confirmation';
     const memory = new Map<string, string>();
-    if (confirmation) {
-      const project = new URL(config.url).hostname.split('.')[0];
-      const key = `sb-${project}-auth-token-code-verifier`;
-      const verifier = localStorage.getItem(key);
-      if (verifier) {
-        memory.set(`${storageKey}-code-verifier`, verifier);
-        localStorage.removeItem(key);
-      }
-    }
+    if (verifier) memory.set(`${storageKey}-code-verifier`, verifier);
     return createClient(config.url, config.publishableKey, {
       auth: {
         flowType: 'pkce',
         detectSessionInUrl: false,
         persistSession: persistent,
-        autoRefreshToken: persistent && !confirmation,
+        autoRefreshToken: persistent && !verifier,
         debug: false,
-        ...(confirmation
+        ...(verifier
           ? {
               storageKey,
               storage: {
@@ -314,9 +306,13 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
   ): Promise<{ kind: 'confirmed' | 'invalid_link' }> {
     if (!code || code.length > 2048) return { kind: 'invalid_link' };
     let confirmationClient: SupabaseClient;
+    const project = new URL(config.url).hostname.split('.')[0];
+    const key = `sb-${project}-auth-token-code-verifier`;
+    let verifier: string | null = null;
     try {
-      // Production moves the one-use PKCE verifier to memory before the SDK stores the exchange.
-      confirmationClient = signal ? providerClient(true, signal, true) : client;
+      verifier = signal ? localStorage.getItem(key) : null;
+      if (signal && !verifier) return { kind: 'invalid_link' };
+      confirmationClient = verifier ? providerClient(true, signal, verifier) : client;
     } catch {
       return { kind: 'invalid_link' };
     }
@@ -329,6 +325,8 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
       const { data, error } = await confirmationClient.auth.exchangeCodeForSession(code);
       if (error || !data.session) return { kind: 'invalid_link' };
       exchangedToken = data.session.access_token;
+      // A rejected link or an older exchange must not clear a newer signup's verifier.
+      if (verifier && localStorage.getItem(key) === verifier) localStorage.removeItem(key);
       const checked =
         recoveryToken === exchangedToken
           ? null

@@ -5399,3 +5399,37 @@ the shared analytics pipeline only in a top-level production window. Desktop
 and mobile verify that the frame can render dishes and portions with zero
 requests to either destination. The same URL in a standalone tab sends the
 menu-view and portion event IDs to both intercepted destinations.
+
+### ERR-20261121-AUTH-001 | Production signup confirmation required a second click
+
+Opening the signup email landed on a callback with a Continue button before
+the owner could sign in. The existing browser case required that extra click.
+Production now exchanges the code automatically and returns to the owner
+sign-in entry after verification. The browser regression checks an invalid
+link followed by a valid one, exactly one successful exchange, URL scrubbing
+and interruption during verification. It uses the Supabase SDK with fixture
+HTTP responses.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-21T21:16:32.061Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test","timestamp":"2026-11-21T21:16:32.061Z","exitCode":1},"status":"resolved","cause":"The local Workerd SQLite fixture reported SQLITE_IOERR_TRUNCATE and timed out during the full run.","fix":"Reran the affected suite in isolation and repeated the complete check without changing the fixture.","regression":"The eight isolated cases and the subsequent pnpm check passed."}
+```
+
+### ERR-20261121-PUBLISH-001 | Published production diner link rejected by Screen 13
+
+Production published a fictional dish and returned HTTP 200 with the matching
+diner URL. The console accepted only the staging diner host and displayed a
+link error. The regression first reproduced `200 invalid_response`, then confirmed
+that the owner client accepts the matching host and rejects a cross-environment
+host, a mismatched path and a query. The normal copy and preview components
+use the validated URL.
+
+The same QA run found a separate form issue. Screen 9 allows a blank dish
+description, but the bundle producer requires it and Screen 13 reports
+`nothing_to_prepare` if every approved dish lacks one. Adding a description
+through the existing editor allowed preparation and publication. The validation
+and error message still need alignment.
