@@ -9,11 +9,13 @@ import hmac
 import httpx
 import json
 import os
+import secrets
 import subprocess
 import sys
 import tempfile
 import threading
 from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
@@ -90,7 +92,89 @@ def read_source(job, settings, capability):
         return bytes(data) if len(data) == length else None
 
 
-def run_extraction(data, kind, timeout, *, include_artifacts=False):
+class _BudgetProxyServer:
+    """Loopback proxy forwarding child-process budget reservations with host credentials."""
+
+    def __init__(self, settings, job, capability):
+        self.token = secrets.token_hex(32)
+        self._url_path = "/_internal/budget/reserve"
+        target_url = f"{settings.source_origin}/budget/reserve"
+        upstream_headers = {
+            "Authorization": "Bearer " + settings.secret,
+            "X-Source-Capability": capability,
+            "X-Tenant-ID": str(job.tenant_id),
+            "X-Job-ID": str(job.job_id),
+            "X-Source-Hash": job.source_hash,
+            "Content-Type": "application/json",
+        }
+        expected_auth = ("Bearer " + self.token).encode("ascii")
+
+        class _Handler(BaseHTTPRequestHandler):
+            def do_POST(self_req):
+                if self_req.path != "/_internal/budget/reserve":
+                    self_req.send_response(404)
+                    self_req.end_headers()
+                    return
+                auth = self_req.headers.get("Authorization", "").encode("utf-8")
+                if not hmac.compare_digest(auth, expected_auth):
+                    payload = b'{"error":"unauthorized"}'
+                    self_req.send_response(401)
+                    self_req.send_header("Content-Type", "application/json")
+                    self_req.send_header("Content-Length", str(len(payload)))
+                    self_req.end_headers()
+                    self_req.wfile.write(payload)
+                    return
+                try:
+                    length = int(self_req.headers.get("Content-Length", "0"))
+                except ValueError:
+                    length = 0
+                if not 0 < length <= 4096:
+                    payload = b'{"error":"invalid_request"}'
+                    self_req.send_response(400)
+                    self_req.send_header("Content-Type", "application/json")
+                    self_req.send_header("Content-Length", str(len(payload)))
+                    self_req.end_headers()
+                    self_req.wfile.write(payload)
+                    return
+                body = self_req.rfile.read(length)
+                try:
+                    upstream = httpx.post(
+                        target_url,
+                        content=body,
+                        headers=upstream_headers,
+                        timeout=5.0,
+                        follow_redirects=False,
+                    )
+                    status = upstream.status_code
+                    content = upstream.content
+                except (httpx.HTTPError, OSError):
+                    status = 503
+                    content = b'{"granted":false,"error":"budget_service_unavailable"}'
+                self_req.send_response(status)
+                self_req.send_header("Content-Type", "application/json")
+                self_req.send_header("Content-Length", str(len(content)))
+                self_req.end_headers()
+                self_req.wfile.write(content)
+
+            def log_message(self_req, format, *args):
+                return
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        port = self._server.server_address[1]
+        self.url = f"http://127.0.0.1:{port}{self._url_path}"
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=2)
+
+
+def run_extraction(data, kind, timeout, *, include_artifacts=False, budget_url=None, budget_token=None):
     # A child process gives the complete pipeline a killable wall-clock deadline.
     with tempfile.TemporaryDirectory(prefix="peekaplate-extract-") as directory:
         root = Path(directory)
@@ -98,11 +182,18 @@ def run_extraction(data, kind, timeout, *, include_artifacts=False):
         source.write_bytes(data)
         source.chmod(0o600)
         env = {key: value for key, value in os.environ.items()
-               if not key.startswith(("R2_", "EXTRACTION_"))}
+               if not key.startswith(("R2_", "EXTRACTION_", "PEEK_BUDGET_"))}
+        command = [
+            sys.executable, "-m", "peekaplate_processing.run_pipeline",
+            "--input", str(source), "--run-dir", str(root / "result"),
+            "--input-mode", "vision_v4", "--batch-pages", "1", "--llm-concurrency", "2", "--no-llm-cache",
+        ]
+        if budget_url and budget_token:
+            env["PEEK_BUDGET_URL"] = budget_url
+            env["PEEK_BUDGET_TOKEN"] = budget_token
+            command.append("--require-budget-gate")
         completed = subprocess.run(
-            [sys.executable, "-m", "peekaplate_processing.run_pipeline",
-             "--input", str(source), "--run-dir", str(root / "result"),
-             "--input-mode", "vision_v4", "--batch-pages", "1", "--llm-concurrency", "2", "--no-llm-cache"],
+            command,
             cwd=root, env=env, timeout=timeout, check=False,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
@@ -140,6 +231,22 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
 
     def reply(body, status=200, **headers):
         return JSONResponse(body, status_code=status, headers={"Cache-Control": "no-store", **headers})
+
+    # The Worker retains the returned review layers. The extraction host uses
+    # this directory only for per-request scratch files.
+    portion_root = os.environ.get("PORTION_REVIEW_ROOT", "")
+    if portion_root and Path(portion_root).is_absolute():
+        from peekaplate_processing.portion_service import register_portion_routes
+        register_portion_routes(
+            app,
+            authorized=lambda request: hmac.compare_digest(
+                request.headers.get("authorization", "").encode("utf-8"),
+                ("Bearer " + settings.secret).encode("ascii"),
+            ),
+            reply=reply,
+            root=Path(portion_root),
+            retain_artifacts=False,
+        )
 
     @app.get("/health")
     def health():
@@ -193,7 +300,19 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
                 return reply({"error": "unsupported_source"}, 422)
             if kind != ("pdf" if job.source_type == "pdf" else "image"):
                 return reply({"error": "source_kind_mismatch"}, 422)
-            result=runner(data,kind,JOB_TIMEOUT_SECONDS,include_artifacts=True) if artifact_version and runner is run_extraction else runner(data,kind,JOB_TIMEOUT_SECONDS)
+            if runner is run_extraction:
+                with _BudgetProxyServer(settings, job, capability) as proxy:
+                    kwargs = {"include_artifacts": True} if artifact_version else {}
+                    result = runner(
+                        data,
+                        kind,
+                        JOB_TIMEOUT_SECONDS,
+                        budget_url=proxy.url,
+                        budget_token=proxy.token,
+                        **kwargs,
+                    )
+            else:
+                result = runner(data, kind, JOB_TIMEOUT_SECONDS)
             bundle=result if isinstance(result,dict) and "report" in result else None
             report = MenuExtractionResult.model_validate(bundle["report"] if bundle else result)
             if (not report.source or report.source.sha256 != job.source_hash

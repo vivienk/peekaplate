@@ -4,7 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./owner-ai": "./src/owner-ai.ts",
+    "./owner-analysis": "./src/owner-analysis.ts",
+    "./owner-report": "./src/owner-report.ts",
+    "./owner-menu": "./src/owner-menu.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

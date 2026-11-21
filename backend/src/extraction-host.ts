@@ -39,9 +39,16 @@ const pipelineVariables = [
   'a2agent_api_MODEL',
 ] as const;
 
+export const MAX_PROVIDER_CALLS_PER_RUN = 2;
+
+const budgetKeyPattern = /^[A-Za-z0-9:_-]{1,128}$/;
+const providerNamePattern = /^[A-Za-z0-9._-]{1,64}$/;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
   envVars: Record<string, string>;
   private readiness: Promise<void> | undefined;
+  private budgetSchemaReady = false;
 
   constructor(ctx: DurableObjectState, env: ExtractionHostEnv) {
     super(ctx, env);
@@ -89,7 +96,157 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
     throw new Error('Extraction container did not become ready');
   }
 
+  private ensureBudgetSchema(): void {
+    if (this.budgetSchemaReady) return;
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS provider_call_budget (
+        run_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        job_id TEXT NOT NULL,
+        max_calls INTEGER NOT NULL,
+        used_calls INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS provider_call_reservations (
+        reservation_key TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        granted INTEGER NOT NULL,
+        used_calls INTEGER NOT NULL,
+        max_calls INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+  }
+
+  private async handleBudgetReserve(request: Request): Promise<Response> {
+    const tenantId = request.headers.get('x-tenant-id') ?? '';
+    const jobId = request.headers.get('x-job-id') ?? '';
+    if (!uuidPattern.test(tenantId) || !uuidPattern.test(jobId)) {
+      return json('forbidden', 403);
+    }
+    const rawBody = await request.text();
+    if (!rawBody || rawBody.length > 4096) {
+      return json('invalid_request', 400);
+    }
+    let payload: { reservation_key?: unknown; provider?: unknown };
+    try {
+      payload = JSON.parse(rawBody) as { reservation_key?: unknown; provider?: unknown };
+    } catch {
+      return json('invalid_request', 400);
+    }
+    const reservationKey =
+      typeof payload.reservation_key === 'string' ? payload.reservation_key : '';
+    const provider = typeof payload.provider === 'string' ? payload.provider : '';
+    if (!budgetKeyPattern.test(reservationKey) || !providerNamePattern.test(provider)) {
+      return json('invalid_request', 400);
+    }
+    const runId = `${tenantId}:${jobId}`;
+    const outcome = this.ctx.storage.transactionSync(() => {
+      this.ensureBudgetSchema();
+      const existing = this.ctx.storage.sql
+        .exec<{ run_id: string; granted: number; used_calls: number; max_calls: number }>(
+          'SELECT run_id, granted, used_calls, max_calls FROM provider_call_reservations WHERE reservation_key = ?',
+          reservationKey,
+        )
+        .toArray()[0];
+      if (existing) {
+        if (existing.run_id !== runId) {
+          return { status: 403, body: { error: 'reservation_scope_mismatch' } };
+        }
+        return {
+          status: existing.granted === 1 ? 200 : 429,
+          body: {
+            granted: existing.granted === 1,
+            ...(existing.granted === 1 ? {} : { error: 'provider_call_budget_exhausted' }),
+            run_id: runId,
+            used_calls: existing.used_calls,
+            max_calls: existing.max_calls,
+            remaining_calls: Math.max(0, existing.max_calls - existing.used_calls),
+            reservation_key: reservationKey,
+          },
+        };
+      }
+      const now = new Date().toISOString();
+      this.ctx.storage.sql.exec(
+        'INSERT OR IGNORE INTO provider_call_budget (run_id, tenant_id, job_id, max_calls, used_calls, created_at) VALUES (?, ?, ?, ?, 0, ?)',
+        runId,
+        tenantId,
+        jobId,
+        MAX_PROVIDER_CALLS_PER_RUN,
+        now,
+      );
+      const budget = this.ctx.storage.sql
+        .exec<{ max_calls: number; used_calls: number }>(
+          'SELECT max_calls, used_calls FROM provider_call_budget WHERE run_id = ?',
+          runId,
+        )
+        .toArray()[0];
+      if (!budget) {
+        throw new Error('Failed to load provider call budget row');
+      }
+      if (budget.used_calls < budget.max_calls) {
+        const nextUsed = budget.used_calls + 1;
+        this.ctx.storage.sql.exec(
+          'UPDATE provider_call_budget SET used_calls = ? WHERE run_id = ?',
+          nextUsed,
+          runId,
+        );
+        this.ctx.storage.sql.exec(
+          'INSERT INTO provider_call_reservations (reservation_key, run_id, provider, granted, used_calls, max_calls, created_at) VALUES (?, ?, ?, 1, ?, ?, ?)',
+          reservationKey,
+          runId,
+          provider,
+          nextUsed,
+          budget.max_calls,
+          now,
+        );
+        return {
+          status: 200,
+          body: {
+            granted: true,
+            run_id: runId,
+            used_calls: nextUsed,
+            max_calls: budget.max_calls,
+            remaining_calls: Math.max(0, budget.max_calls - nextUsed),
+            reservation_key: reservationKey,
+          },
+        };
+      }
+      this.ctx.storage.sql.exec(
+        'INSERT INTO provider_call_reservations (reservation_key, run_id, provider, granted, used_calls, max_calls, created_at) VALUES (?, ?, ?, 0, ?, ?, ?)',
+        reservationKey,
+        runId,
+        provider,
+        budget.used_calls,
+        budget.max_calls,
+        now,
+      );
+      return {
+        status: 429,
+        body: {
+          granted: false,
+          error: 'provider_call_budget_exhausted',
+          run_id: runId,
+          used_calls: budget.used_calls,
+          max_calls: budget.max_calls,
+          remaining_calls: 0,
+          reservation_key: reservationKey,
+        },
+      };
+    });
+    this.budgetSchemaReady = true;
+    return Response.json(outcome.body, {
+      status: outcome.status,
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  }
+
   async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === '/_budget/reserve' && request.method === 'POST') {
+      return this.handleBudgetReserve(request);
+    }
     this.readiness ??= this.waitForReady().finally(() => {
       this.readiness = undefined;
     });
@@ -97,7 +254,7 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
     // Retry only readiness probes; an extraction POST must be forwarded once.
     return this.ctx
       .container!.getTcpPort(8080)
-      .fetch(new Request(`http://container${new URL(request.url).pathname}`, request));
+      .fetch(new Request(`http://container${url.pathname}`, request));
   }
 }
 
@@ -335,6 +492,31 @@ export default {
             'Cache-Control': 'no-store',
           },
         });
+      }
+      if (url.pathname === '/budget/reserve' && request.method === 'POST') {
+        const scope = await readExtractionCapability(
+          request.headers.get('x-source-capability') ?? '',
+          signingSecret,
+        );
+        if (
+          !scope ||
+          scope.tenantId !== request.headers.get('x-tenant-id') ||
+          scope.jobId !== request.headers.get('x-job-id') ||
+          scope.sourceHash !== request.headers.get('x-source-hash')
+        )
+          return json('forbidden', 403);
+        const body = await request.text();
+        return await env.EXTRACTOR.getByName('staging-extractor').fetch(
+          new Request('http://extractor/_budget/reserve', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Tenant-ID': scope.tenantId,
+              'X-Job-ID': scope.jobId,
+            },
+            body,
+          }),
+        );
       }
       if (
         (url.pathname === '/extract' && request.method === 'POST') ||

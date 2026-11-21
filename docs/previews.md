@@ -9,6 +9,12 @@ A PR preview is a temporary copy of the diner and console pages built from one p
    - Diner: `https://pr-<number>.peekaplate-diner-preview.pages.dev`
    - Console: `https://pr-<number>.peekaplate-console-preview.pages.dev`
    - Console component demo (synthetic values, for design review): `https://pr-<number>.peekaplate-console-preview.pages.dev/foundations.html`. Only preview builds include it (`PEEKAPLATE_PREVIEW_DEMOS`); staging and production builds do not.
+   - Owner sign-in demo (E1, S01, S02 and password recovery S03, S04 with a synthetic service; pick its answers in the demo bar, or open S04 as if from the reset email): `https://pr-<number>.peekaplate-console-preview.pages.dev/owner-sign-in.html`. Preview builds only, like the component demo.
+   - Owner onboarding demo (S05 Restaurant details, S06 Choose how to add your menu, S07 Add your menu link and Upload your menu, and S08 Processing, No dishes found and Extraction failed, picked in the demo bar; fictional data, with saves, link imports, uploads and processing answered by the demo bar; S08 Ready to review is not included): `https://pr-<number>.peekaplate-console-preview.pages.dev/owner-onboarding.html`. Preview builds only, like the component demo.
+   - Owner menu preview and publish demo (S13 with no demo controls: the phone shows the same PR's diner preview, then Publish Confirmation and Published with Copy Link; fictional data and an example link, nothing is published; Not ready and a failed publish are covered by unit tests): `https://pr-<number>.peekaplate-console-preview.pages.dev/owner-menu-preview.html`. Preview builds only. Previews allow exactly one frame pairing for this: a console preview may frame a diner preview, and a diner preview may be framed only by a console preview (`scripts/preview.mjs`).
+   - Owner first dashboard arrival demo (S4-FE-03, fictional restaurant): `https://pr-<number>.peekaplate-console-preview.pages.dev/first-dashboard.html`. Preview builds only, like the component demo.
+   - Console owner dashboard demo (fictional sample data plus a synthetic owner report): `https://pr-<number>.peekaplate-console-preview.pages.dev/owner-dashboard.html`. Preview builds only, like the component demo.
+   - Owner menu review and publish demo (S10, S5-FE-10, fictional dishes): `https://pr-<number>.peekaplate-console-preview.pages.dev/review-dishes.html`. Preview builds only; "Publish Menu" only shows the success pop-up locally and calls no API.
 3. Each new push to the PR rebuilds the preview and updates the same comment. Check that its commit matches the latest PR commit before reviewing.
 4. Report findings as PR review comments, with the link, browser and screen size.
 
@@ -106,3 +112,10 @@ GitHub changed this event's source/reference to the default branch in December 2
 - Closing the test PR triggered [automatic cleanup](https://github.com/vivienk/peekaplate/actions/runs/40393553935). The cleanup job passed in 16 seconds; provider readback found no `pr-48` deployments in either project. The same bot comment changed to removed. Edge retirement briefly returned transient errors; by `2026-10-26T20:13:56Z`, both page and marker URLs returned 404.
 
 The test PR is reopened for the final reviewed documentation/merge step; its eventual merge repeats cleanup. No Worker, Supabase, Queue/R2, PostHog or production deployment was changed. Repeat lifecycle acceptance when changing the workflow or provider configuration.
+
+
+## Stacked owner-auth design review
+
+PR146 temporarily targets develop so the existing develop/main-only preview workflow can build its complete auth demo. It still depends on PR143 and stays draft/unmerged; its diff includes signup until143 is merged. Retargeting alone does not trigger this workflow: push the tested recovery head afterward, then verify the preview comment and peekaplate-preview.json match that exact SHA. The workflow_dispatch action is cleanup-only, not a rebuild button.
+
+Rania reviews S03/S04 through `/owner-sign-in.html` and the synthetic demo controls. Real `/owner-auth.html`, `/auth-confirm.html` and `/auth-reset.html` are intentionally excluded from previews. No wildcard Supabase callback, provider secret, staging deployment or auth merge is needed for design review. Merge143 first, then recheck146 against develop after the owner/dashboard flow is accepted.

@@ -1,5 +1,9 @@
 # Menu extraction
 
+For QA-02 source-based reference preparation, development/holdout separation and
+the offline freeze/verify commands, see the [reference handoff](eval/qa02/README.md).
+Its integrity checks are separate from menu accuracy and independent acceptance.
+
 The optional staging HTTP service wraps this same pipeline; it does not replace
 the CLI. See [VIS-01 infrastructure and service handoff](../docs/menu-ingestion-infrastructure.md)
 for the request contract, Docker commands, secrets, limits and activation gates.
@@ -474,6 +478,88 @@ create-only review-page builder. It accepts a T0 detail-sized grayscale mask and
 an optional generated PNG with its actual prompt/model provenance. See
 [asset delivery](../docs/asset-delivery.md#offline-supplied-mask-and-png-review-preview)
 for commands, non-approval behavior, browser controls and test boundaries.
+# Tripo cutout-to-3D review
+
+The private `peekaplate_processing.generate_model` CLI verifies an existing PR25 cutout,
+submits a Tripo image-to-model job, resumes polling without resubmission, and saves a
+validated GLB for human review. The current 2.5D diner remains unchanged.
+See [setup, commands and verification limits](../docs/tripo-cutout-to-3d.md).
+
+
+
+## Dish-photo ingestion to 2.5D
+
+The existing `python -m peekaplate_processing.prepare_assets` entry point now invokes
+`portion_ingestion.ingest_dish_photo` automatically after T0 photo preparation. Its JSON
+result includes `portion.status`, the ingestion manifest path and any fallback reason.
+Opaque photos run automatic local segmentation. Optional `--mask <grayscale.png>` overrides
+it; mask dimensions must match the EXIF-oriented original. On segmentation failure, the original photo remains
+the fallback. This does not run an external segmentation or generative model.
+
+The reusable processor also supports direct and batch jobs:
+
+```sh
+PYTHONPATH=processing/src python -m peekaplate_processing.portion_ingestion \
+  --input dish.webp --dish-id <uuid> --revision-id <uuid> \
+  --capture-evidence "Source capture reference" --output-root work/portions
+
+PYTHONPATH=processing/src python -m peekaplate_processing.portion_ingestion \
+  --batch frontend/diner/src/menu/fixture-assets/portion-ingestion-input.json \
+  --source-root . --output-root work/portions
+```
+
+Each artifact records source/mask hashes, recipe, dish/revision IDs, fallback, bounded
+layers, review state and publication eligibility. Identical jobs reuse verified output;
+a changed source or revision produces a different artifact. Tampered cached output fails
+closed. Source-root traversal and mismatched source hashes are rejected. Local callers
+must enforce tenant authorization before invoking the processor; this is not a public
+upload endpoint. Restaurant approval and public publication remain separate operations.
+
+For PR147 preview assets, `pnpm ingest:portion-fixtures` invokes this same processor and
+exports its output to the diner. Set `PEEKAPLATE_PROCESSING_PYTHON` to the Python executable
+with the processing dependencies installed. `pnpm --filter @peekaplate/diner build`
+checks source hashes, processor fingerprint and provenance before building.
+
+### Automatic photo cutout and local View Portion
+
+Install the pinned local CPU segmentation runtime with `uv sync --extra cutout --extra service`.
+Opaque photos now automatically run rembg U2NetP (no supplied mask or paid API key).
+The model changes alpha only; original food pixels and the source-photo fallback remain.
+Existing transparent PR147 photos bypass inference and retain their exact bytes.
+First use downloads public model weights; photos remain on the local machine. Use
+`U2NET_HOME` for a pre-provisioned cache. First inference may take up to three minutes;
+a timeout, invalid/empty mask or unavailable runtime retains the original photo.
+Model hash, generated mask hash and source/revision identity are recorded for review.
+The output remains `needs_review` and cannot auto-publish. Model segmentation can miss
+plate edges or include table objects; visual review is still required.
+
+Start the local upload flow (no Tripo key or review directory required):
+
+```sh
+PYTHONPATH=processing/src uv run --project processing --extra cutout --extra service python -m peekaplate_processing.serve_model_demo --state-dir /absolute/path/to/private-preview-state
+```
+
+Open `http://127.0.0.1:5173/`, select an actual menu dish, then choose a photo under
+**Try your dish photo (local review)**. Upload runs the same ingestion processor and
+opens View Portion with the returned dish/revision-bound layers. Compare uses the
+uploaded original; reset, back navigation and automatic camera entry are preserved.
+
+The authenticated private endpoint is `POST /v1/portion-uploads/{dish_id}/{revision_id}`
+with raw image bytes, capped at 12 MB / 24 MP. The loopback Vite bridge supplies the
+server token; it is never bundled into the browser. One upload runs at a time.
+The endpoint is single-tenant; callers must authorize dish ownership before exposing it
+outside this private local demo. No production upload route or publication approval is added.
+The static PR162 Pages preview continues to show generated fixture assets; it does not
+host this Python service, so fresh uploads are available locally only.
+
+### Owner serving dimensions and fullscreen AR
+
+Pass `--serving-width-mm` to photo ingestion or preparation, or `serving_width_mm` per batch job. The private upload endpoint accepts `X-Serving-Width-Mm`; the local review form accepts centimetres. This is the owner-measured physical width of the visible dish including its plate, from 30 to 1000 mm, not a weight or servings label. Missing measurements remain unknown. The processor records the width and visible-alpha width fraction so transparent image margins do not shrink the displayed serving. Measurement changes create distinct artifacts. Publication still requires review.
+
+The approved portion contract can carry optional `physical_size` with owner width and foreground fraction. Tracked table AR uses metres and fixes the measured scale; the plain camera overlay cannot establish table distance and explicitly remains approximate. Dimensions and segmentation must be checked against the real dish; physical-phone accuracy has not been accepted. The future owner menu-upload UI must provide these dimensions through its authorized backend; this PR only adds the ingestion/service/preview contract.
+
+View Portion and Compare retain their original detail row. The camera portal uses the full viewport, the existing preview back arrow, and collapsed adjustment controls. A mobile View Portion tap requests landscape/fullscreen where supported; unsupported browsers show a rotate-phone hint. Closing releases only this viewer's orientation/fullscreen request.
+
 
 ## Ingredient intelligence (AI-02)
 
@@ -482,3 +568,15 @@ Inputs outside its bounds retain the original extraction and record explicit sid
 unavailability in `timings.json`. Vision transcriptions never become independent
 ingredient grounding. The [AI-02 guide](../docs/ingredient-intelligence.md) explains
 the offline CLI, limits and remaining authenticated owner-review integration.
+
+## Strict menu field scoring (QA-02 / VIS-04)
+
+Reuse the [source-reference workflow](eval/qa02/README.md) and the
+[versioned source/page proposal](../docs/qa02-real-menu-source-plan-v1.md).
+The [strict scorer guide](eval/qa02/STRICT_SCORER.md) defines the offline CLI,
+hash-bound original outputs and human occurrence associations, complete emitted
+price-text/scalar/currency comparisons, duplicates, null/zero and failed-page counts.
+It is not the historical fuzzy scorer. It does not infer structured option arrays,
+ingredient/geometry truth, reviewer identity, quality approval or publication.
+Fresh evaluated predictions require the independently reviewed reference/scoring
+freeze, Vivien's threshold sign-off and explicit bounded execution authorization.

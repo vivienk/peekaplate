@@ -9,6 +9,7 @@ import {
   ResolvedCandidateFieldsSchema,
   ReviewCandidateCommandSchema,
   ReviewCandidateItemResponseSchema,
+  ReviewEditableFieldSchema,
   UpsertExtractionReviewSessionRequestSchema,
 } from './index';
 
@@ -37,6 +38,19 @@ describe('S3-RES-01.2 review persistence contracts', () => {
   const validActorId = 'a11ac10b-58cc-4372-a567-0e02b2c3d479';
   const validCommandId = 'c11ac10b-58cc-4372-a567-0e02b2c3d479';
   const validRevisionId = 'b11ac10b-58cc-4372-a567-0e02b2c3d479';
+
+  it('can mark all supported correction fields incomplete together', () => {
+    const fields = ReviewEditableFieldSchema.options;
+    const result = ReviewCandidateCommandSchema.parse({
+      commandId: validCommandId,
+      expectedVersion: 0,
+      action: 'mark_incomplete',
+      incompleteFields: fields,
+    });
+    expect(result.incompleteFields).toEqual(fields);
+    expect(fields).toContain('serving_size');
+    expect(fields).toContain('serving_count');
+  });
 
   describe('ExtractionReviewScopeSchema & CandidateReviewScopeSchema', () => {
     it('accepts valid scopes and transforms uuid to lowercase', () => {

@@ -1,5 +1,10 @@
 # Review API and correction persistence (S3-RES-01.2)
 
+For owner-entered Add Dish drafts, private photos and resumable uploads, use the
+[owner menu workspace](owner-menu-workspace.md). Manual input is explicitly marked
+and never registered as a fabricated extraction artifact. Existing extraction
+review-session verification below remains mandatory.
+
 Candidate schema, fixtures and export semantics are documented in [review-candidates.md](review-candidates.md); this page covers the staff review endpoints built on them.
 
 The review persistence service exposes tenant-scoped endpoints in `@peekaplate/backend` for registering extraction sessions, reading candidate review projections, and saving reviewer corrections.

@@ -1,0 +1,115 @@
+# November 15 independent integration review
+
+Integrated runtime: `fa8398c`, reconciled with develop including #147, #189 and #196.
+This section supersedes the older merge/conflict and observer/withdrawal blockers below.
+
+- Preserved current Compare/Replace, Saved, automatic menu aliases, tracking and live artwork. Portion cleanup joins the existing detail-screen lifecycle.
+- Fixed the Saved-origin Back label and added Saved/Compare return regressions. A local conflict-resolution error was caught by typecheck/browser checks and the second review, restored before push, and retested.
+- PASS: `pnpm check`: 1,886 unit tests (27.90s), 115 script tests (5.71s), lint, types, context and documentation.
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2`: 79/79 in 2.1 minutes, including the earlier observer/withdrawal cases. Camera/orientation are simulated.
+- PASS: four preview-state screenshot checks rerun with full-page captures in 7.4s. Review screenshots are local evidence; the historical captures below remain historical.
+- PASS: `pnpm exec playwright test tests/e2e/compare-picker.spec.ts tests/e2e/compare-result.spec.ts tests/e2e/save-screens.spec.ts tests/e2e/search.spec.ts tests/e2e/menu-triggers-live.spec.ts tests/e2e/ingredient-artwork.spec.ts --workers=2`: 46/46 in 32.9s. Replaced the obsolete "View Portion is not available" expectation with an enabled-button assertion; existing Save behavior is unchanged.
+- PASS: `pnpm verify build`. Initial diner JavaScript is below its 150 KB gzip gate; T1 is below its 400 KB gate. No deployment occurs in this check.
+- PASS: 64 focused portion/model/cutout/demo Python tests in the existing Linux service image with `--network none`, plus 12 proxy/bundle/generator script tests.
+- Full Python discovery in that image ran 655 tests in 55.408s: 651 passed; four spatial harness cases could not start because the image lacks Node. All 17 spatial tests, including those four, then passed using the host toolchain in 19.584s. This is split-environment evidence, not a passing full Linux run.
+- Two read-only review lanes checked UI lifecycle and private-service/contract boundaries. The original pinned security diff produced no supported security finding; reconciliation received separate delta review.
+- CI run `43757839050` passed unit, full Python/package, build and database checks, but exposed three landscape screenshot writes to the macOS-only `/private/tmp` path. Both landscape captures and the opt-in upload capture now use Playwright's per-test output directory. The three affected landscape cases pass locally in 13.1s; no application behavior or assertions changed. The PR description now contains the required contract labels. Full CI rerun remains required before merge.
+- NOT RUN: paid Tripo calls, real cutout-model execution, physical-phone camera/orientation/scale acceptance, hosted publication or deployment. Generated/local assets stay review-only and publication-ineligible.
+
+## Historical size and interaction correction
+
+Latest source reviewed: `11a20aa` (delta from `50c3b99`). This section supersedes older interaction evidence below.
+
+- Camera preview contains the complete image, preserves preferred pixel width/relative placement on resize, and temporarily constrains oversized images instead of clipping. Size remains approximate.
+- 2.5D tilt is limited to ±3°. Drag retains the grab point; background taps place the image. Optional local models stay centered in manual mode, with active bounds used for placement.
+- Landscape is requested on opening when supported. Portrait has a fresh-gesture retry only where orientation lock exists; otherwise it gives a manual sideways-rotation prompt. Browser/OS restrictions cannot be overridden by a web page.
+- PASS: `pnpm exec vitest run frontend/diner/src/menu/portion.test.ts frontend/diner/src/menu/portionMotion.test.ts frontend/diner/src/menu/portionOrientation.test.ts frontend/diner/src/menu/portionScale.test.ts frontend/diner/src/menu/portionPlacement.test.ts frontend/diner/src/menu/portionUpload.test.ts` —30 tests.
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --grep 'camera portal|portal closes|table session|opens the camera portal|actual PR145|original actions' --workers=2` —16 tests, including all six photos, drag, original comparison, model switch/failure, cleanup and portrait/landscape. Camera and orientation are simulated.
+- PASS: `pnpm verify lint typecheck context:check docs:check`; workspace build passed before the final interaction correction; final preview diner build passed with `PEEKAPLATE_PREVIEW_DEMOS=true pnpm --filter @peekaplate/diner build`.
+- RED-to-GREEN: original camera code fails the bounded Tilt control regression; corrected code passes. Landscape test port and touch emulation, and six phone viewport setups were corrected.
+- Broader suite was67/76 before test-setup corrections. Two remaining unrelated checks (observer count and withdrawal event count) reproduce with original50c3b99 application files restored. This is not a claim of full-suite or merge readiness.
+- Independent read-only architecture/correctness review found no remaining blocker in the correction. Portrait and landscape screenshots were visually inspected.
+- NOT RUN: physical phone camera/orientation, real AR tracking/scale, real restaurant publication. PR remains draft; no merge or production deployment.
+
+---
+
+# Figma screens with PR25 viewer — November 12, 2026
+
+Local development evidence on Node24.16.0 / pnpm11.25.0. The latest user direction
+selects the supplied Figma screen composition while preserving the accepted PR25 image bytes and movement within View Portion. Four state categories and Back/retry navigation are preserved.
+
+| Ready | Loading |
+| --- | --- |
+| ![Ready](ready.png) | ![Loading](loading.png) |
+| Original-photo fallback | Failed / retry |
+| ![Photo fallback](fallback.png) | ![Failed](failed.png) |
+
+## Exact original image correction
+
+The earlier demo re-encoded the cutout and omitted the generated presentation.
+The local selector now uses the exact prior PNGs, with byte hashes checked in the browser.
+Generated presentation is the default; Original cutout is selectable above the stage.
+Both remain needs-review and publication-ineligible, excluded from production builds.
+
+| Generated presentation | Original cutout |
+| --- | --- |
+| ![Generated](generated.png) | ![Cutout](cutout.png) |
+
+Latest correction checks: PASS `pnpm exec playwright test --config playwright.portion.config.ts --workers=2`
+(52/52); PASS `pnpm verify lint typecheck build`; PASS exact-asset and selector exclusion
+from production dist. The broader unit/script results below predate this asset correction.
+
+## Implemented behavior
+
+- Dark390px Figma shell, Inter type, centered250px dish and native42px Back,64px spinner,46px gesture hint and150px unavailable illustration. Compare/reset and DEV image selection sit in an expandable Preview controls disclosure below the main composition.
+- CSS900px perspective, up to±3° rotation,5px/3px translation. Pointer replaces the
+  shared position; keys step1/6. Pointer tracking55ms linear, reset/keys300ms ease-out.
+- Show original photo / Show review candidate, aria-pressed, Reset view, Home,
+  horizontal touch tilt, vertical scrolling and live reduced-motion support.
+- No WebGL/Three.js dependency. The spatial backdrop is validated but visually replaced
+  by the dark screen surface; foreground cutout layers move together.
+- Original photo must decode before interaction. Missing/invalid cutouts retain the photo;
+  missing photo shows failed/retry. Back/Escape/browser history preserve detail state/focus.
+- PR25 processing output identity/provenance remains needs_review and publication-ineligible
+  in the DEV fixture. No production approval/hosting path was added.
+
+## Current Figma verification
+
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` —52/52.
+- PASS: `pnpm verify lint typecheck build` and `pnpm verify context:check docs:check`.
+- PASS: `node --test scripts/check-bundle.test.mjs` —6/6, including all three font weights.
+- Initial JS53,046 gzip bytes; T1 delivery273,769/400,000 bytes including72,472 font bytes.
+- Architecture and correctness reviews resolved the font-budget finding at3db33af.
+- NOT RUN: physical phones, manual screen readers, hosted publication and full database suite.
+
+
+Figma loading frame was read through design context. The connector then reached its
+plan limit; ready and unavailable frames were inspected in the browser. Existing exact
+SVG exports are reused at native sizes. Ready/loading/unavailable renders were visually
+inspected. Native device status bars are handled by the browser safe area rather than
+fake clock/battery UI. Supplementary controls are below the Figma composition.
+
+## Earlier verification (before Figma shell correction)
+
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` —52/52 in the latest clean run. Includes compare/reset, exact motion/timing, original-photo failure, integrity, reduced motion, cancellation, navigation and four screenshots.
+- PASS: `pnpm verify lint typecheck test build` —1,214 Vitest tests passed,4 skipped;74 script tests passed; app builds and Worker dry-run passed.
+- PASS: final `pnpm verify lint typecheck build context:check docs:check` after layout corrections.
+- PASS: `git diff --check`; production JS excludes DEV fixture host and WebGL renderer.
+- Initial JS53,014 gzip bytes /150,000 limit. T1 delivery201,297 /400,000 bytes including200,000-byte asset/manifest allowance.
+- Inspected all four390×844 screenshots. Read-only architecture/correctness review found no blocking issues on implementation7909e9c.
+- NOT RUN: full default browser suite, database suite(no database changes), physical phones,
+  manual VoiceOver/TalkBack, hosted approved-asset publication. Python processing unchanged
+  in this correction; prior34-test processing evidence remains historical, not rerun here.
+
+Earlier setup/test observations and corrections are recorded in errors.md. The new
+appearance/control regression failed against the previous viewer before implementation.
+
+## Local viewing
+
+Open `http://127.0.0.1:5173/?scenario=portion-demo`, select the dish, then View Portion.
+`previewState=loading` delays loading; `previewState=photo` forces original-photo fallback;
+`previewState=failed` forces failure/retry. Legacy `previewState=fallback` still opens the
+interactive cutout. The four categories originate from Figma846:7146,258:6000,221:260,
+165:2413; the latest request restores the Figma layout while retaining PR25 image and movement.
+
+Local branch only. No PR, merge, workflow setting change or deployment.

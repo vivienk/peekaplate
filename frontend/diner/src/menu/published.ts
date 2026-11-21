@@ -38,6 +38,8 @@ export function publicBundleToWire(bundle: PublicMenuContentBundle): WireMenuBun
           dish_id: dish.dish_id,
           dish_revision_id: dish.dish_revision_id,
           complete: true,
+          ...(dish.portion ? { portion: dish.portion } : {}),
+          ...(dish.serving_count !== undefined ? { serving_count: dish.serving_count } : {}),
           name: dish.name,
           description: dish.description,
           price: { amount: dish.price.amount, currency: dish.price.currency },
@@ -57,7 +59,9 @@ export function publicBundleToWire(bundle: PublicMenuContentBundle): WireMenuBun
                 return 'Gluten-free';
             }
           }),
-          images: { card: { ...dish.images.card }, detail: { ...dish.images.detail } },
+          images: dish.images
+            ? { card: { ...dish.images.card }, detail: { ...dish.images.detail } }
+            : null,
         };
       }),
     })),

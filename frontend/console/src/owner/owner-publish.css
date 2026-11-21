@@ -1,0 +1,18 @@
+/* S13 inside the owner workspace. The preview, panel, dialog and messages are the official S13
+ * (publish/publish.css); this file only lays out the step before it, choosing a prepared menu. */
+.owner-publish__choose {
+  display: grid;
+  gap: var(--pp-space-24);
+  justify-items: stretch;
+}
+.owner-publish__menus {
+  display: grid;
+  gap: var(--pp-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.owner-publish__menus .pp-auth-btn {
+  inline-size: 100%;
+  margin: 0;
+}

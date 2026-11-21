@@ -59,9 +59,9 @@ export function searchPanelMarkup(): string {
   return `
     <div class="pp-search-panel" id="pp-search-panel" hidden>
       <form class="pp-search-bar" role="search" aria-label="Menu search">
-        <span class="pp-search-bar__icon" aria-hidden="true">⌕</span>
+        <span class="pp-search-panel__icon" aria-hidden="true"></span>
         <label class="pp-sr-only" for="pp-search-input">Search dishes or ingredients</label>
-        <input class="pp-search-input" id="pp-search-input" type="search" placeholder="Search dishes or ingredients" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+        <input class="pp-search-input" id="pp-search-input" type="search" placeholder="Search here" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
         <button class="pp-search-close" type="button" aria-label="Close search"><img class="pp-search-close__icon" src="${UI_ICONS.close}" alt="" aria-hidden="true" width="16" height="16" /></button>
       </form>
       <p class="pp-search-staff" hidden>${SEARCH_STAFF_LINE}</p>

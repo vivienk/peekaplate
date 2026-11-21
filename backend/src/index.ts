@@ -1,11 +1,19 @@
 import crypto from 'node:crypto';
 import {
+  AcceptPilotOrderAgreementRequestSchema,
+  type AcceptPilotOrderAgreementResponse,
   type ApproveDishDraftRequest,
   ApproveDishDraftRequestSchema,
+  ApprovedDishFactsSchema,
   ApproveMenuRevisionSchema,
   type BoundedRetrievalResult,
+  CandidateCorrectedFieldsSchema,
   CandidateReviewScopeSchema,
   CreateDishRevisionSchema,
+  type CreateOwnerInsightActionRequest,
+  CreateOwnerInsightActionRequestSchema,
+  DeleteOrderDataRequestSchema,
+  DinerLinkSchema,
   type DishRevision,
   DishRevisionScopeSchema,
   DraftScopeSchema,
@@ -18,21 +26,36 @@ import {
   ObservationBatchV2Schema,
   type ObservationQueueEnvelope,
   ObservationQueueEnvelopeSchema,
+  type OrderDataDeletionReason,
   type OrderOutcomeImportResponse,
+  OwnerDishFieldsSchema,
+  OwnerInsightActionIdSchema,
+  type OwnerInsightActionListQuery,
+  OwnerInsightActionListQuerySchema,
+  OwnerWorkspaceResponseSchema,
+  PreparedMenuPreviewSchema,
+  PreparedMenusSchema,
+  type PublicMenuContentBundle,
   type PublicMenuResponse,
   PublishMenuSchema,
+  RestaurantSlugSchema,
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
   type SubmitMenuIngestionRequest,
   SubmitMenuIngestionRequestSchema,
+  type SubmitOrderDeletionResponse,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
+  type UpdateOwnerInsightActionRequest,
+  UpdateOwnerInsightActionRequestSchema,
   type UpsertExtractionReviewSessionRequest,
   UpsertExtractionReviewSessionRequestSchema,
   VenueScopeSchema,
+  VerifyOrderDeletionRequestSchema,
   WithdrawMenuSchema,
 } from '@peekaplate/contracts';
+import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -44,6 +67,7 @@ import {
   type QueueHandlerServices,
 } from './consumer';
 import { CommandError, createDishRevision, type DishRevisionResult } from './dish-command';
+import { validateMenuPdf } from './ingestion/intake';
 import {
   type PythonExtractor,
   processIngestionQueueBatch,
@@ -61,6 +85,7 @@ import {
 } from './ingestion/repository';
 import { createHttpPythonExtractor } from './ingestion/transport';
 import { readMenuUpload, storeAndDispatchUpload } from './ingestion/upload';
+import { registerArtworkRoutes } from './ingredient-artwork-routes';
 import {
   createMenuTokenVerifier,
   type MenuAuthority,
@@ -70,12 +95,46 @@ import {
 } from './menu-token';
 import { ingestObservations } from './observation-ingest';
 import {
+  acceptPilotOrderAgreement as acceptPilotOrderAgreementService,
   cleanupOrphanedOrderImports,
   importOrderOutcomes as importOrderOutcomesService,
+  type OrderDeletionVerificationStorage,
   OrderImportError,
   type OrderOutcomeStorage,
+  retryPendingOrphanCleanups,
+  submitOrderDataDeletionRequest as submitOrderDataDeletionRequestService,
+  verifyVenueOrderDeletion as verifyVenueOrderDeletionService,
 } from './order-ingestion/service';
+import {
+  mintOwnerReportReference,
+  OWNER_REPORT_REFERENCE_HEADER,
+} from './owner-ai/report-reference';
+import { registerOwnerAnalysisRoutes } from './owner-ai/routes';
+import {
+  createOwnerInsightAction,
+  listOwnerInsightActions,
+  OwnerInsightActionError,
+  updateOwnerInsightAction,
+} from './owner-insight-actions';
+import { registerOwnerMenuRoutes } from './owner-menu-routes';
+import {
+  PREPARED_ASSET_PATH,
+  PREPARED_BUNDLE_PATH,
+  type PreparedStorage,
+  prepareOwnerMenu,
+  readPreparedAsset,
+  readPreparedBundle,
+  readPreparedLogo,
+  readPreparedPreviewAsset,
+} from './owner-prepare';
+import { fetchPreparedMenu, listPreparedMenus, type OwnHost } from './owner-publication';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
+import {
+  buildOwnerReportExportFilename,
+  type ExportableOwnerReport,
+  serializeOwnerReportCsv,
+} from './owner-report-export';
+import { listOwnerVenues } from './owner-workspace';
 import {
   createPublicMenuResponse,
   menuJwks,
@@ -86,8 +145,10 @@ import {
   approveMenuRevision,
   PublicationCommandError,
   publishMenu,
+  readDinerLink,
   withdrawMenu,
 } from './publication-command';
+import { resolveRestaurantLink } from './restaurant-link';
 import { retrieveMenuEvidence } from './retrieval';
 import { type ReviewArtifactObject, verifyReviewArtifact } from './review-artifact';
 import {
@@ -96,15 +157,25 @@ import {
   saveCandidateReviewCommand,
   upsertExtractionReviewSession,
 } from './review-command';
+import { authorizeStaffVenue } from './staff-venue';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
+
+export { authorizeStaffVenue } from './staff-venue';
 
 export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = [
   '00000000-0000-4000-8000-000000000123',
 ];
 
 export type Bindings = {
+  OWNER_AI_RESPONSES_ENABLED?: string;
+  OWNER_AI_OPENAI_API_KEY?: string;
+  OWNER_AI_OPENAI_PROJECT_ID?: string;
+  OWNER_AI_REPORT_REFERENCE_SECRET?: string;
+  OWNER_AI_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
+  INGREDIENT_ARTWORK_ENABLED?: string;
   APP_ENV?: string;
+  DINER_PUBLIC_ORIGIN?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
   LOCAL_DATABASE_URL?: string;
@@ -128,14 +199,70 @@ export type Bindings = {
    * tests bind put() alone; without it, review sessions outside local fail as artifact_unavailable.
    */
   INGESTION_REPORTS_BUCKET?: {
-    put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
+    put(
+      key: string,
+      value: string | ArrayBuffer | ReadableStream,
+      options?: {
+        customMetadata?: Record<string, string>;
+        httpMetadata?: { contentType?: string };
+        onlyIf?: { etagDoesNotMatch?: string };
+        sha256?: string;
+      },
+    ): Promise<unknown>;
     get?(key: string): Promise<ReviewArtifactObject | null>;
+    head?(key: string): Promise<{ uploaded?: Date | string } | null>;
+    list?(options: {
+      prefix: string;
+      limit?: number | undefined;
+      cursor?: string | undefined;
+    }): Promise<{
+      objects: { key: string; size: number; uploaded: Date }[];
+      truncated: boolean;
+      cursor?: string;
+    }>;
+    delete?(key: string): Promise<unknown>;
   };
+  INGREDIENT_ARTWORK_BUCKET?: {
+    put(
+      key: string,
+      value: string | ArrayBuffer | ReadableStream,
+      options?: { onlyIf?: { etagDoesNotMatch?: string }; sha256?: string },
+    ): Promise<unknown>;
+    get?(key: string): Promise<ReviewArtifactObject | null>;
+    head?(key: string): Promise<{ uploaded?: Date | string } | null>;
+    list?(options: {
+      prefix: string;
+      limit?: number | undefined;
+      cursor?: string | undefined;
+    }): Promise<{
+      objects: { key: string; size: number; uploaded: Date }[];
+      truncated: boolean;
+      cursor?: string;
+    }>;
+    delete?(key: string): Promise<unknown>;
+  };
+  INGREDIENT_ARTWORK_ORPHAN_GRACE_MS?: string;
+  INGREDIENT_ARTWORK_CLEANUP_DRY_RUN?: string;
+  MENU_STAGING_RETENTION_DAYS?: string;
+  MENU_STAGING_REJECTED_RETENTION_DAYS?: string;
+  MENU_STAGING_ORPHAN_GRACE_DAYS?: string;
+  MENU_STAGING_CLEANUP_DRY_RUN?: string;
+
   ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
+  ORDER_DELETION_VERIFICATION_BUCKET?: OrderDeletionVerificationStorage;
+  OPERATOR_HYPERDRIVE?: { connectionString: string };
+  LOCAL_OPERATOR_DATABASE_URL?: string;
+  CHECKER_HYPERDRIVE?: { connectionString: string };
+  LOCAL_CHECKER_DATABASE_URL?: string;
+  AUTHORIZED_DELETION_OPERATOR_IDS?: string;
+  AUTHORIZED_DELETION_CHECKER_IDS?: string;
   ORDER_IMPORT_HISTORICAL_DAYS?: string;
   ORDER_IMPORT_RETENTION_DAYS?: string;
   ORDER_IMPORT_GRACE_PERIOD_MS?: string;
+  /** Server-only Python 2.5D service; never exposed to the console bundle. */
+  PORTION_SERVICE_URL?: string;
+  PORTION_SERVICE_SECRET?: string;
   EXTRACTION_SERVICE_URL?: string;
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
@@ -144,6 +271,7 @@ export type Bindings = {
 
 type Dependencies = {
   verify: (authorization: string, env: Bindings) => Promise<string>;
+  readOwnerVenues?: (actorId: string, env: Bindings) => ReturnType<typeof listOwnerVenues>;
   execute: (
     actorId: string,
     venueId: string,
@@ -196,6 +324,51 @@ type Dependencies = {
     menuId: string,
     env: Bindings,
   ) => Promise<PublicMenuRecord | undefined>;
+  resolveRestaurantLink?: (slug: string, env: Bindings) => ReturnType<typeof resolveRestaurantLink>;
+  readDinerLink?: (
+    actorId: string,
+    venueId: string,
+    menuId: string,
+    env: Bindings,
+  ) => ReturnType<typeof readDinerLink>;
+  listPreparedMenus?: (
+    actorId: string,
+    venueId: string,
+    env: Bindings,
+  ) => ReturnType<typeof listPreparedMenus>;
+  fetchPreparedMenu?: typeof fetchPreparedMenu;
+  prepareOwnerMenu?: (
+    actorId: string,
+    venueId: string,
+    origin: string,
+    env: Bindings,
+  ) => ReturnType<typeof prepareOwnerMenu>;
+  readPreparedBundle?: (
+    venueId: string,
+    menuId: string,
+    revisionId: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedBundle>;
+  readPreparedAsset?: (
+    venueId: string,
+    photoId: string,
+    hash: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedAsset>;
+  readPreparedLogo?: (
+    venueId: string,
+    hash: string,
+    extension: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedLogo>;
+  readPreparedPreviewAsset?: (
+    actorId: string,
+    content: PublicMenuContentBundle,
+    origin: string,
+    assetId: string,
+    file: string,
+    env: Bindings,
+  ) => ReturnType<typeof readPreparedPreviewAsset>;
   issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
   readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
   submitIngestion?: (
@@ -236,6 +409,19 @@ type Dependencies = {
     sourceFilename: string,
     env: Bindings,
   ) => Promise<OrderOutcomeImportResponse>;
+  acceptPilotOrderAgreement?: (
+    actorId: string,
+    venueId: string,
+    agreementVersion: string,
+    env: Bindings,
+  ) => Promise<AcceptPilotOrderAgreementResponse>;
+  submitOrderDataDeletionRequest?: (
+    actorId: string,
+    venueId: string,
+    requestId: string,
+    reason: OrderDataDeletionReason | undefined,
+    env: Bindings,
+  ) => Promise<SubmitOrderDeletionResponse>;
   upsertReviewSession?: (
     actorId: string,
     venueId: string,
@@ -256,6 +442,25 @@ type Dependencies = {
     input: ReviewCandidateCommand,
     env: Bindings,
   ) => Promise<ReviewCandidateItemResponse>;
+  createOwnerAction?: (
+    actorId: string,
+    venueId: string,
+    input: CreateOwnerInsightActionRequest,
+    env: Bindings,
+  ) => ReturnType<typeof createOwnerInsightAction>;
+  updateOwnerAction?: (
+    actorId: string,
+    venueId: string,
+    actionId: string,
+    input: UpdateOwnerInsightActionRequest,
+    env: Bindings,
+  ) => ReturnType<typeof updateOwnerInsightAction>;
+  listOwnerActions?: (
+    actorId: string,
+    venueId: string,
+    query: OwnerInsightActionListQuery,
+    env: Bindings,
+  ) => ReturnType<typeof listOwnerInsightActions>;
 };
 
 export async function submitAuthorizedMenuIngestion(
@@ -285,48 +490,6 @@ export async function submitAuthorizedMenuIngestion(
   return job;
 }
 
-export async function authorizeStaffVenue(
-  client: Client,
-  actorId: string,
-  venueId: string,
-  inTransaction = false,
-): Promise<void> {
-  let started = false;
-  try {
-    if (!inTransaction) {
-      await client.query('BEGIN');
-      started = true;
-    }
-    await client.query("SET LOCAL statement_timeout = '5s'");
-    await client.query("SET LOCAL lock_timeout = '3s'");
-    await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
-
-    const membership = await client.query<{ permission: string }>(
-      `SELECT permission
-       FROM app_private.staff_membership
-       WHERE tenant_id = $1 AND actor_id = $2
-       FOR SHARE`,
-      [venueId, actorId],
-    );
-
-    if (!['owner', 'editor'].includes(membership.rows[0]?.permission ?? '')) {
-      throw new CommandError('forbidden', 403);
-    }
-
-    if (!inTransaction) await client.query('COMMIT');
-    started = false;
-  } catch (error) {
-    if (started) {
-      try {
-        await client.query('ROLLBACK');
-      } catch {
-        // Rollback failure preserved
-      }
-    }
-    throw error;
-  }
-}
-
 let verifier: { issuer: string; local: boolean; verify: ReturnType<typeof createStaffVerifier> };
 let menuVerifier: {
   issuer: string;
@@ -339,11 +502,39 @@ let menuVerifier: {
  * Preview and arbitrary origins are rejected; wildcard '*' is not used.
  */
 export const DINER_CORS_ALLOWED_ORIGINS = [
+  'https://peekaplate.app',
   'https://diner.peekaplate.com',
   'https://peekaplate-diner-staging.pages.dev',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ] as const;
+
+function allowedDinerOrigin(origin: string, env: Bindings | undefined) {
+  return DINER_CORS_ALLOWED_ORIGINS.some((allowed) => allowed === origin) ||
+    (env?.APP_ENV === 'staging' &&
+      env.DINER_PUBLIC_ORIGIN === 'https://routing-staging.peekaplate-diner-staging.pages.dev' &&
+      origin === env.DINER_PUBLIC_ORIGIN)
+    ? origin
+    : undefined;
+}
+
+function dinerLinkResponse(link: { path: string }, env: Bindings) {
+  const origin =
+    env.APP_ENV === 'production'
+      ? 'https://peekaplate.app'
+      : env.APP_ENV === 'local'
+        ? 'http://127.0.0.1:5186'
+        : env.APP_ENV === 'staging' &&
+            [
+              'https://peekaplate-diner-staging.pages.dev',
+              'https://routing-staging.peekaplate-diner-staging.pages.dev',
+            ].includes(env.DINER_PUBLIC_ORIGIN ?? '')
+          ? env.DINER_PUBLIC_ORIGIN
+          : undefined;
+  if (!origin) throw new AuthUnavailableError();
+  const path = DinerLinkSchema.parse(link).path;
+  return { path, url: `${origin}${path}` };
+}
 
 /**
  * Exact console-origin allowlist for the owner report route only (S3-RES-03; agreed with Sai,
@@ -374,6 +565,29 @@ export async function consumeJtiRateLimit(
   return { allowed: true, retryAfterSeconds: 1 };
 }
 
+// Owner-prepared menus (Part A) reuse the private ingestion bucket that already holds approved
+// dish photos; bundles live under prepared-menus/.
+function preparedStorage(env: Bindings): PreparedStorage {
+  const bucket = env.INGESTION_REPORTS_BUCKET;
+  if (!bucket?.get) throw new AuthUnavailableError();
+  return {
+    get: (key) => bucket.get!(key),
+    put: (key, bytes, options) => bucket.put(key, bytes, options),
+  };
+}
+
+function ownHost(c: { req: { url: string } }, env: Bindings): OwnHost | undefined {
+  const bucket = env.INGESTION_REPORTS_BUCKET;
+  if (!bucket?.get) return undefined;
+  return {
+    origin: new URL(c.req.url).origin,
+    read: async (key) => {
+      const object = await bucket.get!(key);
+      return object ? new Uint8Array(await object.arrayBuffer()) : null;
+    },
+  };
+}
+
 async function withDatabase<T>(env: Bindings, run: (client: Client) => Promise<T>): Promise<T> {
   const connectionString =
     env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
@@ -388,6 +602,8 @@ async function withDatabase<T>(env: Bindings, run: (client: Client) => Promise<T
 }
 
 const dependencies: Dependencies = {
+  readOwnerVenues: (actorId, env) =>
+    withDatabase(env, (client) => listOwnerVenues(client, actorId)),
   async verify(authorization, env) {
     if (!env.AUTH_ISSUER) throw new AuthUnavailableError();
     const local = env.APP_ENV === 'local';
@@ -493,6 +709,17 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  async createOwnerAction(actorId, venueId, input, env) {
+    return withDatabase(env, (client) => createOwnerInsightAction(client, actorId, venueId, input));
+  },
+  async updateOwnerAction(actorId, venueId, actionId, input, env) {
+    return withDatabase(env, (client) =>
+      updateOwnerInsightAction(client, actorId, venueId, actionId, input),
+    );
+  },
+  async listOwnerActions(actorId, venueId, query, env) {
+    return withDatabase(env, (client) => listOwnerInsightActions(client, actorId, venueId, query));
+  },
   async retrieve(request) {
     return retrieveMenuEvidence(request);
   },
@@ -533,6 +760,48 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  resolveRestaurantLink: (slug, env) =>
+    withDatabase(env, (client) => resolveRestaurantLink(client, slug)),
+  readDinerLink: (actorId, venueId, menuId, env) =>
+    withDatabase(env, (client) => readDinerLink(client, actorId, venueId, menuId)),
+  listPreparedMenus: (actorId, venueId, env) =>
+    withDatabase(env, (client) => listPreparedMenus(client, actorId, venueId)),
+  fetchPreparedMenu,
+  prepareOwnerMenu: (actorId, venueId, origin, env) =>
+    withDatabase(env, (client) =>
+      prepareOwnerMenu(
+        client,
+        actorId,
+        venueId,
+        origin,
+        preparedStorage(env),
+        approveDishDraftAtomic,
+      ),
+    ),
+  readPreparedBundle: (venueId, menuId, revisionId, env) =>
+    withDatabase(env, (client) =>
+      readPreparedBundle(client, preparedStorage(env), venueId, menuId, revisionId),
+    ),
+  readPreparedAsset: (venueId, photoId, hash, env) =>
+    withDatabase(env, (client) =>
+      readPreparedAsset(client, preparedStorage(env), venueId, photoId, hash),
+    ),
+  readPreparedLogo: (venueId, hash, extension, env) =>
+    withDatabase(env, (client) =>
+      readPreparedLogo(client, preparedStorage(env), venueId, hash, extension),
+    ),
+  readPreparedPreviewAsset: (actorId, content, origin, assetId, file, env) =>
+    withDatabase(env, (client) =>
+      readPreparedPreviewAsset(
+        client,
+        preparedStorage(env),
+        actorId,
+        content,
+        origin,
+        assetId,
+        file,
+      ),
+    ),
   async issuePublicMenu(menu, env) {
     if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
     return createPublicMenuResponse(menu, {
@@ -578,7 +847,20 @@ export async function approveDishDraftAtomic(
   actorId: string,
   venueId: string,
   draftId: string,
-  options: { commandId: string; expectedVersion?: number | undefined },
+  options: {
+    commandId: string;
+    expectedVersion?: number | undefined;
+    expectedDraftVersion?: number | undefined;
+    expectedReviewVersion?: number | undefined;
+    extractionId?: string | undefined;
+    confirmed?: true | undefined;
+    /**
+     * Part A preparation only: approve onto this stable dish ID (a new revision when it already
+     * exists, so a reopened and re-verified draft keeps its diner identity) and require the
+     * owner's persisted S11 verification. The public approve route never sets these.
+     */
+    preparedDishId?: string | undefined;
+  },
 ): Promise<{ draft: DishDraftRow; publishedRevision: DishRevisionResult }> {
   let started = false;
   try {
@@ -607,7 +889,30 @@ export async function approveDishDraftAtomic(
     const expectedVersion = options.expectedVersion ?? 0;
     const approvalHash = crypto
       .createHash('sha256')
-      .update(JSON.stringify({ draftId, expectedVersion }))
+      .update(
+        JSON.stringify({
+          draftId,
+          expectedVersion,
+          ...(options.expectedDraftVersion === undefined &&
+          options.expectedReviewVersion === undefined &&
+          options.extractionId === undefined
+            ? {}
+            : {
+                approvalVersion: 2,
+                expectedDraftVersion: options.expectedDraftVersion,
+                ...(options.expectedReviewVersion === undefined
+                  ? {}
+                  : { expectedReviewVersion: options.expectedReviewVersion }),
+                ...(options.extractionId === undefined
+                  ? {}
+                  : { extractionId: options.extractionId }),
+                confirmed: options.confirmed ?? false,
+              }),
+          ...(options.preparedDishId === undefined
+            ? {}
+            : { preparedDishId: options.preparedDishId, requireVerified: true }),
+        }),
+      )
       .digest('hex');
 
     const receipt = await client.query<{ request_hash: string; result: any }>(
@@ -626,6 +931,26 @@ export async function approveDishDraftAtomic(
       return existing.result;
     }
 
+    const discovered = await client.query<{ job_id: string | null }>(
+      'SELECT job_id FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2',
+      [venueId, draftId],
+    );
+    let currentJob:
+      | {
+          status: string;
+          active_review_extraction_id: string | null;
+          result_storage_key: string | null;
+          review_result_storage_key: string | null;
+        }
+      | undefined;
+    if (discovered.rows[0]?.job_id) {
+      currentJob = (
+        await client.query(
+          'SELECT status,active_review_extraction_id,result_storage_key,review_result_storage_key FROM app_private.menu_ingestion_jobs WHERE tenant_id=$1 AND id=$2 FOR SHARE',
+          [venueId, discovered.rows[0].job_id],
+        )
+      ).rows[0];
+    }
     const draftRes = await client.query<DishDraftRow>(
       `SELECT * FROM app_private.dish_drafts
        WHERE tenant_id = $1 AND id = $2
@@ -633,12 +958,111 @@ export async function approveDishDraftAtomic(
       [venueId, draftId],
     );
     const draft = draftRes.rows[0];
-    if (!draft || draft.review_status !== 'pending') {
+    if (!draft || draft.review_status !== 'pending' || draft.removed_at) {
       throw new IngestionError('draft_not_pending_or_not_found', 404);
     }
+    if (options.preparedDishId !== undefined && draft.verification_status !== 'verified')
+      throw new IngestionError('draft_not_verified', 409);
 
-    const newDishId = crypto.randomUUID();
+    const manual =
+      draft.origin === 'manual' ? OwnerDishFieldsSchema.parse(draft.manual_fields) : null;
+    let reviewed = false;
+    let corrected: ReturnType<typeof CandidateCorrectedFieldsSchema.parse> = {};
+    if (!manual) {
+      const sessions = await client.query<{ extraction_id: string }>(
+        'SELECT extraction_id FROM app_private.extraction_review_session WHERE tenant_id=$1 AND job_id=$2',
+        [venueId, draft.job_id],
+      );
+      if (sessions.rows.length) {
+        if (
+          !options.extractionId ||
+          !currentJob ||
+          !['complete', 'incomplete'].includes(currentJob.status) ||
+          currentJob.active_review_extraction_id !== options.extractionId ||
+          !currentJob.result_storage_key ||
+          currentJob.result_storage_key !== currentJob.review_result_storage_key ||
+          !sessions.rows.some((session) => session.extraction_id === options.extractionId)
+        )
+          throw new IngestionError('draft_confirmation_required', 409);
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          `candidate-review:${venueId}:${options.extractionId}:${draft.candidate_id ?? draft.draft_id}`,
+        ]);
+        const reviews = await client.query<{
+          version: number;
+          review_status: string;
+          corrected_fields: unknown;
+          incomplete_fields: string[];
+        }>(
+          'SELECT version,review_status,corrected_fields,incomplete_fields FROM app_private.candidate_review_current WHERE tenant_id=$1 AND extraction_id=$2 AND candidate_id=$3 FOR SHARE',
+          [venueId, options.extractionId, draft.candidate_id ?? draft.draft_id],
+        );
+        const review = reviews.rows[0];
+        if (
+          options.expectedReviewVersion !== (review?.version ?? 0) ||
+          options.expectedDraftVersion !== draft.draft_version ||
+          options.confirmed !== true
+        )
+          throw new IngestionError('draft_confirmation_required', 409);
+        if (
+          review &&
+          (['rejected', 'incomplete'].includes(review.review_status) ||
+            review.incomplete_fields.length > 0)
+        )
+          throw new IngestionError('draft_incomplete', 409);
+        if (review) corrected = CandidateCorrectedFieldsSchema.parse(review.corrected_fields);
+        reviewed = true;
+      }
+    }
+    const resolved = { ...draft, ...corrected };
+    if (
+      manual &&
+      (options.expectedDraftVersion !== draft.draft_version || options.confirmed !== true)
+    ) {
+      throw new IngestionError('draft_confirmation_required', 409);
+    }
+    if (
+      !draft.name ||
+      (manual && (!manual.category || manual.priceAmount === null || manual.priceCurrency === null))
+    ) {
+      throw new IngestionError('draft_incomplete', 409);
+    }
+    const approvedPhotoId = manual?.photoId ?? corrected.photo_id ?? null;
+    if (approvedPhotoId) {
+      const photo = await client.query(
+        'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
+        [venueId, draftId, approvedPhotoId],
+      );
+      if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
+    }
+
+    const newDishId = options.preparedDishId ?? crypto.randomUUID();
     const revisionCommandId = crypto.randomUUID();
+    const facts = manual
+      ? {
+          ...(manual.servingCount !== undefined ? { servingCount: manual.servingCount } : {}),
+          category: manual.category,
+          priceAmount: manual.priceAmount,
+          priceCurrency: manual.priceCurrency,
+          ingredients: manual.ingredients.status === 'confirmed' ? manual.ingredients.items : null,
+          allergens: manual.allergens.status === 'confirmed' ? manual.allergens.items : null,
+          photoId: manual.photoId,
+        }
+      : reviewed
+        ? {
+            ...(resolved.serving_count !== undefined
+              ? { servingCount: resolved.serving_count }
+              : {}),
+            category: resolved.category,
+            priceAmount: resolved.price_amount,
+            priceCurrency: resolved.price_currency,
+            ingredients: resolved.ingredients,
+            allergens:
+              corrected.allergens?.status === 'confirmed' ? corrected.allergens.items : null,
+            photoId: approvedPhotoId,
+          }
+        : undefined;
+    const parsedFacts = facts === undefined ? undefined : ApprovedDishFactsSchema.safeParse(facts);
+    if (parsedFacts && !parsedFacts.success) throw new IngestionError('draft_incomplete', 409);
     const revision = await createDishRevision(
       client,
       actorId,
@@ -647,8 +1071,9 @@ export async function approveDishDraftAtomic(
         commandId: revisionCommandId,
         dishId: newDishId,
         expectedVersion,
-        name: draft.name,
-        description: draft.description ?? draft.name,
+        name: corrected.name ?? draft.name,
+        description: resolved.description ?? (manual || reviewed ? '' : draft.name),
+        ...(parsedFacts?.success ? { facts: parsedFacts.data } : {}),
       },
       { inTransaction: true },
     );
@@ -666,7 +1091,20 @@ export async function approveDishDraftAtomic(
 
     const result = { draft: updatedDraft, publishedRevision: revision };
 
-    const payload = JSON.stringify({ draftId, expectedVersion });
+    const payload = JSON.stringify({
+      draftId,
+      expectedVersion,
+      ...(options.expectedDraftVersion === undefined
+        ? {}
+        : { expectedDraftVersion: options.expectedDraftVersion }),
+      ...(options.extractionId === undefined
+        ? {}
+        : {
+            extractionId: options.extractionId,
+            expectedReviewVersion: options.expectedReviewVersion,
+          }),
+      ...(options.confirmed ? { confirmed: true } : {}),
+    });
     await client.query(
       `INSERT INTO app_private.es_command
         (id, tenant_id, actor_id, command_type, idempotency_key, payload, request_hash, result)
@@ -702,6 +1140,13 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('X-Request-ID', crypto.randomUUID());
     await next();
   });
+  registerOwnerAnalysisRoutes(app, {
+    verify: services.verify,
+    ...(services.readOwnerReport ? { readReport: services.readOwnerReport } : {}),
+    allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
+    syntheticVenues: SYNTHETIC_REPORT_VENUE_ALLOWLIST,
+    ...(services.now ? { now: services.now } : {}),
+  });
   app.get('/health', (c) =>
     c.json({
       status: 'ok',
@@ -709,6 +1154,32 @@ export function createApp(services: Dependencies = dependencies) {
       stage: 'foundation',
     } satisfies HealthResponse),
   );
+  app.use(
+    '/staff/venues',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
+  app.get('/staff/venues', async (c) => {
+    const env = c.env ?? {};
+    if (!['local', 'staging'].includes(env.APP_ENV ?? ''))
+      return c.json({ error: 'not_found' }, 404);
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, env);
+    if (new URL(c.req.url).search) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.readOwnerVenues) throw new AuthUnavailableError();
+    const response = OwnerWorkspaceResponseSchema.safeParse({
+      actorId,
+      venues: await services.readOwnerVenues(actorId, env),
+    });
+    if (!response.success) throw new AuthUnavailableError();
+    return c.json(response.data);
+  });
   app.get('/.well-known/jwks.json', async (c) => {
     if (!services.readMenuJwks) throw new AuthUnavailableError();
     c.header('Content-Type', 'application/jwk-set+json');
@@ -726,8 +1197,22 @@ export function createApp(services: Dependencies = dependencies) {
     maxSize: 16_384,
     onError: (c) => c.json({ error: 'body_too_large' }, 413),
   });
+  const artworkLimit = bodyLimit({
+    maxSize: 1_350_000,
+    onError: (c) => c.json({ error: 'body_too_large' }, 413),
+  });
   app.use('/venues/*', async (c, next) => {
-    if (c.req.method === 'POST' && /^\/venues\/[^/]+\/menus\/uploads$/.test(c.req.path))
+    if (c.req.method === 'POST' && /^\/venues\/[^/]+\/ingredient-icons\/review$/.test(c.req.path))
+      return artworkLimit(c, next);
+    if (
+      c.req.method === 'PUT' &&
+      /^\/venues\/[^/]+\/menus\/upload-groups\/[^/]+\/files\/[0-4]$/.test(c.req.path)
+    )
+      return next();
+    if (
+      c.req.method === 'POST' &&
+      /^\/venues\/[^/]+\/(?:profile\/photos|menus\/uploads|drafts\/[^/]+\/photos)$/.test(c.req.path)
+    )
       return next();
     if (c.req.method === 'POST' && /^\/venues\/[^/]+\/orders\/import$/.test(c.req.path)) {
       return orderImportLimit(c, next);
@@ -741,14 +1226,110 @@ export function createApp(services: Dependencies = dependencies) {
     }
     return defaultVenueLimit(c, next);
   });
+  app.use('/venues/*', async (c, next) => {
+    if (
+      !/^\/venues\/[^/]+\/(?:profile(?:\/|$)|setup$|prepared-menus(?:\/|$)|ingredient-icons(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+        c.req.path,
+      )
+    )
+      return next();
+    return cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
+      exposeHeaders: ['Location'],
+      maxAge: 86400,
+    })(c, next);
+  });
+  registerOwnerMenuRoutes(app, {
+    verify: services.verify,
+    authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
+    database: withDatabase,
+  });
   app.use(
-    '/public/venues/*',
+    '/public/*',
     cors({
-      origin: [...DINER_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) => allowedDinerOrigin(origin, c.env),
       allowMethods: ['GET', 'OPTIONS'],
       maxAge: 86400,
     }),
   );
+  registerArtworkRoutes(app, {
+    verify: services.verify,
+    authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
+    database: withDatabase,
+  });
+  app.get('/public/restaurants/:slug', async (c) => {
+    const slug = RestaurantSlugSchema.safeParse(c.req.param('slug'));
+    if (!slug.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.resolveRestaurantLink) throw new AuthUnavailableError();
+    const scope = await services.resolveRestaurantLink(slug.data, c.env ?? {});
+    return scope ? c.json(MenuScopeSchema.parse(scope)) : c.json({ error: 'not_found' }, 404);
+  });
+  // New public exposure requires the exact currently published snapshot, including its assets.
+  app.get(`${PREPARED_BUNDLE_PATH}/:venueId/:menuId/:file`, async (c) => {
+    const file = /^([0-9a-f-]{36})\.json$/i.exec(c.req.param('file'));
+    const scope = MenuScopeSchema.safeParse({
+      venueId: c.req.param('venueId'),
+      menuId: c.req.param('menuId'),
+    });
+    const revision = VenueScopeSchema.safeParse({ venueId: file?.[1] });
+    if (!scope.success || !revision.success) return c.json({ error: 'not_found' }, 404);
+    if (!services.readPreparedBundle) throw new AuthUnavailableError();
+    const bytes = await services.readPreparedBundle(
+      scope.data.venueId,
+      scope.data.menuId,
+      revision.data.venueId,
+      c.env ?? {},
+    );
+    if (!bytes) return c.json({ error: 'not_found' }, 404);
+    c.header('Cache-Control', 'no-store');
+    return c.body(Uint8Array.from(bytes).buffer, 200, {
+      'Content-Type': 'application/json',
+      'X-Content-Type-Options': 'nosniff',
+    });
+  });
+  // Exact published Screen 5 logo (registered before the photo route).
+  app.get(`${PREPARED_ASSET_PATH}/:venueId/logo/:file`, async (c) => {
+    const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+    const file = /^([0-9a-f]{64})\.(png|jpg)$/.exec(c.req.param('file'));
+    if (!venue.success || !file) return c.json({ error: 'not_found' }, 404);
+    if (!services.readPreparedLogo) throw new AuthUnavailableError();
+    const logo = await services.readPreparedLogo(
+      venue.data.venueId,
+      file[1]!,
+      file[2]!,
+      c.env ?? {},
+    );
+    if (!logo) return c.json({ error: 'not_found' }, 404);
+    c.header('Cache-Control', 'no-store');
+    return c.body(Uint8Array.from(logo.bytes).buffer, 200, {
+      'Content-Type': logo.contentType,
+      'X-Content-Type-Options': 'nosniff',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+  });
+  app.get(`${PREPARED_ASSET_PATH}/:venueId/:photoId/:hash`, async (c) => {
+    const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+    const photo = VenueScopeSchema.safeParse({ venueId: c.req.param('photoId') });
+    const hash = c.req.param('hash');
+    if (!venue.success || !photo.success || !/^[0-9a-f]{64}$/.test(hash))
+      return c.json({ error: 'not_found' }, 404);
+    if (!services.readPreparedAsset) throw new AuthUnavailableError();
+    const asset = await services.readPreparedAsset(
+      venue.data.venueId,
+      photo.data.venueId,
+      hash,
+      c.env ?? {},
+    );
+    if (!asset) return c.json({ error: 'not_found' }, 404);
+    c.header('Cache-Control', 'no-store');
+    return c.body(Uint8Array.from(asset.bytes).buffer, 200, {
+      'Content-Type': asset.contentType,
+      'X-Content-Type-Options': 'nosniff',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+  });
   app.get('/public/venues/:venueId/menus/:menuId', async (c) => {
     const scope = MenuScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
@@ -760,7 +1341,7 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/observations',
     cors({
-      origin: [...DINER_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) => allowedDinerOrigin(origin, c.env),
       allowMethods: ['POST', 'OPTIONS'],
       allowHeaders: ['Authorization', 'Content-Type'],
       maxAge: 86400,
@@ -805,10 +1386,71 @@ export function createApp(services: Dependencies = dependencies) {
       origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Authorization'],
+      exposeHeaders: [OWNER_REPORT_REFERENCE_HEADER],
       maxAge: 86400,
     }),
   );
   app.get('/api/v1/venues/:venueId/analytics/dishes', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer /.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    const env = c.env ?? {};
+    const sources = new URL(c.req.url).searchParams.getAll('source');
+    if (
+      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
+      sources.length !== 1 ||
+      sources[0] !== 'synthetic'
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
+      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
+    });
+    if (!approvedSyntheticVenue.success) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
+      approvedSyntheticVenue.data.venueId.toLowerCase(),
+    );
+    if (
+      !isSyntheticVenue ||
+      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    if (!services.readOwnerReport) throw new AuthUnavailableError();
+    const now = services.now?.() ?? new Date();
+    const venueId = approvedSyntheticVenue.data.venueId;
+    const report = await services.readOwnerReport(actorId, venueId, now, env, 'synthetic');
+    if (env.OWNER_AI_RESPONSES_ENABLED === 'true' && env.OWNER_AI_REPORT_REFERENCE_SECRET) {
+      try {
+        const reference = await mintOwnerReportReference(
+          OwnerDishReportSchema.parse(report),
+          { actorId, venueId },
+          env.OWNER_AI_REPORT_REFERENCE_SECRET,
+          now,
+        );
+        c.header(OWNER_REPORT_REFERENCE_HEADER, reference);
+      } catch {
+        // The owner can still read the authorized report when its optional AI reference is unavailable.
+      }
+    }
+    return c.json(report);
+  });
+  app.use(
+    '/api/v1/venues/:venueId/analytics/dishes/export',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
+  app.get('/api/v1/venues/:venueId/analytics/dishes/export', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer /.test(authorization)) {
       return c.json({ error: 'unauthorized' }, 401);
@@ -848,7 +1490,20 @@ export function createApp(services: Dependencies = dependencies) {
       env,
       'synthetic',
     );
-    return c.json(report);
+    const typedReport = report as ExportableOwnerReport;
+    const csv = serializeOwnerReportCsv(typedReport);
+    const filename = buildOwnerReportExportFilename(
+      typedReport.venue_id,
+      typedReport.report_metadata.generated_at,
+    );
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-store',
+      },
+    });
   });
   app.post('/observations', async (c) => {
     const authorization = c.req.header('Authorization');
@@ -930,6 +1585,7 @@ export function createApp(services: Dependencies = dependencies) {
       | NonNullable<Dependencies['publish']>
       | NonNullable<Dependencies['withdraw']>
       | undefined,
+    includeDinerLink = false,
   ) => {
     app.post(path, async (c) => {
       const authorization = c.req.header('Authorization');
@@ -957,6 +1613,15 @@ export function createApp(services: Dependencies = dependencies) {
         { ...parsed.data, menuId: scope.data.menuId } as never,
         c.env ?? {},
       );
+      if (includeDinerLink && services.readDinerLink) {
+        const link = await services.readDinerLink(
+          actorId,
+          scope.data.venueId,
+          scope.data.menuId,
+          c.env ?? {},
+        );
+        if (link) c.header('Location', dinerLinkResponse(link, c.env ?? {}).url);
+      }
       return c.json(result);
     });
   };
@@ -969,12 +1634,194 @@ export function createApp(services: Dependencies = dependencies) {
     '/venues/:venueId/menus/:menuId/publications',
     PublishMenuSchema,
     services.publish,
+    true,
   );
   publicationRoute(
     '/venues/:venueId/menus/:menuId/withdrawals',
     WithdrawMenuSchema,
     services.withdraw,
   );
+  for (const path of [
+    '/venues/:venueId/prepared-menus',
+    '/venues/:venueId/prepared-menus/:menuId/:revisionId',
+    '/venues/:venueId/prepared-menus/:menuId/:revisionId/assets/:assetId/:file',
+  ]) {
+    app.get(path, async (c) => {
+      if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
+        return c.json({ error: 'not_found' }, 404);
+      const authorization = c.req.header('Authorization');
+      if (!authorization || !/^Bearer \S+$/i.test(authorization))
+        return c.json({ error: 'unauthorized' }, 401);
+      const actorId = await services.verify(authorization, c.env ?? {});
+      const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+      if (!venue.success || new URL(c.req.url).search)
+        return c.json({ error: 'invalid_request' }, 400);
+      if (!services.listPreparedMenus || !services.fetchPreparedMenu)
+        throw new AuthUnavailableError();
+      const menus = await services.listPreparedMenus(actorId, venue.data.venueId, c.env ?? {});
+      const menuId = c.req.param('menuId');
+      if (!menuId) return c.json(PreparedMenusSchema.parse({ menus }));
+      const menu = menus.find(
+        (row) => row.menuId === menuId && row.menuRevisionId === c.req.param('revisionId'),
+      );
+      if (!menu) return c.json({ error: 'not_found' }, 404);
+      // The database connection/authorization transaction has ended before the bounded public fetch.
+      const content = await services.fetchPreparedMenu(menu, fetch, ownHost(c, c.env ?? {}));
+      const assetId = c.req.param('assetId');
+      if (assetId) {
+        if (!services.readPreparedPreviewAsset) throw new AuthUnavailableError();
+        const asset = await services.readPreparedPreviewAsset(
+          actorId,
+          content,
+          new URL(c.req.url).origin,
+          assetId,
+          c.req.param('file') ?? '',
+          c.env ?? {},
+        );
+        if (!asset) return c.json({ error: 'not_found' }, 404);
+        c.header('Cache-Control', 'no-store');
+        return c.body(Uint8Array.from(asset.bytes).buffer, 200, {
+          'Content-Type': asset.contentType,
+          'X-Content-Type-Options': 'nosniff',
+        });
+      }
+      return c.json(PreparedMenuPreviewSchema.parse({ menu, content }));
+    });
+  }
+  // Part A: after S10/S11 verification the owner's verified dishes become a prepared menu for
+  // S13. Owner-only (checked again inside the admit function); never approves or publishes.
+  app.post('/venues/:venueId/prepared-menus/prepare', async (c) => {
+    if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
+      return c.json({ error: 'not_found' }, 404);
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+    if (!venue.success || new URL(c.req.url).search)
+      return c.json({ error: 'invalid_request' }, 400);
+    if (!services.prepareOwnerMenu) throw new AuthUnavailableError();
+    const result = await services.prepareOwnerMenu(
+      actorId,
+      venue.data.venueId,
+      new URL(c.req.url).origin,
+      c.env ?? {},
+    );
+    return c.json(result);
+  });
+  app.get('/venues/:venueId/menus/:menuId/diner-link', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = MenuScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.readDinerLink) throw new AuthUnavailableError();
+    const link = await services.readDinerLink(
+      actorId,
+      scope.data.venueId,
+      scope.data.menuId,
+      c.env ?? {},
+    );
+    return link
+      ? c.json(dinerLinkResponse(link, c.env ?? {}))
+      : c.json({ error: 'not_found' }, 404);
+  });
+
+  app.get('/venues/:venueId/owner-insight-actions', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const url = new URL(c.req.url);
+    const params = url.searchParams;
+    const query = OwnerInsightActionListQuerySchema.safeParse(Object.fromEntries(params.entries()));
+    if (!query.success || [...params.keys()].length !== new Set(params.keys()).size) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+    if (!services.listOwnerActions) throw new AuthUnavailableError();
+
+    const result = await services.listOwnerActions(
+      actorId,
+      scope.data.venueId,
+      query.data,
+      c.env ?? {},
+    );
+    return c.json(result);
+  });
+
+  app.post('/venues/:venueId/owner-insight-actions', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = CreateOwnerInsightActionRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.createOwnerAction) throw new AuthUnavailableError();
+
+    const result = await services.createOwnerAction(
+      actorId,
+      scope.data.venueId,
+      parsed.data,
+      c.env ?? {},
+    );
+    return c.json(result, 201);
+  });
+
+  app.patch('/venues/:venueId/owner-insight-actions/:actionId', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse({
+      venueId: c.req.param('venueId'),
+    });
+    const actionId = OwnerInsightActionIdSchema.safeParse(c.req.param('actionId'));
+    if (!scope.success || !actionId.success) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = UpdateOwnerInsightActionRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.updateOwnerAction) throw new AuthUnavailableError();
+
+    const result = await services.updateOwnerAction(
+      actorId,
+      scope.data.venueId,
+      actionId.data,
+      parsed.data,
+      c.env ?? {},
+    );
+    return c.json(result);
+  });
+
   app.post('/venues/:venueId/menu-evidence', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -1030,6 +1877,7 @@ export function createApp(services: Dependencies = dependencies) {
     const queue = c.env.INGESTION_QUEUE;
     if (!storage || !queue) throw new AuthUnavailableError();
     const upload = await readMenuUpload(c.req.raw);
+    await validateMenuPdf(upload);
     const createJob = async () => {
       const env = c.env;
       const connectionString =
@@ -1302,6 +2150,174 @@ export function createApp(services: Dependencies = dependencies) {
     return c.json(result, 200);
   });
 
+  app.post('/venues/:venueId/orders/agreement-acceptance', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = AcceptPilotOrderAgreementRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const acceptFn =
+      services.acceptPilotOrderAgreement ??
+      (async (actorId, venueId, agreementVersion, env) => {
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          return await acceptPilotOrderAgreementService({
+            client,
+            actorId,
+            venueId,
+            agreementVersion,
+          });
+        } finally {
+          await client.end().catch(() => {});
+        }
+      });
+
+    const result = await acceptFn(
+      actorId,
+      scope.data.venueId,
+      parsed.data.agreementVersion,
+      c.env ?? {},
+    );
+    return c.json(result, 200);
+  });
+
+  app.post('/venues/:venueId/orders/deletion-requests', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = DeleteOrderDataRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const submitDeletionFn =
+      services.submitOrderDataDeletionRequest ??
+      (async (actorId, venueId, requestId, reason, env) => {
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          return await submitOrderDataDeletionRequestService({
+            client,
+            actorId,
+            venueId,
+            requestId,
+            reason,
+          });
+        } finally {
+          await client.end().catch(() => {});
+        }
+      });
+
+    const result = await submitDeletionFn(
+      actorId,
+      scope.data.venueId,
+      parsed.data.requestId,
+      parsed.data.reason,
+      c.env ?? {},
+    );
+    return c.json(result, 202);
+  });
+
+  app.post('/internal/venues/:venueId/orders/deletions/:requestId/verify', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const checkerId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+    const reqScope = DeleteOrderDataRequestSchema.safeParse({
+      requestId: c.req.param('requestId'),
+    });
+    if (!scope.success || !reqScope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = VerifyOrderDeletionRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const env = c.env ?? {};
+    const authorizedCheckerIds = new Set(
+      (env.AUTHORIZED_DELETION_CHECKER_IDS ?? '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean),
+    );
+    if (!authorizedCheckerIds.has(checkerId)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+
+    // Fail closed: never fall back to runtime HYPERDRIVE or LOCAL_DATABASE_URL
+    const checkerConnectionString =
+      env.APP_ENV === 'local'
+        ? env.LOCAL_CHECKER_DATABASE_URL
+        : env.CHECKER_HYPERDRIVE?.connectionString;
+    if (!checkerConnectionString || !env.ORDER_DELETION_VERIFICATION_BUCKET) {
+      return c.json({ error: 'verification_infrastructure_unavailable' }, 503);
+    }
+
+    const client = new Client({
+      connectionString: checkerConnectionString,
+      connectionTimeoutMillis: 5000,
+    });
+    try {
+      await client.connect();
+      const result = await verifyVenueOrderDeletionService({
+        client,
+        checkerId,
+        venueId: scope.data.venueId,
+        requestId: reqScope.data.requestId,
+        outcome: parsed.data.outcome,
+        evidenceRef: parsed.data.evidenceRef,
+        verificationStorage: env.ORDER_DELETION_VERIFICATION_BUCKET,
+        authorizedCheckerIds,
+      });
+      return c.json(result, 200);
+    } finally {
+      await client.end().catch(() => {});
+    }
+  });
+
   app.put('/venues/:venueId/extractions/:extractionId/review-session', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -1395,6 +2411,8 @@ export function createApp(services: Dependencies = dependencies) {
     if (error instanceof AuthUnavailableError) return c.json({ error: 'service_unavailable' }, 503);
     if (error instanceof CommandError) return c.json({ error: error.code }, error.status);
     if (error instanceof PublicationCommandError)
+      return c.json({ error: error.code }, error.status);
+    if (error instanceof OwnerInsightActionError)
       return c.json({ error: error.code }, error.status);
     if (error instanceof IngestionError) return c.json({ error: error.code }, error.status as any);
     if (error instanceof OrderImportError)
@@ -1517,10 +2535,76 @@ export {
   type QueueHandlerServices,
 };
 
-export const handleScheduled = async (event: any, env: any) => {
-  const storage =
+export function parseNonNegativeIntEnv(
+  raw: string | undefined,
+  errorCode: string,
+): number | undefined {
+  if (raw === undefined) return undefined;
+  if (!/^\d+$/.test(raw)) throw new Error(errorCode);
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value)) throw new Error(errorCode);
+  return value;
+}
+
+type ScheduledEnv = Omit<
+  Bindings,
+  'ORDER_OUTCOME_ARCHIVE_BUCKET' | 'ORDER_IMPORT_BUCKET' | 'INGESTION_REPORTS_BUCKET'
+> & {
+  ORDER_OUTCOME_ARCHIVE_BUCKET?: Partial<OrderOutcomeStorage> | undefined;
+  ORDER_IMPORT_BUCKET?: Partial<OrderOutcomeStorage> | undefined;
+  INGESTION_REPORTS_BUCKET?: Bindings['INGESTION_REPORTS_BUCKET'];
+};
+
+function hasListAndDelete<T extends { list?: unknown; delete?: unknown }>(
+  storage: T | undefined,
+): storage is T & {
+  list: NonNullable<T['list']>;
+  delete: NonNullable<T['delete']>;
+} {
+  return (
+    storage !== undefined &&
+    typeof storage.list === 'function' &&
+    typeof storage.delete === 'function'
+  );
+}
+
+function hasOrderMethods<T extends { put?: unknown; list?: unknown; delete?: unknown }>(
+  storage: T | undefined,
+): storage is T & {
+  put: NonNullable<T['put']>;
+  list: NonNullable<T['list']>;
+  delete: NonNullable<T['delete']>;
+} {
+  return hasListAndDelete(storage) && typeof storage.put === 'function';
+}
+
+function hasStagingMethods<T extends { list?: unknown; delete?: unknown; get?: unknown }>(
+  storage: T | undefined,
+): storage is T & {
+  list: NonNullable<T['list']>;
+  delete: NonNullable<T['delete']>;
+  get: NonNullable<T['get']>;
+} {
+  return hasListAndDelete(storage) && typeof storage.get === 'function';
+}
+
+export const handleScheduled = async (
+  _event: unknown,
+  env: ScheduledEnv,
+  createClient: (connectionString: string) => Client = (connectionString) =>
+    new Client({ connectionString, connectionTimeoutMillis: 5000 }),
+) => {
+  const orderStorage =
     env.ORDER_OUTCOME_ARCHIVE_BUCKET ?? env.ORDER_IMPORT_BUCKET ?? env.INGESTION_REPORTS_BUCKET;
-  if (!storage || typeof storage.list !== 'function' || typeof storage.delete !== 'function') {
+  const stagingStorage = env.INGESTION_REPORTS_BUCKET;
+  const artworkStorage = env.INGREDIENT_ARTWORK_BUCKET ?? env.INGESTION_REPORTS_BUCKET;
+
+  const hasOrderStorage = hasListAndDelete(orderStorage);
+  const hasStagingStorage = hasStagingMethods(stagingStorage);
+  const hasArtworkStorage =
+    env.INGREDIENT_ARTWORK_ENABLED === 'true' && hasListAndDelete(artworkStorage);
+
+  if (!hasOrderStorage && !hasStagingStorage && !hasArtworkStorage) {
     return;
   }
   const connectionString =
@@ -1529,39 +2613,161 @@ export const handleScheduled = async (event: any, env: any) => {
     return;
   }
 
-  const rawCsvRetentionDays = env.ORDER_IMPORT_RETENTION_DAYS
-    ? Number.parseInt(env.ORDER_IMPORT_RETENTION_DAYS, 10)
-    : undefined;
-  const orphanGracePeriodMs = env.ORDER_IMPORT_GRACE_PERIOD_MS
-    ? Number.parseInt(env.ORDER_IMPORT_GRACE_PERIOD_MS, 10)
-    : undefined;
-
-  const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+  const client = createClient(connectionString);
   try {
     await client.connect();
-    const result = await cleanupOrphanedOrderImports({
-      storage,
-      client,
-      retentionConfig: {
-        rawCsvRetentionDays,
-        orphanGracePeriodMs,
-      },
-    });
-    if (result.deleted > 0) {
-      console.log(
-        JSON.stringify({
-          event: 'order_import_orphan_cleanup',
-          scanned: result.scanned,
-          deleted: result.deleted,
-          deletedOrphans: result.deletedOrphans,
-          deletedAgedRawCsv: result.deletedAgedRawCsv,
-          skippedActive: result.skippedActive,
-          retained: result.retained,
-        }),
-      );
+
+    if (hasOrderMethods(orderStorage)) {
+      try {
+        const rawCsvRetentionDays = env.ORDER_IMPORT_RETENTION_DAYS
+          ? Number.parseInt(env.ORDER_IMPORT_RETENTION_DAYS, 10)
+          : undefined;
+        const orphanGracePeriodMs = env.ORDER_IMPORT_GRACE_PERIOD_MS
+          ? Number.parseInt(env.ORDER_IMPORT_GRACE_PERIOD_MS, 10)
+          : undefined;
+        const result = await cleanupOrphanedOrderImports({
+          storage: orderStorage,
+          client,
+          retentionConfig: {
+            rawCsvRetentionDays,
+            orphanGracePeriodMs,
+          },
+        });
+        if (result.deleted > 0) {
+          console.log(
+            JSON.stringify({
+              event: 'order_import_orphan_cleanup',
+              scanned: result.scanned,
+              deleted: result.deleted,
+              deletedOrphans: result.deletedOrphans,
+              deletedAgedRawCsv: result.deletedAgedRawCsv,
+              skippedActive: result.skippedActive,
+              retained: result.retained,
+            }),
+          );
+        }
+      } catch {
+        console.error(JSON.stringify({ event: 'order_import_orphan_cleanup_error' }));
+      }
+    }
+
+    // L2: Durable retry queue for failed compensating R2 deletions
+    if (hasListAndDelete(orderStorage)) {
+      try {
+        const tenantRes = await client.query<{ tenant_id: string }>(
+          `SELECT tenant_id FROM app_private.list_pending_orphan_cleanup_tenants()`,
+        );
+        for (const row of tenantRes.rows) {
+          try {
+            const retryRes = await retryPendingOrphanCleanups({
+              client,
+              venueId: row.tenant_id,
+              storage: orderStorage,
+            });
+            if (retryRes.attempted > 0 || retryRes.skippedDeletionActive) {
+              console.log(
+                JSON.stringify({
+                  event: 'order_import_orphan_cleanup_retry',
+                  venueId: row.tenant_id,
+                  ...retryRes,
+                }),
+              );
+            }
+          } catch (retryVenueErr) {
+            console.error(
+              JSON.stringify({
+                event: 'order_import_orphan_cleanup_retry_error',
+                venueId: row.tenant_id,
+                error:
+                  retryVenueErr instanceof Error ? retryVenueErr.message : String(retryVenueErr),
+              }),
+            );
+          }
+        }
+      } catch (listErr) {
+        console.error(
+          JSON.stringify({
+            event: 'order_import_orphan_cleanup_tenant_list_error',
+            error: listErr instanceof Error ? listErr.message : String(listErr),
+          }),
+        );
+      }
+    }
+
+    // Configurable staging menu photo cleanup (Category 1 promoted, Category 2 rejected, Category 3 orphan)
+    const stagingRetentionDays = env.MENU_STAGING_RETENTION_DAYS
+      ? Number.parseInt(env.MENU_STAGING_RETENTION_DAYS, 10)
+      : undefined;
+    const stagingRejectedDays = env.MENU_STAGING_REJECTED_RETENTION_DAYS
+      ? Number.parseInt(env.MENU_STAGING_REJECTED_RETENTION_DAYS, 10)
+      : undefined;
+    const stagingOrphanDays = env.MENU_STAGING_ORPHAN_GRACE_DAYS
+      ? Number.parseInt(env.MENU_STAGING_ORPHAN_GRACE_DAYS, 10)
+      : undefined;
+    const stagingDryRun = env.MENU_STAGING_CLEANUP_DRY_RUN === 'true';
+
+    if (
+      hasStagingMethods(stagingStorage) &&
+      (stagingRetentionDays !== undefined ||
+        stagingRejectedDays !== undefined ||
+        stagingOrphanDays !== undefined)
+    ) {
+      try {
+        const { cleanupStagedMenuPhotos } = await import('./owner-menu-retention');
+        const stagingResult = await cleanupStagedMenuPhotos({
+          storage: stagingStorage,
+          client,
+          retentionConfig: {
+            promotedRetentionDays: stagingRetentionDays,
+            rejectedRetentionDays: stagingRejectedDays ?? 0,
+            orphanGraceDays: stagingOrphanDays ?? 0,
+          },
+          dryRun: stagingDryRun,
+        });
+        if (
+          stagingResult.promotedDeleted > 0 ||
+          stagingResult.rejectedDeleted > 0 ||
+          stagingResult.orphansDeleted > 0
+        ) {
+          console.log(
+            JSON.stringify({
+              event: 'menu_staging_cleanup',
+              ...stagingResult,
+            }),
+          );
+        }
+      } catch {
+        console.error(JSON.stringify({ event: 'menu_staging_cleanup_error' }));
+      }
+    }
+
+    if (hasArtworkStorage) {
+      try {
+        const { cleanupOrphanedIngredientArtwork } = await import('./ingredient-artwork-retention');
+        const gracePeriodMs = parseNonNegativeIntEnv(
+          env.INGREDIENT_ARTWORK_ORPHAN_GRACE_MS,
+          'invalid_artwork_grace_period',
+        );
+        const artworkResult = await cleanupOrphanedIngredientArtwork({
+          storage: artworkStorage,
+          client,
+          gracePeriodMs,
+          dryRun: env.INGREDIENT_ARTWORK_CLEANUP_DRY_RUN === 'true',
+        });
+        if (artworkResult.deleted > 0 || artworkResult.errors > 0) {
+          console.log(
+            JSON.stringify({
+              event: 'ingredient_artwork_cleanup',
+              ...artworkResult,
+            }),
+          );
+        }
+      } catch {
+        console.error(JSON.stringify({ event: 'ingredient_artwork_cleanup_error' }));
+      }
     }
   } catch {
-    console.error(JSON.stringify({ event: 'order_import_orphan_cleanup_error' }));
+    console.error(JSON.stringify({ event: 'scheduled_database_connect_error' }));
   } finally {
     await client.end().catch(() => {});
   }

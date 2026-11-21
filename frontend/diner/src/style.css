@@ -115,19 +115,21 @@ p {
 
 .pp-logo {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0;
+  justify-content: center;
   min-width: 0;
-  width: auto;
+  width: min(240px, 100%);
+  height: 72px;
   margin-top: 12px;
+  overflow: hidden;
 }
 
-.pp-logo__emblem {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  background: #f89537;
+.pp-logo__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .pp-logo__name {
@@ -177,6 +179,9 @@ p {
   background: transparent;
   color: #fafafa;
   font-size: 14px;
+  /* Figma Inter Medium 500, 14/24 (Azoz QA report 03, M3). */
+  font-weight: 500;
+  line-height: 24px;
   cursor: pointer;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
 }
@@ -187,7 +192,9 @@ p {
 }
 
 main:has(> .pp-menu),
-main:has(> .pp-detail) {
+main:has(> .pp-detail),
+main:has(> .pp-picker),
+main:has(> .pp-compare) {
   max-width: none;
   margin: 0;
   padding: 0;
@@ -314,7 +321,8 @@ main:has(> .pp-detail) {
 
 .pp-card__category {
   font-size: 12px;
-  letter-spacing: 0.1em;
+  line-height: 16px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
   color: #a8a59e;
   margin: 0;
@@ -331,6 +339,7 @@ main:has(> .pp-detail) {
 .pp-card__price {
   font-size: 16px;
   font-weight: 600;
+  line-height: 24px;
   color: #f89537;
   margin: 0;
 }
@@ -440,7 +449,8 @@ main:has(> .pp-detail) {
   padding: 4px 0 0;
 }
 
-.pp-search-panel .pp-search-bar {
+.pp-search-panel .pp-search-bar,
+.pp-picker__search {
   position: relative;
 }
 
@@ -455,14 +465,16 @@ main:has(> .pp-detail) {
   pointer-events: none;
 }
 
-.pp-search-panel .pp-search-input {
+.pp-search-panel .pp-search-input,
+.pp-picker__search .pp-search-input {
   height: 36px;
   padding: 6px 12px 6px 34px;
   border: 1px solid transparent;
   font-size: 14px;
 }
 
-.pp-search-panel .pp-search-input:focus {
+.pp-search-panel .pp-search-input:focus,
+.pp-picker__search .pp-search-input:focus {
   outline: none;
   border-color: #f89537;
   box-shadow: 0 0 0 2px rgba(248, 149, 55, 0.35);
@@ -513,6 +525,100 @@ main:has(> .pp-detail) {
 .pp-search-empty__clear:focus-visible {
   outline: 2px solid #f89537;
   outline-offset: 2px;
+}
+
+/* Figma "Search bar_Home page" (905:9153; Azoz QA report 03, S1/S3). A 44px frame with radius 12
+   and 6px/8px insets around a 28px pill field; 16px search icon 12px from the field's left edge and
+   6px before the placeholder "Search here" (12/16, #A8A59E). State=Default: dark #2D3038 field
+   inside an orange frame border. State=Active (focused): light #FAFAFA field, no orange border. The
+   close is the component's own 20px circle with a 12px cross, not the 42px Close Button; its
+   button keeps a 28px target. Typed text stays 16px so phones do not zoom on focus. */
+.pp-search-panel .pp-search-bar {
+  box-sizing: border-box;
+  height: 44px;
+  padding: 8px 6px;
+  border: 1px solid var(--pp-role-primary);
+  border-radius: 12px;
+}
+
+.pp-search-panel .pp-search-bar:hover {
+  border-color: var(--pp-color-orange-400, var(--pp-role-primary));
+}
+
+.pp-search-panel .pp-search-bar:focus-within {
+  border-color: transparent;
+}
+
+.pp-search-panel .pp-search-input {
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 34px 0 34px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pp-color-neutral-700);
+  color: var(--pp-role-on-surface);
+  font-size: 16px;
+  line-height: 20px;
+}
+
+.pp-search-panel .pp-search-input::placeholder {
+  color: #a8a59e;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pp-search-panel .pp-search-input:focus {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+  background: var(--pp-color-neutral-50);
+  color: var(--pp-color-neutral-800);
+}
+
+.pp-search-panel .pp-search-input:focus::placeholder {
+  color: var(--pp-color-neutral-600);
+}
+
+.pp-search-panel .pp-search-input:focus-visible {
+  outline: 2px solid var(--pp-role-input-border-focus);
+  outline-offset: 2px;
+}
+
+.pp-search-panel__icon {
+  position: absolute;
+  top: 50%;
+  left: 19px;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  background: #a8a59e;
+  mask: url("./assets/icons/ui/search.svg") center / contain no-repeat;
+  pointer-events: none;
+}
+
+.pp-search-panel .pp-search-close {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--pp-color-neutral-50);
+}
+
+.pp-search-panel .pp-search-close svg {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--pp-color-neutral-700);
 }
 
 .pp-search-staff {
@@ -727,6 +833,7 @@ main:has(> .pp-detail) {
 .pp-detail__price {
   font-size: 24px;
   font-weight: 700;
+  line-height: 32px;
   color: #f89537;
   margin: 0;
 }
@@ -860,27 +967,14 @@ main:has(> .pp-detail) {
 }
 
 .pp-ingredient__icon {
-  /* width: 36px;
+  width: 36px;
   height: 36px;
-  background: #2d3038;
-  border-radius: 8px; */
-
-  display: block;
-  width: 32px;
-  height: 32px;
   object-fit: contain;
 }
 
-.pp-save-heart {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pp-save-heart__icon img {
-  display: block;
-  width: 18px;
-  height: 18px;
+/* The dish-detail heart is drawn by the mask below; hide the <img> the Save markup also renders. */
+.pp-detail__save .pp-save-heart__icon img {
+  display: none;
 }
 
 .pp-ingredient__name {
@@ -895,6 +989,49 @@ main:has(> .pp-detail) {
   display: flex;
   gap: 12px;
   margin-top: 0;
+}
+
+/* Figma View Portion / Compare: 40px tall (Azoz QA report 03, D6). */
+.pp-detail__actions .pp-btn {
+  min-height: 40px;
+  padding: 0 20px;
+}
+
+/* Dish details top bar (DishDetail_Default; Azoz QA report 03, D2/D3): the title sits left-aligned
+   next to the back button at 18/28 Semi Bold, and Save is a 16px heart icon with "Save" at 18/28.
+   The heart keeps its text character for assistive tech and state; the icon is drawn over it. */
+.pp-detail > .pp-detail__topbar {
+  grid-template-columns: auto 1fr auto;
+}
+
+.pp-detail > .pp-detail__topbar .pp-detail__title {
+  line-height: 28px;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.pp-detail__save.pp-save-heart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.pp-detail__save .pp-save-heart__icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  background-color: #fafafa;
+  mask: url("./assets/icons/ui/heart-outline.svg") center / contain no-repeat;
+}
+
+.pp-detail__save[aria-pressed="true"] .pp-save-heart__icon {
+  background-color: var(--pp-role-primary);
+  mask-image: url("./assets/icons/ui/heart.svg");
 }
 
 .pp-btn {
@@ -989,4 +1126,1156 @@ main:has(> .pp-detail) {
     width: 100%;
     height: 160px;
   }
+}
+
+/* Compare picker (S3-DIN-02.3, Figma "Compare Dish"). Spacing follows the frame's auto layout:
+   24px between sections, 8px from a label to its content, 12px between cards. */
+.pp-picker {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 0 16px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-picker button,
+.pp-picker input {
+  font-family: inherit;
+}
+
+.pp-picker__close:focus-visible,
+.pp-picker__confirm:focus-visible,
+.pp-picker__choose:focus-visible {
+  outline: 2px solid #f89537;
+  outline-offset: 2px;
+}
+
+/* Values from the Figma "Compare_Picker" auto layout: Keeping has 20px above, 12px from its
+   label to the card and 32px below; Dishes has 20px above and 16px between the heading block,
+   the search field and the list. */
+.pp-picker__keeping {
+  padding-top: 20px;
+  padding-bottom: 32px;
+}
+
+.pp-picker__keeping .pp-picker__label {
+  margin-bottom: 12px;
+}
+
+.pp-picker__choose-section {
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+  padding-bottom: 32px;
+}
+
+/* Section headings: Figma Paragraph 2/Bold 14/24, uppercase, color/on-surface-variant. */
+.pp-picker__label {
+  margin: 0 0 10px;
+  color: var(--pp-role-on-surface-variant);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 24px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Figma kept-dish card: 12px padding, 16px gap, 16px radius, surface-container with outline. */
+.pp-picker__kept {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--pp-role-surface-container);
+  /* Inside stroke, as in Figma, so the card is 72px tall (48px photo + 2 × 12px). */
+  box-shadow: inset 0 0 0 1px var(--pp-role-outline);
+}
+
+.pp-picker__kept-image {
+  display: block;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.pp-picker__kept-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+/* Figma Paragraph 2/Regular 14/24, color/text/secondary. */
+.pp-picker__hint,
+.pp-picker__none {
+  margin: 0 0 16px;
+  color: var(--pp-role-text-secondary);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+/* Figma "Search_ compare screen": a 42px pill, 12px padding, a 16px icon and a 6px gap,
+   surface-container with an outline, placeholder Small/Regular 12/16. Typed text stays 16px so
+   phones do not zoom the page when the field is focused. */
+.pp-picker__search {
+  margin: 0 0 16px;
+}
+
+.pp-picker__search-icon {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  background: var(--pp-role-on-surface-variant);
+  mask: url("./assets/icons/ui/search.svg") center / contain no-repeat;
+  pointer-events: none;
+}
+
+.pp-picker__search .pp-search-input:hover {
+  border-color: var(--pp-role-input-border-hover);
+}
+
+.pp-picker__search .pp-search-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--pp-role-outline);
+  background: var(--pp-role-surface-container);
+  color: var(--pp-role-on-surface);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.pp-picker__search .pp-search-input::placeholder {
+  color: var(--pp-role-on-surface-variant);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pp-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pp-picker__list[hidden] {
+  display: none;
+}
+
+/* Figma component "Dishes Menu-Compare": no fill or border by default; Selected adds a 3px
+   color/primary outline with an 8px radius and a 50px check badge. The text column sits beside a
+   220px photo (Direction Right/Left alternates) and aligns toward the photo. */
+.pp-picker__option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: 220px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pp-picker__option:nth-child(even) {
+  flex-direction: row-reverse;
+}
+
+.pp-picker__option--selected {
+  outline: 3px solid var(--pp-role-primary);
+  outline-offset: 0;
+}
+
+.pp-picker__option-body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 16px 0 8px;
+  text-align: right;
+}
+
+.pp-picker__option:nth-child(even) .pp-picker__option-body {
+  align-items: flex-start;
+  padding: 0 8px 0 16px;
+  text-align: left;
+}
+
+/* Figma H5/Bold 18/28. */
+.pp-picker__option-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 28px;
+}
+
+.pp-picker__choose {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pp-role-on-surface);
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.pp-picker__option-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pp-picker__option:nth-child(even) .pp-picker__option-meta {
+  flex-direction: row-reverse;
+}
+
+.pp-picker__option-heart {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pp-role-on-surface);
+}
+
+.pp-picker__heart-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.pp-picker__option-heart:disabled {
+  cursor: not-allowed;
+}
+
+.pp-picker__option-price {
+  margin: 0;
+  color: var(--pp-role-primary);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.pp-picker__option-media {
+  position: static;
+  flex: 0 0 min(220px, 60%);
+  min-width: 0;
+}
+
+.pp-picker__option-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+/* Figma check badge: 50px, color/primary, drop shadow, 20px from the top and 12px in from the
+   card's outer edge on the photo side, so it always sits on the photo's outer corner (never over
+   the middle of the card). The tick is centered in the circle. */
+.pp-picker__check {
+  display: none;
+  position: absolute;
+  align-items: center;
+  justify-content: center;
+  top: 20px;
+  left: 12px;
+  box-sizing: border-box;
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  background: var(--pp-role-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  color: var(--pp-role-on-surface);
+  line-height: 1;
+}
+
+.pp-picker__option:nth-child(odd) .pp-picker__check {
+  left: auto;
+  right: 12px;
+}
+
+.pp-picker__option--selected .pp-picker__check {
+  display: flex;
+}
+
+/* Figma round back/close buttons (Azoz QA report 03, Finding 3): 42px, Back = Nav Button
+   (447:7954), Close = Close Button (683:6577), sharing the component's state variants. */
+.pp-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--pp-role-nav-icon);
+  cursor: pointer;
+}
+
+.pp-nav-btn--back {
+  background: rgba(255, 248, 237, 0.05);
+  border-color: rgba(255, 248, 237, 0.1);
+}
+
+.pp-nav-btn--close {
+  background: var(--pp-color-neutral-700);
+  border-color: var(--pp-role-outline);
+}
+
+.pp-nav-btn svg {
+  display: block;
+}
+
+.pp-nav-btn:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--pp-role-nav-hover-bg);
+  color: var(--pp-role-nav-hover-icon);
+}
+
+.pp-nav-btn:focus-visible {
+  outline: 2px solid var(--pp-role-input-border-focus);
+  outline-offset: 2px;
+}
+
+.pp-nav-btn:active:not(:disabled) {
+  border-color: transparent;
+  background: var(--pp-role-nav-pressed-bg);
+  color: var(--pp-role-nav-icon);
+}
+
+.pp-nav-btn:disabled {
+  border-color: transparent;
+  background: var(--pp-role-nav-disabled-bg);
+  color: var(--pp-role-nav-icon-disabled);
+  cursor: not-allowed;
+}
+
+/* Hover and pressed states (Azoz review #17) from the design-system button and input roles. */
+.pp-picker__option:hover:not(.pp-picker__option--selected) {
+  outline: 1px solid var(--pp-role-outline-solid);
+}
+
+.pp-picker__option:active {
+  transform: scale(0.99);
+}
+
+.pp-picker .pp-btn--primary:hover:not(:disabled),
+.pp-compare .pp-btn--primary:hover:not(:disabled) {
+  background: var(--pp-role-button-action-pressed-bg);
+}
+
+.pp-picker .pp-btn--primary:active:not(:disabled),
+.pp-compare .pp-btn--primary:active:not(:disabled) {
+  background: var(--pp-role-button-action-pressed-bg);
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-picker__option:active,
+  .pp-picker .pp-btn--primary:active,
+  .pp-compare .pp-btn--primary:active {
+    transform: none;
+  }
+}
+
+/* The Compare action stays in the picker's column, pinned to the bottom of the viewport while the
+   list scrolls, and never covers content outside the picker. */
+.pp-picker__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  margin: auto -16px 0;
+  padding: 12px 16px 16px;
+  background: #2a2d36;
+  text-align: center;
+}
+
+.pp-picker__confirm {
+  width: 100%;
+  min-height: 48px;
+}
+
+.pp-picker__footer .pp-notice {
+  margin: 8px 0 0;
+}
+
+/* Compare result (S3-DIN-02.4, Figma "Compare result allergens"): a dish header, then bordered
+   sections with the two dishes side by side and a divider, so every row lines up. */
+.pp-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 0 16px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-compare button {
+  font-family: inherit;
+}
+
+.pp-compare__close {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.pp-compare__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  column-gap: 12px;
+}
+
+.pp-compare__divider {
+  background: rgba(113, 115, 122, 0.3);
+}
+
+.pp-compare__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pp-compare__image {
+  display: block;
+  width: 100%;
+  max-width: 128px;
+  height: auto;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: 999px;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Figma dish header: centered, Paragraph 1/Bold 16/24 name and Paragraph 1/Semi Bold 16/24
+   price in color/primary, 24px above the first section. */
+/* Figma: 16px bottom padding in the header, then a 24px gap: 40px from the prices to the first
+   section (Azoz review #9). The column gap already gives 16px. */
+.pp-compare__header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.pp-compare__name {
+  margin: 4px 0 0;
+  color: var(--pp-role-on-surface);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.pp-compare__price {
+  margin: 0;
+  color: var(--pp-role-primary);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+/* Figma comparison section: 16px padding and gap, 16px radius, surface-container with an
+   outline. */
+.pp-compare__section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--pp-role-outline);
+  border-radius: 16px;
+  background: var(--pp-role-surface-container);
+}
+
+/* Section headings: Figma Paragraph 2/Bold 14/24, uppercase, color/on-surface-variant. */
+.pp-compare__label {
+  margin: 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 24px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Figma Paragraph 2/Regular 14/24, color/text/secondary. */
+.pp-compare__description,
+.pp-compare__ingredient-names {
+  margin: 0;
+  color: var(--pp-role-text-secondary);
+  font-size: 14px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.pp-compare__actions {
+  align-items: center;
+  gap: 8px;
+}
+
+/* Figma Dietary & Allergen Info: icons with room around them, wrapping inside each column; the
+   column divider spans the whole row. */
+.pp-compare__icons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+}
+
+.pp-compare__icon {
+  display: flex;
+}
+
+.pp-compare__icon img {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.pp-compare__none {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--pp-role-text-secondary);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.pp-compare__pair {
+  align-items: stretch;
+}
+
+/* Hover and pressed states (Azoz review #17) from the design-system button roles. */
+.pp-compare__view:hover {
+  border-color: var(--pp-role-outline-solid);
+}
+
+.pp-compare__view:active {
+  background: var(--pp-role-button-outline-pressed-bg);
+}
+
+.pp-compare__replace:hover {
+  background: var(--pp-role-button-text-hover-bg);
+  border-radius: 999px;
+}
+
+.pp-compare__replace:active {
+  background: var(--pp-role-button-text-pressed-bg);
+  border-radius: 999px;
+}
+
+/* Figma Buttons (Medium, Outlined, trailing icon): a 40px pill, 20px side padding, 4px gap; and
+   a text-style color/primary "Replace" under it. */
+.pp-compare__view {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.pp-compare__replace {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--pp-role-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pp-compare__staff {
+  margin: 0;
+  padding: 0;
+}
+
+/* Figma: Back to Menu follows the sections (24px after them) and the frame ends with 32px. */
+.pp-compare__footer {
+  margin-top: 8px;
+  padding-bottom: 32px;
+}
+
+.pp-compare__back {
+  width: 100%;
+  min-height: 48px;
+}
+
+.pp-compare__close:focus-visible,
+.pp-compare__back:focus-visible,
+.pp-compare__view:focus-visible,
+.pp-compare__replace:focus-visible {
+  outline: 2px solid #f89537;
+  outline-offset: 2px;
+}
+
+/* Chips keep their own height when the other dish's side of the row is taller. */
+.pp-compare__cell .pp-chip-group {
+  flex: none;
+  align-items: flex-start;
+}
+
+/* The header shares its rows (photo, name, price) across both dishes, so a name that wraps on
+   one side keeps the two prices level. */
+.pp-compare__header {
+  grid-template-rows: repeat(3, auto);
+}
+
+.pp-compare__header > .pp-compare__cell {
+  display: grid;
+  grid-row: 1 / span 3;
+  grid-template-rows: subgrid;
+  row-gap: 8px;
+  align-content: start;
+}
+
+.pp-compare__header > .pp-compare__divider {
+  grid-row: 1 / span 3;
+}
+
+/* Figma preview shell. PR25 image bytes and movement remain independent of layout. */
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  src: url("./menu/preview-assets/inter-latin-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  src: url("./menu/preview-assets/inter-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  src: url("./menu/preview-assets/inter-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.pp-detail--preview {
+  position: relative;
+  min-height: 100svh;
+  padding: max(12px, env(safe-area-inset-top)) 16px 32px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: "PeekaPlate Preview Inter", "Inter", sans-serif;
+}
+.pp-detail--preview .pp-detail__save,
+.pp-detail--preview .pp-detail__section,
+.pp-detail--preview > .pp-notice:not(.pp-portion__status) {
+  display: none;
+}
+.pp-detail--preview .pp-detail__topbar {
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 54px;
+  box-sizing: border-box;
+}
+.pp-detail--preview .pp-detail__title {
+  text-align: left;
+  line-height: 28px;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.pp-detail--preview .pp-detail__back {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  font-size: 0;
+  background: url("./menu/preview-assets/back.svg") center no-repeat;
+}
+.pp-detail--preview .pp-detail__image-wrap {
+  position: relative;
+  width: 250px;
+  max-width: 100%;
+  height: 250px;
+  padding: 0;
+  margin: max(48px, calc(50svh - 233px)) auto 0;
+  touch-action: pan-y;
+  isolation: isolate;
+}
+.pp-detail--preview .pp-detail__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.pp-portion__css {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pp-portion__css img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 9px #2223);
+}
+.pp-portion--ready > .pp-detail__image,
+.pp-portion--original .pp-portion__css {
+  visibility: hidden;
+}
+.pp-portion--original > .pp-detail__image {
+  visibility: visible;
+}
+.pp-detail--preview .pp-detail__image-wrap:focus-visible,
+.pp-portion__controls :focus-visible {
+  outline: 2px solid #fff8ed;
+  outline-offset: 4px;
+}
+.pp-detail--preview .pp-portion__status {
+  margin: 36px 0 0;
+  font-size: 18px;
+  line-height: 28px;
+  text-align: center;
+  white-space: pre-line;
+  color: #b5b6ba;
+}
+.pp-portion__status strong,
+.pp-portion__status span {
+  display: block;
+}
+.pp-portion__status strong {
+  color: #fafafa;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.pp-detail[data-portion-state="ready"] .pp-portion__status {
+  margin-top: 60px;
+  color: #fafafa;
+  font-weight: 600;
+}
+.pp-detail[data-portion-state="ready"] .pp-portion__status::before {
+  content: "";
+  display: block;
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 8px;
+  background: url("./menu/preview-assets/hand-touch.svg") center no-repeat;
+}
+.pp-detail[data-portion-state="loading"] .pp-portion__status {
+  margin-top: 60px;
+  color: #fff8ed;
+  font-weight: 700;
+}
+.pp-detail[data-portion-state="loading"] .pp-detail__image {
+  filter: blur(20.5px);
+  opacity: 0.61;
+  mix-blend-mode: lighten;
+}
+.pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 32px);
+  top: calc(50% - 32px);
+  width: 64px;
+  height: 64px;
+  background: url("./menu/preview-assets/loading.svg") center no-repeat;
+  animation: pp-portion-spin 1s linear infinite;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image-wrap {
+  height: 150px;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image {
+  display: none;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image-wrap::after {
+  content: "";
+  width: 150px;
+  height: 150px;
+  background: url("./menu/preview-assets/image-not-found.svg") center no-repeat;
+}
+.pp-detail[data-portion-state="failed"] .pp-portion__status {
+  margin-top: 32px;
+}
+.pp-portion__retry {
+  display: block;
+  width: calc(100% - 40px);
+  height: 40px;
+  margin: 48px 20px 0;
+  border: 0;
+  border-radius: 999px;
+  background: #f89537;
+  color: #421708;
+  font:
+    14px "PeekaPlate Preview Inter",
+    sans-serif;
+  cursor: pointer;
+}
+.pp-portion__controls {
+  margin-top: max(80px, calc(50svh - 190px));
+  font-size: 14px;
+  color: #fafafa;
+}
+.pp-portion__controls summary {
+  cursor: pointer;
+  text-align: center;
+  padding: 12px;
+}
+.pp-portion__controls button,
+.pp-portion__visual {
+  padding: 10px;
+  margin: 8px 4px;
+  font: inherit;
+  color: #fafafa;
+  background: #2a2d36;
+  border: 1px solid #b5b6ba;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pp-portion__visual {
+  display: block;
+  width: calc(100% - 8px);
+}
+.pp-portion__retry[hidden],
+.pp-portion__controls[hidden],
+.pp-portion__instructions[hidden] {
+  display: none;
+}
+@keyframes pp-portion-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
+    animation: none;
+  }
+  .pp-portion__css,
+  .pp-portion__css img {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* Local-only 3D review panel; the 2.5D card stays mounted underneath. */
+.pp-local3d {
+  border-top: 1px solid #71737a;
+  margin-top: 16px;
+  padding-top: 8px;
+}
+.pp-local3d p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pp-local3d__viewer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+.pp-local3d__viewer[hidden],
+.pp-local3d button[hidden] {
+  display: none;
+}
+.pp-detail__image-wrap[data-model3d="true"] .pp-portion__css {
+  visibility: hidden;
+}
+
+/* Local AR portal: camera pixels remain on the device and never enter generation requests. */
+.pp-ar {
+  position: fixed;
+  inset: 0;
+  width: min(100vw, 390px);
+  height: min(100dvh, 844px);
+  max-width: 100vw;
+  max-height: 100dvh;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: #171a21;
+  color: #fff;
+  overflow: hidden;
+  font-family: Inter, sans-serif;
+}
+.pp-ar:fullscreen,
+.pp-ar:xr-overlay {
+  width: 100vw;
+  height: 100dvh;
+  margin: 0;
+  background: transparent;
+}
+.pp-ar::backdrop {
+  background: #171a21;
+}
+.pp-ar__camera,
+.pp-ar__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.pp-ar__camera {
+  object-fit: cover;
+}
+.pp-ar__canvas {
+  touch-action: none;
+}
+.pp-ar__canvas canvas {
+  display: block;
+}
+.pp-ar__header,
+.pp-ar__panel {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  padding: 16px max(16px, env(safe-area-inset-right));
+  background: rgb(23 26 33 / 88%);
+}
+.pp-ar__header {
+  top: 0;
+  padding-top: max(16px, env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pp-ar__header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.pp-ar__panel {
+  bottom: 0;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.pp-ar__panel p {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.pp-ar__message {
+  font-weight: 600;
+}
+.pp-ar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.pp-ar button {
+  min-height: 44px;
+  padding: 8px 12px;
+  color: #fff;
+  background: #363b48;
+  border: 1px solid #9a9eaa;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.pp-ar button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.pp-ar button[hidden] {
+  display: none;
+}
+.pp-ar label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.pp-ar input {
+  flex: 1;
+  min-height: 32px;
+  min-width: 0;
+  accent-color: #fff;
+}
+
+/* Keep the original detail action pair together; local upload is outside the row. */
+.pp-detail__actions + label {
+  display: block;
+  margin-top: 16px;
+  font-size: 13px;
+}
+.pp-detail__actions + label input {
+  display: block;
+  max-width: 100%;
+  margin-top: 8px;
+}
+.pp-ar__rotate-hint {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .pp-ar__rotate-hint {
+    display: block;
+    position: absolute;
+    z-index: 2;
+    top: calc(76px + env(safe-area-inset-top));
+    left: 16px;
+    right: 16px;
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: #fff;
+    background: rgb(23 26 33 / 88%);
+    text-align: center;
+    pointer-events: none;
+    font-size: 14px;
+  }
+}
+/* The dish uses the whole camera viewport; adjustments are collapsed by default. */
+.pp-ar {
+  width: 100vw;
+  height: 100dvh;
+}
+.pp-ar__header {
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px
+    max(16px, env(safe-area-inset-left));
+  background: transparent;
+  pointer-events: none;
+}
+.pp-ar .pp-ar__back {
+  pointer-events: auto;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 999px;
+  background: url("./menu/preview-assets/back.svg") center no-repeat;
+  border: 1px solid rgba(255, 248, 237, 0.1);
+}
+.pp-ar__scale-status {
+  position: absolute;
+  z-index: 2;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(16px, env(safe-area-inset-left));
+  right: 130px;
+  margin: 0;
+  font-size: 12px;
+  text-shadow: 0 1px 4px #000;
+  pointer-events: none;
+}
+.pp-ar__settings {
+  position: absolute;
+  z-index: 3;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  right: max(12px, env(safe-area-inset-right));
+  max-width: calc(100vw - 32px);
+}
+.pp-ar__settings > summary {
+  margin-left: auto;
+  width: fit-content;
+  padding: 12px;
+  border-radius: 999px;
+  background: rgb(23 26 33 / 78%);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pp-ar__settings .pp-ar__panel {
+  position: static;
+  width: 320px;
+  max-width: 100%;
+  max-height: calc(100dvh - 140px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 12px;
+}
+.pp-detail__actions ~ label {
+  display: block;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.pp-detail__actions ~ label input {
+  display: block;
+  max-width: 100%;
+  margin-top: 6px;
+}
+
+.pp-ar__original {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #151515;
+  z-index: 2;
+}
+.pp-ar__original[hidden] {
+  display: none;
+}
+.pp-ar__header {
+  z-index: 4;
+}
+.pp-ar__header [data-action="original"] {
+  margin-left: auto;
+  pointer-events: auto;
+}
+.pp-ar--original .pp-ar__settings,
+.pp-ar--original .pp-ar__scale-status,
+.pp-ar--original .pp-ar__rotate-hint {
+  visibility: hidden;
+}
+
+.pp-ar__canvas {
+  touch-action: none;
+  cursor: grab;
+}
+.pp-ar__canvas:active {
+  cursor: grabbing;
+}
+
+.pp-ar__header [data-action="landscape"] {
+  display: none;
+  pointer-events: auto;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .pp-ar__header [data-action="landscape"] {
+    display: block;
+    margin-left: auto;
+  }
+  .pp-ar__header [data-action="original"] {
+    margin-left: 8px;
+  }
+}
+
+.pp-search__icon {
+  display: block;
+  width: 18px;
+  height: 18px;
 }

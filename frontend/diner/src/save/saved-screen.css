@@ -1,7 +1,8 @@
 /*
  * Saved screen structure (S3-DIN-02.5). Only what accessibility needs until the Figma Saved frames
  * are applied: every control is at least 44px square, comfortably above WCAG 2.2's 24px minimum, so
- * the size never depends on the platform's font.
+ * the size never depends on the platform's font. The back button is the Figma Nav Button
+ * (style.css .pp-nav-btn) kept at this screen's 44px floor instead of the component's 42px.
  */
 .pp-saved__back,
 .pp-saved__save,

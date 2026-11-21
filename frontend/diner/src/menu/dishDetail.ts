@@ -1,5 +1,7 @@
 import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
-import { allergenIcon, dietaryIcon, ingredientIcon, UI_ICONS } from './icons';
+import { allergenIcon, dietaryIcon, ingredientIcon } from './icons';
+import { navButtonMarkup } from './navButton';
+import { bindPortionPreview } from './portionPreview';
 import { formatPrice } from './price';
 import type { CompleteDish } from './types';
 
@@ -18,7 +20,7 @@ function iconMarkup(src: string | null, className: string, size: number): string
   return `<img class="${className}" src="${escapeHtml(src)}" alt="" aria-hidden="true" width="${size}" height="${size}" />`;
 }
 
-function allergenChips(dish: CompleteDish): string {
+export function allergenChips(dish: CompleteDish): string {
   if (dish.allergens.length === 0) return '';
   return dish.allergens
     .map(
@@ -32,7 +34,7 @@ function allergenChips(dish: CompleteDish): string {
     .join('');
 }
 
-function dietaryChips(dish: CompleteDish): string {
+export function dietaryChips(dish: CompleteDish): string {
   if (dish.dietary.length === 0) return '';
   return dish.dietary
     .map(
@@ -48,14 +50,15 @@ function dietaryChips(dish: CompleteDish): string {
 
 function ingredientTiles(dish: CompleteDish): string {
   return dish.ingredients
-    .map(
-      (ingredient) => `
+    .map((ingredient) => {
+      const icon = ingredientIcon(ingredient.name);
+      return `
         <div class="pp-ingredient" role="group" aria-label="${escapeHtml(ingredient.name)}">
-          ${iconMarkup(ingredientIcon(ingredient.name), 'pp-ingredient__icon', 32)}
+          ${icon ? `<img class="pp-ingredient__icon" src="${escapeHtml(icon)}" alt="" aria-hidden="true" width="36" height="36" />` : ''}
           <p class="pp-ingredient__name">${escapeHtml(ingredient.name)}</p>
         </div>
-      `,
-    )
+      `;
+    })
     .join('');
 }
 
@@ -64,7 +67,12 @@ export function renderDishDetail(
   dish: CompleteDish,
   onBack: () => void,
   notice: string | null = null,
-): void {
+  // Opens the Compare picker (DIN-02.3); without it the Compare button stays disabled.
+  onCompare?: () => void,
+  // Detail opened from a Compare result (DIN-02.4): Back returns to that result, and the Compare
+  // button is hidden because the diner is already comparing.
+  fromCompare = false,
+): () => void {
   const image = dish.images?.detail ?? dish.images?.card;
   const imageMarkup = image
     ? `<img class="pp-detail__image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt)}" width="${image.width}" height="${image.height}" />`
@@ -77,7 +85,7 @@ export function renderDishDetail(
   container.innerHTML = `
     <div class="pp-detail">
       <header class="pp-detail__topbar">
-        <button class="pp-back pp-detail__back" type="button" aria-label="Back to menu"><img class="pp-detail__back-icon" src="${UI_ICONS.back}" alt="" aria-hidden="true" width="16" height="16" /></button>
+        ${navButtonMarkup('back', 'pp-detail__back', fromCompare ? 'Back to compare' : 'Back to menu')}
         <h1 class="pp-detail__title" tabindex="-1">Dish details</h1>
         ${saveHeartMarkup(dish, 'pp-detail__save')}
       </header>
@@ -88,6 +96,7 @@ export function renderDishDetail(
         ${imageMarkup}
       </div>
 
+      <p class="pp-portion__status pp-notice" role="status" hidden></p>
       <section class="pp-detail__section">
         <div class="pp-detail__text">
           <p class="pp-detail__category">${escapeHtml(dish.categoryName)}</p>
@@ -95,6 +104,7 @@ export function renderDishDetail(
             <h2 class="pp-detail__name">${escapeHtml(dish.name)}</h2>
             <p class="pp-detail__price">${escapeHtml(formatPrice(dish.price))}</p>
           </div>
+          ${dish.servingCount ? `<p class="pp-detail__servings">Serves ${dish.servingCount} ${dish.servingCount === 1 ? 'person' : 'people'}</p>` : ''}
           <p class="pp-detail__description">${escapeHtml(dish.description)}</p>
         </div>
 
@@ -134,16 +144,26 @@ export function renderDishDetail(
         </div>
 
         <div class="pp-detail__actions">
-          <button class="pp-btn pp-btn--primary" type="button" disabled>View Portion</button>
-          <button class="pp-btn pp-btn--outlined" type="button" disabled>Compare <span aria-hidden="true">→</span></button>
+          <button class="pp-btn pp-btn--primary pp-detail__portion" type="button">View Portion</button>
+          ${fromCompare ? '' : `<button class="pp-btn pp-btn--outlined pp-detail__compare" type="button"${onCompare ? '' : ' disabled'}>Compare <span aria-hidden="true">→</span></button>`}
         </div>
-        <p class="pp-notice">View Portion and Compare are not available yet.</p>
+        ${onCompare || fromCompare ? '' : '<p class="pp-notice">Compare is not available yet.</p>'}
       </section>
     </div>
   `;
 
   const backButton = container.querySelector<HTMLButtonElement>('.pp-detail__back');
+  // A failed decoration never replaces or hides its ingredient label.
+  container.querySelectorAll<HTMLImageElement>('img.pp-ingredient__icon').forEach((icon) => {
+    icon.addEventListener('error', () => icon.remove());
+    if (icon.complete && icon.naturalWidth === 0) icon.remove();
+  });
   backButton?.addEventListener('click', onBack);
+  if (onCompare) {
+    container
+      .querySelector<HTMLButtonElement>('.pp-detail__compare')
+      ?.addEventListener('click', onCompare);
+  }
   container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 
   const detailImg = container.querySelector<HTMLImageElement>('img.pp-detail__image');
@@ -167,4 +187,5 @@ export function renderDishDetail(
       handleFailure();
     }
   }
+  return bindPortionPreview(container, dish);
 }
