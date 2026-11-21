@@ -163,43 +163,35 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
       venue_id: z.uuid(),
       source: z.enum(['synthetic', 'production']),
       summary: OwnerReportSummarySchema.optional(),
-      report_metadata: z
-        .strictObject({
-          calculation_version: z.string(),
-          generated_at: z.iso.datetime(),
-          date_window: z
-            .strictObject({
-              start_time: z.iso.datetime(),
-              end_time: z.iso.datetime(),
-              duration_hours: z.number().int().nonnegative(),
-            })
-            .refine(
-              (window) =>
-                new Date(window.end_time).getTime() >= new Date(window.start_time).getTime(),
-              { message: 'End time cannot be before start time' },
-            ),
-          coverage: z
-            .strictObject({
-              total_dishes_monitored: z.number().int().nonnegative(),
-              measurable_dishes_count: z.number().int().nonnegative(),
-            })
-            .refine((cov) => cov.measurable_dishes_count <= cov.total_dishes_monitored, {
-              message: 'Measurable count cannot exceed total monitored dishes',
-            }),
-          freshness: z.strictObject({
-            last_event_ingested_at: z.iso.datetime().nullable(),
-            // Null means pipeline evidence is insufficient to verify freshness.
-            is_stale: z.boolean().nullable(),
+      report_metadata: z.strictObject({
+        calculation_version: z.string(),
+        generated_at: z.iso.datetime(),
+        date_window: z
+          .strictObject({
+            start_time: z.iso.datetime(),
+            end_time: z.iso.datetime(),
+            duration_hours: z.number().int().nonnegative(),
+          })
+          .refine(
+            (window) =>
+              new Date(window.end_time).getTime() >= new Date(window.start_time).getTime(),
+            { message: 'End time cannot be before start time' },
+          ),
+        coverage: z
+          .strictObject({
+            total_dishes_monitored: z.number().int().nonnegative(),
+            measurable_dishes_count: z.number().int().nonnegative(),
+          })
+          .refine((cov) => cov.measurable_dishes_count <= cov.total_dishes_monitored, {
+            message: 'Measurable count cannot exceed total monitored dishes',
           }),
-          report_status: z.enum(['NORMAL', 'EMPTY', 'STALE', 'ERROR']),
-        })
-        .refine(
-          (meta) => {
-            if (meta.report_status === 'EMPTY') return true;
-            return meta.freshness.last_event_ingested_at !== null;
-          },
-          { message: 'Last event timestamp required unless report is empty' },
-        ),
+        freshness: z.strictObject({
+          last_event_ingested_at: z.iso.datetime().nullable(),
+          // Null means pipeline evidence is insufficient to verify freshness.
+          is_stale: z.boolean().nullable(),
+        }),
+        report_status: z.enum(['NORMAL', 'EMPTY', 'STALE', 'ERROR']),
+      }),
       dishes: z
         .array(
           z
@@ -299,6 +291,18 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
         ),
     })
     .superRefine((report, ctx) => {
+      const metadata = report.report_metadata;
+      if (
+        metadata.report_status !== 'EMPTY' &&
+        metadata.freshness.last_event_ingested_at === null &&
+        (report.source !== 'production' || metadata.freshness.is_stale !== null)
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['report_metadata', 'freshness', 'last_event_ingested_at'],
+          message: 'A nonempty report requires an ingestion timestamp when freshness is known',
+        });
+      }
       const summary = report.summary;
       if (!summary) return;
       const at = Date.parse;

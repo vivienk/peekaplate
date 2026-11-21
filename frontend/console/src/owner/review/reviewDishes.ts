@@ -62,7 +62,7 @@ export type MissingField =
   | 'allergens'
   | 'photo';
 
-export type DishStatusTone = 'success' | 'warning' | 'error' | 'information';
+export type DishStatusTone = 'success' | 'warning' | 'error';
 
 export interface DishStatus {
   ready: boolean;
@@ -127,7 +127,7 @@ export function dishStatus(dish: ReviewDish): DishStatus {
   const [first] = missing;
   if (first === undefined) {
     return dish.reviewed === false
-      ? { ready: false, label: 'Pending Review', tone: 'information' }
+      ? { ready: false, label: 'Pending Review', tone: 'warning' }
       : { ready: true, label: 'Ready', tone: 'success' };
   }
   if (missing.length > 1) {

@@ -1,4 +1,6 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
+import { OWNER_PAGE_PATHS } from '../../frontend/console/src/owner/routes';
+import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
 
 const origin = 'http://127.0.0.1:5174';
 const productionOrigin = 'https://peekaplate.app';
@@ -71,6 +73,10 @@ async function provider(
 
 async function signInScreen(page: Page, appOrigin = origin) {
   await page.goto(`${appOrigin}/owner-auth.html`);
+  await enterEmail(page);
+}
+
+async function enterEmail(page: Page) {
   await page.getByLabel('Email address').fill(email);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
@@ -85,6 +91,155 @@ async function signup(page: Page, appOrigin = origin) {
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
 }
+
+test('signed-out owners return to the sign-in path from each production workspace URL', async ({
+  page,
+}) => {
+  await page.route(`${productionOrigin}/**`, serveConsole);
+  const calls = await provider(page, {}, productionOrigin);
+  let workspaceRequests = 0;
+  await page.route('https://api.peekaplate.app/**', async (route) => {
+    workspaceRequests++;
+    await route.abort();
+  });
+  for (const path of Object.values(OWNER_PAGE_PATHS)) {
+    await page.goto(`${productionOrigin}${path}`);
+    await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
+    await expect(page.getByLabel('Email address')).toBeVisible();
+  }
+  expect(calls).toEqual([]);
+  expect(workspaceRequests).toBe(0);
+});
+
+test('production deep links resume after sign-in and keep orientation through browser history', async ({
+  page,
+}) => {
+  await page.route(`${productionOrigin}/**`, serveConsole);
+  await provider(page, {}, productionOrigin);
+  const venue = { venueId: user.id, name: 'Synthetic Corner Cafe', permission: 'owner' };
+  let published = true;
+  let setupReads = 0;
+  let reportReads = 0;
+  let workspaceReads = 0;
+  await page.route('https://api.peekaplate.app/**', async (route) => {
+    const { pathname, searchParams } = new URL(route.request().url());
+    const headers = {
+      'Access-Control-Allow-Origin': productionOrigin,
+      'Access-Control-Allow-Headers': 'Authorization,Content-Type',
+    };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    expect(route.request().headers().authorization).toBe(`Bearer ${session.access_token}`);
+    let json: unknown;
+    if (pathname === '/staff/venues') {
+      workspaceReads++;
+      json = { actorId: user.id, venues: [venue] };
+    } else if (pathname.endsWith('/setup')) {
+      setupReads++;
+      json = {
+        venueId: venue.venueId,
+        restaurantName: venue.name,
+        detailsStatus: 'verified',
+        menuAdded: true,
+        menuVerified: true,
+        published,
+      };
+    } else if (pathname.endsWith('/profile')) json = { profile: null };
+    else if (pathname.endsWith('/jobs')) json = { jobs: [] };
+    else if (pathname.endsWith('/drafts')) json = { drafts: [] };
+    else if (pathname.endsWith('/owner-insight-actions')) {
+      json = { schemaVersion: 1, actions: [] };
+    } else if (pathname.endsWith('/analytics/dishes')) {
+      expect(searchParams.get('source')).toBe('production');
+      reportReads++;
+      json = {
+        ...UNEEZA_REPORT,
+        source: 'production',
+        venue_id: venue.venueId,
+        dishes: UNEEZA_REPORT.dishes.map((dish, index) =>
+          index === 0 ? { ...dish, name: 'Fixture lentil soup' } : dish,
+        ),
+        report_metadata: {
+          ...UNEEZA_REPORT.report_metadata,
+          calculation_version: 'production.v1',
+        },
+      };
+    } else return route.fulfill({ status: 404, headers, json: { error: 'unexpected_path' } });
+    await route.fulfill({ status: 200, headers, json });
+  });
+  await page.goto(`${productionOrigin}/dish-performance?next=https://example.invalid`);
+  await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
+  expect(workspaceReads).toBe(0);
+  await enterEmail(page);
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(`${productionOrigin}/dish-performance`);
+  await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
+  const nav = page.getByRole('navigation', { name: 'Workspace' });
+  const visit = async (label: string, path: string, heading: string) => {
+    await nav.getByRole('button', { name: label, exact: true }).click();
+    await expect(page).toHaveURL(`${productionOrigin}${path}`);
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+  };
+  const mainPane = page.locator('.owner-main');
+  await mainPane.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect.poll(() => mainPane.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await visit('Overview', '/overview', 'How your menu did this period');
+  await expect(page.getByRole('main')).toBeFocused();
+  await expect(page).toHaveTitle('PeekaPlate · Overview');
+  await expect.poll(() => mainPane.evaluate((element) => element.scrollTop)).toBe(0);
+  await visit('AI Insight Report', '/ai-insight-report', 'Menu activity report');
+  await visit('Dish performance', '/dish-performance', 'What diners did with each dish');
+  await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
+  expect(reportReads).toBe(1);
+  await visit('Actions', '/actions', 'What you decided to do');
+  await visit('Menu', '/menu', 'Your dishes');
+  expect(setupReads).toBe(1);
+  expect(workspaceReads).toBe(1);
+
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  const dishName = page.getByRole('textbox', { name: 'Dish name' });
+  await dishName.fill('Unsaved route test');
+  const cancel = page.waitForEvent('dialog').then((dialog) => dialog.dismiss());
+  await page.evaluate(() => window.history.back());
+  await cancel;
+  await expect(page).toHaveURL(`${productionOrigin}/menu`);
+  await expect(dishName).toHaveValue('Unsaved route test');
+  const discard = page.waitForEvent('dialog').then((dialog) => dialog.accept());
+  await page.evaluate(() => window.history.back());
+  await discard;
+  await expect(page).toHaveURL(`${productionOrigin}/actions`);
+  await expect(page.getByRole('heading', { name: 'What you decided to do' })).toBeVisible();
+  await page.goForward();
+  await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
+  await page.goto(`${productionOrigin}/dish-performance`);
+  await expect(page.getByRole('table')).toBeVisible();
+  await page.reload();
+  await expect(page).toHaveURL(`${productionOrigin}/dish-performance`);
+  await expect(page.getByRole('table')).toBeVisible();
+
+  published = false;
+  await page.reload();
+  await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
+  await expect(nav.getByRole('button', { name: 'Dish performance' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  expect(reportReads).toBe(3);
+
+  await page.getByLabel('Owner account').click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
+  await expect(page).toHaveTitle('PeekaPlate · Owner sign in');
+  published = true;
+  await enterEmail(page);
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
+  expect(reportReads).toBe(3);
+});
 
 test('production confirms to sign-in, opens S05, resumes saves and retains the authorized workspace', async ({
   page,
@@ -183,11 +338,14 @@ test('production confirms to sign-in, opens S05, resumes saves and retains the a
   await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
   expect(await page.evaluate(() => localStorage.getItem('sb-auth-fixture-auth-token'))).toBeNull();
   expect(creationRequests).toHaveLength(0);
+  await page.goto(`${productionOrigin}/dish-performance`);
+  await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
   await page.getByLabel('Email address').fill(email);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Restaurant Details' })).toBeFocused();
+  await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
   await expect(page.getByText('Create test restaurant')).toHaveCount(0);
   expect(creationRequests).toHaveLength(0);
   const name = page.getByLabel('Restaurant name');

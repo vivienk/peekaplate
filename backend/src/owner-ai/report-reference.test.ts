@@ -11,20 +11,22 @@ import { mintOwnerReportReference, OWNER_REPORT_REFERENCE_HEADER } from './repor
 
 const venuePath = `/api/v1/venues/${LOCAL_AI_VENUE}`;
 const origin = 'http://127.0.0.1:5174';
+const productionOrigin = 'https://peekaplate.app';
 const owner = 'report-fixture-owner';
 const secret = 'fixture-report-reference-signing-key-for-tests-only';
 const start = Date.parse('2026-11-16T12:00:00.219Z');
 
 afterEach(() => vi.unstubAllGlobals());
 
-function setup() {
+function setup(source: 'synthetic' | 'production' = 'synthetic') {
   let now = start;
+  const reportOrigin = source === 'production' ? productionOrigin : origin;
   const reportState = { allowed: true, fresh: true, rate: 0.5, reversed: false };
   const readOwnerReport = vi.fn(async (actorId: string, venueId: string, anchor: Date) => {
     if (!reportState.allowed || actorId !== owner || venueId !== LOCAL_AI_VENUE) {
       throw new CommandError('forbidden', 403);
     }
-    const report = OwnerDishReportSchema.parse(localOwnerAiReport(anchor));
+    const report = OwnerDishReportSchema.parse({ ...localOwnerAiReport(anchor), source });
     const dish = report.dishes[0]!;
     dish.metrics.open_rate.value = reportState.rate;
     report.dishes.push({ ...dish, dish_id: '00000000-0000-4000-8000-000000000789' });
@@ -55,9 +57,16 @@ function setup() {
     execute: vi.fn(),
     readOwnerReport,
   });
+  const limit = vi.fn(async () => ({ success: true }));
   const env: Bindings = {
-    APP_ENV: 'local',
-    SYNTHETIC_REPORT_VENUE_ID: LOCAL_AI_VENUE,
+    ...(source === 'production'
+      ? {
+          APP_ENV: 'production',
+          OWNER_WORKFLOW_ENABLED: 'true',
+          OWNER_PRODUCTION_REPORTS_ENABLED: 'true',
+          OWNER_AI_RATE_LIMITER: { limit },
+        }
+      : { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: LOCAL_AI_VENUE }),
     OWNER_AI_RESPONSES_ENABLED: 'true',
     OWNER_AI_OPENAI_API_KEY: 'unused-test-provider-key',
     OWNER_AI_OPENAI_PROJECT_ID: 'proj_synthetic',
@@ -65,8 +74,8 @@ function setup() {
   };
   const get = () =>
     worker.request(
-      `${venuePath}/analytics/dishes?source=synthetic`,
-      { headers: { Authorization: `Bearer ${owner}`, Origin: origin } },
+      `${venuePath}/analytics/dishes?source=${source}`,
+      { headers: { Authorization: `Bearer ${owner}`, Origin: reportOrigin } },
       env,
     );
   async function reference() {
@@ -76,7 +85,7 @@ function setup() {
     expect(token).toBeTruthy();
     return token ?? undefined;
   }
-  const analyze = (token?: string, actorId = owner) =>
+  const analyze = (token?: string, actorId = owner, requestOrigin = reportOrigin) =>
     worker.request(
       `${venuePath}/ai/analysis`,
       {
@@ -84,7 +93,7 @@ function setup() {
         headers: {
           Authorization: `Bearer ${actorId}`,
           'Content-Type': 'application/json',
-          Origin: origin,
+          Origin: requestOrigin,
           ...(token ? { [OWNER_REPORT_REFERENCE_HEADER]: token } : {}),
         },
         body: JSON.stringify({ dishId: LOCAL_AI_DISH, goal: 'menu' }),
@@ -97,7 +106,7 @@ function setup() {
       {
         method: 'OPTIONS',
         headers: {
-          Origin: origin,
+          Origin: reportOrigin,
           'Access-Control-Request-Method': 'POST',
           'Access-Control-Request-Headers': OWNER_REPORT_REFERENCE_HEADER,
         },
@@ -117,8 +126,61 @@ function setup() {
     reportState,
     readOwnerReport,
     provider,
+    limit,
   };
 }
+
+it('analyzes the same production report and sends only screened aggregate rates', async () => {
+  const s = setup('production');
+  const preflight = await s.preflight();
+  expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe(productionOrigin);
+  const report = await s.get();
+  expect(report.status).toBe(200);
+  expect(report.headers.get('Access-Control-Allow-Origin')).toBe(productionOrigin);
+  expect(report.headers.get('Access-Control-Expose-Headers')).toContain(
+    OWNER_REPORT_REFERENCE_HEADER,
+  );
+  const { report_metadata: metadata } = OwnerDishReportSchema.parse(await report.json());
+  const token = report.headers.get(OWNER_REPORT_REFERENCE_HEADER);
+  expect(token).toBeTruthy();
+  s.advance(15_000);
+  const response = await s.analyze(token ?? undefined);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    source: 'production',
+    status: 'review',
+    value: 0.5,
+    timeWindow: { start: metadata.date_window.start_time, end: metadata.date_window.end_time },
+  });
+  expect(s.readOwnerReport.mock.calls).toEqual([
+    [owner, LOCAL_AI_VENUE, new Date(start), s.env, 'production'],
+    [owner, LOCAL_AI_VENUE, new Date(start), s.env, 'production'],
+  ]);
+  expect(s.limit).toHaveBeenCalledExactlyOnceWith({ key: `${LOCAL_AI_VENUE}:${owner}` });
+  const [, init] = (s.provider.mock.calls as unknown as [string, RequestInit][])[0]!;
+  const body = JSON.parse(String(init.body));
+  expect(JSON.parse(body.input)).toEqual({
+    goal: 'menu',
+    metrics: { open_rate: 0.5, engagement_rate: 0.3, save_rate: 0 },
+  });
+  expect(init.body).not.toContain(LOCAL_AI_VENUE);
+  expect(init.body).not.toContain(LOCAL_AI_DISH);
+});
+
+it('rejects a synthetic reference and staging origin in production before a report read', async () => {
+  const s = setup('production');
+  const syntheticReference = await mintOwnerReportReference(
+    OwnerDishReportSchema.parse(localOwnerAiReport(new Date(start))),
+    { actorId: owner, venueId: LOCAL_AI_VENUE },
+    secret,
+    new Date(start),
+  );
+  expect((await s.analyze(syntheticReference)).status).toBe(409);
+  expect((await s.analyze(syntheticReference, owner, origin)).status).toBe(403);
+  expect(s.readOwnerReport).not.toHaveBeenCalled();
+  expect(s.limit).not.toHaveBeenCalled();
+  expect(s.provider).not.toHaveBeenCalled();
+});
 
 it('uses the authorized GET window 25 seconds later even if dish rows return in another order', async () => {
   const s = setup();
@@ -184,32 +246,46 @@ it('rejects missing, modified, expired or incorrectly scoped references before t
   expect(s.provider).not.toHaveBeenCalled();
 });
 
-it('checks current membership again for the pinned read', async () => {
-  const s = setup();
-  const reference = await s.reference();
-  s.reportState.allowed = false;
-  expect((await s.analyze(reference)).status).toBe(403);
-  expect(s.readOwnerReport).toHaveBeenCalledTimes(2);
-  expect(s.provider).not.toHaveBeenCalled();
-});
+it.each(['synthetic', 'production'] as const)(
+  'checks current membership again for the pinned %s read',
+  async (source) => {
+    const s = setup(source);
+    const reference = await s.reference();
+    s.reportState.allowed = false;
+    expect((await s.analyze(reference)).status).toBe(403);
+    expect(s.readOwnerReport).toHaveBeenCalledTimes(2);
+    expect(s.limit).not.toHaveBeenCalled();
+    expect(s.provider).not.toHaveBeenCalled();
+  },
+);
 
-it('refuses analysis if a new observation changes the report within the pinned window', async () => {
-  const s = setup();
-  const reference = await s.reference();
-  s.reportState.rate = 0.75;
-  const response = await s.analyze(reference);
-  expect(response.status).toBe(409);
-  expect(await response.json()).toEqual({ error: 'report_reference_unavailable' });
-  expect(s.provider).not.toHaveBeenCalled();
-});
+it.each(['synthetic', 'production'] as const)(
+  'refuses analysis if a new observation changes the report within the pinned %s window',
+  async (source) => {
+    const s = setup(source);
+    const reference = await s.reference();
+    s.reportState.rate = 0.75;
+    const response = await s.analyze(reference);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'report_reference_unavailable' });
+    expect(s.limit).not.toHaveBeenCalled();
+    expect(s.provider).not.toHaveBeenCalled();
+  },
+);
 
-it('abstains on the pinned window if freshness is still unknown', async () => {
-  const s = setup();
-  s.reportState.fresh = false;
-  const reference = await s.reference();
-  s.advance(25_000);
-  const response = await s.analyze(reference);
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
-  expect(s.provider).not.toHaveBeenCalled();
-});
+it.each(['synthetic', 'production'] as const)(
+  'abstains on the pinned %s window if freshness is still unknown',
+  async (source) => {
+    const s = setup(source);
+    s.reportState.fresh = false;
+    const reference = await s.reference();
+    s.advance(25_000);
+    const response = await s.analyze(reference);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'abstained',
+      reason: 'unusable_evidence',
+    });
+    expect(s.provider).not.toHaveBeenCalled();
+  },
+);

@@ -11,3 +11,15 @@ export function ownerWorkflowAvailable(env?: {
     (env?.APP_ENV === 'production' && env.OWNER_WORKFLOW_ENABLED === 'true')
   );
 }
+
+export function productionOwnerReportingEnabled(env?: {
+  APP_ENV?: string;
+  OWNER_WORKFLOW_ENABLED?: string;
+  OWNER_PRODUCTION_REPORTS_ENABLED?: string;
+}): boolean {
+  return (
+    env?.APP_ENV === 'production' &&
+    ownerWorkflowAvailable(env) &&
+    env.OWNER_PRODUCTION_REPORTS_ENABLED === 'true'
+  );
+}

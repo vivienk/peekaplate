@@ -131,17 +131,22 @@ import {
   readPreparedPreviewAsset,
 } from './owner-prepare';
 import { fetchPreparedMenu, listPreparedMenus, type OwnHost } from './owner-publication';
-import { readOwnerReport as queryOwnerReport } from './owner-report';
+import { type OwnerReportSource, readOwnerReport as queryOwnerReport } from './owner-report';
 import {
   buildOwnerReportExportFilename,
   type ExportableOwnerReport,
   serializeOwnerReportCsv,
 } from './owner-report-export';
+import {
+  OwnerReportPostHogUnavailableError,
+  readLivePostHogOwnerEvents,
+} from './owner-report-posthog';
 import { registerOwnerVenueCreation } from './owner-venue-create';
 import {
   ownerWorkflowAvailable,
   PRODUCTION_DINER_ORIGIN,
   PRODUCTION_OWNER_ORIGIN,
+  productionOwnerReportingEnabled,
 } from './owner-workflow-environment';
 import { listOwnerVenues } from './owner-workspace';
 import {
@@ -189,12 +194,14 @@ export type Bindings = {
   INGREDIENT_ARTWORK_ENABLED?: string;
   APP_ENV?: string;
   OWNER_WORKFLOW_ENABLED?: string;
+  OWNER_PRODUCTION_REPORTS_ENABLED?: string;
   DINER_PUBLIC_ORIGIN?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
   LOCAL_DATABASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
   POSTHOG_PROJECT_ID?: string;
+  POSTHOG_OWNER_REPORT_READ_KEY?: string;
   TEAM_GITHUB_TOKEN?: string;
   LOCAL_GITHUB_API_URL?: string;
   MENU_TOKEN_ISSUER?: string;
@@ -326,7 +333,7 @@ type Dependencies = {
     venueId: string,
     now: Date,
     env: Bindings,
-    source: 'synthetic',
+    source: OwnerReportSource,
   ) => ReturnType<typeof queryOwnerReport>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
   verifyMenu?: (authorization: string, env: Bindings) => Promise<MenuAuthority>;
@@ -572,6 +579,18 @@ function ownerConsoleOrigin(origin: string, env: Bindings | undefined) {
     : undefined;
 }
 
+function ownerReportRequestSource(url: string, env: Bindings): OwnerReportSource | null {
+  const sources = new URL(url).searchParams.getAll('source');
+  if (sources.length !== 1) return null;
+  if (env.APP_ENV === 'production')
+    return productionOwnerReportingEnabled(env) && sources[0] === 'production'
+      ? 'production'
+      : null;
+  return ['staging', 'local'].includes(env.APP_ENV ?? '') && sources[0] === 'synthetic'
+    ? 'synthetic'
+    : null;
+}
+
 /**
  * Native rate limiting for token-scoped observation ingestion.
  * Note: Cloudflare Worker rate limiting bindings enforce approximate per-location limits
@@ -773,6 +792,28 @@ const dependencies: Dependencies = {
         source === 'synthetic' &&
         ['local', 'staging'].includes(env.APP_ENV ?? '') &&
         configuredSyntheticReportVenues(env).includes(venueId.toLowerCase());
+      if (source === 'production' && productionOwnerReportingEnabled(env)) {
+        return await queryOwnerReport(client, actorId, venueId, now, source, {
+          includeSummary: true,
+          readTodayEvents: async (venueId, start, end) => {
+            if (!env.POSTHOG_OWNER_REPORT_READ_KEY || !env.POSTHOG_PROJECT_ID)
+              throw new AuthUnavailableError();
+            try {
+              return await readLivePostHogOwnerEvents({
+                projectId: env.POSTHOG_PROJECT_ID,
+                readKey: env.POSTHOG_OWNER_REPORT_READ_KEY,
+                venueId,
+                windowStart: start.toISOString(),
+                windowEnd: end.toISOString(),
+              });
+            } catch (error) {
+              if (error instanceof OwnerReportPostHogUnavailableError)
+                throw new AuthUnavailableError();
+              throw error;
+            }
+          },
+        });
+      }
       if (!syntheticReport) throw new AuthUnavailableError();
       return await queryOwnerReport(client, actorId, venueId, now, source, {
         trafficClass: syntheticReportTrafficClass(venueId),
@@ -1191,6 +1232,7 @@ export function createApp(services: Dependencies = dependencies) {
     verify: services.verify,
     ...(services.readOwnerReport ? { readReport: services.readOwnerReport } : {}),
     allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
+    allowedOrigin: ownerConsoleOrigin,
     syntheticVenues: SYNTHETIC_REPORT_VENUE_ALLOWLIST,
     ...(services.now ? { now: services.now } : {}),
   });
@@ -1447,11 +1489,10 @@ export function createApp(services: Dependencies = dependencies) {
     const result = await services.readAnalytics(projectId, kind, parsed.data, env);
     return c.json(TeamAnalyticsResponseSchema.parse(result));
   });
-  // CORS only: authentication, the synthetic-source rule and venue access below are unchanged.
   app.use(
     '/api/v1/venues/:venueId/analytics/dishes',
     cors({
-      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) => ownerConsoleOrigin(origin, c.env),
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Authorization'],
       exposeHeaders: [OWNER_REPORT_REFERENCE_HEADER],
@@ -1467,21 +1508,21 @@ export function createApp(services: Dependencies = dependencies) {
     const scope = VenueScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
     const env = c.env ?? {};
-    const sources = new URL(c.req.url).searchParams.getAll('source');
-    if (
-      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
-      sources.length !== 1 ||
-      sources[0] !== 'synthetic'
-    ) {
+    const source = ownerReportRequestSource(c.req.url, env);
+    if (!source) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
-    if (!configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())) {
+    if (
+      source === 'synthetic' &&
+      !configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())
+    ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
     const now = services.now?.() ?? new Date();
     const venueId = scope.data.venueId.toLowerCase();
-    const report = await services.readOwnerReport(actorId, venueId, now, env, 'synthetic');
+    const report = await services.readOwnerReport(actorId, venueId, now, env, source);
+    c.header('Cache-Control', 'no-store');
     if (env.OWNER_AI_RESPONSES_ENABLED === 'true' && env.OWNER_AI_REPORT_REFERENCE_SECRET) {
       try {
         const reference = await mintOwnerReportReference(
@@ -1500,7 +1541,7 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/api/v1/venues/:venueId/analytics/dishes/export',
     cors({
-      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) => ownerConsoleOrigin(origin, c.env),
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Authorization'],
       maxAge: 86400,
@@ -1515,15 +1556,14 @@ export function createApp(services: Dependencies = dependencies) {
     const scope = VenueScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
     const env = c.env ?? {};
-    const sources = new URL(c.req.url).searchParams.getAll('source');
-    if (
-      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
-      sources.length !== 1 ||
-      sources[0] !== 'synthetic'
-    ) {
+    const source = ownerReportRequestSource(c.req.url, env);
+    if (!source) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
-    if (!configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())) {
+    if (
+      source === 'synthetic' &&
+      !configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())
+    ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
@@ -1532,7 +1572,7 @@ export function createApp(services: Dependencies = dependencies) {
       scope.data.venueId.toLowerCase(),
       services.now?.() ?? new Date(),
       env,
-      'synthetic',
+      source,
     );
     const typedReport = report as ExportableOwnerReport;
     const csv = serializeOwnerReportCsv(typedReport);

@@ -79,6 +79,7 @@ function typedMenuFile(file: File): File {
 }
 
 export function OwnerMenuWorkspace({
+  active = true,
   apiBase,
   actorId,
   venueId,
@@ -98,6 +99,7 @@ export function OwnerMenuWorkspace({
   onMenuChange,
   dishAssistanceEnabled = false,
 }: {
+  active?: boolean;
   apiBase: string;
   actorId: string;
   venueId: string;
@@ -919,6 +921,7 @@ export function OwnerMenuWorkspace({
       setVerified(true);
     });
 
+  if (!active) return null;
   if (!loaded) {
     const loading = (
       <section>

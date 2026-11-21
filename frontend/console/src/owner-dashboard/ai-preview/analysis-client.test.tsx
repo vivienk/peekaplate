@@ -41,6 +41,23 @@ it('does not send a request without a signed-in session', async () => {
   await expect(analyze({ dishId, goal: 'menu' }, new AbortController().signal)).rejects.toThrow();
   expect(fetchImpl).not.toHaveBeenCalled();
 });
+it('accepts only production evidence from the production API', async () => {
+  const valid = { ...result, source: 'production' };
+  const request = { dishId, goal: 'menu' } as const;
+  const analyze = createOwnerAnalysisClient({
+    baseUrl: 'https://api.peekaplate.app',
+    venueId,
+    getAccessToken: async () => 'owner-session',
+    fetchImpl: vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(valid))
+      .mockResolvedValueOnce(Response.json(result)),
+  });
+  await expect(analyze(request, new AbortController().signal)).resolves.toEqual(valid);
+  await expect(analyze(request, new AbortController().signal)).rejects.toThrow(
+    'Analysis unavailable',
+  );
+});
 it('forwards the displayed report reference in a header without changing dish/goal', async () => {
   const { analyze, fetchImpl } = setup();
   await analyze({ dishId, goal: 'menu' }, new AbortController().signal, 'signed.report.reference');

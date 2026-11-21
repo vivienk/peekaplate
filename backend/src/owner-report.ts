@@ -3,10 +3,12 @@ import { toOwnerReport } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { CommandError } from './dish-command';
 import { verifySyntheticCompleteness } from './owner-ai/synthetic-completeness';
+import { PRODUCTION_REPORT_FILTER, TODAY_REPORT_EVIDENCE } from './owner-report-evidence';
+import type { LivePostHogOwnerEvent } from './owner-report-posthog';
 import { readOwnerReportSummary } from './owner-report-summary';
 
 const REPORT_PERMISSIONS = ['owner'];
-type OwnerReportSource = 'production' | 'synthetic';
+export type OwnerReportSource = 'production' | 'synthetic';
 
 export async function readOwnerReport(
   client: Client,
@@ -19,6 +21,7 @@ export async function readOwnerReport(
     includeSummary?: boolean;
     syntheticSeal?: string;
     validationNow?: Date;
+    readTodayEvents?: (venueId: string, start: Date, end: Date) => Promise<LivePostHogOwnerEvent[]>;
   } = {},
 ): Promise<unknown> {
   let started = false;
@@ -46,14 +49,31 @@ export async function readOwnerReport(
     // Tenant scope is set only after the owner permission is confirmed.
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
-    const query = options.trafficClass === 'test' ? TEST_OWNER_REPORT_QUERY : OWNER_REPORT_QUERY;
+    const today = new Date(now);
+    today.setUTCHours(0, 0, 0, 0);
+    const liveEvidence =
+      source === 'production' && options.readTodayEvents
+        ? { start: today, events: await options.readTodayEvents(venueId, today, now) }
+        : undefined;
+    const query = liveEvidence
+      ? PRODUCTION_OWNER_REPORT_QUERY
+      : options.trafficClass === 'test'
+        ? TEST_OWNER_REPORT_QUERY
+        : OWNER_REPORT_QUERY;
     const result = await client.query(query, [
       venueId,
       new Date(now.getTime() - 24 * 60 * 60 * 1000),
       now,
+      ...(liveEvidence ? [liveEvidence.start, JSON.stringify(liveEvidence.events)] : []),
     ]);
     const summary = options.includeSummary
-      ? await readOwnerReportSummary(client, venueId, now, options.trafficClass ?? 'live')
+      ? await readOwnerReportSummary(
+          client,
+          venueId,
+          now,
+          options.trafficClass ?? 'live',
+          liveEvidence,
+        )
       : undefined;
     const complete =
       source === 'synthetic' &&
@@ -71,7 +91,12 @@ export async function readOwnerReport(
       ...internal,
       report_metadata: {
         ...internal.report_metadata,
-        freshness: { ...internal.report_metadata.freshness, is_stale: complete ? false : null },
+        freshness: {
+          last_event_ingested_at: liveEvidence
+            ? null
+            : internal.report_metadata.freshness.last_event_ingested_at,
+          is_stale: complete ? false : null,
+        },
       },
       ...(summary ? { summary } : {}),
     });
@@ -299,6 +324,14 @@ type ReportRow = Record<string, unknown>;
 const TEST_OWNER_REPORT_QUERY = OWNER_REPORT_QUERY.replace(
   'FROM app_private.owner_observation_v1 obs',
   'FROM app_private.owner_test_observation_v1 obs',
+);
+// The capture provider supplies inclusion IDs. Canonical facts retain authority over scope and values.
+const PRODUCTION_OWNER_REPORT_QUERY = OWNER_REPORT_QUERY.replace(
+  'WITH filtered_observations AS',
+  `WITH ${TODAY_REPORT_EVIDENCE}, filtered_observations AS`,
+).replace(
+  'AND obs.dish_id IS NOT NULL',
+  `AND obs.dish_id IS NOT NULL AND dish.dish_id IS NOT NULL ${PRODUCTION_REPORT_FILTER}`,
 );
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
 

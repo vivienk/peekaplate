@@ -73,7 +73,7 @@ export async function analyzeOwnerReport(options: {
   const report = OwnerDishReportSchema.parse(options.report);
   const meta = report.report_metadata;
   const dish = report.dishes.find((item) => item.dish_id === options.request.dishId);
-  if (report.venue_id !== options.venueId || report.source !== 'synthetic' || !dish) {
+  if (report.venue_id !== options.venueId || !dish) {
     throw new OwnerAnalysisUnavailable();
   }
   const base = {
@@ -81,7 +81,7 @@ export async function analyzeOwnerReport(options: {
     venueId: report.venue_id,
     dishId: dish.dish_id,
     goal: options.request.goal,
-    source: 'synthetic' as const,
+    source: report.source,
     reportSnapshot: ownerReportSnapshot(report),
     timeWindow: { start: meta.date_window.start_time, end: meta.date_window.end_time },
     approvalRequired: true as const,
@@ -137,7 +137,7 @@ export async function analyzeOwnerReport(options: {
         tools: [],
         tool_choice: 'none',
         instructions:
-          'Select one supplied browsing metric for a human to review, or abstain. These are synthetic data. Do not infer sales, customer identity, retention, revenue, causality, or industry benchmarks. A low rate alone does not prove a problem. No tools or changes are authorized.',
+          'Select one supplied browsing metric for a human to review, or abstain. Do not infer sales, customer identity, retention, revenue, causality, or industry benchmarks. A low rate alone does not prove a problem. No tools or changes are authorized.',
         input: JSON.stringify({ goal: options.request.goal, metrics }),
         text: {
           format: {

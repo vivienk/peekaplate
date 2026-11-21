@@ -7,7 +7,6 @@ export const OWNER_REPORT_REFERENCE_HEADER = 'X-Owner-Report-Ref';
 const referenceLifetime = 60;
 const issuer = 'peekaplate-api';
 const audience = 'peekaplate-owner-report-analysis';
-const source = 'synthetic';
 
 type ReportScope = { actorId: string; venueId: string };
 
@@ -38,7 +37,6 @@ export async function mintOwnerReportReference(
   const anchor = now.getTime();
   if (
     report.venue_id !== scope.venueId ||
-    report.source !== source ||
     Date.parse(report.report_metadata.date_window.end_time) !== anchor
   ) {
     throw new Error('Invalid owner report reference scope');
@@ -47,7 +45,7 @@ export async function mintOwnerReportReference(
   return new SignJWT({
     version: 1,
     venue: scope.venueId,
-    source,
+    source: report.source,
     anchor,
     snapshot: ownerReportSnapshot(report),
   })
@@ -65,6 +63,7 @@ export async function readOwnerReportReference(
   scope: ReportScope,
   secret: string,
   now: Date,
+  source: OwnerDishReport['source'],
 ): Promise<{ anchor: Date; snapshot: string } | null> {
   if (!token || token.length > 2048) return null;
   try {

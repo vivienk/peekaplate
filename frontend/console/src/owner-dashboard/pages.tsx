@@ -61,6 +61,7 @@ export interface LiveDashboardInput {
   reportContent?: ReactNode;
   summary?: OwnerDishReport['summary'];
   summaryFreshness?: boolean | null | undefined;
+  summarySource?: OwnerDishReport['source'] | undefined;
 }
 
 type OverviewSummary = NonNullable<OwnerDishReport['summary']>;
@@ -223,6 +224,12 @@ export function Overview({
               ? `Current period: ${overviewWindow(live.summary.periods.current)}. Previous period: ${overviewWindow(live.summary.periods.baseline)}. ${live.summaryFreshness === null || live.summaryFreshness === undefined ? 'Freshness not known.' : live.summaryFreshness ? 'Report is out of date.' : 'Report is up to date.'}`
               : 'Summary unavailable. Your saved dishes are listed below; no measurements are inferred.'
             : 'No diner data yet. Your dishes are listed below with no numbers. Data appears once diners use the menu.'}
+        </Note>
+      )}
+      {live?.summary && live.summarySource === 'production' && (
+        <Note icon="info">
+          Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow
+          for delivery delays when comparing periods.
         </Note>
       )}
       {(live || !empty) && (

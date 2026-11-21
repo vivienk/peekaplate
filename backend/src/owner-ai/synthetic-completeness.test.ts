@@ -352,9 +352,17 @@ describe('sealed synthetic scenario completeness', () => {
     const scope = { actorId: 'actor', venueId: venue };
     const secret = 's'.repeat(48);
     const reference = await mintOwnerReportReference(report, scope, secret, now);
-    expect(await readOwnerReportReference(reference, scope, secret, now)).not.toBeNull();
     expect(
-      await readOwnerReportReference(reference, scope, secret, new Date(now.getTime() + 60_000)),
+      await readOwnerReportReference(reference, scope, secret, now, 'synthetic'),
+    ).not.toBeNull();
+    expect(
+      await readOwnerReportReference(
+        reference,
+        scope,
+        secret,
+        new Date(now.getTime() + 60_000),
+        'synthetic',
+      ),
     ).toBeNull();
   });
 });

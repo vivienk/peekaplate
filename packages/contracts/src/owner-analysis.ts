@@ -11,7 +11,7 @@ export const OwnerAnalysisResultSchema = z
     venueId: z.uuid(),
     dishId: z.uuid(),
     goal: OwnerAnalysisRequestSchema.shape.goal,
-    source: z.literal('synthetic'),
+    source: z.enum(['synthetic', 'production']),
     reportSnapshot: z.string().regex(/^[a-f0-9]{64}$/),
     timeWindow: z.strictObject({ start: z.iso.datetime(), end: z.iso.datetime() }),
     status: z.enum(['review', 'abstained']),
