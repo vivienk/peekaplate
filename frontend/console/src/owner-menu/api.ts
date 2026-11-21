@@ -41,7 +41,7 @@ import {
   type VerifyDishDraft,
   VerifyDishDraftSchema,
 } from '@peekaplate/contracts';
-import { readWorkspaceApiBase } from '../owner/workspace-api';
+import { PRODUCTION_OWNER_API_ORIGIN, readWorkspaceApiBase } from '../owner/api-origin';
 
 export type SourceType = 'pdf' | 'photo';
 
@@ -514,8 +514,12 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           const path = field(body, 'path');
           if (typeof value !== 'string' || typeof path !== 'string') throw new Error('link');
           const url = new URL(value);
+          const dinerOrigin =
+            base === PRODUCTION_OWNER_API_ORIGIN
+              ? 'https://diner.peekaplate.app'
+              : 'https://routing-staging.peekaplate-diner-staging.pages.dev';
           if (
-            url.origin !== 'https://routing-staging.peekaplate-diner-staging.pages.dev' ||
+            url.origin !== dinerOrigin ||
             url.pathname !== path ||
             !/^\/diner\/[a-z0-9][a-z0-9_-]{0,63}$/.test(path) ||
             url.search ||

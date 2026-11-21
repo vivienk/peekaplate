@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../style.css';
+import { PRODUCTION_OWNER_API_ORIGIN, readWorkspaceApiBase } from '../owner/api-origin';
 import { OwnerWorkspace } from '../owner/OwnerWorkspace';
-import { readWorkspaceApiBase } from '../owner/workspace-api';
 import { isAuthCallbackPath, readConfirmationCode } from './callback';
 import { OwnerAuth } from './OwnerAuth';
 import {
@@ -26,7 +26,7 @@ if (window.location.search || window.location.hash)
 const config = readOwnerAuthConfig(import.meta.env, window.location.origin);
 const runtime = config ? connectOwnerAuth(config) : null;
 const configuredApi = readWorkspaceApiBase(import.meta.env.VITE_PUBLIC_API_URL);
-const productionApi = configuredApi === 'https://api.peekaplate.app';
+const productionApi = configuredApi === PRODUCTION_OWNER_API_ORIGIN;
 const apiBase = production === productionApi ? configuredApi : null;
 // The owner AI panel stays off unless this console build turns it on (see docs/owner-ai-responses.md).
 const aiEnabled = import.meta.env.VITE_OWNER_AI_ENABLED === 'true';
