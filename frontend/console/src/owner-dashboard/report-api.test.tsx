@@ -63,6 +63,19 @@ describe('fetchOwnerReport (S3-RES-03)', () => {
     expect(state.report).toEqual(UNEEZA_REPORT);
   });
 
+  it('limits the production console to live data for the signed-in restaurant', async () => {
+    const apiBase = 'https://api.peekaplate.app/';
+    const report = { ...UNEEZA_REPORT, source: 'production' };
+    const fetch = respond(200, report);
+    expect(await request(fetch, { apiBase })).toMatchObject({ kind: 'ready', report });
+    expect(fetch).toHaveBeenCalledWith(
+      `https://api.peekaplate.app/api/v1/venues/${VENUE}/analytics/dishes?source=production`,
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+    expect(await request(respond(200, UNEEZA_REPORT), { apiBase })).toEqual({ kind: 'invalid' });
+    expect(await request(respond(200, report))).toEqual({ kind: 'invalid' });
+  });
+
   it('does not call the API without a sign-in or with a malformed restaurant id', async () => {
     const fetch = respond(200, UNEEZA_REPORT);
     expect(await request(fetch, { accessToken: null })).toEqual({ kind: 'signed_out' });

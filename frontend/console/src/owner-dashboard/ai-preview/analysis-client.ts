@@ -3,7 +3,7 @@ import {
   OwnerAnalysisRequestSchema,
   OwnerAnalysisResultSchema,
 } from '@peekaplate/contracts/owner-analysis';
-import { readWorkspaceApiBase } from '../../owner/api-origin';
+import { PRODUCTION_OWNER_API_ORIGIN, readWorkspaceApiBase } from '../../owner/api-origin';
 
 export class OwnerAnalysisAccessError extends Error {
   constructor(readonly status: 401 | 403) {
@@ -67,7 +67,8 @@ export function createOwnerAnalysisClient(options: {
     if (
       result.venueId !== options.venueId ||
       result.dishId !== input.dishId ||
-      result.goal !== input.goal
+      result.goal !== input.goal ||
+      result.source !== (apiBase === PRODUCTION_OWNER_API_ORIGIN ? 'production' : 'synthetic')
     ) {
       throw new Error('Analysis unavailable');
     }

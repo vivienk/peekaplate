@@ -5433,3 +5433,33 @@ description, but the bundle producer requires it and Screen 13 reports
 `nothing_to_prepare` if every approved dish lacks one. Adding a description
 through the existing editor allowed preparation and publication. The validation
 and error message still need alignment.
+
+### ERR-20261121-REPORT-001 | Published production venues could not load owner reports
+
+Two isolated production restaurants published through Screen 13. Both owner
+dashboards requested their own venue as `source=synthetic`; the production
+preflight omitted the allowed-origin header. Production now has its own
+source and origin gate, with a default Worker/database regression that uses
+two owners and fixture PostHog responses. Hosted activation still requires
+the secure production query binding and reviewed evidence.
+
+The production provider adapter also has a regression for a disallowed
+redirect. A local workerd probe reproduced that `redirect: 'error'` throws
+before the request. The adapter uses `redirect: 'manual'` and rejects
+non-success statuses without forwarding the private key.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-21T22:20:19.851Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-21T22:31:50.163Z","exitCode":1}
+```
+
+The first local database check overlapped an owner browser suite on port 5174.
+The second overlapped the unit suite and hit the 15-second owner summary fixture
+deadline. The following database-only `pnpm verify test:db` passed all 199
+integration tests and the local Worker demo. Run these suites separately on this
+workstation. No test deadline or database behavior was changed.

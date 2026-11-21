@@ -41,6 +41,7 @@ describe('S8 Review menu (Pending Review, then Ready)', () => {
     ]);
     const words = text(html);
     expect(words).toContain('Pending Review');
+    expect(html).toContain('review-status--warning">Pending Review');
     expect(words).toContain('Price Missing');
     expect(words).toContain('Import more dishes');
     expect(words).toContain('Save and Exit');
@@ -62,6 +63,7 @@ describe('S8 Review menu (Pending Review, then Ready)', () => {
     ]);
     const words = text(html);
     expect(words).toContain('Ready');
+    expect(html).toContain('review-status--success">Ready');
     expect(words).not.toContain('Pending Review');
     expect(words).toContain('Complete verification');
     expect(words).toContain('Save and Exit');

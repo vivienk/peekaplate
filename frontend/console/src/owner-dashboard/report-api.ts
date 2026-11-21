@@ -4,6 +4,7 @@
 // Imports only the owner-report contract, so the rest of the contracts package (including its
 // analytics export schemas) stays out of the dashboard bundle.
 import { type OwnerDishReport, OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
+import { PRODUCTION_OWNER_API_ORIGIN } from '../owner/api-origin';
 
 export type ReportState =
   | { kind: 'loading' }
@@ -12,8 +13,7 @@ export type ReportState =
   | { kind: 'signed_out' }
   // 403: not a member of this restaurant, or membership was removed.
   | { kind: 'denied' }
-  // 503: reports are not available for this restaurant here. Until live data is enabled the API
-  // serves only the synthetic test venue on local and staging, and fails closed for everything else.
+  // 503: reporting or its required evidence source is unavailable.
   | { kind: 'unavailable' }
   // The response failed the owner_report.v1 check, or belongs to another restaurant.
   | { kind: 'invalid' }
@@ -33,8 +33,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 export function reportUrl(apiBase: string, venueId: string): string {
   const base = apiBase.replace(/\/+$/, '');
-  // Only synthetic reports exist until live data is enabled; the API enforces the same.
-  return `${base}/api/v1/venues/${encodeURIComponent(venueId)}/analytics/dishes?source=synthetic`;
+  const source = base === PRODUCTION_OWNER_API_ORIGIN ? 'production' : 'synthetic';
+  return `${base}/api/v1/venues/${encodeURIComponent(venueId)}/analytics/dishes?source=${source}`;
 }
 
 export async function fetchOwnerReport({
@@ -71,7 +71,12 @@ export async function fetchOwnerReport({
   }
   const parsed = OwnerDishReportSchema.safeParse(body);
   // A report for another restaurant is never shown, even if it is otherwise valid.
-  if (!parsed.success || parsed.data.venue_id.toLowerCase() !== venueId.toLowerCase()) {
+  const production = apiBase.replace(/\/+$/, '') === PRODUCTION_OWNER_API_ORIGIN;
+  if (
+    !parsed.success ||
+    parsed.data.venue_id.toLowerCase() !== venueId.toLowerCase() ||
+    parsed.data.source !== (production ? 'production' : 'synthetic')
+  ) {
     return { kind: 'invalid' };
   }
   const reference = response.headers.get('X-Owner-Report-Ref');

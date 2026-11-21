@@ -36,6 +36,8 @@ import type { MenuSnapshot } from './menu-snapshot';
 import { OwnerMenuWorkspace } from './OwnerMenuWorkspace';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
 import { fetchOwnerActions, type OwnerActionsState } from './owner-actions-api';
+import { OWNER_PAGE_LABELS } from './routes';
+import { useOwnerPage } from './useOwnerPage';
 import {
   createRestaurant,
   fetchOwnerWorkspace,
@@ -84,7 +86,6 @@ export function OwnerWorkspace({
   const [state, setState] = useState<WorkspaceState>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState('');
-  const [page, setPage] = useState<OwnerPage>('setup');
   const [navigation, setNavigation] = useState(0);
   const [firstProfile, setFirstProfile] = useState<{
     venueId: string;
@@ -94,9 +95,21 @@ export function OwnerWorkspace({
   const [reportAttempt, setReportAttempt] = useState(0);
   const [detailsRequested, setDetailsRequested] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [menuRead, setMenuRead] = useState<{ actor: string; value: MenuSnapshot } | null>(null);
+  const canLeave = useCallback(
+    () =>
+      !dirty || window.confirm('Leave these unsaved changes? Your saved draft stays available.'),
+    [dirty],
+  );
+  const resetView = useCallback(() => {
+    setDetailsRequested(false);
+    setNavigation((value) => value + 1);
+  }, []);
+  const [page, setPage] = useOwnerPage(production, canLeave, resetView);
+  const [menuRead, setMenuRead] = useState<{ actor: string; value: MenuSnapshot | null } | null>(
+    null,
+  );
   const updateMenu = useCallback(
-    (value: MenuSnapshot | null) => setMenuRead(value ? { actor: owner.id, value } : null),
+    (value: MenuSnapshot | null) => setMenuRead({ actor: owner.id, value }),
     [owner.id],
   );
   const [setupRead, setSetupRead] = useState<{ actor: string; value: RestaurantSetup } | null>(
@@ -106,8 +119,6 @@ export function OwnerWorkspace({
     (value: RestaurantSetup | null) => setSetupRead(value ? { actor: owner.id, value } : null),
     [owner.id],
   );
-  const canLeave = () =>
-    !dirty || window.confirm('Leave these unsaved changes? Your saved draft stays available.');
   const pickerId = useId();
   // The report on screen, tagged with the restaurant it belongs to, so the AI panel never offers
   // one restaurant's dishes under another.
@@ -141,9 +152,9 @@ export function OwnerWorkspace({
     setState({ kind: 'loading' });
     setMenuRead(null);
     setSetupRead(null);
-    setPage('setup');
+    setPage('setup', 'replace');
     setAttempt((value) => value + 1);
-  }, []);
+  }, [setPage]);
   const accessFailure = useCallback(
     (kind: 'signed_out' | 'denied') => {
       if (kind === 'signed_out') onSessionExpired();
@@ -166,7 +177,7 @@ export function OwnerWorkspace({
           published: null,
         };
   const menu =
-    menuRead?.actor === owner.id && menuRead.value.venueId === selected?.venueId
+    menuRead?.actor === owner.id && menuRead.value?.venueId === selected?.venueId
       ? menuRead.value
       : null;
   const pages = ownerDashboardPages(
@@ -175,6 +186,38 @@ export function OwnerWorkspace({
     workspaceSetup.published,
   );
   const activePage = pages.has(page) ? page : 'setup';
+  const checkingPage = selected?.permission === 'owner' && !menuRead && !pages.has(page);
+  const workspaceReady = state.kind === 'ready' && !checkingPage;
+  const readyPage = workspaceReady ? (selected ? activePage : 'setup') : null;
+  useEffect(() => {
+    if (production && workspaceReady)
+      setPage(selected && page === activePage ? page : 'setup', 'replace');
+  }, [activePage, page, production, selected, setPage, workspaceReady]);
+  useEffect(() => {
+    if (!production || !readyPage) return;
+    const previousTitle = document.title;
+    document.title = `PeekaPlate · ${OWNER_PAGE_LABELS[readyPage]}`;
+    const frame = window.requestAnimationFrame(() => {
+      const main = document.getElementById('owner-content');
+      if (!main) return;
+      main.closest('.owner-main')?.scrollTo(0, 0);
+      window.scrollTo(0, 0);
+      main.focus({ preventScroll: true });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.title = previousTitle;
+    };
+  }, [production, readyPage]);
+  useEffect(() => {
+    if (!production || selected || state.kind !== 'ready' || !dirty) return;
+    function onUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onUnload);
+    return () => window.removeEventListener('beforeunload', onUnload);
+  }, [dirty, production, selected, state.kind]);
   const scope = selected ? `${owner.id}:${selected.venueId}` : '';
   const showReport = useCallback(
     (report: OwnerDishReport | null, reference?: string) =>
@@ -362,6 +405,11 @@ export function OwnerWorkspace({
       )}
     </>
   );
+  const openPage = (next: OwnerPage) => {
+    if (!pages.has(next) || !canLeave()) return;
+    setPage(next);
+    resetView();
+  };
   const renderShell = (content: ReactNode) => (
     <div className="owner-root owner-workspace">
       <OwnerShell
@@ -373,13 +421,7 @@ export function OwnerWorkspace({
         visible={
           new Set<OwnerPage>(['overview', 'report', 'performance', 'menu', 'actions', 'setup'])
         }
-        onNavigate={(next) => {
-          if (pages.has(next) && canLeave()) {
-            setDetailsRequested(false);
-            setPage(next);
-            setNavigation((value) => value + 1);
-          }
-        }}
+        onNavigate={openPage}
         aside={aside}
         topbar={
           <div className="owner-workspace-toolbar">
@@ -399,64 +441,68 @@ export function OwnerWorkspace({
         : next === 'welcome'
           ? 'setup'
           : next;
-    if (pages.has(target) && canLeave()) {
-      setPage(target);
-      setDetailsRequested(false);
-      setNavigation((value) => value + 1);
-    }
+    openPage(target);
   };
-  if (activePage === 'actions')
-    return renderShell(
-      <LiveActions
-        key={scope}
-        apiBase={apiBase}
-        venueId={selected.venueId}
-        restaurantName={workspaceSetup.restaurantName}
-        getAccessToken={getAccessToken}
-        onAccessFailure={accessFailure}
-      />,
-    );
-  if (activePage === 'overview' || activePage === 'report' || activePage === 'performance')
-    return renderShell(
-      <LiveDashboardReport
-        key={`${scope}:${reportAttempt}`}
-        page={activePage}
-        apiBase={apiBase}
-        venueId={selected.venueId}
-        restaurantName={workspaceSetup.restaurantName}
-        menu={menu?.dishes ?? []}
-        getAccessToken={getAccessToken}
-        onAccessFailure={accessFailure}
-        onReport={showReport}
-        go={navigate}
-      />,
-    );
+  const showMenu = activePage === 'menu' || activePage === 'setup';
   return (
-    <OwnerMenuWorkspace
-      key={`${owner.id}:${selected.venueId}`}
-      apiBase={apiBase}
-      actorId={owner.id}
-      venueId={selected.venueId}
-      restaurantName={selected.name}
-      canPublish={selected.permission === 'owner'}
-      dishAssistanceEnabled={dishAssistanceEnabled}
-      section={activePage === 'menu' ? 'menu' : 'overview'}
-      navigation={navigation}
-      detailsRequested={detailsRequested}
-      offerInitialDetails={production && selected.permission === 'owner' && activePage === 'setup'}
-      firstProfileStatus={
-        firstProfile?.venueId === selected.venueId && firstProfile.navigation === navigation
-          ? firstProfile.status
-          : undefined
-      }
-      getAccessToken={getAccessToken}
-      onAccessFailure={accessFailure}
-      onDirtyChange={setDirty}
-      onSetupChange={updateSetup}
-      onMenuChange={updateMenu}
-      renderShell={renderShell}
-      accountActions={accountActions}
-    />
+    <>
+      {(showMenu || production) && (
+        <OwnerMenuWorkspace
+          key={scope}
+          active={showMenu}
+          apiBase={apiBase}
+          actorId={owner.id}
+          venueId={selected.venueId}
+          restaurantName={selected.name}
+          canPublish={selected.permission === 'owner'}
+          dishAssistanceEnabled={dishAssistanceEnabled}
+          section={activePage === 'menu' ? 'menu' : 'overview'}
+          navigation={navigation}
+          detailsRequested={detailsRequested}
+          offerInitialDetails={
+            production && selected.permission === 'owner' && activePage === 'setup'
+          }
+          firstProfileStatus={
+            firstProfile?.venueId === selected.venueId && firstProfile.navigation === navigation
+              ? firstProfile.status
+              : undefined
+          }
+          getAccessToken={getAccessToken}
+          onAccessFailure={accessFailure}
+          onDirtyChange={setDirty}
+          onSetupChange={updateSetup}
+          onMenuChange={updateMenu}
+          renderShell={renderShell}
+          accountActions={accountActions}
+        />
+      )}
+      {activePage === 'actions' &&
+        renderShell(
+          <LiveActions
+            key={scope}
+            apiBase={apiBase}
+            venueId={selected.venueId}
+            restaurantName={workspaceSetup.restaurantName}
+            getAccessToken={getAccessToken}
+            onAccessFailure={accessFailure}
+          />,
+        )}
+      {(activePage === 'overview' || activePage === 'report' || activePage === 'performance') &&
+        renderShell(
+          <LiveDashboardReport
+            key={`${scope}:${reportAttempt}`}
+            page={activePage}
+            apiBase={apiBase}
+            venueId={selected.venueId}
+            restaurantName={workspaceSetup.restaurantName}
+            menu={menu?.dishes ?? []}
+            getAccessToken={getAccessToken}
+            onAccessFailure={accessFailure}
+            onReport={showReport}
+            go={navigate}
+          />,
+        )}
+    </>
   );
 }
 
@@ -671,6 +717,7 @@ function LiveDashboardReport({
     reportContent,
     summary: report?.summary,
     summaryFreshness: report?.report_metadata.freshness.is_stale,
+    summarySource: report?.source,
     period: report ? reportPeriod(report.report_metadata.date_window) : undefined,
   };
   return (
@@ -757,8 +804,7 @@ function LiveActions({
 // header with restaurant and report-period chips, intro text, messages, composer. Identity and
 // restaurant come only from the signed-in workspace: the token getter is bound to this owner and the
 // venue is the authorised selection. The analysis API (#164) takes a dish and a review focus rather
-// than free text, so the composer offers those two pickers in place of Figma's text box (design gap
-// flagged for Rania). Only `{ dishId, goal }` is sent; nothing is published or changed.
+// than free text, so typed questions can only select a focus for the displayed report.
 const FOCUS_OPTIONS: { value: OwnerAnalysisRequest['goal']; label: string }[] = [
   { value: 'menu', label: 'Menu presentation' },
   { value: 'engagement', label: 'Dish engagement' },
@@ -766,11 +812,24 @@ const FOCUS_OPTIONS: { value: OwnerAnalysisRequest['goal']; label: string }[] = 
 ];
 
 export function matchReportQuestion(question: string): OwnerAnalysisRequest['goal'] | null {
-  const words = question.toLowerCase();
-  if (/\b(open|engagement|attention|interaction|view)\b/.test(words)) return 'engagement';
-  if (/\b(save|bookmark|menu|presentation|describe|description)\b/.test(words)) return 'menu';
-  if (/\b(customer|retention|crm)\b/.test(words)) return 'crm';
-  return null;
+  const text = question
+    .trim()
+    .toLowerCase()
+    .replace(/[?.!]$/, '')
+    .trim();
+  switch (text) {
+    case 'dish engagement':
+    case 'how is engagement for this dish':
+      return 'engagement';
+    case 'menu presentation':
+    case 'dish saves':
+      return 'menu';
+    case 'customer retention':
+    case 'how can i improve customer retention':
+      return 'crm';
+    default:
+      return null;
+  }
 }
 const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -858,7 +917,8 @@ function LiveAiPanel({
   const dishId = dishes.some((dish) => dish.dish_id === picked)
     ? picked
     : (dishes[0]?.dish_id ?? '');
-  const scope = `${venueId}:${dishId}:${goal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}:${reportReference ?? ''}`;
+  const requestGoal = question.trim() ? matchReportQuestion(question) : goal;
+  const scope = `${venueId}:${dishId}:${requestGoal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}:${reportReference ?? ''}`;
   const analyze = useMemo(
     () => createOwnerAnalysisClient({ baseUrl: apiBase, venueId, getAccessToken }),
     [apiBase, venueId, getAccessToken],
@@ -877,16 +937,17 @@ function LiveAiPanel({
   async function ask(event: FormEvent) {
     event.preventDefault();
     if (!dishId || !reportReference || pending.current) return;
-    const requestGoal = question.trim() ? matchReportQuestion(question) : goal;
     if (!requestGoal) {
-      setQuestionError('Ask about menu presentation, engagement, saves, or customer retention.');
+      setQuestionError(
+        'Use the focus menu or type “Dish engagement”, “Menu presentation”, “Dish saves”, or “Customer retention”. The review uses the displayed dish and report period.',
+      );
       return;
     }
     setQuestionError(null);
     const controller = new AbortController();
     pending.current = controller;
     const dishName = dishes.find((dish) => dish.dish_id === dishId)?.name ?? '';
-    const requestScope = `${venueId}:${dishId}:${requestGoal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}:${reportReference}`;
+    const requestScope = scope;
     setReply({ kind: 'loading', scope: requestScope });
     try {
       const result = await analyze(
@@ -935,8 +996,9 @@ function LiveAiPanel({
           </p>
         )}
         <p className="owner-muted">
-          Choose a dish for analysis from a separate authorized server-read snapshot. Its evidence
-          period may differ from the report displayed here.
+          {report.source === 'production'
+            ? 'Analysis uses the same authorized report window shown here.'
+            : 'Choose a dish for analysis from a separate authorized server-read snapshot. Its evidence period may differ from the report displayed here.'}
         </p>
         {dishes.length === 0 && (
           <>
@@ -1023,7 +1085,9 @@ function LiveAiPanel({
                 })}
               </p>
               <p className="owner-muted">
-                Synthetic analysis from a separate server-read snapshot.
+                {shown.result.source === 'production'
+                  ? 'Analysis from the authorized production report.'
+                  : 'Synthetic analysis from a separate server-read snapshot.'}
               </p>
               <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
               <p className="owner-muted">No menu changes or customer messages are sent.</p>
@@ -1039,13 +1103,13 @@ function LiveAiPanel({
           className="owner-ai__input"
           value={question}
           onChange={(event) => {
-            const value = event.target.value;
-            setQuestion(value);
+            setQuestion(event.target.value);
             setQuestionError(null);
-            const matched = matchReportQuestion(value);
-            if (matched) setGoal(matched);
+            pending.current?.abort();
+            pending.current = null;
+            setReply(null);
           }}
-          placeholder="Ask about engagement, saves, or menu presentation"
+          placeholder="Type a review focus, e.g. Dish engagement"
           disabled={dishes.length === 0}
         />
         {questionError && (
@@ -1076,7 +1140,7 @@ function LiveAiPanel({
           <select
             id={`${ids}-focus`}
             className="owner-ai__input"
-            value={goal}
+            value={requestGoal ?? goal}
             onChange={(event) => {
               setGoal(event.target.value as OwnerAnalysisRequest['goal']);
               setQuestion('');

@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "1a1d9cda9499ce63b51c70f8d496937c20788f269407a79e3d82e828bdb8bdd5"
+      "sourceFingerprint": "9ea7b0d019aade985f780511c4899babcd31c7184dc12b899042a8cebdcea787"
     },
     {
       "id": "tokens",
@@ -356,6 +356,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/recovery-provider.test.tsx",
         "tests/e2e/owner-recovery.spec.ts",
         "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "frontend/console/src/owner/routes.ts",
+        "frontend/console/src/owner/useOwnerPage.ts",
         "frontend/console/src/owner/workspace-api.ts",
         "frontend/console/src/owner/workspace-api.test.tsx",
         "frontend/console/src/owner/workspace.css",
@@ -469,7 +471,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c98d065daaf03ac530cf42e4619180436c857a874ac1530201de84e4c35bea20"
+      "sourceFingerprint": "1a0cc35c2e88e3f125b343e7515b1a41f0826bb68332490a08f7b6149588102f"
     },
     {
       "id": "backend",
@@ -502,6 +504,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish.integration.ts",
         "backend/src/owner-report.test.ts",
         "backend/src/owner-report.ts",
+        "backend/src/owner-report-evidence.ts",
+        "backend/src/owner-report-posthog.ts",
+        "backend/src/owner-report-posthog.test.ts",
+        "backend/src/owner-production-report.integration.ts",
         "backend/src/extraction-capability.ts",
         "backend/src/extraction-host.test.ts",
         "backend/src/extraction-host.ts",
@@ -736,7 +742,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "adf8e58549c0b49c2a0fc76e826c2a9bf674a8f8fbdf2bd6150e82180f6a1753"
+      "sourceFingerprint": "c213ee9f4ce4834c200ef86a5269a176ea2f3d46691b5fbcc24156a2478eeeab"
     },
     {
       "id": "database",
@@ -898,7 +904,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "af7c6fa089bc147be369f9d2c8c2f4406d25cde1ab2a89400da6ba3d151f32d0"
+      "sourceFingerprint": "3f4dada5bc5864a4ecd613bff21b13518397c9e709bebf7c303ddf50d8435d0e"
     },
     {
       "id": "agents",
@@ -1270,13 +1276,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database",
         "delivery"
       ],
-      "summary": "The production candidate reuses the owner and diner paths with production-specific origins, first-owner onboarding, three-dish comparison and separate portion opening evidence. Synthetic report seals reconcile the typed portion fact alongside legacy event families.",
+      "summary": "The production candidate adds auth-gated owner page URLs, reuses the authored pages and scopes current reporting to PostHog event tuples corroborated by canonical Supabase facts. Earlier UTC events come from canonical storage. Production wiring is gated and AI uses the same signed snapshot with unknown freshness until proven.",
       "files": [
         "docs/production-release.md",
+        "docs/adr/0017-production-owner-report-sources.md",
+        "backend/src/owner-production-report.integration.ts",
         "backend/src/owner-workflow-environment.ts",
         "backend/wrangler.production.jsonc"
       ],
-      "next": "Keep Meta staging frozen. Verify the production database, bindings, reviewed analytics authority, protected email/OCR/publish flow and rollback before attaching domains."
+      "next": "Keep Meta staging frozen. Provision production-only provider credentials securely and verify the two published venue flows plus freshness and disclosure before enabling reporting or paid AI."
     }
   ]
 }

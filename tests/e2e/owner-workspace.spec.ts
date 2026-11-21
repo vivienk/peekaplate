@@ -650,6 +650,27 @@ async function signIn(page: Page, email = 'owner@example.test', openMenu = true)
   }
 }
 
+test('staging workspace does not resume a production deep link after sign-in', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await page.goto(`${origin}/dish-performance`);
+  await expect(page.getByLabel('Email address')).toBeVisible();
+  await expect(page).toHaveURL(`${origin}/dish-performance`);
+  await page.getByLabel('Email address').fill('owner@example.test');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(
+    page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', {
+      name: 'Restaurant Setup',
+    }),
+  ).toHaveAttribute('aria-current', 'page');
+  await expect(page).toHaveURL(`${origin}/dish-performance`);
+  expect(state.apiCalls.some((call) => call.path.endsWith('/analytics/dishes'))).toBe(false);
+});
+
 async function addCategory(page: Page, category: string) {
   await page.getByRole('combobox', { name: 'Category' }).click();
   const option = page.getByRole('option', { name: category, exact: true });
@@ -2316,6 +2337,33 @@ test('editor access shows no AI panel', async ({ context, page }) => {
   await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
   expect(state.analyses).toEqual([]);
+});
+
+test('the typed AI question displays its matching focus and rejects a different time window', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const question = panel.getByRole('textbox', { name: 'Ask a report question' });
+  await expect(panel.getByLabel('Review focus')).toHaveValue('menu');
+  await question.fill('How is engagement for this dish?');
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+  expect(state.analyses[0]?.body).toMatchObject({ goal: 'engagement' });
+  for (const unsupported of [
+    'How was engagement yesterday?',
+    'Show engagement on Monday',
+    'Show menu engagement on November 18',
+  ]) {
+    await question.fill(unsupported);
+    await panel.getByRole('button', { name: 'Review report' }).click();
+    await expect(panel.getByRole('alert')).toContainText('The review uses the displayed dish');
+    await expect(panel.getByRole('heading', { name: 'Suggested review' })).toHaveCount(0);
+  }
+  expect(state.analyses).toHaveLength(1);
 });
 
 test('the AI panel shows the report period and an honest error when the review fails', async ({

@@ -97,7 +97,7 @@ describe('dishStatus', () => {
     expect(dishStatus(dish({ reviewed: false }))).toEqual({
       ready: false,
       label: 'Pending Review',
-      tone: 'information',
+      tone: 'warning',
     });
     expect(dishStatus(dish({ reviewed: true })).label).toBe('Ready');
     // Missing details come first.

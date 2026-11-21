@@ -253,7 +253,9 @@ function ReportTable({
             <Note kind="warn">Saved copy of a report: synthetic test data. Not real diners.</Note>
           ) : r.source === 'synthetic' ? (
             <Note kind="warn">Synthetic test data from the report API. Not real diners.</Note>
-          ) : null
+          ) : (
+            <Note>Today uses matched PostHog events. Earlier UTC days use Supabase.</Note>
+          )
         }
         columns={COLUMNS}
         display={(cell, kind) =>

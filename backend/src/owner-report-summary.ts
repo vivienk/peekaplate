@@ -3,6 +3,11 @@ import {
   OwnerReportSummarySchema,
 } from '@peekaplate/contracts/owner-report';
 import type { Client } from 'pg';
+import {
+  type OwnerReportLiveEvidence,
+  PRODUCTION_REPORT_FILTER,
+  TODAY_REPORT_EVIDENCE,
+} from './owner-report-evidence';
 
 // The same authorized read-only snapshot and canonical traffic class as the dish report.
 const query = `/* owner_summary.v1 */
@@ -57,6 +62,18 @@ SELECT p.period,
   (EXISTS(SELECT 1 FROM timed_cohorts WHERE period=p.period AND timed BETWEEN 1 AND 9)
    OR EXISTS(SELECT 1 FROM opened_cohorts WHERE period=p.period AND opened BETWEEN 1 AND 9)) AS has_small_timed_dish
 FROM periods p`;
+
+const productionQuery = query
+  .replace('WITH periods AS', `WITH ${TODAY_REPORT_EVIDENCE}, periods AS`)
+  .replace(
+    'AND obs.occurred_at>=p.starts AND obs.occurred_at<p.ends',
+    `AND obs.occurred_at>=p.starts AND obs.occurred_at<p.ends
+    ${PRODUCTION_REPORT_FILTER}
+    AND (obs.dish_id IS NULL OR EXISTS (
+      SELECT 1 FROM app_private.dish_current d
+      WHERE d.tenant_id=obs.tenant_id AND d.dish_id=obs.dish_id
+    ))`,
+  );
 
 type Row = Record<string, unknown>;
 type DailyRow = { start_time: string; end_time: string; opens: number; sessions: number };
@@ -130,13 +147,21 @@ export async function readOwnerReportSummary(
   venueId: string,
   now: Date,
   trafficClass: 'live' | 'test',
+  liveEvidence?: OwnerReportLiveEvidence,
 ): Promise<OwnerReportSummary> {
   const start = new Date(now.getTime() - 86_400_000);
   const result = await client.query(
-    trafficClass === 'test'
-      ? query.replace('app_private.owner_observation_v1', 'app_private.owner_test_observation_v1')
-      : query,
-    [venueId, start, now],
+    liveEvidence
+      ? productionQuery
+      : trafficClass === 'test'
+        ? query.replace('app_private.owner_observation_v1', 'app_private.owner_test_observation_v1')
+        : query,
+    [
+      venueId,
+      start,
+      now,
+      ...(liveEvidence ? [liveEvidence.start, JSON.stringify(liveEvidence.events)] : []),
+    ],
   );
   const currentRow = result.rows.find((row) => row.period === 'current');
   const baselineRow = result.rows.find((row) => row.period === 'baseline');
