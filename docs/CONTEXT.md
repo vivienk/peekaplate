@@ -1094,7 +1094,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "assets",
       "status": "foundation",
-      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Rejected candidates retain returned model/fidelity metadata and distinct fallback identities. Bundles are create-only, needs_review and publication.eligible=false. No automatic segmentation, image-provider calls, backend signing or diner integration; captured-food fidelity, rights and real-device acceptance remain manual.",
+      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Rejected candidates retain returned model/fidelity metadata and distinct fallback identities. Private Kaggle T4 x2 research notebook builds dual-backend TripoSR vertex-colored and Hunyuan3D-2mini geometry-only GLBs from open-weights dish fallbacks (plus preflight-gated TRELLIS.2-4B adapters) into non-publishable comparison manifests. Bundles are create-only, needs_review and publication_eligible=false. Captured-food fidelity, rights and real-device acceptance remain manual.",
       "paths": [
         "processing/src/peekaplate_processing/assets.py",
         "processing/src/peekaplate_processing/harness.py",
@@ -1112,7 +1112,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_review_preview.py",
         "playwright.review-preview.config.ts",
         "tests/review-preview/review-preview.spec.ts",
-        "docs/research/dish-3d-delivery.md"
+        "docs/research/dish-3d-delivery.md",
+        "notebooks/dish-3d-openrouter.ipynb",
+        "processing/tests/test_dish_3d_notebook.py"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md",
@@ -1121,7 +1123,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "a8295ffd8707588796f0d3008b2629c49d38897aa096bed4c14cb1e6977f9652"
+      "sourceFingerprint": "b73c805663413fe8d7af7d6f072371ae4a6a82b7f40dfcac320dc9a4f02aeb31"
     }
   ],
   "handoffs": [
@@ -1256,17 +1258,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Complete focused and repository checks, independently review the pinned correction, and update PR237. Human review and exact staging release remain required; physical-device scale acceptance is separate."
     },
     {
-      "date": "2026-11-20",
+      "date": "2026-11-21",
       "modules": [
         "assets",
         "processing",
         "diner"
       ],
-      "summary": "Research traced the one-photo Kaggle TRELLIS.2 workflow and proposed a capture-based route to revision-bound GLB delivery, with Beam and Runpod pilot criteria. The report distinguishes free manual Gemini app image generation from Studio and API access.",
+      "summary": "Delivered and verified the Kaggle T4 x2 multi-model dish-to-3D notebook (TripoSR vertex-color + Hunyuan3D-2mini geometry-only GLBs from open-weights dish fallbacks, OpenRouter 429 retry handling, preflight-gated TRELLIS.2-4B adapters with Astra/Antigravity review fixes, publication_eligible=false manifest) and recorded verified Version 6 metrics alongside the capture-based GLB delivery proposal.",
       "files": [
-        "docs/research/dish-3d-delivery.md"
+        "docs/research/dish-3d-delivery.md",
+        "notebooks/dish-3d-openrouter.ipynb",
+        "processing/tests/test_dish_3d_notebook.py"
       ],
-      "next": "Verify the current 2.5D owner-to-phone path on staging. Evaluate real multi-view reconstruction separately from private generative experiments."
+      "next": "Verify the current 2.5D owner-to-phone path on staging. Optionally run TRELLIS.2-4B on Kaggle only with an authorized HF_TOKEN for DINOv3, and evaluate real multi-view capture reconstruction separately from private generative experiments."
     }
   ]
 }

@@ -94,8 +94,41 @@ Illustrative USD compute per accepted asset, using 600 seconds of work and 80 ac
 
 Use a paired pilot of 12 rights-cleared capture sets, including shiny, low-texture and richly textured dishes. Repeat cold, warm and burst runs on both providers, record peak VRAM, queue-to-candidate p50/p95, export failures, bytes served and accepted count. Score against held-out real views before revealing the provider. Include retries, rejected jobs, storage, transfer and review in total cost divided by distinct approved revisions. Select the cheapest provider that meets fidelity, phone performance and turnaround targets agreed before the pilot.
 
+## Live Kaggle T4 ×2 Multi-Model Comparison (2026-11-21)
+
+Updated private experiment artifact: [`dish-3d-openrouter.ipynb`](../../notebooks/dish-3d-openrouter.ipynb) with offline verification suite [`test_dish_3d_notebook.py`](../../processing/tests/test_dish_3d_notebook.py) on [Public notebook `yacine105/notebooke3207ed4f5`](https://www.kaggle.com/code/yacine105/notebooke3207ed4f5).
+
+### Architecture & Provenance Design
+- **Image stage (2 distinct models per run):**
+  - Primary (`image_source: "openrouter"`): Calls OpenRouter `/api/v1/chat/completions` (`modalities: ["image", "text"]`) with `google/gemini-3.1-flash-lite-image` and `google/gemini-3.1-flash-image` and bounded `429` retry handling. Live probing against the local key (`$0` OpenRouter balance, free-tier Google AI Studio BYOK `limit: 0`) returned HTTP `429` on all 3 attempts per model, and zero `:free` image models exist on OpenRouter.
+  - Open-weights fallback (`image_source: "kaggle-open-weights-fallback"`): When `OPENROUTER_API_KEY` is missing or quota-blocked, Cell 5 launches two isolated `StableDiffusionPipeline` `fp16` subprocesses in parallel across `2× Tesla T4` using pinned, ungated checkpoints (`stabilityai/sd-turbo` @ `b261bac6fd2cf515557d5d0707481eafa0485ec2` on GPU 0; `Lykon/dreamshaper-8` @ `a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917` on GPU 1; `safety_checker=None`, without `upcast_vae()`). Fallback results never masquerade as OpenRouter/Google images.
+- **Dual-backend `T4 ×2` 3D stage:**
+  - **Ungated parallel backends (always run):** `TripoSR` (`VAST-AI-Research/TripoSR` @ `107cefdc244c39106fa830359024f6a2f1c78871`, `stabilityai/TripoSR` @ `5b521936b01fbe1890f6f9baed0254ab6351c04a`, `facebook/dino-vitb16` @ `f205d5d8e640a89a2b8ef0369670dfc37cc07fc2`) produces **vertex-colored** GLBs (`appearance: "vertex_color"`) via CPU marching cubes (`skimage.measure.marching_cubes`) and a strict 1:1 `transformers` 4.x/5.x `ViTModel` `state_dict` key remap; `Hunyuan3D-2mini` (`Tencent/Hunyuan3D-2` @ `f8db63096c8282cb27354314d896feba5ba6ff8a`, `tencent/Hunyuan3D-2mini` @ `f90a0f7df7d5e6f71109cf333f6a95a0ae3194a6`, subfolder `hunyuan3d-dit-v2-mini-fast`) produces **geometry-only** GLBs (`appearance: "geometry_only"`) via `mc_algo="mc"` with zero custom `diso` build.
+  - **Gated `TRELLIS.2-4B` (`microsoft/TRELLIS.2` @ `75fbf0183001ed9876c8dbb35de6b68552ee08bd`, `microsoft/TRELLIS.2-4B` @ `af44b45f2e35a493886929c6d786e563ec68364d`):** Preflight-checks `HF_TOKEN` authorization on `facebook/dinov3-vitl16-pretrain-lvd1689m` (`ea8dc2863c51be0a264bab82070e3e8836b02d51`) `config.json` **before** any ~20-minute CUDA build or downloads. Removes the broken `flex_gemm` Python fallback, treats optional `nvdiffrec_render` as non-fatal, uses `points.trunc().long()` for nearest voxel sampling in `trellis_native_compat.py`, seeds pinned `model_revision` + `DINOV3_REVISION`, and bounds preparation/runner execution with process-group timeouts. Live `TRELLIS.2-4B` inference on Kaggle remains unverified without an approved `HF_TOKEN`.
+
+### Measured Kaggle `T4 ×2` Results (Version 6 `COMPLETE` in ~364s container run)
+
+Environment: `2× Tesla T4 (14.56 GiB, cc=[7, 5])`, Python `3.13.15`, PyTorch `2.11.0+cu128`, CUDA `12.8`, runtime package pinning via `kaggle_constraints.txt`, and subprocess-isolated `rembg[cpu]==2.0.67` (`u2net`).
+
+- **Fallback dish inputs generated (zero CLIP `> 77` truncation warnings):**
+  - `sd-turbo/input_image.png`: `512×512`, `30.43s` (`Tesla T4`), `510,051` B, `sha256` `30a3b6adcddb36699938e6ea7b28d0365148f257b9a11c505059d4a08cef6d0f` (`cutout_rgba.png` `395,068` B, `sha256` `d435cfc3b90fccb03bab99ecb6372fc01083ce84e2e17c1123ef94b76354d0a6`).
+  - `dreamshaper-8/input_image.png`: `512×512`, `34.56s` (`Tesla T4`), `410,776` B, `sha256` `3a2c0852cb1a176e7baa9aba713afd564bb5d424ebbfba41a285f9ad76c13759` (`cutout_rgba.png` `200,972` B, `sha256` `54deb17750898f5798183a6ee08cf76ebbf3659d2a764c1f9518356a35c96068`).
+
+| Output Path | Backend | Appearance | Vertices | Faces | Bytes | Elapsed / Peak VRAM | Verified SHA-256 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `sd-turbo/triposr.glb` | `TripoSR` (`cuda:0`) | `vertex_color` | `33,414` | `66,802` | `1,337,236` | `9.02s` / `2.075 GiB` | `837667ac5309a6bd2bb92fe2bac2057f76b0cb556fed54446ade808fc40c67ce` |
+| `dreamshaper-8/triposr.glb` | `TripoSR` (`cuda:1`) | `vertex_color` | `30,019` | `60,010` | `1,201,416` | `9.00s` / `2.075 GiB` | `995a62fc7f57294142ac5012d1d6e4194aab6eb4a96845351e3f0f343d2491f0` |
+| `sd-turbo/hunyuan3d_2mini.glb` | `Hunyuan3D-2mini` (`cuda:0`) | `geometry_only` | `302,832` | `605,518` | `10,900,988` | `72.27s` / `4.08 GiB` | `2abfff0c1bbae13bcdeb6db9a2d6f066c1b9d005650368b68b4f2bd80c996b7b` |
+| `dreamshaper-8/hunyuan3d_2mini.glb` | `Hunyuan3D-2mini` (`cuda:1`) | `geometry_only` | `559,137` | `1,119,764` | `20,147,604` | `72.06s` / `4.08 GiB` | `f38ad8bd8992f9160ecfe75fe2b510a376d807cda71dd588f5a5d89d12616ec0` |
+
+- **Empirical foreground-cutout finding:** Visual inspection confirmed `sd-turbo/cutout_rgba.png` preserved the entire matte ivory plate and food, whereas `rembg` (`u2net`) feathered out the outer white rim of `dreamshaper-8/input_image.png` to isolate only the food/parsley ring. This empirically reinforces why [`trellis_prepare_full_plate.py`](../../notebooks/dish-3d-openrouter.ipynb) (`automatic_background_removal: False`) and [ADR 0004](../adr/0004-visual-tiers.md) forbid unreviewed automatic cutout cropping in production.
+- **Post-review update (Version 7):** Applied independent Antigravity review P2/P3 fixes (seeded `TRELLIS_MODEL_REVISION` + `DINOV3_REVISION`, bounded process-group timeouts, explicit `publication_eligible: False` in `manifest.json`), verified by all offline unit checks (`test_dish_3d_notebook.py`); Version 7 was pushed to Kaggle (`QUEUED` at handoff).
+- **Private-experiment boundary ([ADR 0004](../adr/0004-visual-tiers.md)):** Fictional dish comparisons (`publication_eligible: false`) remain strictly private experiments and must never enter PeekaPlate menu publication or captured-food evidence.
+
 ## Research checks
 
+- **PASS (Kaggle Version 6 live `T4 ×2` run + local byte/GLB audit)** — Executed end-to-end on `yacine105/notebooke3207ed4f5` (`COMPLETE`, 355.7s notebook execution); downloaded `dish-3d-comparison.zip` and `manifest.json`, verified exact SHA-256 + byte matches across all 14 packaged artifacts, passed `validate_glb()` on all 4 `.glb` files, verified 6/6 `FullPlateTest` + 12/12 `NativeAdaptersTest`/`SpaceToolsMeshContractTest` CUDA checks in the Kaggle log, visually inspected generated PNGs and `comparison_sheet.png`, and confirmed zero leaked secrets or CLIP truncation warnings.
+- **PASS** — `PYTHONPATH=processing/src:processing/tests processing/.venv/bin/python -m unittest -v test_dish_3d_notebook test_model_service test_generate_model test_portion_service`.
 - **PASS** — `PATH="$HOME/.local/bin:$PATH" corepack pnpm context:show -- diner`.
 - **PASS** — `PATH="$HOME/.local/bin:$PATH" corepack pnpm exec vitest run backend/src/owner-portion-preview.test.ts backend/src/owner-prepare.test.ts backend/src/bundle-producer/approved-portions.test.ts frontend/diner/src/menu/portionAssets.test.ts frontend/diner/src/menu/portionMotion.test.ts packages/contracts/src/serving-size.test.ts` (78 tests).
 - **PASS** — ClickUp task and comments read for `86bd5m6q0` with explicit workspace selection. The first lookup without workspace selection was rejected. Babylon and COLMAP upstream docs were also read.
