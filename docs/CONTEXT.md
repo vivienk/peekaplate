@@ -736,7 +736,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "809029fda206e5fe1b91a7576350a3df8a5c12d6522a00688d8d39a35a3231e6"
+      "sourceFingerprint": "adf8e58549c0b49c2a0fc76e826c2a9bf674a8f8fbdf2bd6150e82180f6a1753"
     },
     {
       "id": "database",
@@ -1270,7 +1270,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database",
         "delivery"
       ],
-      "summary": "The production candidate reuses the owner and diner paths with production-specific origins, first-owner onboarding, three-dish comparison and separate portion opening evidence.",
+      "summary": "The production candidate reuses the owner and diner paths with production-specific origins, first-owner onboarding, three-dish comparison and separate portion opening evidence. Synthetic report seals reconcile the typed portion fact alongside legacy event families.",
       "files": [
         "docs/production-release.md",
         "backend/src/owner-workflow-environment.ts",

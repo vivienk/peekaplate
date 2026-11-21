@@ -15,9 +15,9 @@ import { SYNTHETIC_EVIDENCE_QUERY, syntheticEvidenceDigests } from './synthetic-
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
 const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
-describe.skipIf(!runtimeUrl || !adminUrl)(
-  'sealed synthetic completeness (real tenant-scoped PostgreSQL)',
-  () => {
+describe.skipIf(!runtimeUrl || !adminUrl).each(['menu_viewed', 'dish_portion_opened'] as const)(
+  'sealed synthetic completeness for %s (real tenant-scoped PostgreSQL)',
+  (type) => {
     const admin = new Client({ connectionString: adminUrl });
     const runtime = new Client({ connectionString: runtimeUrl });
     const tenant = crypto.randomUUID();
@@ -38,11 +38,14 @@ describe.skipIf(!runtimeUrl || !adminUrl)(
       producerId: crypto.randomUUID(),
       localSequence: 1,
       authorizedPublicationId: tenant,
-      type: 'menu_viewed',
+      type,
       occurredAt: '2035-02-02T23:00:00.000Z',
       firstReceivedAt: '2035-02-02T23:00:01.000Z',
       traffic_class: 'test',
-      payload: { entry_source: 'qr' },
+      payload:
+        type === 'menu_viewed'
+          ? { entry_source: 'qr' }
+          : { dish_id: crypto.randomUUID(), dish_revision_id: crypto.randomUUID() },
     });
     beforeAll(async () => {
       await admin.connect();
