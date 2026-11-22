@@ -39,6 +39,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       APP_ENV: 'production',
       OWNER_WORKFLOW_ENABLED: 'true',
       OWNER_PRODUCTION_REPORTS_ENABLED: 'true',
+      OWNER_REPORT_DISPLAY_ACTIONS_ENABLED: 'true',
       AUTH_ISSUER: 'https://owner-report-fixture.invalid/auth/v1',
       HYPERDRIVE: { connectionString: runtimeUrl! },
       POSTHOG_PROJECT_ID: '12',
@@ -474,13 +475,19 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           throw new Error('Unexpected network request in production report fixture');
         });
 
-        const request = (suffix: string, bearer: string, id = venue.venueId, extended = true) =>
+        const request = (
+          suffix: string,
+          bearer: string,
+          id = venue.venueId,
+          extended = true,
+          enabled = 'true',
+        ) =>
           app.request(
             `/api/v1/venues/${id}/analytics/dishes${suffix}?source=production${extended ? '&displayActions=true' : ''}`,
             {
               headers: { Authorization: `Bearer ${bearer}`, Origin: 'https://peekaplate.app' },
             },
-            env,
+            { ...env, OWNER_REPORT_DISPLAY_ACTIONS_ENABLED: enabled },
           );
 
         for (const suffix of ['', '/export']) {
@@ -524,6 +531,10 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           value: null,
           status: 'MISSING',
         });
+        const rolledBack = OwnerDishReportSchema.parse(
+          await (await request('', token, venue.venueId, true, 'false')).json(),
+        );
+        expect(rolledBack).toEqual(legacy);
         expect(report.summary?.baseline).toMatchObject({
           menu_sessions: { value: 10, status: 'NORMAL' },
           dish_opens: { value: 10, status: 'NORMAL' },

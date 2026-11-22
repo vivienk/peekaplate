@@ -29,6 +29,7 @@ export type OwnerReportSource = 'production' | 'synthetic';
 type ReportOptions = {
   trafficClass?: 'live' | 'test';
   includeSummary?: boolean;
+  includeDisplayActions?: boolean;
   syntheticSeal?: string;
   validationNow?: Date;
   readTodayEvents?: (venueId: string, start: Date, end: Date) => Promise<LivePostHogOwnerEvent[]>;
@@ -160,7 +161,7 @@ async function measureReport(
     }));
   const internal = buildInternalReport(result.rows, venueId, now, source, durationMs);
   const displayActions =
-    isBatch && liveEvidence
+    isBatch && options.includeDisplayActions && liveEvidence
       ? await readOwnerReportDisplayActions(
           client,
           venueId,

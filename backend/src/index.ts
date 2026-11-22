@@ -195,6 +195,7 @@ export type Bindings = {
   APP_ENV?: string;
   OWNER_WORKFLOW_ENABLED?: string;
   OWNER_PRODUCTION_REPORTS_ENABLED?: string;
+  OWNER_REPORT_DISPLAY_ACTIONS_ENABLED?: string;
   PRODUCTION_OBSERVATION_PROVENANCE_ENABLED?: string;
   DINER_PUBLIC_ORIGIN?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
@@ -804,6 +805,7 @@ const dependencies: Dependencies = {
       if (source === 'production' && productionOwnerReportingEnabled(env)) {
         return await queryOwnerReport(client, actorId, venueId, now, source, {
           includeSummary: true,
+          includeDisplayActions: env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED === 'true',
           productionPublications: {
             storage: preparedStorage(env),
             origin: 'https://api.peekaplate.app',
@@ -1536,10 +1538,15 @@ export function createApp(services: Dependencies = dependencies) {
     const venueId = scope.data.venueId.toLowerCase();
     const report = await services.readOwnerReport(actorId, venueId, now, env, source);
     c.header('Cache-Control', 'no-store');
-    if (source === 'production' && c.req.query('displayActions') !== 'true') {
+    let responseReport = report;
+    if (
+      source === 'production' &&
+      (env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED !== 'true' ||
+        c.req.query('displayActions') !== 'true')
+    ) {
       const legacy = OwnerDishReportSchema.parse(report);
       const missing = { value: null, status: 'MISSING' } as const;
-      return c.json({
+      responseReport = {
         ...legacy,
         dishes: legacy.dishes.map(({ display_actions: _, ...dish }) => dish),
         ...(legacy.summary
@@ -1551,14 +1558,14 @@ export function createApp(services: Dependencies = dependencies) {
               },
             }
           : {}),
-      });
+      };
     }
     if (env.OWNER_AI_RESPONSES_ENABLED === 'true' && env.OWNER_AI_REPORT_REFERENCE_SECRET) {
       try {
         const parsedReport = OwnerDishReportSchema.parse(report);
         // Production batches do not issue rolling-window AI references.
         if (parsedReport.report_metadata.calculation_version === 'production.batch.v1')
-          return c.json(report);
+          return c.json(responseReport);
         const reference = await mintOwnerReportReference(
           parsedReport,
           { actorId, venueId },
@@ -1570,7 +1577,7 @@ export function createApp(services: Dependencies = dependencies) {
         // The owner can still read the authorized report when its optional AI reference is unavailable.
       }
     }
-    return c.json(report);
+    return c.json(responseReport);
   });
   app.use(
     '/api/v1/venues/:venueId/analytics/dishes/export',

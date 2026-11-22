@@ -5539,3 +5539,8 @@ The display-action count fields widened the legacy metric object with optional v
 metric-description map supplied an optional prop to the chart. Own display-action counts in an
 optional sidecar on each production dish row and supply a complete set of metric descriptions.
 The contract checks and production deep-link browser test cover the changed fields and chart cells.
+
+The first backward-compatible projection returned before legacy report references were generated.
+Keep the reference path and project only the response. The owner AI report-reference regression
+test covers non-batch reports. The production database fixture verifies that a disabled compatible
+Worker can still read a sealed batch and return its original fields.
