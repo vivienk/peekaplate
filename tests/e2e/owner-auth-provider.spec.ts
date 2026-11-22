@@ -9,6 +9,12 @@ async function serveConsole(route: Route) {
   const response = await route.fetch({ url: `${origin}${pathname}${search}` });
   await route.fulfill({ response });
 }
+
+test.afterEach(async ({ page }, { status }) => {
+  // A failed assertion can leave a deliberately paused fixture request waiting for the test.
+  await page.unrouteAll({ behavior: status === 'passed' ? 'wait' : 'ignoreErrors' });
+});
+
 const email = 'owner@example.test';
 const user = {
   id: '00000000-0000-4000-8000-000000000001',

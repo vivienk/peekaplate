@@ -27,7 +27,7 @@ test('stops after the first failed named check and records no command output', a
   const ledger = join(root, 'errors.md');
   const seen = [];
   try {
-    const result = await runChecks(['lint', 'build'], {
+    const result = await runChecks(['test:e2e:workspace', 'build'], {
       ledger,
       execute: async (spec) => {
         seen.push(spec);
@@ -35,9 +35,9 @@ test('stops after the first failed named check and records no command output', a
       },
     });
     assert.equal(result.exitCode, 7);
-    assert.deepEqual(seen, [checkSpec('lint')]);
+    assert.deepEqual(seen, [checkSpec('test:e2e:workspace')]);
     const recorded = await readFile(ledger, 'utf8');
-    assert.match(recorded, /"check":"lint"/);
+    assert.match(recorded, /"check":"test:e2e:workspace"/);
     assert.doesNotMatch(recorded, /do-not-record|token=/);
   } finally {
     await rm(root, { recursive: true, force: true });
