@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '@peekaplate/contracts';
-import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
+import {
+  OWNER_PRODUCTION_BATCH_VERSION,
+  type OwnerDishReport,
+} from '@peekaplate/contracts/owner-report';
 import { jwtVerify, SignJWT } from 'jose';
+import { latestOwnerReportBatchEnd, OWNER_BATCH_MS } from '../owner-report-batches';
 
 export const OWNER_REPORT_REFERENCE_HEADER = 'X-Owner-Report-Ref';
 const referenceLifetime = 60;
@@ -35,9 +39,16 @@ export async function mintOwnerReportReference(
   now: Date,
 ): Promise<string> {
   const anchor = now.getTime();
+  const metadata = report.report_metadata;
+  const productionBatch =
+    report.source === 'production' &&
+    metadata.calculation_version === OWNER_PRODUCTION_BATCH_VERSION;
+  const expectedEnd = productionBatch ? latestOwnerReportBatchEnd(now) : anchor;
   if (
     report.venue_id !== scope.venueId ||
-    Date.parse(report.report_metadata.date_window.end_time) !== anchor
+    Date.parse(metadata.date_window.end_time) !== expectedEnd ||
+    (productionBatch &&
+      Date.parse(metadata.date_window.start_time) !== expectedEnd - OWNER_BATCH_MS)
   ) {
     throw new Error('Invalid owner report reference scope');
   }

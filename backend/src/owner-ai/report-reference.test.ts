@@ -18,7 +18,7 @@ const start = Date.parse('2026-11-16T12:00:00.219Z');
 
 afterEach(() => vi.unstubAllGlobals());
 
-function setup(source: 'synthetic' | 'production' = 'synthetic') {
+function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = false) {
   let now = start;
   const reportOrigin = source === 'production' ? productionOrigin : origin;
   const reportState = { allowed: true, fresh: true, rate: 0.5, reversed: false };
@@ -27,6 +27,16 @@ function setup(source: 'synthetic' | 'production' = 'synthetic') {
       throw new CommandError('forbidden', 403);
     }
     const report = OwnerDishReportSchema.parse({ ...localOwnerAiReport(anchor), source });
+    if (sealedBatch) {
+      const end = Math.floor((anchor.getTime() - 60_000) / 300_000) * 300_000;
+      report.report_metadata.calculation_version = 'production.batch.v1';
+      report.report_metadata.date_window = {
+        start_time: new Date(end - 300_000).toISOString(),
+        end_time: new Date(end).toISOString(),
+        duration_hours: 0,
+      };
+      delete report.summary;
+    }
     const dish = report.dishes[0]!;
     dish.metrics.open_rate.value = reportState.rate;
     report.dishes.push({ ...dish, dish_id: '00000000-0000-4000-8000-000000000789' });
@@ -129,6 +139,33 @@ function setup(source: 'synthetic' | 'production' = 'synthetic') {
     limit,
   };
 }
+
+it('submits a sealed production batch across the next batch boundary without using unknown evidence', async () => {
+  const s = setup('production', true);
+  s.advance(59_000);
+  s.reportState.fresh = false;
+  const report = await s.get();
+  expect(report.status).toBe(200);
+  const { report_metadata: metadata } = OwnerDishReportSchema.parse(await report.json());
+  const token = report.headers.get(OWNER_REPORT_REFERENCE_HEADER);
+  expect(token).toBeTruthy();
+  s.advance(10_000);
+
+  const response = await s.analyze(token ?? undefined);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    source: 'production',
+    status: 'abstained',
+    reason: 'unusable_evidence',
+    timeWindow: { start: metadata.date_window.start_time, end: metadata.date_window.end_time },
+  });
+  expect(s.readOwnerReport.mock.calls.map((call) => call[2].getTime())).toEqual([
+    start + 59_000,
+    start + 59_000,
+  ]);
+  expect(s.limit).not.toHaveBeenCalled();
+  expect(s.provider).not.toHaveBeenCalled();
+});
 
 it('analyzes the same production report and sends only screened aggregate rates', async () => {
   const s = setup('production');

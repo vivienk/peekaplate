@@ -127,11 +127,14 @@ test('production deep links resume after sign-in and keep orientation through br
   let setupReads = 0;
   let reportReads = 0;
   let workspaceReads = 0;
+  let emptyReport = false;
+  let analysisRequests = 0;
   await page.route('https://api.peekaplate.app/**', async (route) => {
     const { pathname, searchParams } = new URL(route.request().url());
     const headers = {
       'Access-Control-Allow-Origin': productionOrigin,
-      'Access-Control-Allow-Headers': 'Authorization,Content-Type',
+      'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Owner-Report-Ref',
+      'Access-Control-Expose-Headers': 'X-Owner-Report-Ref',
     };
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
     expect(route.request().headers().authorization).toBe(`Bearer ${session.access_token}`);
@@ -154,6 +157,27 @@ test('production deep links resume after sign-in and keep orientation through br
     else if (pathname.endsWith('/drafts')) json = { drafts: [] };
     else if (pathname.endsWith('/owner-insight-actions')) {
       json = { schemaVersion: 1, actions: [] };
+    } else if (pathname.endsWith('/ai/analysis')) {
+      analysisRequests++;
+      expect(route.request().headers()['x-owner-report-ref']).toBe('fixture-report-reference');
+      const { dishId, goal } = route.request().postDataJSON();
+      expect(goal).toBe('engagement');
+      const period = UNEEZA_REPORT.report_metadata.date_window;
+      json = {
+        schemaVersion: 'owner-analysis.v1',
+        venueId: venue.venueId,
+        dishId,
+        goal,
+        source: 'production',
+        reportSnapshot: 'a'.repeat(64),
+        timeWindow: { start: period.start_time, end: period.end_time },
+        status: 'abstained',
+        metric: null,
+        value: null,
+        reason: 'unusable_evidence',
+        approvalRequired: true,
+        allowedEffects: [],
+      };
     } else if (pathname.endsWith('/analytics/dishes')) {
       expect(searchParams.get('source')).toBe('production');
       expect(searchParams.get('displayActions')).toBe('true');
@@ -162,7 +186,7 @@ test('production deep links resume after sign-in and keep orientation through br
         ...UNEEZA_REPORT,
         source: 'production',
         venue_id: venue.venueId,
-        dishes: UNEEZA_REPORT.dishes.map((dish, index) =>
+        dishes: (emptyReport ? [] : UNEEZA_REPORT.dishes).map((dish, index) =>
           index === 0
             ? {
                 ...dish,
@@ -179,6 +203,11 @@ test('production deep links resume after sign-in and keep orientation through br
           calculation_version: 'production.batch.v1',
         },
       };
+      return route.fulfill({
+        status: 200,
+        headers: { ...headers, 'X-Owner-Report-Ref': 'fixture-report-reference' },
+        json,
+      });
     } else return route.fulfill({ status: 404, headers, json: { error: 'unexpected_path' } });
     await route.fulfill({ status: 200, headers, json });
   });
@@ -190,6 +219,14 @@ test('production deep links resume after sign-in and keep orientation through br
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(`${productionOrigin}/dish-performance`);
   await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
+  const question = page.getByRole('textbox', { name: 'Ask a report question' });
+  const sendQuestion = page.getByRole('button', { name: 'Review report' });
+  await question.fill('Dish engagement');
+  await sendQuestion.click();
+  await expect(
+    page.getByText('There is not enough verified evidence to suggest a next step.'),
+  ).toBeVisible();
+  expect(analysisRequests).toBe(1);
   await page.getByRole('button', { name: '2.5D previews', exact: true }).click();
   await page.getByRole('button', { name: 'View as table', exact: true }).click();
   await expect(
@@ -265,6 +302,14 @@ test('production deep links resume after sign-in and keep orientation through br
   await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
   await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
   expect(reportReads).toBe(3);
+  emptyReport = true;
+  await visit('Overview', '/overview', 'How your menu did this period');
+  await question.fill('Dish engagement');
+  await sendQuestion.click();
+  await expect(
+    page.getByText('There are no dishes with report data in this period.'),
+  ).toBeVisible();
+  expect(analysisRequests).toBe(1);
 });
 
 test('production confirms to sign-in, opens S05, resumes saves and retains the authorized workspace', async ({
