@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1c513e3e0f73197bd034faa6b999bc5e2bb70691f6f3433b332949cd7af0696e"
+      "sourceFingerprint": "e2199421a710f11399476b1d3b81da52d4d87fd6906b61dbc4ffc914ea23282c"
     },
     {
       "id": "backend",
@@ -1282,13 +1282,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "delivery"
       ],
-      "summary": "Run the eight existing Playwright suite invocations across three parallel jobs. Share the seven regular suites with local verification and include owner AI inputs and portion fixtures in path selection. Require each selected lane to pass before the stable ci check can pass.",
+      "summary": "Run the eight existing Playwright suite invocations across three parallel jobs. Share the seven regular suites with local verification and include owner AI inputs and portion fixtures in path selection. Drain active auth fixture routes after passing tests. Require each selected lane to pass before the stable ci check can pass.",
       "files": [
         ".github/workflows/ci.yml",
         "package.json",
-        "scripts/verify.mjs"
+        "scripts/verify.mjs",
+        "tests/e2e/owner-auth-provider.spec.ts"
       ],
-      "next": "Check the first hosted run for lane results and compare its elapsed time with the prior serial browser job."
+      "next": "Verify auth fixture teardown in hosted CI and compare the three jobs' elapsed time with the prior serial browser job."
     }
   ]
 }
