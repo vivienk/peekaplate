@@ -286,7 +286,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Merged auth, owner shell, S05-S13 and dashboard components are reused. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Test-restaurant creation is staging-only. No replacement charts, fabricated orders or automatic publication. S09 has one Serving size (people) count field and separate optional Plate size (cm). Canonical counts, including null, take precedence over legacy text. Confirmed boundaries bind to the authenticated saved photo, survive manual/extracted review, and clear on count, measurement or photo edits. Production confirms valid signup links automatically in the signup browser and returns to sign-in. The authenticated production entry uses the authored Screen 5 for first-restaurant creation. Screen 13 validates the returned share link against the diner host for its configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
+      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Owners can refresh in place. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -312,6 +312,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-onboarding.spec.ts",
         "frontend/console/src/owner/PublishSuccessDialog.tsx",
         "frontend/console/src/owner-dashboard/report-api.ts",
+        "frontend/console/src/owner-dashboard/pages.tsx",
+        "frontend/console/src/owner-dashboard/report-data.tsx",
         "tests/e2e/owner-report-api.spec.ts",
         "frontend/console/src/owner-dashboard/App.tsx",
         "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.tsx",
@@ -471,12 +473,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1a0cc35c2e88e3f125b343e7515b1a41f0826bb68332490a08f7b6149588102f"
+      "sourceFingerprint": "de10a01e3260ba914c380e192536e3be38746ca94176c0166f4358dac38726d5"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Owner AI uses checked report references and currently gates to approved synthetic reports; its diagnostic path and private portion processing remain separate. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. Hosted production binding and provider compatibility still require verification.",
+      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Owner AI uses checked report references and currently gates to approved synthetic reports; its diagnostic path and private portion processing remain separate. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. Hosted production binding and provider compatibility still require verification. The production extraction host supports a separate portion-only deployment with no provider credentials or Internet egress. Its container requires the source origin to match its environment. The existing menu OCR transport is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -742,7 +744,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c213ee9f4ce4834c200ef86a5269a176ea2f3d46691b5fbcc24156a2478eeeab"
+      "sourceFingerprint": "be6348c3e47ef77d3516b63d58a37e4eb909b90bd31e85165b8dd70b02c80155"
     },
     {
       "id": "database",
@@ -834,7 +836,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending. The production preparation uses separate Pages, Queues and R2 configuration during the Meta freeze. Production database provisioning, domain cutover and hosted acceptance remain pending.",
+      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending. The production preparation uses separate Pages, Queues and R2 configuration during the Meta freeze. Production database provisioning, domain cutover and hosted acceptance remain pending. Production portion rollout requires the exact reviewed container, private production storage, custom domain and a paired dedicated API binding. Production reporting remains gated on verified provenance and disclosure.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -904,7 +906,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "3f4dada5bc5864a4ecd613bff21b13518397c9e709bebf7c303ddf50d8435d0e"
+      "sourceFingerprint": "88dfa79593ef590e3d177ef0f37a43d52f8706d872d43eafb2bf0409ebf6dec2"
     },
     {
       "id": "agents",
@@ -1102,7 +1104,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "37041f2d2cb1a3352b5d0d4ca3876c8033a16046f51fb8bc1c6c92d6b53d1ec3"
+      "sourceFingerprint": "c443ae118979c83a2c40d1e331513e4412a597162ad512768a9f2dcb1b5a0fbd"
     },
     {
       "id": "assets",
@@ -1137,20 +1139,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend"
-      ],
-      "summary": "PR222 creates pending structured website dishes and server-built evidence-bound review sessions without providers or publication. Review fixes reject competing offers and reuse the first fetched source for file fallback. Reconciled merged PR219 through documentation/ledger conflicts only; owner routes merge without manual runtime changes.",
-      "files": [
-        "backend/src/ingestion/html-menu.ts",
-        "backend/src/ingestion/intake.ts",
-        "backend/src/retrieval/parser.ts",
-        "backend/src/owner-menu-routes.ts"
-      ],
-      "next": "Require reconciled-head CI and review before merge; hosted Screen 8 to Screen 9 acceptance remains unverified."
-    },
     {
       "date": "2026-11-17",
       "modules": [
@@ -1276,15 +1264,33 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database",
         "delivery"
       ],
-      "summary": "The production candidate adds auth-gated owner page URLs, reuses the authored pages and scopes current reporting to PostHog event tuples corroborated by canonical Supabase facts. Earlier UTC events come from canonical storage. Production wiring is gated and AI uses the same signed snapshot with unknown freshness until proven.",
+      "summary": "Production owner pages use the existing screens and authenticated routes. Actions reads accept the exact production owner origin under the owner workflow gate and still require current restaurant ownership. Reports use canonical Supabase facts, corroborate current-day events in PostHog and keep AI freshness unknown until proven.",
       "files": [
         "docs/production-release.md",
         "docs/adr/0017-production-owner-report-sources.md",
         "backend/src/owner-production-report.integration.ts",
+        "backend/src/owner-actions-cors.test.ts",
         "backend/src/owner-workflow-environment.ts",
         "backend/wrangler.production.jsonc"
       ],
       "next": "Keep Meta staging frozen. Provision production-only provider credentials securely and verify the two published venue flows plus freshness and disclosure before enabling reporting or paid AI."
+    },
+    {
+      "date": "2026-11-21",
+      "modules": [
+        "console",
+        "backend",
+        "delivery"
+      ],
+      "summary": "Use the authored dashboard with an authenticated report refresh. Fix the production portion container startup and support a production-only processor with no OCR or external providers. Keep menu OCR and production reporting activation separate.",
+      "files": [
+        "backend/src/extraction-host.ts",
+        "backend/wrangler.extraction.production.jsonc",
+        "frontend/console/src/owner-dashboard/report-data.tsx",
+        "processing/src/peekaplate_processing/service.py",
+        "docs/production-release.md"
+      ],
+      "next": "Review the pinned PR and verify an exact production-only release. Reporting activation remains subject to publication provenance, historical isolation, and repeated-release disclosure checks."
     }
   ]
 }

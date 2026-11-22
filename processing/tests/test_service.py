@@ -53,6 +53,13 @@ class ServiceTests(unittest.TestCase):
     def send(self, **changes):
         return self.client.post("/extract", json={**self.payload, **changes}, headers=self.headers)
 
+    def test_production_health_accepts_only_the_production_source_origin(self):
+        settings = Settings(self.settings.secret, "https://extraction.peekaplate.app", "production")
+        client = TestClient(create_app(settings))
+        self.assertEqual(client.get("/health").json()["environment"], "production")
+        with self.assertRaises(ValueError):
+            create_app(Settings(self.settings.secret, self.settings.source_origin, "production"))
+
     def test_valid_request_uses_fixed_bucket_and_preserves_report(self):
         response = self.send()
         self.assertEqual(response.status_code, 200)

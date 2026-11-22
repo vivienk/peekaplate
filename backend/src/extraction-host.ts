@@ -7,6 +7,7 @@ type Stub = { fetch(request: Request): Promise<Response> };
 export type ExtractionHostEnv = {
   APP_ENV: string;
   EXTRACTION_PRODUCTION_ENABLED?: string;
+  EXTRACTION_PRODUCTION_PORTION_ONLY?: string;
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
   EXTRACTION_SOURCE_ORIGIN: string;
@@ -46,6 +47,10 @@ const budgetKeyPattern = /^[A-Za-z0-9:_-]{1,128}$/;
 const providerNamePattern = /^[A-Za-z0-9._-]{1,64}$/;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function productionPortionOnly(env: ExtractionHostEnv) {
+  return env.APP_ENV === 'production' && env.EXTRACTION_PRODUCTION_PORTION_ONLY === 'true';
+}
+
 export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
   envVars: Record<string, string>;
   private readiness: Promise<void> | undefined;
@@ -56,10 +61,13 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
     this.envVars = {
       EXTRACTION_SERVICE_SECRET: env.EXTRACTION_SERVICE_SECRET ?? '',
       EXTRACTION_SOURCE_ORIGIN: env.EXTRACTION_SOURCE_ORIGIN,
+      EXTRACTION_ENVIRONMENT: env.APP_ENV,
       PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
       U2NET_HOME: '/app/models',
       ...Object.fromEntries(
-        pipelineVariables.flatMap((key) => (env[key] ? [[key, env[key]]] : [])),
+        productionPortionOnly(env)
+          ? []
+          : pipelineVariables.flatMap((key) => (env[key] ? [[key, env[key]]] : [])),
       ),
     };
     if (ctx.container?.running) {
@@ -77,7 +85,7 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
         image,
         instance: 'standard-1',
         env: this.envVars,
-        enableInternet: true,
+        enableInternet: !productionPortionOnly(this.env),
       });
     }
     await container.setInactivityTimeout(60_000);
@@ -469,14 +477,13 @@ export default {
     const environment = env.APP_ENV;
     const secret = env.EXTRACTION_SERVICE_SECRET;
     const signingSecret = env.EXTRACTION_SOURCE_SIGNING_SECRET;
+    const portionOnly = productionPortionOnly(env);
     if (
       (environment !== 'staging' &&
         !(environment === 'production' && env.EXTRACTION_PRODUCTION_ENABLED === 'true')) ||
       !secret ||
       secret.length < 48 ||
-      !signingSecret ||
-      signingSecret.length < 48 ||
-      signingSecret === secret
+      (!portionOnly && (!signingSecret || signingSecret.length < 48 || signingSecret === secret))
     )
       return json('not_configured', 503);
     const containerName =
@@ -514,6 +521,12 @@ export default {
           headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
         });
       }
+      if (portionOnly) {
+        if (url.pathname === '/health' && request.method === 'GET')
+          return await env.EXTRACTOR.getByName(containerName).fetch(request);
+        return json('not_found', 404);
+      }
+      if (!signingSecret) return json('not_configured', 503);
       const source = sourcePath.exec(url.pathname);
       if (source && request.method === 'GET') {
         const scope = await readExtractionCapability(

@@ -1,18 +1,20 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "peekaplate-extraction-production",
+  "name": "peekaplate-portion-production",
   "account_id": "51eda1917fd22a9478808a82d2980741",
   "main": "src/extraction-host.ts",
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
+  "routes": [{ "pattern": "portions.peekaplate.app", "custom_domain": true }],
   "observability": {
     "enabled": false
   },
   "vars": {
     "APP_ENV": "production",
     "EXTRACTION_PRODUCTION_ENABLED": "false",
+    "EXTRACTION_PRODUCTION_PORTION_ONLY": "true",
     "EXTRACTION_SOURCE_ORIGIN": "https://extraction.peekaplate.app"
   },
   "r2_buckets": [
@@ -47,6 +49,6 @@
     }
   ],
   "secrets": {
-    "required": ["EXTRACTION_SERVICE_SECRET", "EXTRACTION_SOURCE_SIGNING_SECRET"]
+    "required": ["EXTRACTION_SERVICE_SECRET"]
   }
 }

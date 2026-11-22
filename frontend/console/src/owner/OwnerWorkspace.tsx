@@ -26,6 +26,7 @@ import {
   OwnerAnalysisAccessError,
   OwnerAnalysisReferenceError,
 } from '../owner-dashboard/ai-preview/analysis-client';
+import { Btn } from '../owner-dashboard/controls';
 import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
 import { ReportView, useOwnerReport } from '../owner-dashboard/report-data';
 import { createOwnerMenuClient, newCommandId, OwnerMenuApiError } from '../owner-menu/api';
@@ -695,7 +696,12 @@ function LiveDashboardReport({
   onReport: (report: OwnerDishReport | null, reference?: string) => void;
   go: (page: Page) => void;
 }) {
-  const { state, retry } = useOwnerReport({ mode: 'live', apiBase, venueId, getAccessToken });
+  const { state, retry, refreshing } = useOwnerReport({
+    mode: 'live',
+    apiBase,
+    venueId,
+    getAccessToken,
+  });
   const report = state.kind === 'ready' ? state.report : null;
   const reference = state.kind === 'ready' ? state.reference : undefined;
   useEffect(() => {
@@ -705,16 +711,33 @@ function LiveDashboardReport({
   useEffect(() => {
     if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure(state.kind);
   }, [state.kind, onAccessFailure]);
+  const reportRefresh =
+    state.kind === 'ready' ||
+    state.kind === 'unavailable' ||
+    state.kind === 'invalid' ||
+    (page === 'overview' && state.kind === 'error') ? (
+      <div className="row">
+        <Btn type="button" size="md" onClick={retry} disabled={refreshing}>
+          Refresh report
+        </Btn>
+        <span className="muted" aria-live="polite">
+          {refreshing ? 'Refreshing report…' : ''}
+        </span>
+      </div>
+    ) : null;
   const reportContent = (
     <ReportView
       state={state}
       onRetry={retry}
+      refreshing={refreshing}
+      refreshControl={page === 'performance' ? reportRefresh : undefined}
       presentation={page === 'performance' ? 'performance' : 'data'}
     />
   );
   const live = {
     restaurantName,
     reportContent,
+    reportRefresh,
     summary: report?.summary,
     summaryFreshness: report?.report_metadata.freshness.is_stale,
     summarySource: report?.source,

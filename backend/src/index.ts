@@ -1338,7 +1338,7 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/venues/:venueId/owner-insight-actions',
     cors({
-      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) => ownerConsoleOrigin(origin, c.env),
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Authorization'],
       maxAge: 86400,
@@ -1811,11 +1811,14 @@ export function createApp(services: Dependencies = dependencies) {
   });
 
   app.get('/venues/:venueId/owner-insight-actions', async (c) => {
+    const env = c.env ?? {};
+    if (env.APP_ENV === 'production' && !ownerWorkflowAvailable(env))
+      return c.json({ error: 'not_found' }, 404);
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
       return c.json({ error: 'unauthorized' }, 401);
     }
-    const actorId = await services.verify(authorization, c.env ?? {});
+    const actorId = await services.verify(authorization, env);
     const scope = VenueScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
 
@@ -1827,12 +1830,7 @@ export function createApp(services: Dependencies = dependencies) {
     }
     if (!services.listOwnerActions) throw new AuthUnavailableError();
 
-    const result = await services.listOwnerActions(
-      actorId,
-      scope.data.venueId,
-      query.data,
-      c.env ?? {},
-    );
+    const result = await services.listOwnerActions(actorId, scope.data.venueId, query.data, env);
     return c.json(result);
   });
 
