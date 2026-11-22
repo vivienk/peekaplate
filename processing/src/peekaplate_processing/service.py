@@ -1,4 +1,4 @@
-"""Staging-only HTTP bridge to the existing local extraction pipeline.
+"""HTTP bridge to the existing local extraction pipeline.
 
 The authenticated Worker owns job authorization/leases; this process never writes
 application records. URL/text inputs must be materialized by the Worker first.
@@ -47,17 +47,29 @@ def read_result(path, limit):
 class Settings:
     secret: str
     source_origin: str
+    environment: str = "staging"
 
     @classmethod
     def from_env(cls):
-        return cls(*(os.environ.get(name, "") for name in (
-            "EXTRACTION_SERVICE_SECRET", "EXTRACTION_SOURCE_ORIGIN",
-        )))
+        return cls(
+            os.environ.get("EXTRACTION_SERVICE_SECRET", ""),
+            os.environ.get("EXTRACTION_SOURCE_ORIGIN", ""),
+            os.environ.get("EXTRACTION_ENVIRONMENT", "staging"),
+        )
 
     def validate(self):
-        if (len(self.secret) < 48 or not self.secret.isascii()
-                or self.source_origin != "https://peekaplate-extraction-staging.vxkong.workers.dev"):
-            raise ValueError("Valid staging service configuration is required.")
+        origins = {
+            "staging": "https://peekaplate-extraction-staging.vxkong.workers.dev",
+            "production": "https://extraction.peekaplate.app",
+        }
+        origin = origins.get(self.environment)
+        if (
+            not origin
+            or self.source_origin != origin
+            or len(self.secret) < 48
+            or not self.secret.isascii()
+        ):
+            raise ValueError("Valid extraction service configuration is required.")
 
 
 class ExtractRequest(BaseModel):
@@ -250,7 +262,7 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
 
     @app.get("/health")
     def health():
-        return reply({"status": "ok", "service": "menu-extraction", "environment": "staging"})
+        return reply({"status": "ok", "service": "menu-extraction", "environment": settings.environment})
 
     @app.post("/extract")
     async def extract(request: Request):

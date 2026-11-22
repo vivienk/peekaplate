@@ -5472,3 +5472,14 @@ route now uses the existing owner console origin policy for GET and OPTIONS.
 Production also requires the owner workflow flag. Bearer verification and
 restaurant owner authorization remain required. The focused CORS, service, and
 client tests passed. Hosted verification remains pending.
+
+### ERR-20261121-PORTION-001 | Production portion container rejected its production origin
+
+The Python app accepted only the staging origin, while the production Worker
+forwarded its own origin. The Worker health test mocked the container and
+missed startup validation. The app now validates the exact origin for the
+supplied environment and reports that environment in health. The production
+portion-only binding serves the existing private upload path while denying
+OCR, source and budget endpoints. The Python startup regression and Worker
+route and credential-scope tests cover the boundary. Hosted validation is
+pending.

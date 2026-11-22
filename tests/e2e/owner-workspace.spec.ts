@@ -3313,24 +3313,39 @@ test('Overview uses validated KPI cards and clears their values across restauran
       avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
     },
   };
-  let secondStarted = false;
-  let releaseSecond = () => {};
+  let venueMetric = 31;
+  let delayVenue = false;
+  let firstRequests = 0;
+  const releaseLate = Promise.withResolvers<void>();
+  const finishedLate = Promise.withResolvers<void>();
+  const secondStarted = Promise.withResolvers<void>();
+  const releaseSecond = Promise.withResolvers<void>();
   await context.route(`${api}/api/v1/venues/*/analytics/dishes*`, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
     const id = new URL(route.request().url()).pathname.split('/')[4];
-    if (id === otherVenue.venueId)
-      await new Promise<void>((resolve) => {
-        releaseSecond = resolve;
-        secondStarted = true;
+    const reportSummary = {
+      ...summary,
+      current: { ...current, menu_sessions: { value: venueMetric, status: 'NORMAL' } },
+    };
+    const late = id === venue.venueId && delayVenue;
+    if (id === venue.venueId) firstRequests++;
+    if (late) await releaseLate.promise;
+    if (id === otherVenue.venueId) {
+      secondStarted.resolve();
+      await releaseSecond.promise;
+    }
+    try {
+      await route.fulfill({
+        json: OwnerDishReportSchema.parse({
+          ...UNEEZA_REPORT,
+          venue_id: id,
+          ...(id === venue.venueId ? { summary: reportSummary } : {}),
+        }),
+        headers: { 'Access-Control-Allow-Origin': origin },
       });
-    await route.fulfill({
-      json: OwnerDishReportSchema.parse({
-        ...UNEEZA_REPORT,
-        venue_id: id,
-        ...(id === venue.venueId ? { summary } : {}),
-      }),
-      headers: { 'Access-Control-Allow-Origin': origin },
-    });
+    } finally {
+      if (late) finishedLate.resolve();
+    }
   });
   await signIn(page, undefined, false);
   await openAccount(page);
@@ -3346,17 +3361,65 @@ test('Overview uses validated KPI cards and clears their values across restauran
   await expect(cards.nth(3).locator('.v')).toHaveText('Unavailable');
   await expect(cards.nth(4).locator('.v')).toHaveText('Unavailable');
   await expect(page.getByRole('heading', { name: 'How your menu did this period' })).toBeVisible();
-  await openAccount(page);
-  await page.getByLabel('Restaurant', { exact: true }).selectOption(otherVenue.venueId);
-  await expect(cards).toHaveCount(0);
-  await page.getByRole('button', { name: 'Overview', exact: true }).click();
-  await expect.poll(() => secondStarted).toBe(true);
-  await expect(cards.nth(0).locator('.v')).toHaveText('Unavailable');
-  releaseSecond();
-  await expect(cards.nth(0).locator('.v')).toHaveText('Unavailable');
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+  await expect(refresh).toBeEnabled();
+  venueMetric = 57;
+  await refresh.click();
+  await expect(cards.nth(0).locator('.v')).toHaveText('57');
+  const requestsBeforeDelay = firstRequests;
+  venueMetric = 78;
+  delayVenue = true;
+  try {
+    await refresh.click();
+    await expect.poll(() => firstRequests).toBe(requestsBeforeDelay + 1);
+    await expect(refresh).toBeDisabled();
+    await expect(cards.nth(0).locator('.v')).toHaveText('57');
+    await openAccount(page);
+    await page.getByLabel('Restaurant', { exact: true }).selectOption(otherVenue.venueId);
+    await expect(cards).toHaveCount(0);
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await secondStarted.promise;
+    await expect(cards.nth(0).locator('.v')).toHaveText('Unavailable');
+    releaseSecond.resolve();
+    await expect(refresh).toBeEnabled();
+    releaseLate.resolve();
+    await finishedLate.promise;
+    await expect(cards.nth(0).locator('.v')).toHaveText('Unavailable');
+  } finally {
+    releaseLate.resolve();
+    releaseSecond.resolve();
+  }
   await openAccount(page);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(cards).toHaveCount(0);
+});
+
+test('Refresh report recovers an unavailable report and clears values when it becomes unavailable', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  state.reportStatus = 503;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+  await expect(refresh).toBeEnabled();
+  await expect(page.getByText('Reports aren’t available for this restaurant yet.')).toBeVisible();
+  await expect(page.getByRole('table')).toHaveCount(0);
+  state.reportStatus = 200;
+  await refresh.click();
+  await expect(page.getByRole('table').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'AI Insight Report', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Menu activity report' })).toBeVisible();
+  await expect(page.getByRole('table')).toBeVisible();
+  state.reportStatus = 503;
+  await refresh.click();
+  await expect(page.getByText('Reports aren’t available for this restaurant yet.')).toBeVisible();
+  await expect(page.getByRole('table')).toHaveCount(0);
+  await expect(refresh).toBeEnabled();
+  await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
 });
 
 test('staging creation retries the same command, opens S05 and keeps the next actor isolated', async ({

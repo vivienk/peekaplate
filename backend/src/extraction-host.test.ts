@@ -218,6 +218,31 @@ function runtime(running = false, overrides: Partial<ExtractionHostEnv> = {}) {
 }
 
 describe('production extraction host', () => {
+  it('permits private portion processing without opening the menu OCR routes', async () => {
+    const { env, request, forward } = setup();
+    env.APP_ENV = 'production';
+    env.EXTRACTION_PRODUCTION_ENABLED = 'true';
+    env.EXTRACTION_PRODUCTION_PORTION_ONLY = 'true';
+    delete env.EXTRACTION_SOURCE_SIGNING_SECRET;
+    expect((await host.fetch(request('/health'), env)).status).toBe(200);
+    expect((await host.fetch(request('/extract', secret, 'POST'), env)).status).toBe(404);
+    expect((await host.fetch(request('/budget/reserve', secret, 'POST'), env)).status).toBe(404);
+    expect((await host.fetch(request('/sources/' + tenant + '/' + job), env)).status).toBe(404);
+
+    forward.mockResolvedValueOnce(Response.json({ status: 'ready' }));
+    const photo = new Request(
+      'https://extraction.peekaplate.app/v1/portion-uploads/' + job + '/' + tenant,
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + secret, 'Content-Type': 'application/octet-stream' },
+        body: 'fictional-photo-bytes',
+      },
+    );
+    expect(await (await host.fetch(photo, env)).json()).toEqual({ status: 'ready' });
+    expect(forward).toHaveBeenCalledTimes(2);
+    expect(await forward.mock.calls[1]![0].text()).toBe('fictional-photo-bytes');
+  });
+
   it('requires activation and credentials before reaching the separate production container', async () => {
     const { env, request, forward } = setup();
     env.APP_ENV = 'production';
@@ -246,6 +271,7 @@ describe('direct Container startup', () => {
       env: {
         EXTRACTION_SERVICE_SECRET: secret,
         EXTRACTION_SOURCE_ORIGIN: 'https://peekaplate-extraction-staging.vxkong.workers.dev',
+        EXTRACTION_ENVIRONMENT: 'staging',
         PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
         U2NET_HOME: '/app/models',
       },
@@ -257,6 +283,29 @@ describe('direct Container startup', () => {
     expect(forwarded.method).toBe('POST');
     expect(await forwarded.text()).toBe('synthetic');
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts the portion-only container without provider credentials or Internet access', async () => {
+    const { actor, container } = runtime(false, {
+      APP_ENV: 'production',
+      EXTRACTION_PRODUCTION_PORTION_ONLY: 'true',
+      EXTRACTION_SOURCE_ORIGIN: 'https://extraction.peekaplate.app',
+      OCR_SPACE_API_KEY: 'synthetic-ocr-key',
+      MENU_AI_API_KEY: 'synthetic-model-key',
+    });
+    expect((await actor.fetch(new Request('https://host.invalid/health'))).status).toBe(200);
+    expect(container.start).toHaveBeenCalledWith({
+      image: container.images.base,
+      instance: 'standard-1',
+      enableInternet: false,
+      env: {
+        EXTRACTION_SERVICE_SECRET: secret,
+        EXTRACTION_SOURCE_ORIGIN: 'https://extraction.peekaplate.app',
+        EXTRACTION_ENVIRONMENT: 'production',
+        PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
+        U2NET_HOME: '/app/models',
+      },
+    });
   });
 
   it('forwards only configured provider settings without logging credentials', async () => {
@@ -294,6 +343,7 @@ describe('direct Container startup', () => {
         env: {
           EXTRACTION_SERVICE_SECRET: secret,
           EXTRACTION_SOURCE_ORIGIN: 'https://peekaplate-extraction-staging.vxkong.workers.dev',
+          EXTRACTION_ENVIRONMENT: 'staging',
           PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
           U2NET_HOME: '/app/models',
           ...settings,
@@ -319,6 +369,7 @@ describe('direct Container startup', () => {
       env: {
         EXTRACTION_SERVICE_SECRET: secret,
         EXTRACTION_SOURCE_ORIGIN: 'https://peekaplate-extraction-staging.vxkong.workers.dev',
+        EXTRACTION_ENVIRONMENT: 'staging',
         PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
         U2NET_HOME: '/app/models',
       },

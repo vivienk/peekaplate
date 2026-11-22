@@ -59,6 +59,7 @@ export interface LiveDashboardInput {
   restaurantName: string;
   period?: string | undefined;
   reportContent?: ReactNode;
+  reportRefresh?: ReactNode;
   summary?: OwnerDishReport['summary'];
   summaryFreshness?: boolean | null | undefined;
   summarySource?: OwnerDishReport['source'] | undefined;
@@ -216,6 +217,7 @@ export function Overview({
       <div className="pagehead">
         <span className="eyebrow">Overview · {live ? live.restaurantName : REST.period}</span>
         <h1>{live ? 'How your menu did this period' : 'How your menu did this week'}</h1>
+        {live?.reportRefresh}
       </div>
       {empty && (
         <Note icon="info">
@@ -610,6 +612,7 @@ export function Report({
             Why am I seeing this?
           </Btn>
         </div>
+        {live?.reportRefresh}
         {why &&
           (live ? (
             <div className="ins-box" role="region" aria-label="Why am I seeing this?">
@@ -1464,6 +1467,7 @@ function PerfFrame({
   summary,
   table,
   notice,
+  headerAction,
   q,
   setQ,
   tab,
@@ -1476,6 +1480,7 @@ function PerfFrame({
   summary: ReactNode;
   table: ReactNode;
   notice?: ReactNode;
+  headerAction?: ReactNode;
   q: string;
   setQ: (value: string) => void;
   tab: string;
@@ -1489,6 +1494,7 @@ function PerfFrame({
         <span className="eyebrow">Dish performance · {period}</span>
         <h1>What diners did with each dish</h1>
         <p className="lede">{description}</p>
+        {headerAction}
       </div>
       {notice}
       <section className="card" aria-labelledby="ad-h">
@@ -1552,6 +1558,7 @@ export function LivePerf({
   period,
   summary,
   notice,
+  headerAction,
   columns,
   display,
 }: {
@@ -1559,6 +1566,7 @@ export function LivePerf({
   period: string;
   summary: ReactNode;
   notice: ReactNode;
+  headerAction?: ReactNode;
   columns: [
     keyof OwnerDishReport['dishes'][number]['metrics'],
     string,
@@ -1627,6 +1635,7 @@ export function LivePerf({
         </>
       }
       notice={notice}
+      headerAction={headerAction}
       q={q}
       setQ={setQ}
       tab={tab}
