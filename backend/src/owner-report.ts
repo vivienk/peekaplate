@@ -366,7 +366,13 @@ const OWNER_REPORT_QUERY = `
     SELECT
       openings.dish_id,
       COUNT(*) AS total_openings,
-      COUNT(*) FILTER (WHERE openings.has_final_checkpoint) AS timed_openings
+      COUNT(*) FILTER (WHERE openings.has_final_checkpoint) AS timed_openings,
+      COUNT(DISTINCT openings.session_id) FILTER (
+        WHERE openings.has_final_checkpoint
+      ) AS timed_opening_sessions,
+      COUNT(DISTINCT openings.session_id) FILTER (
+        WHERE NOT openings.has_final_checkpoint
+      ) AS untimed_opening_sessions
     FROM opening_metrics openings
     GROUP BY openings.dish_id
   )
@@ -374,7 +380,9 @@ const OWNER_REPORT_QUERY = `
     metrics.*,
     timing.average_active_seconds,
     coverage.total_openings,
-    coverage.timed_openings
+    coverage.timed_openings,
+    coverage.timed_opening_sessions,
+    coverage.untimed_opening_sessions
   FROM dish_metrics metrics
   LEFT JOIN timing_metrics timing USING (dish_id)
   LEFT JOIN opening_coverage_metrics coverage USING (dish_id);
@@ -487,6 +495,11 @@ function buildInternalReport(
       const openEligibleSessions = Number(row.open_eligible_sessions);
       const timedSessions = Number(row.timed_sessions);
       const belowDishFloor = totalSessions < 10;
+      const coverageHasSmallSessionGroup =
+        isBatch &&
+        [row.timed_opening_sessions, row.untimed_opening_sessions]
+          .map(Number)
+          .some((count) => count > 0 && count < 10);
 
       return {
         dish_id: row.dish_id,
@@ -505,7 +518,7 @@ function buildInternalReport(
           timing_coverage: rateMetric(
             Number(row.timed_openings),
             Number(row.total_openings),
-            belowDishFloor,
+            belowDishFloor || coverageHasSmallSessionGroup,
             openEligibleSessions,
             isBatch,
           ),

@@ -205,7 +205,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
                 payload: {
                   ...dish,
                   save_origin: 'direct',
-                  save_surface: 'menu_list',
+                  save_surface: 'menu_card',
                   shortlist_size: 1,
                 },
               },

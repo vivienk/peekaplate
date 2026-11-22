@@ -5514,3 +5514,8 @@ decoder supplies `ignoreBOM`, and unavailable production evidence uses `AuthUnav
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-22T05:52:18.337Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-22T06:00:05.014Z","exitCode":1}
+```
