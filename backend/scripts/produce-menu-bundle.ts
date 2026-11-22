@@ -3,12 +3,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import pg from 'pg';
-import { writeHandoffImmutable } from '../src/bundle-producer/handoff-file';
 import {
   type PreparedPortionFile,
   prepareApprovedPortion,
   verifyHostedPortionFiles,
 } from '../src/bundle-producer/approved-portions';
+import { writeHandoffImmutable } from '../src/bundle-producer/handoff-file';
 import {
   BundleProducerError,
   produceMenuBundle,
