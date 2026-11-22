@@ -30,9 +30,7 @@ function isCompatibleHandoff(value: unknown, expected: HandoffFile): boolean {
 
   if ('diagnostics' in actual && !Array.isArray(actual.diagnostics)) return false;
 
-  return REQUIRED_FIELDS.every(
-    (field) => actual[field] === expected[field],
-  );
+  return REQUIRED_FIELDS.every((field) => actual[field] === expected[field]);
 }
 
 export async function writeHandoffImmutable(path: string, handoff: HandoffFile) {
@@ -53,7 +51,9 @@ export async function writeHandoffImmutable(path: string, handoff: HandoffFile) 
     }
 
     if (!isCompatibleHandoff(existing, handoff)) {
-      throw new Error(`${path} already exists with different handoff metadata; refusing to overwrite`);
+      throw new Error(
+        `${path} already exists with different handoff metadata; refusing to overwrite`,
+      );
     }
   }
 }

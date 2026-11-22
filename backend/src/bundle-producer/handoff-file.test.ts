@@ -45,10 +45,7 @@ describe('writeHandoffImmutable', () => {
 
   it('accepts an existing handoff when only diagnostics differ', async () => {
     await withHandoffFile(async (path) => {
-      await writeFile(
-        path,
-        `${JSON.stringify({ ...handoff, diagnostics: [] }, null, 2)}\n`,
-      );
+      await writeFile(path, `${JSON.stringify({ ...handoff, diagnostics: [] }, null, 2)}\n`);
 
       await expect(writeHandoffImmutable(path, handoff)).resolves.toBeUndefined();
     });

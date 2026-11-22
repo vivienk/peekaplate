@@ -803,7 +803,9 @@ it('uses the approved unavailable allergen declaration over a requested empty li
     assets(),
   );
 
-  expect(dishes(result).find((dish) => dish.dish_id === CHICKEN)?.allergens).toBeNull();
+  expect(dishes(result).find((dish) => dish.dish_id === CHICKEN)).toMatchObject({
+    allergens: null,
+  });
   expect(result.diagnostics).toContainEqual({
     dishId: CHICKEN,
     code: 'allergens_unreviewed',
@@ -817,7 +819,9 @@ it('uses the approved empty allergen declaration over a requested null value', a
     assets(),
   );
 
-  expect(dishes(result).find((dish) => dish.dish_id === CHICKEN)?.allergens).toEqual([]);
+  expect(dishes(result).find((dish) => dish.dish_id === CHICKEN)).toMatchObject({
+    allergens: [],
+  });
   expect(result.diagnostics).not.toContainEqual({
     dishId: CHICKEN,
     code: 'allergens_unreviewed',
