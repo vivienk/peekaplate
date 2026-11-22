@@ -714,6 +714,7 @@ function LiveDashboardReport({
   const reportRefresh =
     state.kind === 'ready' ||
     state.kind === 'unavailable' ||
+    state.kind === 'invalid' ||
     (page === 'overview' && state.kind === 'error') ? (
       <div className="row">
         <Btn type="button" size="md" onClick={retry} disabled={refreshing}>

@@ -3422,6 +3422,48 @@ test('Refresh report recovers an unavailable report and clears values when it be
   await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
 });
 
+test('Refresh report rejects a wrong-venue response and recovers with the correct venue', async ({
+  context,
+  page,
+}) => {
+  await fixture(context, true);
+  let reportVenueId = venue.venueId;
+  let dishName = 'Initial report bowl';
+  await context.route(`${api}/api/v1/venues/${venue.venueId}/analytics/dishes*`, (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({
+          json: {
+            ...UNEEZA_REPORT,
+            venue_id: reportVenueId,
+            dishes: UNEEZA_REPORT.dishes.map((dish, index) =>
+              index === 0 ? { ...dish, name: dishName } : dish,
+            ),
+          },
+          headers: { 'Access-Control-Allow-Origin': origin },
+        })
+      : route.fallback(),
+  );
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const table = page.getByRole('table').first();
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+  await expect(table).toContainText('Initial report bowl');
+
+  reportVenueId = otherVenue.venueId;
+  dishName = 'Other venue bowl';
+  await refresh.click();
+  await expect(page.getByText('We couldn’t verify this report, so it isn’t shown.')).toBeVisible();
+  await expect(table).toHaveCount(0);
+  await expect(page.getByText('Other venue bowl', { exact: true })).toHaveCount(0);
+  await expect(refresh).toBeEnabled();
+
+  reportVenueId = venue.venueId;
+  dishName = 'Refreshed report bowl';
+  await refresh.click();
+  await expect(table).toContainText('Refreshed report bowl');
+  await expect(table).not.toContainText('Initial report bowl');
+});
+
 test('staging creation retries the same command, opens S05 and keeps the next actor isolated', async ({
   context,
   page,
