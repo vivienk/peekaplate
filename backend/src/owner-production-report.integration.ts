@@ -13,6 +13,7 @@ import { FakeR2ArchiveStorage } from './consumer/r2-storage';
 import { createDishRevision } from './dish-command';
 import { createApp } from './index';
 import { bundleKey, PREPARED_BUNDLE_PATH } from './owner-prepare';
+import { readOwnerReportDisplayActions } from './owner-report-display-actions';
 import type { LivePostHogOwnerEvent } from './owner-report-posthog';
 import { approveMenuRevision, publishMenu } from './publication-command';
 
@@ -242,6 +243,132 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       }
       return evidence;
     }
+
+    it('counts only approved 2.5D renders and deduplicates comparison pairs within a start', async () => {
+      const venue = await createVenue('Display action fixture');
+      const anchor = { id: venue.dishId, revision: venue.dishRevisionId, has_portion: true };
+      const sideA = { id: crypto.randomUUID(), revision: crypto.randomUUID(), has_portion: false };
+      const sideB = { id: crypto.randomUUID(), revision: crypto.randomUUID(), has_portion: false };
+      const published = { publicationId: venue.publicationId, dishes: [anchor, sideA, sideB] };
+      const events: LivePostHogOwnerEvent[] = [];
+      const add = async (
+        eventType: 'dish_portion_opened' | 'dish_compared',
+        payload: Record<string, unknown>,
+        sessionId: string,
+        corroborated = true,
+      ) => {
+        const eventId = crypto.randomUUID();
+        const result = await consumer.processMessage(
+          ObservationQueueMessageSchema.parse({
+            kind: 'observation.v2',
+            tenantId: venue.venueId,
+            eventId,
+            sessionId,
+            producerId: crypto.randomUUID(),
+            localSequence: 1,
+            schemaVersion: 'observation.v2',
+            authorizedPublicationId: venue.publicationId,
+            occurredAt: today,
+            firstReceivedAt: today,
+            type: eventType,
+            payload,
+            traffic_class: 'live',
+            sourceEnvironment: 'production',
+          }),
+        );
+        expect(result).toEqual({ status: 'acknowledged', reason: 'persisted' });
+        if (corroborated) events.push({ eventId, publicationId: venue.publicationId, eventType });
+      };
+      const portion = { dish_id: anchor.id, dish_revision_id: anchor.revision };
+      for (let index = 0; index < 10; index++) {
+        const sessionId = crypto.randomUUID();
+        const comparison_id = crypto.randomUUID();
+        await add('dish_portion_opened', portion, sessionId);
+        for (const entry of [sideA, sideB]) {
+          await add(
+            'dish_compared',
+            {
+              ...portion,
+              other_dish_id: entry.id,
+              other_dish_revision_id: entry.revision,
+              comparison_id,
+              compare_action: 'start',
+              save_available: true,
+            },
+            sessionId,
+          );
+        }
+        await add(
+          'dish_compared',
+          {
+            ...portion,
+            other_dish_id: sideA.id,
+            other_dish_revision_id: sideA.revision,
+            comparison_id,
+            compare_action: 'replace',
+            save_available: true,
+          },
+          sessionId,
+        );
+      }
+      await add('dish_portion_opened', portion, crypto.randomUUID(), false);
+      await add(
+        'dish_portion_opened',
+        {
+          dish_id: anchor.id,
+          dish_revision_id: crypto.randomUUID(),
+        },
+        crypto.randomUUID(),
+      );
+      await add(
+        'dish_portion_opened',
+        {
+          dish_id: sideA.id,
+          dish_revision_id: sideA.revision,
+        },
+        crypto.randomUUID(),
+      );
+
+      await runtime.query('BEGIN READ ONLY');
+      try {
+        await runtime.query("SELECT set_config('app.tenant_id', $1, true)", [venue.venueId]);
+        const result = await readOwnerReportDisplayActions(
+          runtime,
+          venue.venueId,
+          new Date(today),
+          new Date(latestEnd),
+          { start: new Date(today), events, publications: [published] },
+        );
+        const observed = { value: 10, status: 'NORMAL' };
+        expect(result.portionTotal).toEqual(observed);
+        expect(result.byDish.get(anchor.id)).toEqual({
+          comparisons_started: observed,
+          portion_previews_shown: observed,
+        });
+        expect(result.byDish.get(sideA.id)).toEqual({ comparisons_started: observed });
+        expect(result.byDish.get(sideB.id)).toEqual({ comparisons_started: observed });
+        const smallComplement = await readOwnerReportDisplayActions(
+          runtime,
+          venue.venueId,
+          new Date(today),
+          new Date(latestEnd),
+          {
+            start: new Date(today),
+            events,
+            publications: [
+              {
+                ...published,
+                dishes: [anchor, { ...sideA, has_portion: true }, sideB],
+              },
+            ],
+          },
+        );
+        expect(smallComplement.portionTotal).toEqual({ value: null, status: 'SUPPRESSED' });
+        expect(smallComplement.byDish.get(anchor.id)?.portion_previews_shown).toEqual(observed);
+      } finally {
+        await runtime.query('ROLLBACK');
+      }
+    });
 
     it('seals matching production batches, uses canonical previous UTC data, and isolates two restaurants', async () => {
       const venue = await createVenue('Production report fixture');

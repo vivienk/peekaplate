@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "605303da11583eff9d2e3ac76197f8f8210c80eb571ba5c8a0f42f8c40c66d1a"
+      "sourceFingerprint": "64e593bf2c6a4472c2b5faa39e2aeab6c2a6d6cf98a9ef9a7d9f2d78338cc4e4"
     },
     {
       "id": "tokens",
@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1c513e3e0f73197bd034faa6b999bc5e2bb70691f6f3433b332949cd7af0696e"
+      "sourceFingerprint": "4c26582440e12ae2e346a2b85909da6a604f657356d62d683b08661815fa395f"
     },
     {
       "id": "backend",
@@ -507,6 +507,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-report.test.ts",
         "backend/src/owner-report.ts",
         "backend/src/owner-report-evidence.ts",
+        "backend/src/owner-report-display-actions.ts",
         "backend/src/owner-report-batches.ts",
         "backend/src/owner-report-publications.ts",
         "backend/src/owner-report-posthog.ts",
@@ -746,7 +747,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "860e07e96c73ac0cbd3b96003e1960b82ca169f50f4a03754cf421a8f001f244"
+      "sourceFingerprint": "2e627e6f53ac128aa6b2c3b5a6e6a588f8409952bbd4ec05cac87ed93f12b9e5"
     },
     {
       "id": "database",
@@ -909,7 +910,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "f8e957ac13fe958f3a04711f4550ac94cc5840c7dbf8dd3635a3bc9aaf4ca3ee"
+      "sourceFingerprint": "d6906d228b4a13ba79f66fabc2a466fa8ea2d50371b9010fba6ddb675ea3db8d"
     },
     {
       "id": "agents",
@@ -1267,7 +1268,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database",
         "delivery"
       ],
-      "summary": "Production reports use fixed five-minute UTC batches sealed once in the private bucket. The reader requires owner membership, attested production facts, verified approvals and exact PostHog matches for same-day events. Earlier UTC batches use canonical Supabase. Proposed ADR 0018 permits venue-wide visit and open totals down to one while dish rates and timing retain their floors. Production activation and AI remain gated.",
+      "summary": "Production reports seal five-minute UTC batches from attested canonical facts and exact same-day PostHog matches. Dish performance uses real exposure, timing, save and engagement measures. New batches can show qualifying 2.5D renders and comparison starts from verified publication revisions. Venue visits and opens can start at one; dish metrics and display-action counts retain their floors. Verified orders lack linked evidence.",
       "files": [
         "docs/production-release.md",
         "docs/adr/0017-production-owner-report-sources.md",

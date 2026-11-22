@@ -728,6 +728,7 @@ function LiveDashboardReport({
   const reportContent = (
     <ReportView
       state={state}
+      savedMenu={menu}
       onRetry={retry}
       refreshing={refreshing}
       refreshControl={page === 'performance' ? reportRefresh : undefined}

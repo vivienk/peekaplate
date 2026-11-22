@@ -12,6 +12,8 @@ Allow exact venue-wide counts of captured menu sessions and rendered dish opens,
 
 Retain suppression for dish-level counts, rates, timing, and their small complements. Do not return raw observations, identifiers, or an individual activity timeline. Comparison, 2.5D and order measures without supported evidence remain unavailable. The earlier staging and local contracts retain their existing floors.
 
+Supported 2.5D preview counts use only rendered, non-sample previews for the exact approved publication dish revision. Comparisons started count the distinct rendered start involving each dish; two pair events in a three-dish comparison and a replacement reuse one start. Each displayed count requires ten distinct contributing sessions. Suppress the restaurant preview total when a contributing dish group is protected. Order counts require separately verified POS or ticket linkage.
+
 ## Consequences
 
 A five-minute total can reveal that a visit happened. An owner who knows who was present may infer which visit contributed. Keep intervals fixed and adjacent. Do not combine the exception with arbitrary date filters, narrower drill-downs, a mutable live counter, or AI input. Record data/product approval before setting the production reporting flag.

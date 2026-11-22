@@ -5519,3 +5519,23 @@ decoder supplies `ignoreBOM`, and unavailable production evidence uses `AuthUnav
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-22T06:00:05.014Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-22T06:32:07.207Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-22T06:33:42.669Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-22T06:36:06.883Z","exitCode":2}
+```
+
+The display-action count fields widened the legacy metric object with optional values, and the
+metric-description map supplied an optional prop to the chart. Own display-action counts in an
+optional sidecar on each production dish row and supply a complete set of metric descriptions.
+The contract checks and production deep-link browser test cover the changed fields and chart cells.
