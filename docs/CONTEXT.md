@@ -834,12 +834,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "backend"
       ],
-      "sourceFingerprint": "f7d3271c08362f59fea15fc9b529aab38f6531c3b1c826de480a1763727ca96e"
+      "sourceFingerprint": "29fc4d529dbe7e1b30ac06191be7adb6a0996482edea828a0147bbde7b35c196"
     },
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending. The production preparation uses separate Pages, Queues and R2 configuration during the Meta freeze. Production database provisioning, domain cutover and hosted acceptance remain pending. Production portion rollout requires the exact reviewed container, private production storage, custom domain and a paired dedicated API binding. Production reporting remains gated on verified provenance and disclosure.",
+      "summary": "The required CI gate checks each selected database and parallel browser job. Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending. The production preparation uses separate Pages, Queues and R2 configuration during the Meta freeze. Production database provisioning, domain cutover and hosted acceptance remain pending. Production portion rollout requires the exact reviewed container, private production storage, custom domain and a paired dedicated API binding. Production reporting remains gated on verified provenance and disclosure.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -909,7 +909,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "f8e957ac13fe958f3a04711f4550ac94cc5840c7dbf8dd3635a3bc9aaf4ca3ee"
+      "sourceFingerprint": "8b426b7de84ac5fcedb6bad07f5739290447e6d7c2c698f205dc839323eeaf6e"
     },
     {
       "id": "agents",
@@ -1147,25 +1147,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "backend",
         "console",
-        "processing",
-        "database",
-        "delivery"
-      ],
-      "summary": "Focused owner retest release reuses merged screens, main-only performance/camera/error fixes and existing portion producer. Corrects USD default, S10 wrapping, verified-menu navigation, real report/action wiring, same-window AI reference and private CPU portion generation through publication. Synthetic report facts remain isolated; unknown freshness still abstains.",
-      "files": [
-        "docs/owner-flow-retest.md",
-        "docs/screen9-portion-publish.md",
-        "backend/src/owner-prepare.ts",
-        "backend/src/extraction-host.ts",
-        "frontend/console/src/owner/OwnerWorkspace.tsx"
-      ],
-      "next": "PR223 is merged and deployed; hosted portion testing exposed unsupported Worker redirect:error. The narrow correction uses manual redirect handling with unchanged non-OK rejection and actual-function workerd regression evidence. Deploy the corrected exact-main release and finish authenticated portion/publication screenshots. AI secret provisioning still awaits the protected environment reviewer; unknown freshness abstains. Preserve Poulet drafts and accounts; no new OCR/provider call or physical-scale claim."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console",
         "diner",
         "contracts",
         "delivery"
@@ -1295,6 +1276,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/production-release.md"
       ],
       "next": "Review the pinned PR and verify an exact production-only release. Reporting activation remains subject to publication provenance, historical isolation, and repeated-release disclosure checks."
+    },
+    {
+      "date": "2026-11-21",
+      "modules": [
+        "delivery"
+      ],
+      "summary": "Run the eight existing Playwright suite invocations across three parallel jobs. Share the seven regular suites with local verification and include owner AI inputs and portion fixtures in path selection. Require each selected lane to pass before the stable ci check can pass.",
+      "files": [
+        ".github/workflows/ci.yml",
+        "package.json",
+        "scripts/verify.mjs"
+      ],
+      "next": "Check the first hosted run for lane results and compare its elapsed time with the prior serial browser job."
     }
   ]
 }
