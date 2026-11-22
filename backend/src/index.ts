@@ -1563,9 +1563,6 @@ export function createApp(services: Dependencies = dependencies) {
     if (env.OWNER_AI_RESPONSES_ENABLED === 'true' && env.OWNER_AI_REPORT_REFERENCE_SECRET) {
       try {
         const parsedReport = OwnerDishReportSchema.parse(report);
-        // Production batches do not issue rolling-window AI references.
-        if (parsedReport.report_metadata.calculation_version === 'production.batch.v1')
-          return c.json(responseReport);
         const reference = await mintOwnerReportReference(
           parsedReport,
           { actorId, venueId },

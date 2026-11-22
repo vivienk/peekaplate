@@ -5544,3 +5544,12 @@ The first backward-compatible projection returned before legacy report reference
 Keep the reference path and project only the response. The owner AI report-reference regression
 test covers non-batch reports. The production database fixture verifies that a disabled compatible
 Worker can still read a sealed batch and return its original fields.
+
+## Production question box cannot submit a completed batch
+
+Production report reads skipped reference issuance for completed batches. The signer's rolling
+window check also required the report end time to equal request time. A signed-in owner could
+therefore not send the question even with the UI and API flags configured. Use the report reader's
+completed-batch calculation when signing, preserve the request anchor across the next batch
+boundary and keep unknown freshness gated. The report reference and production browser tests
+cover the signed submission and the empty-report state.

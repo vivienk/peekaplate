@@ -936,6 +936,7 @@ function LiveAiPanel({
 }) {
   const ids = useId();
   const dishes = report.dishes;
+  const production = report.source === 'production';
   const [picked, setPicked] = useState('');
   const [goal, setGoal] = useState<OwnerAnalysisRequest['goal']>('menu');
   const [question, setQuestion] = useState('');
@@ -964,7 +965,15 @@ function LiveAiPanel({
 
   async function ask(event: FormEvent) {
     event.preventDefault();
-    if (!dishId || !reportReference || pending.current) return;
+    if (pending.current) return;
+    if (!dishId) {
+      if (production) setQuestionError('There are no dishes with report data in this period.');
+      return;
+    }
+    if (!reportReference) {
+      if (production) setReply({ kind: 'reference_error', scope });
+      return;
+    }
     if (!requestGoal) {
       setQuestionError(
         'Use the focus menu or type “Dish engagement”, “Menu presentation”, “Dish saves”, or “Customer retention”. The review uses the displayed dish and report period.',
@@ -1138,7 +1147,7 @@ function LiveAiPanel({
             setReply(null);
           }}
           placeholder="Type a review focus, e.g. Dish engagement"
-          disabled={dishes.length === 0}
+          disabled={!production && dishes.length === 0}
         />
         {questionError && (
           <p className="owner-ai__error" role="alert">
@@ -1184,7 +1193,7 @@ function LiveAiPanel({
           <button
             type="submit"
             className="owner-ai__send"
-            disabled={busy || dishes.length === 0 || !reportReference}
+            disabled={busy || (!production && (dishes.length === 0 || !reportReference))}
             aria-label="Review report"
           >
             <Icon name="send" size={18} />

@@ -6,14 +6,17 @@ export const OWNER_BATCH_MS = 5 * 60_000;
 export const OWNER_BATCH_SETTLE_MS = 60_000;
 const MAX_REPORT_BYTES = 2_000_000;
 
+export function latestOwnerReportBatchEnd(now: Date): number {
+  return Math.floor((now.getTime() - OWNER_BATCH_SETTLE_MS) / OWNER_BATCH_MS) * OWNER_BATCH_MS;
+}
+
 export async function readBatchedOwnerReport(
   venueId: string,
   now: Date,
   storage: PreparedStorage,
   measure: (end: Date) => Promise<OwnerDishReport>,
 ): Promise<OwnerDishReport> {
-  const lastEnd =
-    Math.floor((now.getTime() - OWNER_BATCH_SETTLE_MS) / OWNER_BATCH_MS) * OWNER_BATCH_MS;
+  const lastEnd = latestOwnerReportBatchEnd(now);
   const current = await readOrSeal(lastEnd);
   const previous = await readOrSeal(lastEnd - OWNER_BATCH_MS);
   if (!current.summary || !previous.summary) throw new AuthUnavailableError();

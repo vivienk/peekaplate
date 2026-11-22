@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "bdf3769afd29dc1c39a50965ed8780690091bc6e0261f47c81ef4471cd3de89c"
+      "sourceFingerprint": "740140a58afa303711664e905845ce1770665ff6cbbc8dd6bdb8263376d97e38"
     },
     {
       "id": "backend",
@@ -747,7 +747,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "7fd425d3364b69c5a9e6036d0a585f681dfd6a41a62b51a8edfd7472d74eb32d"
+      "sourceFingerprint": "a97613088c4db2a48ec6f4c05af31ef8ae90113b97e99991addbad599fb255d6"
     },
     {
       "id": "database",
@@ -910,7 +910,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "719fbf1b91721b64a187f3a47f6066368cdf6b1b0101642cf78a49f6df9bb145"
+      "sourceFingerprint": "220fd2243d5e8e0beb0e00d40c1cfdba30df0192b7adfc1d3ee804ed86e3e1c3"
     },
     {
       "id": "agents",
@@ -1146,23 +1146,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-17",
       "modules": [
-        "backend",
-        "console",
-        "diner",
-        "contracts",
-        "delivery"
-      ],
-      "summary": "Reconcile main release fixes with develop without removing comparison, order-ingestion, ingredient-intelligence or QA tooling. Preserve deployed S09/performance/portion fixes and both regression suites.",
-      "files": [
-        "docs/owner-flow-retest.md",
-        "frontend/console/src/owner-dashboard/DishFormView.tsx",
-        "frontend/diner/src/menu/portionAssets.ts"
-      ],
-      "next": "Finish source-backed ingredient proposals, consent visibility and legitimate AI configuration; test before promoting only the intended staging changes."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
         "console",
         "contracts"
       ],
@@ -1291,6 +1274,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-auth-provider.spec.ts"
       ],
       "next": "Verify auth fixture teardown in hosted CI and compare the three jobs' elapsed time with the prior serial browser job."
+    },
+    {
+      "date": "2026-11-22",
+      "modules": [
+        "backend",
+        "console",
+        "delivery"
+      ],
+      "summary": "Allow dashboard questions for the exact sealed production report batch. Preserve signed scope, current membership, report privacy and the unknown-freshness abstention. The empty report composer explains why there is no dish to analyse.",
+      "files": [
+        "backend/src/owner-ai/report-reference.ts",
+        "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "docs/production-release.md"
+      ],
+      "next": "Release the approved production API and console with their dashboard AI flags enabled, then verify one signed-in report question."
     }
   ]
 }
