@@ -1,13 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { renderDishDetail } from './dishDetail';
+import { describe, expect, it, vi } from 'vitest';
+import { allergenChips, dietaryChips, renderDishDetail } from './dishDetail';
 import type { CompleteDish } from './types';
 
 const NOTE = 'For allergy questions, please ask the restaurant staff.';
 
-const render = (allergens: string[]): string => {
+const render = (allergens: string[], name = 'Leaf', icons: unknown[] = []): string => {
   const container = {
     innerHTML: '',
     querySelector: () => null,
+    querySelectorAll: () => icons,
   } as unknown as HTMLElement;
   renderDishDetail(
     container,
@@ -20,7 +21,7 @@ const render = (allergens: string[]): string => {
       name: 'Dish',
       description: 'Desc',
       price: { amount: '1.00', currency: 'USD' },
-      ingredients: [{ ingredientId: 'i', name: 'Leaf', description: null }],
+      ingredients: [{ ingredientId: 'i', name, description: null }],
       allergens,
       dietary: [],
       images: null,
@@ -33,6 +34,48 @@ const render = (allergens: string[]): string => {
 const count = (html: string) => html.split(NOTE).length - 1;
 
 describe('dish detail allergen note', () => {
+  it('keeps the original decorative icons alongside confirmed allergen and dietary labels', () => {
+    const dish = { allergens: ['Wheat'], dietary: ['Vegetarian'] } as CompleteDish;
+    for (const html of [allergenChips(dish), dietaryChips(dish)]) {
+      expect(html).toContain('class="pp-chip__icon"');
+      expect(html).toContain('alt="" aria-hidden="true" width="16" height="16"');
+    }
+    expect(allergenChips({ allergens: [] } as unknown as CompleteDish)).toBe('');
+    expect(dietaryChips({ dietary: [] } as unknown as CompleteDish)).toBe('');
+  });
+  it('renders Figma decoration with its visible ingredient label', () => {
+    const html = render([], 'Avocado');
+    expect(html).toContain('class="pp-ingredient__icon"');
+    expect(html).toContain('alt="" aria-hidden="true"');
+    expect(html).toContain('class="pp-ingredient__name">Avocado</p>');
+  });
+
+  it('retains text for missing or unreviewed generated art and escapes labels', () => {
+    expect(render([], 'Coconut')).toContain('class="pp-ingredient__icon"');
+    expect(render([], 'Coconut')).toContain('class="pp-ingredient__name">Coconut</p>');
+    expect(render([], '<img onerror="x">')).toContain('&lt;img onerror=&quot;x&quot;&gt;');
+  });
+
+  it('removes failed images without removing the label', () => {
+    const remove = vi.fn();
+    const handlers: Record<string, () => void> = {};
+    const html = render([], 'Avocado', [
+      {
+        complete: false,
+        naturalWidth: 0,
+        remove,
+        addEventListener: (name: string, callback: () => void) => {
+          handlers[name] = callback;
+        },
+      },
+    ]);
+    if (!handlers.error) throw new Error('Missing image error handler');
+    handlers.error();
+    expect(remove).toHaveBeenCalledOnce();
+    expect(html).toContain('class="pp-ingredient__name">Avocado</p>');
+    render([], 'Avocado', [{ complete: true, naturalWidth: 0, remove, addEventListener: vi.fn() }]);
+    expect(remove).toHaveBeenCalledTimes(2);
+  });
   it('shows the note once, under Contains, when no allergens are confirmed', () => {
     const html = render([]);
     expect(count(html)).toBe(1);

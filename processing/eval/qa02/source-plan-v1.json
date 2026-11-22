@@ -1,0 +1,484 @@
+{
+  "schema_version": "qa02.source-plan.v1",
+  "plan_version": "qa02-real-menu-source-plan/1.0.0-proposed",
+  "status": "PROPOSED — NOT APPROVED",
+  "created_at_utc": "2026-11-14T20:52:13Z",
+  "kind": "source/page split and custody proposal; metadata only; NOT gold answers",
+  "not_a_manifest": "This file is a source-selection proposal, not qa02.manifest.v1. Selected cases become a qa02.manifest.v1 only through a separate reviewed PR169 reference freeze. Do not consume this JSON as a manifest.",
+  "not_gold": "No reference answers, expected dish counts, labels, transcriptions or predictions are contained here. Source-only human annotation, independent review and freeze are separate gates.",
+  "public_metadata_policy": "Only source names, IDs, public URLs, SHA-256 values, byte sizes, page counts, dimensions, declared routes, provenance dates, known exposure and status are published. No menu text, dish names, prices, labels, predictions, personal filesystem paths or raw HTTP headers.",
+  "prepared_by": "SourceScorerHandoffDocs worker agent for Main",
+  "scope": {
+    "purpose": "Bound the initial development set, list development stress/reserve sources, and propose two new metadata-only CANDIDATE held-out PDFs with exact bytes, hashes, official URLs and declared intake routes.",
+    "owns": [
+      "docs/qa02-real-menu-source-plan-v1.md",
+      "processing/eval/qa02/source-plan-v1.json",
+      "processing/eval/qa02/STRICT_SCORER.md"
+    ],
+    "not_owned_or_changed": [
+      "docs/qa02-strict-scorer-spec.md",
+      "docs/CONTEXT.md",
+      "docs/README.md",
+      "processing/README.md",
+      "errors.md",
+      "existing QA-02 source/reference manifests and tests",
+      "qa02_strict_score implementation (owned by the parent builder/integration owner)",
+      "scorer commit, commands, thresholds, evaluation results and publication"
+    ]
+  },
+  "pilot_totals": {
+    "sources": 6,
+    "selected_pages": 9,
+    "development_sources": 4,
+    "development_selected_pages": 5,
+    "candidate_holdout_sources": 2,
+    "candidate_holdout_selected_pages": 4,
+    "route_coverage": {
+      "image": ["dev-galaxie-photo-p1", "dev-casa-photo-p1"],
+      "pdf": [
+        "dev-panania-pdf-all-2-pages",
+        "dev-twin-city-pdf-all-1-page",
+        "candidate-A-dipaolos"
+      ],
+      "url": ["candidate-B-bluestone"]
+    },
+    "coverage_limit": "The six-source/nine-page overall pilot spans photo, PDF and URL routes. Candidate held-outs are two PDF families/four pages with no unseen photo source. Reviewers must decide the applicable population and eligible-fact minimums under the existing rubric; this proposal makes no statistical-power or held-out acceptance claim."
+  },
+  "development": {
+    "status": "DEVELOPMENT — previously inspected, collected or exposed; none may be promoted to holdout",
+    "initial_set": [
+      {
+        "id": "dev-galaxie-photo-p1",
+        "source_name": "Galaxie Diner",
+        "source_family": "galaxie-diner / original camera photo (user-supplied)",
+        "source_type": "photo",
+        "input_route": "image",
+        "filename": "img1_galaxie_diner_phone.jpg",
+        "sha256": "922858bf17dfbc9b5b330eec23c4a59cf48c47e83de9ddae3b01d0e2f9586f7b",
+        "bytes": 3573722,
+        "page_count": 1,
+        "pages_selected": "page 1 of 1 (single image frame; complete source)",
+        "dimensions_px": "2448x3264",
+        "format": "JPEG/JFIF baseline with EXIF",
+        "public_url": null,
+        "acquisition_note": "Original acquisition URL/date not recorded in the existing source inventory; user-supplied original held in the existing private source folder.",
+        "known_exposure": "Previously rendered/inspected and included in historical extraction runs (Galaxie17 saved candidates; 95 Galaxie/Casa candidates).",
+        "rights_status": "User-provided private original; no redistribution licence recorded. Private evaluation only; no upload or permission change.",
+        "currency_assumption": "Unknown. No printed-currency claim is made and AUD must not be assumed.",
+        "reference_status": "NOT GOLD — not human-reviewed; no reference has been authored or frozen for this case.",
+        "proposed_split": "development",
+        "status": "development"
+      },
+      {
+        "id": "dev-casa-photo-p1",
+        "source_name": "Casa D'Angelo",
+        "source_family": "casa-d-angelo / single WebP menu image (user-supplied)",
+        "source_type": "photo",
+        "input_route": "image",
+        "filename": "casaDangello-all.webp",
+        "sha256": "470b24a54044ec460cdf7cc5b82034386aeb75dc95337c08f6d268b869543960",
+        "bytes": 172488,
+        "page_count": 1,
+        "pages_selected": "page 1 of 1 (single static WebP frame, no ANIM/ANMF chunks; complete source)",
+        "dimensions_px": "765x1020",
+        "format": "WebP RIFF; VP8X canvas with EXIF chunk; animation flag off",
+        "public_url": null,
+        "acquisition_note": "Original acquisition URL/date not recorded in the existing source inventory; user-supplied original held in the existing private source folder.",
+        "known_exposure": "Previously rendered/inspected and included in historical extraction runs (Casa78 saved candidates; 95 Galaxie/Casa candidates).",
+        "rights_status": "User-provided private original; no redistribution licence recorded. Private evaluation only; no upload or permission change.",
+        "currency_assumption": "Unknown. No printed-currency claim is made and AUD must not be assumed.",
+        "hosted_route_note": "WebP is not an accepted hosted upload type. Any JPEG/PNG derivative requires its own SHA-256 and route/reference review before use; it cannot inherit the original hash or identity and must remain in the same development source family/split.",
+        "reference_status": "NOT GOLD — not human-reviewed; no reference has been authored or frozen for this case.",
+        "proposed_split": "development",
+        "status": "development"
+      },
+      {
+        "id": "dev-panania-pdf-all-2-pages",
+        "source_name": "Siding Bistro, Panania Diggers",
+        "source_family": "panania-diggers-bistro / first-party PDF",
+        "source_type": "pdf",
+        "input_route": "pdf",
+        "filename": "panania.pdf",
+        "sha256": "bf42cf066aaf24ee41a20498abe0bbda9bf834f71953ef239e63081c01008896",
+        "bytes": 3339944,
+        "page_count": 2,
+        "pages_selected": "pages 1-2 of 2 (all pages)",
+        "page_dimensions_pts": ["1683.75 x 1190.25 (page 1, A2)", "1683.75 x 1190.25 (page 2, A2)"],
+        "public_url": "https://pananiadiggers.com.au/wp-content/uploads/2026/07/Updated-Menu-2026.pdf",
+        "retrieved_at_utc": "2026-11-14T14:13:38Z",
+        "known_exposure": "At least page 1 was rendered/inspected and text extraction was checked at collection.",
+        "rights_status": "Public first-party availability only; no redistribution or evaluation licence recorded. Private evaluation only; verify rights before sharing.",
+        "currency_assumption": "A printed-currency field of '$' appears in prior collection notes; it is not labelled AUD and is not currency verification. Reference annotation must record currency as printed, or null when unknown.",
+        "reference_status": "NOT GOLD — not human-reviewed; no reference has been authored or frozen for this case.",
+        "proposed_split": "development",
+        "status": "development"
+      },
+      {
+        "id": "dev-twin-city-pdf-all-1-page",
+        "source_name": "Twin City Hotel",
+        "source_family": "twin-city-hotel / first-party PDF",
+        "source_type": "pdf",
+        "input_route": "pdf",
+        "filename": "twin-city.pdf",
+        "sha256": "3693c0ba9e3ed8b760d0eaf34528a7223f462bfc899f0fdba9d41e1d3bac92ea",
+        "bytes": 678722,
+        "page_count": 1,
+        "pages_selected": "page 1 of 1 (all pages)",
+        "page_dimensions_pts": ["1190.16 x 842.16 (A3, 0 rotation)"],
+        "public_url": "https://twincityhotel.com.au/wp-content/uploads/2026/09/Twin-City-Main-Menu-26.pdf",
+        "retrieved_at_utc": "2026-11-14T14:13:40Z",
+        "known_exposure": "Page 1 was rendered/inspected at collection; text extraction returned no text (prices visible only in the render). Absent text layer is a source property, not a metadata-only inference.",
+        "rights_status": "Public first-party availability only; no redistribution or evaluation licence recorded. Private evaluation only; verify rights before sharing.",
+        "currency_assumption": "A printed-currency field of '$' appears in prior collection notes; it is not labelled AUD and is not currency verification. Reference annotation must record currency as printed, or null when unknown.",
+        "reference_status": "NOT GOLD — not human-reviewed; no reference has been authored or frozen for this case.",
+        "proposed_split": "development",
+        "status": "development"
+      }
+    ],
+    "stress": [
+      {
+        "id": "dev-denny-pdf-35-pages-full",
+        "source_name": "Denny's",
+        "source_family": "dennys / full 35-page PDF (user-supplied history)",
+        "source_type": "pdf",
+        "input_route": "pdf",
+        "filename": "Dennys_Menu.pdf",
+        "sha256": "2430807aeb2556cd85186b1b0d4126a89cee066dea3ccf5ad18b5e23b5082275",
+        "bytes": 7187184,
+        "page_count": 35,
+        "pages_selected": "pages 1-35 of 35 (all pages) for local stress evaluation only",
+        "page_dimensions_pts": ["684 x 918 (uniform per pdfinfo)"],
+        "known_exposure": "Previously rendered/run; included in historical extraction/replay records.",
+        "rights_status": "User-supplied private original; no redistribution licence recorded. Private evaluation only.",
+        "constraint": "35 pages exceeds the hosted 1-10 page PDF intake limit. A full-file local evaluation is NOT hosted full-PDF acceptance and cannot be described as such.",
+        "reference_status": "NOT GOLD — not human-reviewed; no reference has been authored or frozen for this case.",
+        "proposed_split": "development-stress",
+        "status": "development-stress"
+      }
+    ],
+    "reserve": {
+      "note": "All previously inspected/collected sources remain DEVELOPMENT/RESERVE. None may be re-promoted to holdout, including unused-looking files. Batch A/B holds ten old PDFs in total; two are the selected development cases above and the remaining eight are reserve.",
+      "batch_pdfs": [
+        {
+          "filename": "fiftysix.pdf",
+          "source_family": "Fiftysix, The Shellharbour Club (AU first-party PDF)",
+          "sha256": "c833802e57fbe4b45ce97fb4595e1bbfa51f1c2c556091aa75ecc1eb0aaa4f74",
+          "bytes": 709947,
+          "page_count": 2,
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "pastoral.pdf",
+          "source_family": "Pastoral Hotel (AU first-party PDF)",
+          "sha256": "8e3a82d7c317cf03bbef56e591001832a023c0360a3741783d200799ded06825",
+          "bytes": 806774,
+          "page_count": 2,
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "whitebull.pdf",
+          "source_family": "Whitebull Hotel (AU first-party PDF)",
+          "sha256": "45901f1e7e1635685b65e18c98c967008a43a19dc81168a4d5e783ff93a9b54f",
+          "bytes": 1156329,
+          "page_count": 6,
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "schooners-burgers-and-beer.pdf",
+          "source_family": "Schooners Burgers & Beer (US first-party PDF; identical duplicate copy exists in batch B)",
+          "sha256": "791fd1c545ef8e9f0433612ba341f0966a5e178639cdcf0c977d4c0a8d92ec9e",
+          "bytes": 1596470,
+          "page_count": 2,
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "the-waters-on-50th.pdf",
+          "source_family": "The Waters on 50th (US first-party PDF; identical duplicate copy exists in batch B)",
+          "sha256": "7c832bf44ae1a83d43e572b4876d11a51577544729911e0aeb11ee2efa17ecf4",
+          "bytes": 282027,
+          "page_count": 3,
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "casa-bella.pdf",
+          "source_family": "Casa Bella (FR first-party PDF)",
+          "sha256": "94eabaebb7ccde0bed654418667b035920e0e0dc073e949ebfb5692083600461",
+          "bytes": 909292,
+          "page_count": 7,
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "old-man-raffertys.pdf",
+          "source_family": "Old Man Rafferty's (US first-party PDF)",
+          "sha256": "1e09e85117eb20c6b296a02bcf97ae06d1f04c43bcc4757fa84f041721a4dc16",
+          "bytes": 763258,
+          "page_count": 2,
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "restaurant-26.pdf",
+          "source_family": "Restaurant 26 (DE first-party PDF)",
+          "sha256": "d40b209b42186ce652760a40ca83f2b8b5f2f5f42409abc424b0c51f96e3516d",
+          "bytes": 264746,
+          "page_count": 14,
+          "constraint": "14 pages exceeds the hosted 1-10 page limit; no hosted full-PDF claim.",
+          "proposed_split": "development-reserve"
+        }
+      ],
+      "images": [
+        {
+          "filename": "patis.webp",
+          "source_family": "Patis (user-supplied WebP)",
+          "sha256": "14e2795b63efdf874df9362f2f6b1b89a21c4c4488e1ced14671649f58c58414",
+          "bytes": 557864,
+          "page_count": 1,
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "virginia-menu.jpg",
+          "source_family": "Virginia (user-supplied JPEG)",
+          "sha256": "b511ce4a2089f059e33e4c1ac1c57e52e5a2e91355a0ddaf2b11544ff1d0985b",
+          "bytes": 453164,
+          "page_count": 1,
+          "dimensions_px": "870x1650",
+          "proposed_split": "development-reserve"
+        }
+      ],
+      "listed_but_not_locally_verified": [
+        {
+          "filename": "img2_currans_family_diner.jpg",
+          "source_family": "Curran's Family Diner",
+          "status": "listed in the existing private source folder; no local copy or SHA-256 verified; development-reserve",
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "img3_inn_between_diner.jpg",
+          "source_family": "Inn Between Diner",
+          "status": "listed in the existing private source folder; no local copy or SHA-256 verified; development-reserve",
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "pdf1_homeslice_austin.pdf",
+          "source_family": "Homeslice (Austin)",
+          "status": "listed in the existing private source folder; no local copy or SHA-256 verified; development-reserve",
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "pdf2_mapleberry_diner.pdf",
+          "source_family": "Mapleberry Diner",
+          "status": "listed in the existing private source folder; no local copy or SHA-256 verified; development-reserve",
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "pdf3_carmines_nyc.pdf",
+          "source_family": "Carmine's NYC",
+          "status": "listed in the existing private source folder; no local copy or SHA-256 verified; development-reserve",
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "unnamed.webp",
+          "source_family": "unidentified",
+          "status": "listed in the existing private source folder; identity and bytes unverified; development-reserve",
+          "proposed_split": "development-reserve"
+        },
+        {
+          "filename": "permitted QR URL candidate referenced in the audit",
+          "source_family": "unidentified URL",
+          "status": "identity and bytes not recorded locally; reserve, NOT a tested URL source and NOT a holdout",
+          "proposed_split": "development-reserve"
+        }
+      ]
+    }
+  },
+  "candidate_holdouts": {
+    "status": "CANDIDATE held-outs — provisional, metadata-only, NOT certified held-outs, NOT frozen references",
+    "certification_note": "Reviewers must confirm prior history/access, rights, source-family independence and reviewer independence before these can be called unseen holdouts. Public URL availability cannot rule out third-party exposure. This proposal alone does not pass the held-out gate.",
+    "acquisition_constraint": "Exactly two new PDF binaries, distinct first-party restaurant/domain families, each complete at two pages and below 12,000,000 bytes, discovered from official page HTML hrefs only. No page text, pixels, transcription, OCR, render or model call was performed by the collector; PDF metadata only.",
+    "candidates": [
+      {
+        "id": "candidate-A-dipaolos",
+        "source_name": "Di Paolo's Italian Ristorante",
+        "source_family": "dipaolosrestaurant.com / first-party Canva-exported PDF",
+        "source_type": "pdf",
+        "input_route": "pdf",
+        "filename": "candidate-a-dipaolos-77.pdf",
+        "sha256": "653094a1ed49d593053064e983994a3adbc280ee330572b5323ce2c22e241d8b",
+        "bytes": 4625755,
+        "page_count": 2,
+        "pages_selected": "pages 1-2 of 2 (all pages)",
+        "page_dimensions_pts": [
+          "612 x 792 (page 1, letter, 0 rotation)",
+          "612 x 792 (page 2, letter, 0 rotation)"
+        ],
+        "official_download_url": "https://dipaolosrestaurant.com/wp-content/uploads/2026/10/Untitled-design-77.pdf",
+        "official_page_url": "https://dipaolosrestaurant.com/",
+        "discovery_note": "Official homepage exposes two PDF hrefs from the same restaurant family; only the first href (Untitled-design-77.pdf) is used. The site also links an affiliate domain; no bytes from it were fetched. Because the homepage exposes multiple PDF links, HTML-page URL intake is ambiguous; the declared route is PDF upload.",
+        "retrieved_at_utc": "2026-11-14T20:37:32Z",
+        "pdf_metadata": {
+          "title": "Untitled design",
+          "creator": "Canva",
+          "producer": "Canva",
+          "creation_date": "2026-10-28T15:25:04+02:00",
+          "encrypted": false,
+          "javascript": false,
+          "forms": "none"
+        },
+        "known_exposure": "No rendering, text extraction, OCR, model call or prediction by the collector; bytes stored after metadata parsing only. Public URL availability cannot prove prior third-party access.",
+        "rights_status": "Public first-party URL only; no redistribution or evaluation licence recorded. Treat as a private candidate; no upload, share or permission change.",
+        "independence_status": "UNCERTIFIED; reviewer must confirm no prior source/prediction exposure and no ownership conflict. Shares an Italian-cuisine category with Casa D'Angelo/Casa Bella but has a different owner/domain/URL and no shared bytes or hashes; reviewers must confirm distinct source family.",
+        "currency_assumption": "Unknown. No text was read; AUD must not be assumed and any reference annotation must state printed currency only.",
+        "reference_status": "NOT GOLD — no reference authored, reviewed or frozen; not a frozen reference.",
+        "route_detail": "PDF upload route: preflight the custody bytes against the declared SHA-256, create an upload group for one PDF, upload the original bytes with application/pdf, then verify the job source_hash equals the declared hash and source_uploaded=true before extraction. Never describe this as URL intake.",
+        "route_executed": false,
+        "proposed_split": "holdout",
+        "status": "candidate-holdout",
+        "hosted_route": "pdf_upload"
+      },
+      {
+        "id": "candidate-B-bluestone",
+        "source_name": "Bluestone",
+        "source_family": "bluestoneonline.net / first-party Adobe Illustrator PDF",
+        "source_type": "pdf",
+        "input_route": "url",
+        "filename": "candidate-b-bluestone-dinner-2026-11-02.pdf",
+        "sha256": "65787a601bc3d62059e6fc86df0ff79e2a824ac362dc1e1f7c0a45ae39500450",
+        "bytes": 1158087,
+        "page_count": 2,
+        "pages_selected": "pages 1-2 of 2 (all pages)",
+        "page_dimensions_pts": [
+          "792 x 1224 (page 1, 0 rotation)",
+          "792 x 1224 (page 2, 0 rotation)"
+        ],
+        "official_download_url": "https://bluestoneonline.net/wp-content/uploads/2025/07/dinner-menu-11-2-26.pdf",
+        "official_page_url": "https://bluestoneonline.net/menus/",
+        "discovery_note": "Official menus index exposes twelve PDF hrefs across the restaurant family; this candidate is the single href whose filename and PDF title identify the current dinner menu dated 2026-11-02. Selection used href filename and PDF metadata only. HTML intake of the index is ambiguous, so the declared route is direct-PDF URL intake of the official href.",
+        "retrieved_at_utc": "2026-11-14T20:37:39Z",
+        "byte_reverification": {
+          "method": "Independent fresh HTTPS GET of the same official URL; SHA-256 of the response body compared to the custody file.",
+          "observed_at_utc": "2026-11-14T20:38:01Z",
+          "observed_sha256": "65787a601bc3d62059e6fc86df0ff79e2a824ac362dc1e1f7c0a45ae39500450",
+          "equals_custody_file": true,
+          "scope": "Pre-run byte/hash re-verification only; not app-side hosted retrieval."
+        },
+        "pdf_metadata": {
+          "title": "dinner menu 11-2-26",
+          "creator": "Adobe Illustrator 30.8 (Macintosh)",
+          "producer": "Adobe PDF library 18.00",
+          "creation_date": "2026-11-02T02:32:02+02:00",
+          "encrypted": false,
+          "javascript": false,
+          "forms": "none"
+        },
+        "known_exposure": "No rendering, text extraction, OCR, model call or prediction by the collector; bytes stored after metadata parsing only. Public URL availability cannot prove prior third-party access.",
+        "rights_status": "Public first-party URL only; no redistribution or evaluation licence recorded. Treat as a private candidate; no upload, share or permission change.",
+        "independence_status": "UNCERTIFIED; a distinct US restaurant/domain with no prior inspection recorded, but reviewers must confirm history and no ownership conflict.",
+        "currency_assumption": "Unknown. No text was read; AUD must not be assumed and any reference annotation must state printed currency only.",
+        "reference_status": "NOT GOLD — no reference authored, reviewed or frozen; not a frozen reference.",
+        "route_detail": "Direct-PDF URL intake route: the server must fetch the official href over the supported URL-intake path, enforce public destination/size/page limits, retain originalUrl/finalUrl/retrievedAt and record source_hash. A hash mismatch or different final URL means STOP and re-version, not scoring. Uploading the downloaded local file and calling it URL intake is prohibited.",
+        "route_executed": false,
+        "proposed_split": "holdout",
+        "status": "candidate-holdout",
+        "hosted_route": "url_intake"
+      }
+    ],
+    "coverage_limits": {
+      "unseen_photo_coverage": "UNESTABLISHED / BLOCKED. No fresh photo candidate exists; every existing photo is development or reserve.",
+      "input_route_coverage": "Candidate held-outs cover PDF upload and direct-PDF URL intake only; no unseen photo route and no HTML-discovery URL candidate.",
+      "statistical_minimum": "BLOCKED. Two PDFs and four candidate pages cannot satisfy the proposed at least three distinct rights-cleared sources spanning URL, PDF and photo, and establish no statistical power.",
+      "source_family": "Distinct restaurant/domain families declared; reviewer must still confirm historical independence and check Candidate A's affiliate-domain linkage.",
+      "derivative_rule": "Any derivative, conversion or re-export is a new artifact with its own SHA-256 and source-family declaration and needs explicit review approval; it cannot inherit the original's split or hash."
+    }
+  },
+  "custody_and_privacy": {
+    "public_scope": "This JSON and docs/qa02-real-menu-source-plan-v1.md publish names, IDs, public URLs, hashes, sizes, page counts, dimensions, routes and status only.",
+    "private_scope": "Exact custody locations, local paths, header captures, raw sources, annotations, runs and receipts remain in private artifacts outside Git. They are deliberately not reproduced here.",
+    "existing_private_source_folder": "The original user-supplied sources already have an existing private Drive source folder. It was not opened, uploaded to or permission-changed by this task.",
+    "private_provenance_artifact_sha256": "c42d02f31967e10ef58a924d388792acada423f32bb89601b8ef9c93fac24649",
+    "hash_identity_note": "SHA-256 proves byte identity and format only. It does not prove source truth, transcription completeness, rights, licence, reviewer independence or untouched status."
+  },
+  "reference_handoff": "No reference answers exist in this file. Source-only human annotation must use PR169 qa02.reference.v1, followed by independent review and a PR169 freeze; see docs/qa02-real-menu-source-plan-v1.md.",
+  "routes": {
+    "declared_not_executed": true,
+    "shared_constraints": "Hosted routes require an authenticated actor, an authorized venue and a deployed queue. Upload groups accept one PDF or 1-5 JPEG/PNG images, each file at most 12,000,000 bytes, and a PDF must parse at 1-10 pages; the server verifies actual bytes, signature and hash. URL intake requires a public destination, at most 12 MB for non-HTML, at most 3 redirects, and an HTML page that resolves exactly one linked PDF/PNG/JPEG. None of these routes was executed here.",
+    "candidate_A_pdf_upload": {
+      "steps": [
+        "Preflight custody SHA-256 equals the declared hash; size is at most 12,000,000 bytes; page count is within 1-10.",
+        "Create the upload group for one PDF with the declared source hash and a unique idempotency key.",
+        "Upload the original PDF bytes with application/pdf and the same idempotency key.",
+        "Verify the job source_hash equals the declared hash and source_uploaded is true before extraction."
+      ],
+      "expected_job_source_hash": "653094a1ed49d593053064e983994a3adbc280ee330572b5323ce2c22e241d8b",
+      "substitution_rule": "This route legitimately uses the original local file; it must not be described as URL intake.",
+      "executed": false
+    },
+    "candidate_B_url_intake": {
+      "steps": [
+        "Fresh GET of the official href; body SHA-256 must equal the declared hash immediately before the request.",
+        "Create the URL intake with the official href and a unique idempotency key; the server re-downloads it.",
+        "Verify the job source_hash equals the declared hash and the recorded finalUrl equals the official href.",
+        "Any hash or URL drift means STOP, re-version the candidate and request renewed approval; do not score."
+      ],
+      "expected_job_source_hash": "65787a601bc3d62059e6fc86df0ff79e2a824ac362dc1e1f7c0a45ae39500450",
+      "substitution_rule": "Must be a genuine server-side URL fetch with retained provenance; uploading the downloaded local file and calling it URL intake is prohibited.",
+      "executed": false
+    }
+  },
+  "declarations": {
+    "no_gold_answers": "No reference answers, expected dish counts, labels, transcriptions or predictions were created, inspected or inferred for any source in this plan.",
+    "no_menu_content": "No menu text, dish names, prices, pixels, renders or labels are published or were transcribed for this plan. Candidate metadata was limited to PDF page counts/dimensions and title/creator/producer fields.",
+    "no_model_calls": 0,
+    "no_uploads": true,
+    "no_permission_or_sharing_changes": true,
+    "no_scorer_claim": "The scorer interface and commit are documented separately in STRICT_SCORER.md; no scorer run, test success or quality result is claimed here.",
+    "splits_not_pooled": "Development, development-stress and candidate-holdout cases must never be pooled and reported as held-out quality.",
+    "hash_dedup": "Candidate SHA-256 values do not collide with any development PDF/photo hash. The duplicated development copies of schooners-burgers-and-beer.pdf and the-waters-on-50th.pdf remain one source family and one development split."
+  },
+  "gates": [
+    {
+      "gate": "development split selected with exact bytes/pages",
+      "status": "PASS (local byte evidence only)"
+    },
+    {
+      "gate": "candidate acquisition bounds (2 PDFs, 2 pages each, below 12,000,000 bytes, first-party hrefs)",
+      "status": "PASS (metadata evidence only)"
+    },
+    {
+      "gate": "candidate B official-URL byte/hash pre-run re-verification",
+      "status": "PASS (pre-run only; app-side hash not observed)"
+    },
+    {
+      "gate": "rights / retention permission",
+      "status": "BLOCKED"
+    },
+    {
+      "gate": "reviewer independence and prior-exposure declarations",
+      "status": "BLOCKED"
+    },
+    {
+      "gate": "source-only reference authoring, independent review and freeze",
+      "status": "NOT RUN"
+    },
+    {
+      "gate": "unseen photo coverage",
+      "status": "BLOCKED / UNESTABLISHED"
+    },
+    {
+      "gate": "held-out representativeness and sample sufficiency",
+      "status": "PENDING Vivien/independent-reviewer agreement; unseen photo coverage absent"
+    },
+    {
+      "gate": "hosted PDF-upload and URL-intake execution",
+      "status": "NOT RUN"
+    },
+    {
+      "gate": "held-out gate overall",
+      "status": "BLOCKED"
+    }
+  ],
+  "change_control": {
+    "version": "qa02-real-menu-source-plan/1.0.0-proposed",
+    "rule": "Any change to a selected source, page extent, SHA-256, route, split or source-family declaration requires a new plan version and renewed human approval before predictions. Candidates must be re-hashed and re-verified immediately before any run.",
+    "out_of_scope": "Scorer commit/commands, numerical quality thresholds, evaluation results, release acceptance and publication are owned by the parent, Vivien and independent reviewers as separate decisions. This plan claims none of them."
+  },
+  "scorer_handoff": "processing/eval/qa02/STRICT_SCORER.md documents the fixed qa02_strict_score CLI and qa02.runs.v1 ledger. No scorer run or test result is claimed here."
+}

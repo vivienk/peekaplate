@@ -1,0 +1,206 @@
+# Owner menu wiring from merged code
+
+Current composition (November 17): authored S05–S13 now include persisted
+restaurant details, saved-dish verification, server preparation, publication and
+revision-bound portion links. Ingredient assistance resurfaces persisted evidence
+as unverified proposals; it does not ask a provider to invent recipes. The new
+ingredient change has no hosted acceptance yet. AI secret provisioning and
+trusted report freshness remain separate blockers. See [owner-flow retest](owner-flow-retest.md).
+
+The November 16 [S05–S13 correction guide](owner-flow-corrections.md) records
+source PR attribution, profile/setup persistence, authored S09 adaptation,
+removal/Undo, extracted-photo fixes and the full synthetic PR-preview journey.
+Earlier sections below describe their dated release slices; they do not establish
+that this new migration or code has reached hosted staging.
+
+The initial slice described below connected the signed-in owner shell to the existing staff-authorized
+menu APIs. DES-02 guides the multi-source journey, but this is not the complete
+owner onboarding or publication flow.
+
+## Why PR156 was merged
+
+The source/upload/processing screens and authentication were already merged.
+Ehab's PR156 supplied their reusable API client, draft/review mappings and source
+evidence editor. Its draft dependencies were those screens and sign-in. Sai
+reviewed and fixed the client boundaries, ran local checks and waited for green
+GitHub CI before merging it. This avoided writing a competing menu client.
+No other pending team PR is merged by this wiring task.
+
+## Initial client wiring flow (historical)
+
+1. Sign in, then select a restaurant returned by GET /staff/venues. Accounts
+   without membership receive no restaurant authority or sample restaurant.
+2. Open Menu and use the merged S06 picker: paste a URL, upload photos/PDF,
+   or add a dish manually. Add further sources from Menu as needed.
+   Each intake group remains one PDF or up to five photos. Further sources and
+   saved dishes stay together in that restaurant's workspace. Supported URL
+   intake is a direct public menu PDF/image, not general HTML crawling.
+3. Upload original bytes with SHA-256 manifests and stable retry identities.
+   Replacing/removing a selection cancels the old immutable group and creates
+   another; historical evidence is not overwritten.
+4. Processing reads stored job status. Queued work stays queued, status polls
+   do not overlap and successful source results survive partial failures.
+5. Review an extracted dish alongside its stored source evidence. Save changes
+   with the review API, with separate command identities for separate candidates.
+   Extracted ingredients remain proposed and allergens remain unknown.
+6. Add/edit a manual dish, save its full snapshot, upload an original private
+   JPEG/PNG and attach its returned photo ID. Reload retrieves saved fields and
+   authorized image bytes. Save does not approve a dish/photo or publish a menu.
+
+The client retrieves a fresh actor-bound token for every request, allows only
+the existing local/staging API origins, refuses redirects and validates consumed
+responses. Image URLs contain no tokens; temporary blob URLs are revoked on exit.
+Account/restaurant changes abort old requests. Access denial clears private state.
+Unsaved dish edits warn before leaving, and late imports cannot reopen an
+abandoned screen. No new backend route, table, migration or membership grant is
+part of this narrowed slice.
+
+## Boundaries at the initial client release (historical)
+
+Later S05–S13 integration supersedes the missing-profile, serving-size,
+verification, preparation and portion boundaries listed here. They explain the
+original scope, not current missing screens.
+
+- S05 restaurant-details persistence has no merged API. Its backend expansion is
+  parked locally and is not included here. The workspace does not simulate saved
+  setup/verification status.
+- Required serving-size persistence, source consolidation and automatic autosave
+  are not supplied by this wiring. Existing draft fields remain unchanged.
+- Harshita's pending PR163 owns verification-only S10 integration.
+  Required owner confirmations, optional verification badges, approval and
+  publication must remain separate. Use the returned diner URL after an explicit
+  successful publish. The [S13 handoff](owner-publish-handoff.md)
+  publishes already prepared snapshots through the existing owner commands.
+- Pending AI, portion/2.5D and other team PRs remain separate. No unfinished
+  screen is used as a live fallback.
+
+## Verification and rollout
+
+The workspace Chromium suite uses the real Supabase SDK and rendered controls
+with synthetic provider/API HTTP. It covers original-photo save/reload, mixed
+sources, immutable replacement, corrections, slow polling, late imports, stale
+saves and account/access changes. Those results are local, not hosted acceptance.
+
+Hosted readback on November15 found 13 migration entries, latest20261114010000,
+and the existing draft/upload tables. No profile migration was applied. Staging
+API was version0c60d064-c804-44a0-b4f3-3aaf44e64848 (main20e52a3), and extraction
+host60b99488-78f3-4d6a-a497-2ff1597f1ab7 predates merged PR188. All four Queues
+were empty and paused. Recheck exact release versions before rollout; keep
+normal delivery paused outside an authorized synthetic test window.
+
+Record each rollout's exact commit and authenticated screen evidence on its
+release PR. Local fixture checks alone are not hosted screen acceptance.
+Deploy PR188's paired host/container before claiming hosted provider-budget
+enforcement. A zero-provider reserve probe uses its own disposable job identity.
+
+## Initial narrow staging release (historical)
+
+The release promotes the reviewed menu client (#156), merged source/draft/photo
+workspace (#190), and opt-in owner analysis connection (#164/#187). The source
+controls reuse the already merged onboarding/dish components. #156 was required
+because those controls had no shared authenticated menu client on develop before
+this integration; its verified client replaces duplicate request code.
+
+Existing main Worker bindings, hosted migrations, extraction service, diner and
+paused Queues are preserved. AI remains off by default and current unknown
+freshness continues to abstain. The release does not provision provider keys or
+a rate limiter, manufacture freshness, persist restaurant details, consolidate
+menus, or add the pending final verification/publish screen.
+
+Use [owner sign-in](https://peekaplate-console-staging.pages.dev/owner-auth).
+A confirmed account still needs server-authorized restaurant membership. The
+menu upload, saved draft/photo and correction controls appear in that workspace;
+Dish performance remains restricted to owners and its configured synthetic venue.
+The diner continues to open already published, verified links. No changes to the
+.io homepage or production domains are included. Deployment/hosted results are
+recorded on the release PR; local synthetic HTTP tests are separate evidence.
+
+## Screen composition correction — November 15
+
+The first wiring release used a plain workspace list instead of the authors'
+dashboard and Screen 9 composition. Functional save/upload checks did not prove
+visual alignment. The correction uses the merged `FirstDashboard` content in
+`OwnerShell`, the original three-option `ChooseMenuSource` in `OnboardingLayout`,
+and shared `DishFormFrame` / `MenuTable` markup extracted from the owner demo.
+The demo retains its existing actions and data; live presentation imports no
+sample menu, thumbnails or AI suggestion generators.
+
+The existing Figma Design file was inspected for cross-checking, not recreated:
+dashboard `1669:3682`, source choice `2292:9846`, upload `1936:5274`, and dish
+form `2470:19843`. The older dashboard pointer `2346:6206` no longer resolves.
+Authored source remains the implementation reference. Responsive desktop/mobile
+screenshots cover every connected page and are retained with the review evidence.
+
+Known differences follow the persisted API rather than sample design data:
+details/publication status can be unavailable; no fabricated progress or activity
+is shown. Currency, unknown/proposed/confirmed food fields and extraction evidence
+remain explicit. Serving size and 2.5D controls are marked unconnected. Save keeps
+a private draft; final review/publication is still a separate integration.
+
+The previous authenticated November 15 run verified original-photo persistence,
+manual draft reload, extracted correction save/reload and restoration, partial
+upload retention and revoked-access cleanup against staging. It did not establish
+visual fidelity. This correction requires its own Pages rollout and screenshot
+readback; provider extraction is not rerun for a presentation-only change.
+
+Independent review also caught an inherited global menu-heading style and a
+sidebar hint promising unsupported publication unlocks. The live surface now
+uses the author's scoped 28px heading and describes unavailable connections
+without changing the demo. Browser-dropped files with no MIME use the existing
+extension policy to declare PDF/JPEG/PNG while retaining the original bytes;
+server signature/hash verification remains authoritative.
+
+## S8/S10 integration reconciliation (PR #206, historical)
+
+Harshita's existing review table, status pills, edit/return flow and review
+checkboxes are reused. Completing verification calls the existing authenticated
+photo-approval and versioned draft-verification APIs, then confirms the saved
+versions before showing success. It does not accept a dish revision or publish a
+menu. Conflicts and revoked access cannot show the success dialog.
+
+Both the Menu table and review screen reload effective candidate corrections
+through the existing review-session API. They do not re-display the original
+extraction after a correction. Unknown allergens remain unknown. Review/license
+attestations are never inferred from an old draft; editing text or replacing a
+photo resets the relevant checkbox. A missing image needs no image attestation.
+Prices use the existing decimal contract, including zero, and preserve currency.
+
+An empty menu does not prove missing restaurant details. Existing restaurants
+stay in the authored dashboard. S5's local-only form cannot mark details submitted:
+there is no profile-save API in this slice. Extracted-photo editing and menu-level
+publication handoff remain separate gaps; imported dishes without photos remain
+unready instead of receiving invented photos or approval. Final publishing remains
+separate from verification. PR #205 must reuse this implementation once reconciled,
+including its transport helpers, rather than introduce another review controller.
+
+Local evidence: all 41 workspace browser cases passed in 39.3 seconds; the three
+strengthened correction/verification/attestation regressions passed in 7.0 seconds.
+After reconciling current develop, 46 workspace cases passed in 52.8 seconds,
+including the existing S13 publication/URL flow. Independent review found an
+unready extraction could block workspace reload: its regression failed before
+the fix and passed in 4.9 seconds afterward. Unready/failed review hydration now
+leaves other saved work usable with an explicit notice; 401/403 still clear access.
+These use the real browser/SDK with synthetic intercepted HTTP. Hosted acceptance
+requires the later reviewed staging release; this is not hosted evidence.
+
+## Review-source reconciliation with #206
+
+That correction release took Harshita's reconciled #206 controller, review
+components, dish editor and API client unchanged. It supersedes the earlier
+embedded S10 composition: Menu remains the authored management table, while the
+setup menu step opens the authored standalone review screen. Existing S13 still
+owns explicit approval/publication and the returned diner URL.
+
+The review list reads saved effective corrections, keeps other saved work usable
+when an extraction review is unavailable, and confirms persisted verification
+before reporting success. Review/photo-rights checkboxes are not inferred from a
+previous save. At that point S05 remained local-only until
+the restaurant-profile API existed, and extracted-photo verification was blocked;
+unknown facts and unsupported actions are not turned into success states.
+
+Subsequent integration connects those existing forms and photo controls to the
+profile and verification APIs; the current preparation/portion path is documented
+in [the S13 handoff](owner-publish-handoff.md).
+
+See [the preservation audit](screen-preservation-audit.md) for exact provenance,
+verification evidence and staging rollout limits.

@@ -29,6 +29,30 @@ async function expectNoAxeViolations(page: Page) {
   ).toEqual([]);
 }
 
+test('empty search keeps readable placeholder contrast when focused', async ({ page }) => {
+  await openMenu(page);
+  await page.getByRole('button', { name: 'Search menu' }).click();
+  const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue('');
+  const contrast = await input.evaluate((element) => {
+    const luminance = (color: string) => {
+      const channels = (color.match(/[\d.]+/g) ?? []).slice(0, 3).map((value) => {
+        const channel = Number(value) / 255;
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return (
+        (channels[0] ?? 0) * 0.2126 + (channels[1] ?? 0) * 0.7152 + (channels[2] ?? 0) * 0.0722
+      );
+    };
+    const foreground = luminance(getComputedStyle(element, '::placeholder').color);
+    const background = luminance(getComputedStyle(element).backgroundColor);
+    return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+  });
+  expect(contrast, 'focused search placeholder contrast').toBeGreaterThanOrEqual(4.5);
+  await expectNoAxeViolations(page);
+});
+
 test('the search icon opens the bar and the results are the normal dish cards', async ({
   page,
 }) => {

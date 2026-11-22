@@ -6,8 +6,28 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-// The synthetic console foundations demo is built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS),
-// never for staging or production. Agreed with Sai and Jeffin.
+// The synthetic console demos are built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS), never for
+// staging or production. Agreed with Sai and Jeffin.
+const DEMOS = [
+  {
+    page: 'first-dashboard.html',
+    asset: /firstDashboard/,
+    label: /Synthetic demo/,
+  },
+  { page: 'foundations.html', asset: /foundations/, label: /Synthetic demo/ },
+  { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
+  { page: 'review-dishes.html', asset: /reviewDishes|menuReviewDemo/, label: /Synthetic demo/ },
+  // S4-FE-04: the owner sign-in demo answers with a synthetic service, so it never reaches staging.
+  { page: 'owner-sign-in.html', asset: /ownerSignIn/, label: /Synthetic demo/ },
+  // FE-05/FE-06: the owner onboarding demo answers saves itself, so it never reaches staging.
+  { page: 'owner-onboarding.html', asset: /ownerOnboarding/, label: /Synthetic demo/ },
+  // S13: the menu preview demo answers the publish request itself, so it never reaches staging. It
+  // has no demo bar (Jeffin, 16 Nov), so it is identified by its screen title instead of a
+  // "Synthetic demo" label; it stays preview-only, noindex and free of analytics like the others.
+  { page: 'owner-menu-preview.html', asset: /ownerMenuPreview/, label: /Preview your menu/ },
+];
+// Normal builds carry the provider-backed sign-in pages instead; preview builds do not.
+const LIVE_AUTH = ['owner-auth.html', 'auth-confirm.html', 'auth-reset.html'];
 const consoleDir = fileURLToPath(new URL('../frontend/console/', import.meta.url));
 const vite = join(consoleDir, 'node_modules/vite/bin/vite.js');
 
@@ -29,6 +49,35 @@ async function build(t, previewDemos) {
   return dir;
 }
 
+// What analytics code looks like in a built script: the PostHog SDK (its package name and its
+// $pageview event), our adapter's config names, or a PostHog ingestion host. A document that only
+// names PostHog, such as the owner Privacy Policy, matches none of these. Agreed with Sai (15 Nov).
+const ANALYTICS_CODE = [
+  /posthog-js/,
+  /\$pageview/,
+  /VITE_POSTHOG_/,
+  /\b(?:us|eu)(?:-assets)?\.i\.posthog\.com/,
+];
+const analyticsCode = (source) =>
+  ANALYTICS_CODE.filter((marker) => marker.test(source)).map(String);
+const posthogSdk = fileURLToPath(
+  new URL(
+    '../packages/analytics/node_modules/posthog-js/dist/module.slim.no-external.js',
+    import.meta.url,
+  ),
+);
+
+test('the analytics check flags the PostHog SDK and wiring, not a policy that names PostHog', async () => {
+  const policy = await readFile(
+    new URL('../frontend/console/src/legal/privacy-policy.md', import.meta.url),
+    'utf8',
+  );
+  assert.match(policy, /PostHog/);
+  assert.deepEqual(analyticsCode(policy), []);
+  assert.notDeepEqual(analyticsCode(await readFile(posthogSdk, 'utf8')), []);
+  assert.notDeepEqual(analyticsCode("host === 'https://us.i.posthog.com'"), []);
+});
+
 // Every script a page loads, following its module preloads.
 async function pageScripts(dir, page) {
   const html = await readFile(join(dir, page), 'utf8');
@@ -41,20 +90,44 @@ async function pageScripts(dir, page) {
 test('a normal console build contains no demo page', async (t) => {
   const dir = await build(t, false);
   const files = await readdir(dir);
+  const assets = await readdir(join(dir, 'assets'));
   assert.ok(files.includes('index.html'));
-  assert.ok(!files.includes('foundations.html'));
-  for (const asset of await readdir(join(dir, 'assets'))) assert.doesNotMatch(asset, /foundations/);
+  for (const page of LIVE_AUTH) assert.ok(files.includes(page), page);
+  for (const demo of DEMOS) {
+    assert.ok(!files.includes(demo.page), demo.page);
+    for (const asset of assets) assert.doesNotMatch(asset, demo.asset);
+  }
 });
 
-test('a preview build adds the demo page, labelled synthetic, noindex and without analytics', async (t) => {
+test('a preview build adds the demo pages, labelled synthetic, noindex and without analytics', async (t) => {
   const dir = await build(t, true);
   const files = await readdir(dir);
   assert.ok(files.includes('index.html'));
-  assert.ok(files.includes('foundations.html'));
-  const html = await readFile(join(dir, 'foundations.html'), 'utf8');
+  for (const page of LIVE_AUTH) assert.ok(!files.includes(page), page);
+  for (const demo of DEMOS) {
+    assert.ok(files.includes(demo.page), demo.page);
+    const html = await readFile(join(dir, demo.page), 'utf8');
+    assert.match(html, /<meta name="robots" content="noindex"/);
+    const scripts = (await pageScripts(dir, demo.page)).join('\n');
+    assert.match(scripts, demo.label);
+    if (demo.page === 'first-dashboard.html') assert.match(scripts, /Illustrative sample data/);
+    // The sign-in demo carries the owner Privacy Policy, which names PostHog as a provider.
+    if (demo.page === 'owner-sign-in.html') assert.match(scripts, /PostHog \(US\)/);
+    assert.deepEqual(analyticsCode(scripts), [], demo.page);
+  }
+  // The same check still catches a page that turns analytics on: the console app mounts the
+  // analytics consent and adapter.
+  assert.notDeepEqual(analyticsCode((await pageScripts(dir, 'index.html')).join('\n')), []);
+});
+
+test('a preview build adds the menu review demo, labelled synthetic, noindex and without analytics', async (t) => {
+  const dir = await build(t, true);
+  assert.ok((await readdir(dir)).includes('review-dishes.html'));
+  const html = await readFile(join(dir, 'review-dishes.html'), 'utf8');
   assert.match(html, /<meta name="robots" content="noindex"/);
-  const scripts = (await pageScripts(dir, 'foundations.html')).join('\n');
+  const scripts = (await pageScripts(dir, 'review-dishes.html')).join('\n');
   assert.match(scripts, /Synthetic demo/);
+  assert.match(scripts, /Illustrative sample data/);
   assert.doesNotMatch(scripts, /posthog/i);
 });
 
@@ -66,5 +139,18 @@ test('only the preview workflow turns the demo flag on', async () => {
   assert.equal(preview.match(/PEEKAPLATE_PREVIEW_DEMOS/g)?.length, 1);
   for (const other of ['deploy-staging.yml', 'ci.yml']) {
     assert.doesNotMatch(await read(other), /PEEKAPLATE_PREVIEW_DEMOS/);
+  }
+});
+
+// The FE-06.1 owner menu integration harness calls the real staging API with a pasted token. It is
+// for the local dev server only (the API allows that origin), so no build ever contains it.
+test('no console build contains the owner menu integration harness', async (t) => {
+  for (const previewDemos of [false, true]) {
+    const dir = await build(t, previewDemos);
+    const files = await readdir(dir);
+    assert.ok(!files.includes('owner-menu-harness.html'));
+    for (const asset of await readdir(join(dir, 'assets'))) assert.doesNotMatch(asset, /harness/);
+    const scripts = (await pageScripts(dir, 'index.html')).join('\n');
+    assert.doesNotMatch(scripts, /Integration harness/);
   }
 });

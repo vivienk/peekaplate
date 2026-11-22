@@ -2,8 +2,14 @@
 // screens always show the text label next to them and mark the image alt="" / aria-hidden, so a
 // missing icon never hides information. Allergen and dietary icons are keyed by the approved
 // values in ./types; ingredient icons by ingredient name, because the bundle has no icon field.
+
+import generatedCatalogue from '../assets/icons/generated-ingredients/catalogue.json';
+import unknownIngredient from '../assets/icons/ingredients/unknown.svg';
+import back from '../assets/icons/ui/back-navigation.svg';
+import close from '../assets/icons/ui/close.svg';
 import heart from '../assets/icons/ui/heart.svg';
 import search from '../assets/icons/ui/search.svg';
+import unsaveHeart from '../assets/icons/ui/unsave-heart.svg';
 import { ALLERGENS, DIETARY_VALUES, LEGACY_ALLERGEN_CODES } from './types';
 
 type UrlModules = Record<string, string>;
@@ -19,6 +25,11 @@ const glob = {
     import: 'default',
   }),
   ingredients: import.meta.glob<string>('../assets/icons/ingredients/*.svg', {
+    eager: true,
+    query: '?url',
+    import: 'default',
+  }),
+  generated: import.meta.glob<string>('../assets/icons/generated-ingredients/*.{png,webp}', {
     eager: true,
     query: '?url',
     import: 'default',
@@ -42,7 +53,7 @@ const allergenIcons = byKey(glob.allergens);
 const dietaryIcons = byKey(glob.dietary);
 const ingredientIcons = byKey(glob.ingredients);
 
-export const UI_ICONS = { heart, search } as const;
+export const UI_ICONS = { heart, search, back, unsaveHeart, close } as const;
 
 // Accepts the label screens show ("Nuts"), the code ("nuts") or a legacy code ("tree nut").
 export function allergenIcon(value: string): string | null {
@@ -60,5 +71,23 @@ export function dietaryIcon(value: string): string | null {
 
 // Exact name match only (case and spacing ignored): a guess could show the wrong food.
 export function ingredientIcon(name: string): string | null {
-  return ingredientIcons.get(iconKey(name)) ?? null;
+  return (
+    ingredientIcons.get(iconKey(name)) ??
+    generatedIngredientIcon(name, generatedCatalogue, glob.generated) ??
+    unknownIngredient
+  );
+}
+
+// Only the reviewed build catalogue can supply artwork. Never accept remote URLs
+// or extraction drafts from a menu bundle; artwork does not establish food facts.
+export function generatedIngredientIcon(
+  name: string,
+  catalogue: Readonly<Record<string, string>>,
+  modules: UrlModules,
+): string | null {
+  const label = name.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!Object.hasOwn(catalogue, label)) return null;
+  const file = catalogue[label];
+  if (!file || !/^[a-f0-9]{64}\.(png|webp)$/.test(file)) return null;
+  return modules[`../assets/icons/generated-ingredients/${file}`] ?? null;
 }

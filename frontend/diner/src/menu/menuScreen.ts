@@ -1,3 +1,17 @@
+import { PRODUCTION_DINER_ORIGIN } from '@peekaplate/analytics/posthog';
+import {
+  type CompareAction,
+  type CompareSide,
+  type Comparison,
+  comparisonDishes,
+  dishComparedPayloads,
+  MAX_COMPARE_CHOICES,
+  replaceExclusions,
+  replaceSide,
+  startComparison,
+} from '../compare/comparison';
+import { renderComparePicker } from '../compare/pickerScreen';
+import { type CompareResultOptions, renderCompareResult } from '../compare/resultScreen';
 import { createSaveState, type SaveState } from '../save/save-state';
 import { renderSavedScreen } from '../save/saved-screen';
 import {
@@ -12,6 +26,7 @@ import {
 import {
   isLiveTracking,
   isTrackingAllowed,
+  newComparisonId,
   newExposureId,
   newOpeningId,
   onTrackingAllowedChange,
@@ -20,14 +35,17 @@ import {
   track,
 } from '../tracking';
 import type { MenuToken } from '../tracking/delivery';
+import { completeDishes } from './adapter';
 import { menuMode } from './config';
 import { renderDishDetail } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
+import { UI_ICONS } from './icons';
+import { mountLiveArtwork } from './liveArtwork';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
-import { menuRouteFromPath } from './route';
+import { resolveMenuRoute } from './route';
 import {
   bindMenuSearch,
   SEARCH_ALL_CATEGORY_ID,
@@ -38,6 +56,7 @@ import type { CompleteDish, Menu, MenuLoadResult } from './types';
 
 const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
   'demo',
+  'portion-demo',
   'edge-cases',
   'withdrawal',
   'layout-20',
@@ -103,6 +122,15 @@ function stateHeading(): string {
 
 function fixtureNotice(): string {
   return fixtureMode ? `<p class="pp-notice">${FIXTURE_LABEL}</p>` : '';
+}
+
+function completeDishById(menu: Menu, dishId: string): CompleteDish | undefined {
+  for (const category of menu.categories) {
+    for (const dish of category.dishes) {
+      if (dish.kind === 'complete' && dish.dishId === dishId) return dish;
+    }
+  }
+  return undefined;
 }
 
 function renderLoading(container: HTMLElement): void {
@@ -204,11 +232,14 @@ function renderMenu(
       <header class="pp-header">
         ${savedHeaderMarkup()}
         <div class="pp-logo">
-          <span class="pp-logo__emblem" aria-hidden="true"></span>
-          <span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>
+          ${
+            menu.restaurant.logo
+              ? `<img class="pp-logo__image" src="${escapeHtml(menu.restaurant.logo.url)}" alt="${escapeHtml(menu.restaurant.name)}" width="${menu.restaurant.logo.width}" height="${menu.restaurant.logo.height}" />`
+              : `<span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>`
+          }
         </div>
         <button class="pp-search" type="button" aria-label="Search menu" aria-expanded="false" aria-controls="pp-search-panel">
-          <span aria-hidden="true">⌕</span>
+          <img class="pp-search__icon" src="${UI_ICONS.search}" alt="" aria-hidden="true" width="18" height="18" />
         </button>
       </header>
       ${toastAreaMarkup()}
@@ -250,6 +281,18 @@ function renderMenu(
       <p class="pp-notice">Compare is not available yet.</p>
     </div>
   `;
+
+  container.querySelector<HTMLImageElement>('.pp-logo__image')?.addEventListener(
+    'error',
+    (event) => {
+      const image = event.currentTarget as HTMLImageElement;
+      const name = document.createElement('span');
+      name.className = 'pp-logo__name';
+      name.textContent = menu.restaurant.name;
+      image.replaceWith(name);
+    },
+    { once: true },
+  );
 
   const tabButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('.pp-tab'));
   const categoryBlocks = Array.from(container.querySelectorAll<HTMLElement>('.pp-category'));
@@ -372,8 +415,21 @@ function attachSave(bind: () => () => void): () => void {
 
 // Removes the previous mount's Saved-route listener, so remounting never navigates twice.
 let stopRouting: () => void = () => {};
+// Detaches the active screen's Save and live-artwork lifecycle before the next screen or remount renders.
+let leaveScreen: () => void = () => {};
+
+function runLeaveScreen(): void {
+  const prev = leaveScreen;
+  leaveScreen = () => {};
+  prev();
+}
 
 export function mountMenuScreen(container: HTMLElement): void {
+  try {
+    runLeaveScreen();
+  } catch {
+    /* Ensure remaining mount teardown still runs if a screen cleanup callback throws. */
+  }
   teardownTracking?.();
   teardownTracking = null;
   activeLoad?.abort();
@@ -392,9 +448,7 @@ export function mountMenuScreen(container: HTMLElement): void {
   let currentMenu: Menu | null = null;
   // Shared by every screen, so the hearts, badge and Saved screen agree (S3-DIN-02).
   let saveState: SaveState | null = null;
-  let view: 'menu' | 'detail' | 'saved' = 'menu';
-  // Detaches the current screen's Save behaviour before the next screen renders.
-  let leaveScreen: () => void = () => {};
+  let view: 'menu' | 'detail' | 'saved' | 'compare' = 'menu';
   // True when this page added the Saved route to history, so leaving it can go back instead.
   let savedRouteAdded = false;
   let isLoading = false;
@@ -412,7 +466,9 @@ export function mountMenuScreen(container: HTMLElement): void {
   const menuViewedTrigger = createMenuViewedTrigger();
   // QR is out of scope (Nov 1), so this is always direct_link.
   const entrySource = 'direct_link' as const;
-  const canTrackUi = () => fixtureMode || (isLiveTracking() && isTrackingAllowed());
+  const production = import.meta.env.MODE === 'production';
+  const canTrackUi = () =>
+    (!production && fixtureMode) || (isLiveTracking() && isTrackingAllowed());
 
   const cleanupExposure = () => {
     exposureTimers.forEach((timer) => window.clearTimeout(timer));
@@ -536,8 +592,7 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   const switchScreen = (next: typeof view) => {
     if (view === 'menu') savedScroll = window.scrollY;
-    leaveScreen();
-    leaveScreen = () => {};
+    runLeaveScreen();
     disposeObserver();
     // Leaving a screen ends its tracking: exposure timers and the detail clock's final checkpoint.
     cleanupExposure();
@@ -562,32 +617,70 @@ export function mountMenuScreen(container: HTMLElement): void {
     startExposureTracking(menu);
   };
 
-  const showDetail = (dish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
+  // returning: back from the Compare picker, so the new opening is a back navigation.
+  // compareBack: opened with View details on a Compare result (source compare_view); Back returns
+  // to that result and the detail offers no Compare of its own.
+  const showDetail = (
+    requestedDish: CompleteDish,
+    from: 'menu_card' | 'saved_screen',
+    returning = false,
+    compareBack?: () => void,
+  ) => {
     if (!currentMenu || !saveState) return;
     const menu = currentMenu;
+    const dish = completeDishById(menu, requestedDish.dishId);
+    if (!dish) {
+      if (compareBack) leaveCompare();
+      else if (from === 'saved_screen') showSaved();
+      else showMenu('opener');
+      return;
+    }
     switchScreen('detail');
     const fromSaved = from === 'saved_screen';
-    renderDishDetail(
+    const stopPortion = renderDishDetail(
       container,
       dish,
-      fromSaved ? () => showSaved() : () => showMenu(),
+      compareBack ?? (fromSaved ? () => showSaved() : () => showMenu()),
       menu.notice,
+      compareBack ? undefined : () => showPicker(dish, from),
+      Boolean(compareBack),
+      () => {
+        if (!canTrackUi()) return;
+        track('dish_portion_opened', {
+          publication_revision_id: menu.publicationRevisionId,
+          dish_id: dish.dishId,
+          dish_revision_id: dish.dishRevisionId,
+        });
+      },
     );
-    if (fromSaved) {
+    if (fromSaved && !compareBack) {
       container.querySelector('.pp-detail__back')?.setAttribute('aria-label', 'Back to Saved');
     }
     const state = saveState;
-    leaveScreen = attachSave(() =>
+    const stopArtwork =
+      menu.source === 'published' && import.meta.env.VITE_PUBLIC_API_URL
+        ? mountLiveArtwork(container, dish, {
+            apiBase: import.meta.env.VITE_PUBLIC_API_URL,
+            venueId: menu.venueId,
+          })
+        : () => {};
+    const stopSave = attachSave(() =>
       bindDetailSave(container, { saveState: state, menu, send: track }),
     );
+    leaveScreen = () => {
+      stopPortion();
+      stopArtwork();
+      stopSave();
+    };
     window.scrollTo(0, 0);
 
     // The Saved screen's own entry point (DIN-02.5), unchanged.
-    if (fromSaved) {
+    if (fromSaved && !compareBack) {
       try {
         trackDishDetailOpened(menu, dish, {
           source: 'saved_screen',
           saveAvailable: state.isSaveAvailable(),
+          ...(returning ? { navRelation: 'back_navigation' as const } : {}),
         });
       } catch {}
       return;
@@ -596,11 +689,16 @@ export function mountMenuScreen(container: HTMLElement): void {
     // Consent begins a fresh opening; time from a disallowed stretch is never reused.
     resumeDetailTracking = () => {
       if (!canTrackUi()) return;
-      const exposureId = exposureIds.get(dish.dishId);
+      const exposureId = compareBack ? undefined : exposureIds.get(dish.dishId);
       const opening: DetailOpening = {
-        source: 'menu_card',
+        source: compareBack ? 'compare_view' : 'menu_card',
         saveAvailable: state.isSaveAvailable(),
         ...(exposureId === undefined ? {} : { fromExposureId: exposureId }),
+        ...(compareBack
+          ? { navRelation: 'from_compare' as const }
+          : returning
+            ? { navRelation: 'back_navigation' as const }
+            : {}),
       };
       const openingId = trackDishDetailOpened(menu, dish, opening, track, newOpeningId);
       if (!openingId) return;
@@ -628,6 +726,117 @@ export function mountMenuScreen(container: HTMLElement): void {
       };
     };
     resumeDetailTracking();
+  };
+
+  // Compare on a detail opens the picker (DIN-02.3); closing it returns to that detail's Compare
+  // button. The picker itself sends nothing.
+  const showPicker = (requestedDish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
+    if (!currentMenu) return;
+    const menu = currentMenu;
+    const dish = completeDishes(menu).find((dish) => dish.dishId === requestedDish.dishId);
+    if (!dish) {
+      if (from === 'saved_screen') showSaved();
+      else showMenu('opener');
+      return;
+    }
+    switchScreen('compare');
+    renderComparePicker(container, {
+      menu,
+      keptDishes: [dish],
+      selectionLimit: MAX_COMPARE_CHOICES,
+      onClose: () => {
+        showDetail(dish, from, true);
+        container.querySelector<HTMLElement>('.pp-detail__compare')?.focus();
+      },
+      onConfirm: (pickedDishIds) => {
+        const comparison = startComparison(menu, dish.dishId, pickedDishIds, newComparisonId);
+        if (comparison) showResult(comparison, 'start');
+      },
+    });
+    window.scrollTo(0, 0);
+  };
+
+  // Shows a comparison (DIN-02.4). dish_compared fires only when a result is actually displayed
+  // after a start or a replacement; coming back from a detail or a cancelled Replace shows it again
+  // silently. The same comparison_id is kept across Replace (matrix v0.1h D7).
+  let compareScroll = 0;
+  const leaveCompare = () => {
+    if (isSavedRoute()) leaveSaved();
+    else showMenu();
+  };
+  const showResult = (
+    comparison: Comparison,
+    action?: CompareAction,
+    focus?: CompareResultOptions['focus'],
+  ) => {
+    if (!currentMenu || !saveState) return;
+    const menu = currentMenu;
+    const state = saveState;
+    switchScreen('compare');
+    const shown = renderCompareResult(container, {
+      menu,
+      comparison,
+      focus,
+      onBackToMenu: leaveCompare,
+      onReplace: (side) => {
+        compareScroll = window.scrollY;
+        showReplacePicker(comparison, side);
+      },
+      onViewDetails: (dish, side) => {
+        compareScroll = window.scrollY;
+        showDetail(dish, 'menu_card', false, () =>
+          showResult(comparison, undefined, { side, control: 'view' }),
+        );
+      },
+    });
+    if (!shown) {
+      leaveCompare();
+      return;
+    }
+    // Coming back to the result (focus set) restores where the diner was, so the focused View
+    // details / Replace button is on screen (Azoz review #13); a new result starts at the top.
+    window.scrollTo(0, focus ? compareScroll : 0);
+    if (!action || !canTrackUi()) return;
+    try {
+      for (const payload of dishComparedPayloads(
+        menu,
+        comparison,
+        action,
+        state.isSaveAvailable(),
+        focus?.side,
+      ))
+        track('dish_compared', payload);
+    } catch {}
+  };
+
+  // Replace opens the picker for one side, keeping the other dish; both shown dishes are excluded.
+  const showReplacePicker = (comparison: Comparison, side: CompareSide) => {
+    if (!currentMenu) return;
+    const menu = currentMenu;
+    const keptDishes = comparisonDishes(menu, comparison)
+      .filter((entry) => entry.side !== side)
+      .map((entry) => entry.dish);
+    if (!keptDishes.length) {
+      leaveCompare();
+      return;
+    }
+    const back = { side, control: 'replace' } as const;
+    switchScreen('compare');
+    renderComparePicker(container, {
+      menu,
+      keptDishes,
+      selectionLimit: 1,
+      exclude: replaceExclusions(comparison),
+      confirmLabel: 'Replace Dish',
+      title: 'Replace Dish',
+      onClose: () => showResult(comparison, undefined, back),
+      onConfirm: ([pickedDishId]) => {
+        if (!pickedDishId) return;
+        const next = replaceSide(menu, comparison, side, pickedDishId);
+        if (next !== comparison) showResult(next, 'replace', back);
+      },
+    });
+    window.scrollTo(0, 0);
   };
 
   const showSaved = (recordView = true) => {
@@ -728,8 +937,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       }
     }
     cleanupExposure();
-    leaveScreen();
-    leaveScreen = () => {};
+    runLeaveScreen();
     renderMenu(container, next, (dish) => showDetail(dish, 'menu_card'));
     const state = saveState;
     if (state) {
@@ -795,10 +1003,14 @@ export function mountMenuScreen(container: HTMLElement): void {
             import('./published'),
             import('../tracking'),
             import('../tracking/delivery'),
-          ]).then(([published, tracking, delivery]): Promise<MenuLoadResult> | MenuLoadResult => {
+          ]).then(async ([published, tracking, delivery]): Promise<MenuLoadResult> => {
             const apiBase = import.meta.env.VITE_PUBLIC_API_URL;
             if (!apiBase) return { status: 'error' };
-            const route = menuRouteFromPath(window.location.pathname);
+            const route = await resolveMenuRoute(window.location.pathname, {
+              apiBase,
+              signal: controller.signal,
+            });
+            controller.signal.throwIfAborted();
             if (!route) return { status: 'unavailable' };
             const source = published.createPublishedMenuSource({
               apiBase,
@@ -812,7 +1024,14 @@ export function mountMenuScreen(container: HTMLElement): void {
                 };
                 // Every verified load, first or re-read, re-arms the timer for the new expiry.
                 activeRefresher?.schedule(info.expiresAt);
-                if (liveTrackingOn) return;
+                // The owner’s post-publish phone preview loads this URL in an iframe.
+                if (
+                  liveTrackingOn ||
+                  (production &&
+                    (location.origin !== PRODUCTION_DINER_ORIGIN || window.top !== window))
+                ) {
+                  return;
+                }
                 liveTrackingOn = true;
                 tracking.enableLiveTracking(
                   delivery.createLiveDeliver({
@@ -822,7 +1041,15 @@ export function mountMenuScreen(container: HTMLElement): void {
                     token: () => menuToken,
                     canSend: () => !controller.signal.aborted && tracking.isLiveTracking(),
                   }),
+                  () =>
+                    menuToken && !controller.signal.aborted
+                      ? {
+                          venueId: route.venueId,
+                          publicationRevisionId: menuToken.publicationRevisionId,
+                        }
+                      : undefined,
                 );
+                if (production) tracking.setTrackingAllowed(true);
               },
             });
             activeRefresher = createMenuRefresher({

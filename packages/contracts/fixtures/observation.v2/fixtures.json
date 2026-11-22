@@ -148,6 +148,20 @@
       "payload": {
         "shortlist_size": 1
       }
+    },
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000010",
+      "type": "dish_portion_opened",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 10,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "dish_id": "50000000-0000-4000-8000-000000000001",
+        "dish_revision_id": "60000000-0000-4000-8000-000000000001"
+      }
     }
   ],
   "invalid_events": [
@@ -322,6 +336,24 @@
         "payload": {
           "shortlist_size": 1,
           "dish_id": "50000000-0000-4000-8000-000000000001"
+        }
+      }
+    },
+    {
+      "name": "invalid_portion_open_with_activity",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000010",
+        "type": "dish_portion_opened",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 10,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "dish_id": "50000000-0000-4000-8000-000000000001",
+          "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+          "active_ms": 10000
         }
       }
     }

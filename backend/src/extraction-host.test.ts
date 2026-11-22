@@ -217,6 +217,44 @@ function runtime(running = false, overrides: Partial<ExtractionHostEnv> = {}) {
   return { actor, container, fetch, ctx };
 }
 
+describe('production extraction host', () => {
+  it('permits private portion processing without opening the menu OCR routes', async () => {
+    const { env, request, forward } = setup();
+    env.APP_ENV = 'production';
+    env.EXTRACTION_PRODUCTION_ENABLED = 'true';
+    env.EXTRACTION_PRODUCTION_PORTION_ONLY = 'true';
+    delete env.EXTRACTION_SOURCE_SIGNING_SECRET;
+    expect((await host.fetch(request('/health'), env)).status).toBe(200);
+    expect((await host.fetch(request('/extract', secret, 'POST'), env)).status).toBe(404);
+    expect((await host.fetch(request('/budget/reserve', secret, 'POST'), env)).status).toBe(404);
+    expect((await host.fetch(request('/sources/' + tenant + '/' + job), env)).status).toBe(404);
+
+    forward.mockResolvedValueOnce(Response.json({ status: 'ready' }));
+    const photo = new Request(
+      'https://extraction.peekaplate.app/v1/portion-uploads/' + job + '/' + tenant,
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + secret, 'Content-Type': 'application/octet-stream' },
+        body: 'fictional-photo-bytes',
+      },
+    );
+    expect(await (await host.fetch(photo, env)).json()).toEqual({ status: 'ready' });
+    expect(forward).toHaveBeenCalledTimes(2);
+    expect(await forward.mock.calls[1]![0].text()).toBe('fictional-photo-bytes');
+  });
+
+  it('requires activation and credentials before reaching the separate production container', async () => {
+    const { env, request, forward } = setup();
+    env.APP_ENV = 'production';
+    expect((await host.fetch(request('/health'), env)).status).toBe(503);
+    env.EXTRACTION_PRODUCTION_ENABLED = 'true';
+    expect((await host.fetch(request('/health', 'wrong-test-key'), env)).status).toBe(401);
+    expect(forward).not.toHaveBeenCalled();
+    expect((await host.fetch(request('/health'), env)).status).toBe(200);
+    expect(env.EXTRACTOR.getByName).toHaveBeenCalledWith('production-extractor');
+  });
+});
+
 describe('direct Container startup', () => {
   afterEach(() => vi.useRealTimers());
 
@@ -233,6 +271,9 @@ describe('direct Container startup', () => {
       env: {
         EXTRACTION_SERVICE_SECRET: secret,
         EXTRACTION_SOURCE_ORIGIN: 'https://peekaplate-extraction-staging.vxkong.workers.dev',
+        EXTRACTION_ENVIRONMENT: 'staging',
+        PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
+        U2NET_HOME: '/app/models',
       },
     });
     expect(container.setInactivityTimeout).toHaveBeenCalledWith(60_000);
@@ -242,6 +283,29 @@ describe('direct Container startup', () => {
     expect(forwarded.method).toBe('POST');
     expect(await forwarded.text()).toBe('synthetic');
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts the portion-only container without provider credentials or Internet access', async () => {
+    const { actor, container } = runtime(false, {
+      APP_ENV: 'production',
+      EXTRACTION_PRODUCTION_PORTION_ONLY: 'true',
+      EXTRACTION_SOURCE_ORIGIN: 'https://extraction.peekaplate.app',
+      OCR_SPACE_API_KEY: 'synthetic-ocr-key',
+      MENU_AI_API_KEY: 'synthetic-model-key',
+    });
+    expect((await actor.fetch(new Request('https://host.invalid/health'))).status).toBe(200);
+    expect(container.start).toHaveBeenCalledWith({
+      image: container.images.base,
+      instance: 'standard-1',
+      enableInternet: false,
+      env: {
+        EXTRACTION_SERVICE_SECRET: secret,
+        EXTRACTION_SOURCE_ORIGIN: 'https://extraction.peekaplate.app',
+        EXTRACTION_ENVIRONMENT: 'production',
+        PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
+        U2NET_HOME: '/app/models',
+      },
+    });
   });
 
   it('forwards only configured provider settings without logging credentials', async () => {
@@ -279,6 +343,9 @@ describe('direct Container startup', () => {
         env: {
           EXTRACTION_SERVICE_SECRET: secret,
           EXTRACTION_SOURCE_ORIGIN: 'https://peekaplate-extraction-staging.vxkong.workers.dev',
+          EXTRACTION_ENVIRONMENT: 'staging',
+          PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
+          U2NET_HOME: '/app/models',
           ...settings,
         },
       });
@@ -302,6 +369,9 @@ describe('direct Container startup', () => {
       env: {
         EXTRACTION_SERVICE_SECRET: secret,
         EXTRACTION_SOURCE_ORIGIN: 'https://peekaplate-extraction-staging.vxkong.workers.dev',
+        EXTRACTION_ENVIRONMENT: 'staging',
+        PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
+        U2NET_HOME: '/app/models',
       },
     });
   });
@@ -364,6 +434,139 @@ describe('direct Container startup', () => {
 });
 
 describe('staging extraction host', () => {
+  it('forwards a bounded private photo once through the existing authenticated container', async () => {
+    const { env, forward, get, put } = setup();
+    const path = `/v1/portion-uploads/${tenant}/${job}`;
+    forward.mockResolvedValueOnce(Response.json({ status: 'ready', publication_eligible: false }));
+    const response = await host.fetch(
+      new Request(`https://host.invalid${path}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/octet-stream' },
+        body: 'synthetic-photo',
+      }),
+      env,
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({ status: 'ready', publication_eligible: false });
+    expect(env.EXTRACTOR.getByName).toHaveBeenCalledWith('staging-extractor');
+    expect(forward).toHaveBeenCalledOnce();
+    const forwarded = forward.mock.calls[0]![0];
+    expect(new URL(forwarded.url).pathname).toBe(path);
+    expect(forwarded.headers.get('authorization')).toBe(`Bearer ${secret}`);
+    expect(forwarded.redirect).toBe('manual');
+    expect(await forwarded.text()).toBe('synthetic-photo');
+    expect(get).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported portion paths, methods, credentials and request byte sizes before forwarding', async () => {
+    const { env, forward } = setup();
+    const path = `/v1/portion-uploads/${tenant}/${job}`;
+    for (const [suffix, method, token, body, contentType, status] of [
+      ['', 'GET', secret, undefined, 'application/octet-stream', 404],
+      ['/extra', 'POST', secret, 'photo', 'application/octet-stream', 404],
+      ['?other=1', 'POST', secret, 'photo', 'application/octet-stream', 400],
+      ['', 'POST', 'wrong', 'photo', 'application/octet-stream', 401],
+      ['', 'POST', secret, 'photo', 'text/plain', 415],
+      ['', 'POST', secret, '', 'application/octet-stream', 400],
+      ['', 'POST', secret, new Uint8Array(12_000_001), 'application/octet-stream', 413],
+    ] as const) {
+      const response = await host.fetch(
+        new Request(`https://host.invalid${path}${suffix}`, {
+          method,
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType },
+          ...(body !== undefined ? { body } : {}),
+        }),
+        env,
+      );
+      expect(response.status).toBe(status);
+    }
+    expect(
+      (
+        await host.fetch(
+          new Request('https://host.invalid/v1/portion-uploads/invalid/invalid', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${secret}` },
+            body: 'photo',
+          }),
+          env,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await host.fetch(
+          new Request(`https://host.invalid${path}`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${secret}`,
+              'Content-Type': 'application/octet-stream',
+              'Content-Length': '12000001',
+            },
+            body: 'photo',
+          }),
+          env,
+        )
+      ).status,
+    ).toBe(413);
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('bounds portion response bytes and sanitizes processor failures', async () => {
+    const { env, forward } = setup();
+    const request = () =>
+      new Request(`https://host.invalid/v1/portion-uploads/${tenant}/${job}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/octet-stream' },
+        body: 'photo',
+      });
+    forward.mockResolvedValueOnce(
+      new Response('x'.repeat(300_001), { headers: { 'Content-Type': 'application/json' } }),
+    );
+    expect((await host.fetch(request(), env)).status).toBe(502);
+    forward.mockResolvedValueOnce(
+      Response.json({ error: 'photo_processing_failed', private: 'not exposed' }, { status: 422 }),
+    );
+    const failed = await host.fetch(request(), env);
+    expect(failed.status).toBe(422);
+    expect(await failed.json()).toEqual({ error: 'photo_processing_failed' });
+    forward.mockResolvedValueOnce(new Response('not JSON'));
+    expect((await host.fetch(request(), env)).status).toBe(502);
+  });
+
+  it('cancels a stalled portion response under the complete 220-second deadline', async () => {
+    const { env, forward } = setup();
+    const controller = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+    const cancel = vi.fn();
+    try {
+      forward.mockResolvedValueOnce(
+        new Response(new ReadableStream({ cancel }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const response = host.fetch(
+        new Request(`https://host.invalid/v1/portion-uploads/${tenant}/${job}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${secret}`,
+            'Content-Type': 'application/octet-stream',
+          },
+          body: 'photo',
+        }),
+        env,
+      );
+      await vi.waitFor(() => expect(forward).toHaveBeenCalledOnce());
+      controller.abort();
+      expect((await response).status).toBe(502);
+      expect(timeout).toHaveBeenCalledWith(220_000);
+      expect(cancel).toHaveBeenCalledOnce();
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
   it('denies a valid service credential and job-A capability requesting another valid job', async () => {
     const { env, get, request } = setup();
     const otherJob = '00000000-0000-4000-8000-000000000003';
@@ -807,5 +1010,275 @@ describe('staging extraction host', () => {
     const result = await host.fetch(request(`/sources/${tenant}/${job}`), env);
     expect(result.status).toBe(502);
     expect(await result.text()).not.toContain('synthetic-sensitive-detail');
+  });
+});
+
+describe('provider call budget enforcement', () => {
+  function createBudgetContainer() {
+    const budgets = new Map<
+      string,
+      { tenant_id: string; job_id: string; max_calls: number; used_calls: number }
+    >();
+    const reservations = new Map<
+      string,
+      { run_id: string; provider: string; granted: number; used_calls: number; max_calls: number }
+    >();
+    const storage = {
+      transactionSync: <T>(fn: () => T): T => fn(),
+      sql: {
+        exec: <T = Record<string, unknown>>(query: string, ...params: unknown[]) => {
+          const normalized = query.replace(/\s+/g, ' ').trim();
+          if (normalized.startsWith('CREATE TABLE IF NOT EXISTS')) {
+            return { toArray: () => [] as T[] };
+          }
+          if (
+            normalized.startsWith(
+              'SELECT run_id, granted, used_calls, max_calls FROM provider_call_reservations',
+            )
+          ) {
+            const row = reservations.get(String(params[0]));
+            return { toArray: () => (row ? [row as unknown as T] : []) };
+          }
+          if (normalized.startsWith('INSERT OR IGNORE INTO provider_call_budget')) {
+            const [runId, tenantId, jobId, maxCalls] = params as [string, string, string, number];
+            if (!budgets.has(runId)) {
+              budgets.set(runId, {
+                tenant_id: tenantId,
+                job_id: jobId,
+                max_calls: maxCalls,
+                used_calls: 0,
+              });
+            }
+            return { toArray: () => [] as T[] };
+          }
+          if (normalized.startsWith('SELECT max_calls, used_calls FROM provider_call_budget')) {
+            const row = budgets.get(String(params[0]));
+            return { toArray: () => (row ? [row as unknown as T] : []) };
+          }
+          if (normalized.startsWith('UPDATE provider_call_budget SET used_calls')) {
+            const [usedCalls, runId] = params as [number, string];
+            const row = budgets.get(runId);
+            if (row) row.used_calls = usedCalls;
+            return { toArray: () => [] as T[] };
+          }
+          if (normalized.startsWith('INSERT INTO provider_call_reservations')) {
+            const [reservationKey, runId, provider, usedCalls, maxCalls] = params as [
+              string,
+              string,
+              string,
+              number,
+              number,
+            ];
+            const granted = normalized.includes(', 1, ?, ?, ?)') ? 1 : 0;
+            if (reservations.has(reservationKey)) {
+              throw new Error(
+                'UNIQUE constraint failed: provider_call_reservations.reservation_key',
+              );
+            }
+            reservations.set(reservationKey, {
+              run_id: runId,
+              provider,
+              granted,
+              used_calls: usedCalls,
+              max_calls: maxCalls,
+            });
+            return { toArray: () => [] as T[] };
+          }
+          throw new Error(`Unexpected SQL in test: ${normalized}`);
+        },
+      },
+    };
+    const env = {
+      APP_ENV: 'staging',
+      EXTRACTION_SERVICE_SECRET: secret,
+      EXTRACTION_SOURCE_SIGNING_SECRET: signingSecret,
+      EXTRACTION_SOURCE_ORIGIN: 'https://extract.example',
+      SOURCE_BUCKET: { get: vi.fn(), put: vi.fn() },
+      EXTRACTOR: {
+        getByName: () => container,
+      },
+    } as unknown as ExtractionHostEnv;
+    const container = new ExtractionContainer({ storage } as unknown as DurableObjectState, env);
+    let activeContainer = container;
+    const envWithRestart = {
+      ...env,
+      EXTRACTOR: {
+        getByName: () => activeContainer,
+      },
+    } as unknown as ExtractionHostEnv;
+    return {
+      env: envWithRestart,
+      container,
+      restartContainer: () => {
+        activeContainer = new ExtractionContainer(
+          { storage } as unknown as DurableObjectState,
+          envWithRestart,
+        );
+        return activeContainer;
+      },
+    };
+  }
+
+  function budgetRequest(
+    body: Record<string, unknown>,
+    overrides: Partial<{
+      auth: string;
+      cap: string;
+      tenantId: string;
+      jobId: string;
+      sourceHash: string;
+    }> = {},
+  ) {
+    return new Request('https://extract.example/budget/reserve', {
+      method: 'POST',
+      headers: {
+        Authorization: overrides.auth ?? `Bearer ${secret}`,
+        'Content-Type': 'application/json',
+        'X-Source-Capability': overrides.cap ?? capability,
+        'X-Tenant-ID': overrides.tenantId ?? tenant,
+        'X-Job-ID': overrides.jobId ?? job,
+        'X-Source-Hash': overrides.sourceHash ?? 'a'.repeat(64),
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('enforces a hard cap of 2 reservations per run across providers and blocks the 3rd', async () => {
+    const { env } = createBudgetContainer();
+    const first = await host.fetch(
+      budgetRequest({ reservation_key: 'res-1', provider: 'google_studio' }),
+      env,
+    );
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({
+      granted: true,
+      used_calls: 1,
+      max_calls: 2,
+      remaining_calls: 1,
+    });
+
+    const second = await host.fetch(
+      budgetRequest({ reservation_key: 'res-2', provider: 'ocr_space' }),
+      env,
+    );
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({
+      granted: true,
+      used_calls: 2,
+      max_calls: 2,
+      remaining_calls: 0,
+    });
+
+    const third = await host.fetch(
+      budgetRequest({ reservation_key: 'res-3', provider: 'qwen' }),
+      env,
+    );
+    expect(third.status).toBe(429);
+    expect(await third.json()).toMatchObject({
+      granted: false,
+      error: 'provider_call_budget_exhausted',
+      used_calls: 2,
+      max_calls: 2,
+      remaining_calls: 0,
+    });
+  });
+
+  it('is idempotent per reservation_key and isolates concurrent calls', async () => {
+    const { env } = createBudgetContainer();
+    const replay1 = await host.fetch(
+      budgetRequest({ reservation_key: 'idem-1', provider: 'google_studio' }),
+      env,
+    );
+    const replay2 = await host.fetch(
+      budgetRequest({ reservation_key: 'idem-1', provider: 'google_studio' }),
+      env,
+    );
+    expect(replay1.status).toBe(200);
+    expect(replay2.status).toBe(200);
+    expect((await replay2.json()) as { used_calls: number }).toMatchObject({ used_calls: 1 });
+
+    const burst = await Promise.all(
+      ['c-1', 'c-2', 'c-3', 'c-4'].map((key) =>
+        host.fetch(budgetRequest({ reservation_key: key, provider: 'glm' }), env),
+      ),
+    );
+    const grantedCount = burst.filter((r) => r.status === 200).length;
+    const deniedCount = burst.filter((r) => r.status === 429).length;
+    expect(grantedCount).toBe(1);
+    expect(deniedCount).toBe(3);
+  });
+
+  it('rejects missing/mismatched capability or auth and isolates separate job runs', async () => {
+    const { env } = createBudgetContainer();
+    expect(
+      (
+        await host.fetch(
+          budgetRequest({ reservation_key: 'u-1', provider: 'qwen' }, { auth: 'Bearer wrong' }),
+          env,
+        )
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await host.fetch(
+          budgetRequest(
+            { reservation_key: 'u-2', provider: 'qwen' },
+            { tenantId: '00000000-0000-4000-8000-000000000099' },
+          ),
+          env,
+        )
+      ).status,
+    ).toBe(403);
+
+    const job2 = '00000000-0000-4000-8000-000000000099';
+    const cap2 = await mintExtractionCapability(
+      { tenantId: tenant, jobId: job2, sourceHash: 'b'.repeat(64) },
+      signingSecret,
+    );
+    const resOtherJob = await host.fetch(
+      budgetRequest(
+        { reservation_key: 'job2-1', provider: 'google_studio' },
+        { cap: cap2, jobId: job2, sourceHash: 'b'.repeat(64) },
+      ),
+      env,
+    );
+    expect(resOtherJob.status).toBe(200);
+    expect((await resOtherJob.json()) as { used_calls: number }).toMatchObject({ used_calls: 1 });
+
+    // Reusing an existing reservation_key from another job/tenant fails closed with 403.
+    const crossKeyReplay = await host.fetch(
+      budgetRequest(
+        { reservation_key: 'job2-1', provider: 'google_studio' },
+        { cap: capability, jobId: job, sourceHash: 'a'.repeat(64) },
+      ),
+      env,
+    );
+    expect(crossKeyReplay.status).toBe(403);
+    expect(await crossKeyReplay.json()).toMatchObject({ error: 'reservation_scope_mismatch' });
+  });
+
+  it('persists budget exhaustion across container/DO instance restarts', async () => {
+    const { env, restartContainer } = createBudgetContainer();
+    expect(
+      (await host.fetch(budgetRequest({ reservation_key: 'r-1', provider: 'google_studio' }), env))
+        .status,
+    ).toBe(200);
+    expect(
+      (await host.fetch(budgetRequest({ reservation_key: 'r-2', provider: 'qwen' }), env)).status,
+    ).toBe(200);
+
+    restartContainer();
+
+    const afterRestart = await host.fetch(
+      budgetRequest({ reservation_key: 'r-3', provider: 'glm' }),
+      env,
+    );
+    expect(afterRestart.status).toBe(429);
+    expect(await afterRestart.json()).toMatchObject({
+      granted: false,
+      error: 'provider_call_budget_exhausted',
+      used_calls: 2,
+      max_calls: 2,
+    });
   });
 });

@@ -39,6 +39,36 @@ afterEach(() => {
 });
 
 describe('shared dispatch', () => {
+  it('uses verified public scope only for the matching publication, including after a swap', async () => {
+    const tracking = await fresh();
+    const sink = fakeSink();
+    const canonical = recordingDeliver();
+    const replacement = 'a5000000-0000-4000-8000-000000000002';
+    const venueId = 'a5000000-0000-4000-8000-000000000003';
+    let publicationRevisionId = PUBLICATION;
+    tracking.enableLiveTracking(canonical.deliver, () => ({ venueId, publicationRevisionId }));
+    tracking.connectPostHog(sink);
+    tracking.setTrackingAllowed(true);
+
+    tracking.track('menu_viewed', menuViewed);
+    publicationRevisionId = replacement;
+    tracking.track('menu_viewed', menuViewed);
+    tracking.track('menu_viewed', { ...menuViewed, publication_revision_id: replacement });
+    await flush();
+
+    expect(sink.capturePostHog.mock.calls.map(([, , ids]) => ids.scope)).toEqual([
+      { venueId, publicationRevisionId: PUBLICATION },
+      undefined,
+      { venueId, publicationRevisionId: replacement },
+    ]);
+    expect(canonical.batches.flat().map((event) => event.publication_revision_id)).toEqual([
+      PUBLICATION,
+      PUBLICATION,
+      replacement,
+    ]);
+    expect(canonical.batches.flat().every(({ payload }) => !('venue_id' in payload))).toBe(true);
+  });
+
   it('suspends both destinations on publication withdrawal without changing consent', async () => {
     const tracking = await fresh();
     const sink = fakeSink();
@@ -327,6 +357,31 @@ function fakeSdk() {
 }
 
 describe('PostHog adapter wiring', () => {
+  it('captures consent-triggered menu views when the screen subscribes before the adapter', async () => {
+    const tracking = await fresh();
+    const sdk = fakeSdk();
+    const canonical = recordingDeliver();
+    tracking.enableLiveTracking(canonical.deliver);
+    const stopScreen = tracking.onTrackingAllowedChange((allowed) => {
+      if (allowed) tracking.track('menu_viewed', menuViewed);
+    });
+    tracking.connectPostHogFromEnv(postHogEnv, { origin: ORIGIN, loadSdk: sdk.loadSdk });
+    try {
+      tracking.setTrackingAllowed(true);
+      await flush();
+      expect(canonical.sent()).toHaveLength(1);
+      expect(sdk.captures.map((event) => event.uuid)).toEqual(canonical.sent());
+      tracking.setTrackingAllowed(false);
+      tracking.setTrackingAllowed(true);
+      await flush();
+      expect(canonical.sent()).toHaveLength(2);
+      expect(sdk.captures.map((event) => event.uuid)).toEqual(canonical.sent());
+      expect(sdk.instances).toHaveLength(2);
+    } finally {
+      stopScreen();
+    }
+  });
+
   it('publication suspension discards a capture waiting for the SDK to load', async () => {
     const tracking = await fresh();
     const sdk = fakeSdk();

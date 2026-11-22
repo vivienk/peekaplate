@@ -1,0 +1,608 @@
+{
+  "verifiedAt": "2026-11-12T15:31:16.439Z",
+  "scope": "Existing staging API; labelled synthetic venue; local console-origin Chromium harness",
+  "runtime": {
+    "mainCommit": "fad0eb0870ade177a98ba035fac8cdb9e0964f40",
+    "workerVersion": "58034c48-e720-4d13-b5e4-28af5621b150",
+    "migration": "20261112010000",
+    "runtimeChangedForThisRetest": false
+  },
+  "auth": {
+    "freshEmailVerified": true,
+    "genuineDedicatedStaffIdentity": true,
+    "settingsOrPasswordChanged": false,
+    "credentialsSaved": false,
+    "issue": "Gmail cached/trimmed the newest message body, leaving an older link visible to the previous verifier.",
+    "correction": "Refresh the conversation, match the latest delivery time, expand Show trimmed content, and verify that complete link once with its original type.",
+    "uiEvidence": {
+      "freshLinkCountBeforeExpansion": 0,
+      "freshLinkCountAfterExpansion": 1
+    }
+  },
+  "counts": {
+    "hostedWorkspaceHttpChecks": 53,
+    "serverWorkspaceHttpChecks": 16,
+    "chromiumWorkspaceHttpChecks": 37,
+    "chromiumAssertions": 29,
+    "readOnlyDatabasePostconditions": 3
+  },
+  "serverHttp": [
+    {
+      "label": "anonymous save denied",
+      "status": 401,
+      "expected": 401,
+      "passed": true
+    },
+    {
+      "label": "cross-venue save denied",
+      "status": 403,
+      "expected": 403,
+      "passed": true
+    },
+    {
+      "label": "manual incomplete save",
+      "status": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "label": "identical save receipt replay",
+      "status": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "label": "stale manual version denied",
+      "status": 409,
+      "expected": 409,
+      "passed": true
+    },
+    {
+      "label": "manual draft reload",
+      "status": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "label": "private synthetic photo upload",
+      "status": 201,
+      "expected": 201,
+      "passed": true
+    },
+    {
+      "label": "private photo bytes verified",
+      "status": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "label": "anonymous photo read denied",
+      "status": 401,
+      "expected": 401,
+      "passed": true
+    },
+    {
+      "label": "ordered image group accepted",
+      "status": 202,
+      "expected": 202,
+      "passed": true
+    },
+    {
+      "label": "first image verified without extraction dispatch",
+      "status": 202,
+      "expected": 202,
+      "passed": true
+    },
+    {
+      "label": "group processing resume state",
+      "status": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "label": "whole group cancel fenced",
+      "status": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "label": "whole group cancel idempotent replay",
+      "status": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "label": "retained extraction jobs inspected",
+      "status": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "label": "retained genuine extraction artifact bootstraps review",
+      "status": 200,
+      "expected": 200,
+      "passed": true
+    }
+  ],
+  "chromium": {
+    "origin": "http://127.0.0.1:5174",
+    "requests": [
+      {
+        "label": "browser draft resume",
+        "method": "GET",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 2000
+      },
+      {
+        "label": "browser photo reference saved",
+        "method": "PUT",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1744
+      },
+      {
+        "label": "browser attached photo survives reload",
+        "method": "GET",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1142
+      },
+      {
+        "label": "browser identical attachment replay",
+        "method": "PUT",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1198
+      },
+      {
+        "label": "browser stale attachment rejected",
+        "method": "PUT",
+        "status": 409,
+        "expected": 409,
+        "passed": true,
+        "elapsedMs": 1466
+      },
+      {
+        "label": "photo belonging to another draft rejected",
+        "method": "PUT",
+        "status": 404,
+        "expected": 404,
+        "passed": true,
+        "elapsedMs": 1614
+      },
+      {
+        "label": "browser private photo download",
+        "method": "GET",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1290
+      },
+      {
+        "label": "browser anonymous photo denied",
+        "method": "GET",
+        "status": 401,
+        "expected": 401,
+        "passed": true,
+        "elapsedMs": 80
+      },
+      {
+        "label": "browser cross-venue photo denied",
+        "method": "GET",
+        "status": 403,
+        "expected": 403,
+        "passed": true,
+        "elapsedMs": 575
+      },
+      {
+        "label": "manual approval requires current confirmation",
+        "method": "POST",
+        "status": 409,
+        "expected": 409,
+        "passed": true,
+        "elapsedMs": 1021
+      },
+      {
+        "label": "manual draft approved with current version",
+        "method": "POST",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 2624
+      },
+      {
+        "label": "manual approval receipt replays",
+        "method": "POST",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 698
+      },
+      {
+        "label": "one-page PDF manifest",
+        "method": "POST",
+        "status": 202,
+        "expected": 202,
+        "passed": true,
+        "elapsedMs": 2139
+      },
+      {
+        "label": "one-page manifest idempotency",
+        "method": "POST",
+        "status": 202,
+        "expected": 202,
+        "passed": true,
+        "elapsedMs": 1774
+      },
+      {
+        "label": "one-page PDF bytes validation",
+        "method": "PUT",
+        "status": 202,
+        "expected": 202,
+        "passed": true,
+        "elapsedMs": 2672
+      },
+      {
+        "label": "browser PDF job resume",
+        "method": "GET",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1277
+      },
+      {
+        "label": "changed PDF bytes rejected for the same slot",
+        "method": "PUT",
+        "status": 409,
+        "expected": 409,
+        "passed": true,
+        "elapsedMs": 1458
+      },
+      {
+        "label": "eleven-page PDF manifest",
+        "method": "POST",
+        "status": 202,
+        "expected": 202,
+        "passed": true,
+        "elapsedMs": 1816
+      },
+      {
+        "label": "eleven-page manifest idempotency",
+        "method": "POST",
+        "status": 202,
+        "expected": 202,
+        "passed": true,
+        "elapsedMs": 1551
+      },
+      {
+        "label": "eleven-page PDF bytes validation",
+        "method": "PUT",
+        "status": 400,
+        "expected": 400,
+        "passed": true,
+        "elapsedMs": 546
+      },
+      {
+        "label": "synthetic PDF group cancelled",
+        "method": "POST",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1682
+      },
+      {
+        "label": "synthetic PDF group cancelled",
+        "method": "POST",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1879
+      },
+      {
+        "label": "browser retained review session reload",
+        "method": "GET",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 886
+      },
+      {
+        "label": "browser pending extracted drafts",
+        "method": "GET",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1021
+      },
+      {
+        "label": "browser owner corrections persisted",
+        "method": "POST",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1452
+      },
+      {
+        "label": "browser correction receipt replay",
+        "method": "POST",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 693
+      },
+      {
+        "label": "browser stale review rejected",
+        "method": "POST",
+        "status": 409,
+        "expected": 409,
+        "passed": true,
+        "elapsedMs": 1056
+      },
+      {
+        "label": "browser corrected review survives reload",
+        "method": "GET",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 820
+      },
+      {
+        "label": "changed extraction originals rejected",
+        "method": "PUT",
+        "status": 409,
+        "expected": 409,
+        "passed": true,
+        "elapsedMs": 184
+      },
+      {
+        "label": "stale review cannot approve a dish",
+        "method": "POST",
+        "status": 409,
+        "expected": 409,
+        "passed": true,
+        "elapsedMs": 1173
+      },
+      {
+        "label": "current reviewed candidate approved",
+        "method": "POST",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 2881
+      },
+      {
+        "label": "later review correction remains separate",
+        "method": "POST",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 1369
+      },
+      {
+        "label": "approved receipt remains frozen after later edits",
+        "method": "POST",
+        "status": 200,
+        "expected": 200,
+        "passed": true,
+        "elapsedMs": 797
+      },
+      {
+        "label": "existing JWT denied after owner becomes viewer",
+        "method": "GET",
+        "status": 403,
+        "expected": 403,
+        "passed": true,
+        "elapsedMs": 717
+      },
+      {
+        "label": "viewer cannot read private photo",
+        "method": "GET",
+        "status": 403,
+        "expected": 403,
+        "passed": true,
+        "elapsedMs": 947
+      },
+      {
+        "label": "viewer cannot read review session",
+        "method": "GET",
+        "status": 403,
+        "expected": 403,
+        "passed": true,
+        "elapsedMs": 495
+      },
+      {
+        "label": "viewer cannot list upload groups",
+        "method": "GET",
+        "status": 403,
+        "expected": 403,
+        "passed": true,
+        "elapsedMs": 554
+      }
+    ],
+    "assertions": [
+      {
+        "label": "one fresh test sign-in email accepted",
+        "passed": true
+      },
+      {
+        "label": "link destination is the existing Supabase project",
+        "passed": true
+      },
+      {
+        "label": "verification preserves the original email link type",
+        "passed": true
+      },
+      {
+        "label": "fresh link verifies once",
+        "passed": true
+      },
+      {
+        "label": "real session belongs to the existing dedicated staging account",
+        "passed": true
+      },
+      {
+        "label": "manual draft has no fabricated extraction",
+        "passed": true
+      },
+      {
+        "label": "photo attachment increments working draft version",
+        "passed": true
+      },
+      {
+        "label": "saved photo reference survives API reload",
+        "passed": true
+      },
+      {
+        "label": "replayed save has no extra version",
+        "passed": true
+      },
+      {
+        "label": "private photo bytes match the uploaded source",
+        "passed": true
+      },
+      {
+        "label": "approval preserves the private photo reference",
+        "passed": true
+      },
+      {
+        "label": "proposed ingredients and unknown allergens are not confirmed food claims",
+        "passed": true
+      },
+      {
+        "label": "manual approval replay does not create another dish revision",
+        "passed": true
+      },
+      {
+        "label": "one-page manifest retry reuses its group",
+        "passed": true
+      },
+      {
+        "label": "actual PDF upload marks the group ready",
+        "passed": true
+      },
+      {
+        "label": "source hash retained while normal Queue delivery stays paused",
+        "passed": true
+      },
+      {
+        "label": "eleven-page manifest retry reuses its group",
+        "passed": true
+      },
+      {
+        "label": "eleven-page PDF is rejected by the real page-count parser",
+        "passed": true
+      },
+      {
+        "label": "synthetic PDF job is fenced before any provider processing",
+        "passed": true
+      },
+      {
+        "label": "synthetic PDF job is fenced before any provider processing",
+        "passed": true
+      },
+      {
+        "label": "a pending synthetic candidate is available for independent review",
+        "passed": true
+      },
+      {
+        "label": "correction has a durable new version and effective price",
+        "passed": true
+      },
+      {
+        "label": "identical correction retry does not add an event version",
+        "passed": true
+      },
+      {
+        "label": "corrected name survives API reload",
+        "passed": true
+      },
+      {
+        "label": "approval snapshots the effective owner corrections",
+        "passed": true
+      },
+      {
+        "label": "extracted unknown allergens remain unknown after approval",
+        "passed": true
+      },
+      {
+        "label": "later working review records the new correction",
+        "passed": true
+      },
+      {
+        "label": "later corrections do not change the approved receipt",
+        "passed": true
+      },
+      {
+        "label": "only the current test session was signed out",
+        "passed": true
+      }
+    ],
+    "phases": [
+      {
+        "name": "fresh email delivery",
+        "passed": true,
+        "elapsedMs": 1195
+      },
+      {
+        "name": "genuine browser staff session",
+        "passed": true,
+        "elapsedMs": 517
+      },
+      {
+        "name": "draft and private photo",
+        "passed": true,
+        "elapsedMs": 15461
+      },
+      {
+        "name": "PDF upload boundaries and cancellation",
+        "passed": true,
+        "elapsedMs": 16807
+      },
+      {
+        "name": "artifact review and approval",
+        "passed": true,
+        "elapsedMs": 12345
+      },
+      {
+        "name": "current viewer denial",
+        "passed": true,
+        "elapsedMs": 2732
+      },
+      {
+        "name": "end current test session",
+        "passed": true,
+        "elapsedMs": 558
+      }
+    ],
+    "activePhaseSeconds": 49.615,
+    "timingNote": "Active phase time excludes inbox reading and operator/UI waiting."
+  },
+  "independent": {
+    "privateR2PdfBytesMatchBrowserUpload": true,
+    "database": {
+      "manualDraftAndPrivatePhotoPersisted": true,
+      "approvedPriceRemains9WhileWorkingReviewIs9_5": true,
+      "uploadedPdfJobCancelled": true
+    }
+  },
+  "cleanup": {
+    "testMembershipRestoredToViewer": true,
+    "existingJwtDeniedAfterRestoration": true,
+    "testSessionsEnded": true,
+    "normalQueuesAndDlqsPaused": true,
+    "temporaryLocalPageRemoved": true,
+    "originalAuthSourceAndServerPreserved": true,
+    "syntheticAuditRowsAndPrivateObjectsRetained": true
+  },
+  "limitations": [
+    "No new OCR/model request; review used the retained genuine two-dish extraction.",
+    "One cancelled synthetic PDF delivery may remain queued until normal handling or expiry; no existing backlog was purged.",
+    "This proves backend/browser transport, not the unfinished production S06–S09 screens.",
+    "Auth PR143/146 remain held for the complete dashboard flow; production was not tested."
+  ]
+}

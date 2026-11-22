@@ -17,6 +17,7 @@ test('integration launcher accepts pnpm mjs entry points and preserves failure r
     assert.deepEqual(args.slice(1), ['run', '--config', 'vitest.db.config.ts']);
     assert.equal(options.env.PEEKAPLATE_DB_TEST_URL, database.runtimeUrl);
     assert.equal(options.env.PEEKAPLATE_DB_ADMIN_URL, database.adminUrl);
+    assert.equal(options.timeout, 300_000);
     const result = spawnSync(command, [args[0], '--version'], {
       cwd: options.cwd,
       env: options.env,
@@ -29,6 +30,10 @@ test('integration launcher accepts pnpm mjs entry points and preserves failure r
     return result;
   });
   assert.equal(launched, true);
+  assert.throws(
+    () => runIntegrationTests(database, () => ({ status: null, error: new Error('ETIMEDOUT') })),
+    /real database integration tests: ETIMEDOUT/,
+  );
   assert.throws(
     () => runIntegrationTests(database, () => ({ status: 1, stderr: 'runner failure' })),
     /real database integration tests: exited 1.*runner failure/s,

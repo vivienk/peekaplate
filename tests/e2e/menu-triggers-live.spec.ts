@@ -22,7 +22,11 @@ async function open(page: Page) {
       response,
       body: (await response.text())
         .replaceAll('import.meta.env.VITE_MENU_SOURCE', '"live"')
-        .replaceAll('import.meta.env.VITE_PUBLIC_API_URL', '"http://127.0.0.1:5173"'),
+        .replaceAll('import.meta.env.VITE_PUBLIC_API_URL', '"http://127.0.0.1:5173"')
+        .replace(
+          'currentMenu = next;',
+          'currentMenu = next; window.refreshedPublication = next.publicationRevisionId;',
+        ),
     });
   });
   await page.route('**/public/venues/**', async (route) =>
@@ -105,11 +109,16 @@ test('opting in on an open detail starts a new opening without preconsent time',
     active_ms: 5000,
     final: false,
   });
-  await page.clock.runFor(5000);
-  const deliveries = await page.evaluate(
-    () => (window as unknown as { triggerCaptures: Captures }).triggerCaptures.delivered,
-  );
-  expect(deliveries.some((event) => event.type === 'dish_detail_opened')).toBe(true);
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(1000);
+      return page.evaluate(() =>
+        (window as unknown as { triggerCaptures: Captures }).triggerCaptures.delivered.some(
+          (event) => event.type === 'dish_detail_opened',
+        ),
+      );
+    })
+    .toBe(true);
 });
 
 test('withdrawal discards detail timing and reconsent starts a fresh opening', async ({ page }) => {
@@ -165,15 +174,20 @@ test('a readable replacement records its menu once and cannot reuse the old expo
   await page.locator('.pp-category:not([hidden]) .pp-card__open').first().click();
   const opening = (await captured(page, 'dish_detail_opened')).at(-1);
   expect(opening?.payload).not.toHaveProperty('from_exposure_id');
-  await page.clock.runFor(6000);
-  const deliveries = await page.evaluate(
-    () => (window as unknown as { triggerCaptures: Captures }).triggerCaptures.delivered,
-  );
-  expect(
-    deliveries.filter(
-      (event) => event.type === 'menu_viewed' && event.publication_revision_id === publicationB,
-    ),
-  ).toHaveLength(1);
+  // Advancing timers does not await the IndexedDB queue and asynchronous delivery.
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(1000);
+      return page.evaluate(
+        (publication) =>
+          (window as unknown as { triggerCaptures: Captures }).triggerCaptures.delivered.filter(
+            (event) =>
+              event.type === 'menu_viewed' && event.publication_revision_id === publication,
+          ).length,
+        publicationB,
+      );
+    })
+    .toBe(1);
   await page.locator('.pp-detail__back').click();
   await page.waitForTimeout(100);
   await page.clock.runFor(1500);
@@ -194,4 +208,119 @@ test('a readable replacement records its menu once and cannot reuse the old expo
       publicationB,
     ),
   ).toBe(1);
+});
+
+for (const removed of [false, true]) {
+  test(`closing a refreshed picker ${removed ? 'cannot reopen a removed dish' : 'uses the current dish revision'}`, async ({
+    page,
+  }) => {
+    const state = await open(page);
+    await consent(page, true);
+    await page.locator('.pp-category:not([hidden]) .pp-card__open').first().click();
+    await page.locator('.pp-detail__compare').click();
+    const dishId = state.bundle.categories[0].dishes[0].dish_id;
+    state.publication = publicationB;
+    state.bundle.menu_revision_id = '00000000-0000-4000-8000-000000000203';
+    state.bundle.categories[0].dishes[0].dish_revision_id = '00000000-0000-4000-8000-000000000221';
+    state.bundle.categories[0].dishes[0].name = 'Refreshed synthetic dish';
+    if (removed) state.bundle.categories[0].dishes.shift();
+    await page.clock.fastForward(25 * 60_000);
+    await page.waitForFunction(
+      (publication) =>
+        (window as unknown as { refreshedPublication: string }).refreshedPublication ===
+        publication,
+      publicationB,
+      { polling: 100 },
+    );
+    await page.locator('.pp-picker__close').click();
+    if (removed) {
+      await expect(page.locator('.pp-detail')).toHaveCount(0);
+      await expect(page.locator('.pp-card__open').first()).toBeVisible();
+      expect(
+        (await captured(page, 'dish_detail_opened')).filter(
+          (event) => event.payload.dish_id === dishId,
+        ),
+      ).toHaveLength(1);
+    } else {
+      await expect(page.locator('.pp-detail')).toContainText('Refreshed synthetic dish');
+      expect((await captured(page, 'dish_detail_opened')).at(-1)?.payload.dish_revision_id).toBe(
+        '00000000-0000-4000-8000-000000000221',
+      );
+    }
+  });
+}
+
+test('Compare from an old detail resolves the kept dish from the refreshed menu', async ({
+  page,
+}) => {
+  const state = await open(page);
+  await consent(page, true);
+  await page.locator('.pp-category:not([hidden]) .pp-card__open').first().click();
+  state.publication = publicationB;
+  state.bundle.menu_revision_id = '00000000-0000-4000-8000-000000000203';
+  state.bundle.categories[0].dishes[0].dish_revision_id = '00000000-0000-4000-8000-000000000221';
+  state.bundle.categories[0].dishes[0].name = 'Refreshed synthetic dish';
+  await page.clock.fastForward(25 * 60_000);
+  await page.waitForFunction(
+    (publication) =>
+      (window as unknown as { refreshedPublication: string }).refreshedPublication === publication,
+    publicationB,
+    { polling: 100 },
+  );
+  await page.locator('.pp-detail__compare').click();
+  await expect(page.locator('.pp-picker__kept-name')).toHaveText('Refreshed synthetic dish');
+});
+
+test('Replace leaves a comparison whose kept dish was removed by a publication refresh', async ({
+  page,
+}) => {
+  const state = await open(page);
+  await consent(page, true);
+  await page.locator('.pp-category:not([hidden]) .pp-card__open').first().click();
+  await page.locator('.pp-detail__compare').click();
+  await page.locator('.pp-picker__choose').first().click();
+  await page.locator('.pp-picker__confirm').click();
+  await expect(page.locator('.pp-compare')).toBeVisible();
+  expect(await captured(page, 'dish_compared')).toHaveLength(1);
+  state.publication = publicationB;
+  state.bundle.menu_revision_id = '00000000-0000-4000-8000-000000000203';
+  state.bundle.categories[0].dishes.shift();
+  await page.clock.fastForward(25 * 60_000);
+  await page.waitForFunction(
+    (publication) =>
+      (window as unknown as { refreshedPublication: string }).refreshedPublication === publication,
+    publicationB,
+    { polling: 100 },
+  );
+  await page.locator('[data-side="other"] .pp-compare__replace').click();
+  await expect(page.locator('.pp-compare')).toHaveCount(0);
+  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+  expect(await captured(page, 'dish_compared')).toHaveLength(1);
+});
+
+test('a removed comparison detail also leaves its original Saved route', async ({ page }) => {
+  const state = await open(page);
+  await consent(page, true);
+  await page.locator('.pp-category:not([hidden]) .pp-card__save').first().click();
+  await page.getByRole('button', { name: /^Saved dishes/ }).click();
+  await page.locator('.pp-saved__open').first().click();
+  await page.locator('.pp-detail__compare').click();
+  await page.locator('.pp-picker__choose').first().click();
+  await page.locator('.pp-picker__confirm').click();
+  await expect(page.locator('.pp-compare')).toBeVisible();
+  state.publication = publicationB;
+  state.bundle.menu_revision_id = '00000000-0000-4000-8000-000000000203';
+  state.bundle.categories[0].dishes.shift();
+  await page.clock.fastForward(25 * 60_000);
+  await page.waitForFunction(
+    (publication) =>
+      (window as unknown as { refreshedPublication: string }).refreshedPublication === publication,
+    publicationB,
+    { polling: 100 },
+  );
+  await page.locator('[data-side="first"] .pp-compare__view').click();
+  await expect(page).not.toHaveURL(/#saved$/);
+  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+  await page.getByRole('button', { name: /^Saved dishes/ }).click();
+  await expect(page.getByRole('heading', { name: 'Saved Dishes', exact: true })).toBeVisible();
 });

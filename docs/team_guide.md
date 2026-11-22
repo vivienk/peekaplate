@@ -1,5 +1,21 @@
 # PeekaPlate: team guide
 
+**Owner authentication (merged PR143 → PR146):** read the
+[owner auth guide](owner-auth.md) for Supabase/Resend email, exact confirmation
+and reset URLs, public-only browser config and the remaining dashboard handoff.
+The PR previews are synthetic; real credentials belong only on the configured
+owner auth entry. The [session-to-restaurant bridge](owner-session-workspace.md)
+connects the merged shell/report reader using server-returned memberships. It
+lists the next upload/edit/publish wiring order and hosted acceptance boundary.
+
+**Owner menu backend:** [upload, processing and Add Dish handoff](owner-menu-workspace.md)
+lists the saved group/file APIs, draft/photo save-resume, cancel/retry and explicit
+owner confirmation. It reuses the ingestion/review pipeline and private R2; no
+new browser DB access is needed. Ehab's S06–S09 screen wiring remains his slice.
+Authenticated staging acceptance now passes 53 HTTP checks and 29 browser assertions,
+with independent database/storage verification. The handoff keeps Ehab’s real UI
+connection and the held auth/dashboard integration separate.
+
 Latest diner integration: [published-menu connection](diner-connection.md). It
 explains the verified QR/link flow, valid/tampered/withdrawn states, staging build
 configuration and reused public hosting. Its release acceptance record identifies
@@ -55,7 +71,7 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Saving a dish | Backend draft-save flow tested locally and online with Supabase identity | Connecting it to the staff screen |
 | Approving and publishing | Owner-only backend commands and public-menu/token reads deployed and tested with synthetic data | Trusted real-content admission, review/publish screens and diner integration |
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
-| Diner tracking | Deployed Queue/R2 pipeline, transactional typed facts and archive recovery; genuine-token browser transport passed in staging | Real diner controls, consent/outbox/delivery, owner-report API and pilot acceptance; normal collection remains paused |
+| Diner tracking | Deployed Queue/R2 pipeline and typed facts; shared consent/outbox and reviewed menu/detail triggers. See the [PR78 staging release](diner-tracking-staging.md) for the frontend deployment boundary | Coordinated real PostHog/canonical readback, report reconciliation and pilot acceptance; normal collection remains paused |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
 | Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
 | Owner report | Synthetic staging API checks recorded; [internal period-comparison reader](comparison-reporting.md) and privacy fixtures tested locally | Live-data reporting, comparison API/dashboard wiring and release acceptance |
@@ -155,9 +171,11 @@ frontend code or receive them in chat. On October 28, the OCR.space key was adde
 to GitHub's protected staging environment and the extraction Worker's secret store.
 A fresh OCR-only test read three made-up dishes and their prices in 4.654 seconds.
 This proves that the OCR provider accepted the key for that image; it does not
-prove the complete hosted menu-processing flow. The AI step still needs its
-provider configuration, and menu-to-draft acceptance remains pending. The queues stay
-paused until that passes. Follow the
+prove the complete hosted menu-processing flow at that October 28 checkpoint.
+The latest [owner workspace acceptance](owner-menu-workspace.md#acceptance-record)
+now verifies genuine staff upload, draft/photo storage, corrections and approval
+against staging; a retained real extraction was used without another model call.
+Normal queues remain paused for controlled testing and the real UI handoff. Follow the
 [VIS-01 setup and handoff](menu-ingestion-infrastructure.md) for exact names,
 interfaces and who does what next. Provisioned infrastructure is not a completed
 menu-processing feature.
@@ -803,6 +821,11 @@ decisions remain PENDING.
 
 ## Owner-report staging API — November 10
 
+For the independent draft/photo verification APIs and retention controls, see
+[owner menu workspace](owner-menu-workspace.md#independent-draft-and-photo-verification-161).
+These additions need their own migration/release and hosted acceptance. The
+dashboard design previews still use synthetic state, with no live save/publish connection.
+
 The console may call the owner-report route from its exact staging origin or
 http://127.0.0.1:5174, using the signed-in owner’s Supabase access token.
 GitHub collaborator tokens do not authorize restaurant reports. Staging reports
@@ -812,3 +835,18 @@ checks](owner-report-staging.md). Deployment evidence belongs in the narrow
 owner-report release PR; merging into develop alone does not deploy the Worker.
 
 Current release and hosted results: [PR 135](https://github.com/vivienk/peekaplate/pull/135).
+
+## Owner session/workspace release
+
+The merged owner connection is Auth #143/#146 → bridge #179 → shell #125/#139 →
+report reader #128. Use the [workspace guide](owner-session-workspace.md) for the
+exact staging entry, permission states, release evidence boundary and next UI/API
+connections. Signup alone never grants restaurant access. Existing report
+acceptance remains restricted to its labelled synthetic staging venue.
+
+## FE-06.4 controlled staging setup
+
+The [operator/tester handoff](fe064-staging-setup.md) separates the narrow #161
+release, lifecycle migration, staff identity setup and proposed two-request
+provider window. Do not treat the read-only harness counter as an upstream
+request cap or open Queues before the actual budget is pinned.

@@ -69,6 +69,7 @@ describe('allowlist', () => {
       'dish_detail_opened',
       'dish_activity_checkpoint',
       'dish_compared',
+      'dish_portion_opened',
       'dish_saved',
       'dish_unsaved',
       'shortlist_viewed',

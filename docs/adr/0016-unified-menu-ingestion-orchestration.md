@@ -57,6 +57,29 @@ command boundary rather than introducing a parallel persistence mechanism.
    transitions, retries, duplicate submissions, partial failures, evidence
    integrity, and the end-to-end path from submission through review.
 
+9. Amendment, 2026-11-17 (proposed with #210 and #216). After human review, an
+   owner can turn verified dishes into a prepared menu without the operator's
+   privileged `--admit` step, and new ingredients get placeholders:
+   - **Owner-triggered preparation.** S11 verification records verification
+     only. Opening Review and publish (S13) asks the Worker to prepare. It
+     approves each verified dish through the existing authorized approval
+     command, with the persisted verification and exact draft/review versions,
+     then builds the bundle with the existing producer. Approval reuses a stable
+     dish identity per draft and deterministic command identities, so a partial
+     failure is recovered by repeating the request.
+   - **Narrow admission.** A single-purpose, owner-checked database function
+     admits only the Worker's own bundle for that venue. The runtime role still
+     cannot insert review subjects or bundle rows directly; the operator path
+     is unchanged.
+   - **Still no auto-publish.** Preparing creates a reviewable snapshot only.
+     Publication remains the owner's explicit S13 approval and publish action.
+     An owner edit of an approved dish reopens it for verification; the next
+     preparation approves a new revision of the same dish.
+   - **Ingredient placeholders.** When extracted drafts are saved, each new
+     normalized ingredient label gets an insert-only, tenant-scoped placeholder
+     with no image or approval. Diners keep the existing name or icon fallback
+     until a person approves artwork.
+
 ## Consequences
 
 - Existing VIS-02 processing and VIS-04 retrieval/handoff implementations remain the preferred reusable boundaries.
@@ -66,6 +89,7 @@ command boundary rather than introducing a parallel persistence mechanism.
 - Queue delivery must remain controlled until approved OCR/AI provider configuration, processing/transport/lease/retry budgets, and full feature-level acceptance are verified.
 - Extracted dishes remain separate from authorized dish-revision persistence and publication; human review remains mandatory.
 - Python processing tests and a pinned Python CI job must remain part of the repository verification workflow.
+- Amendment (item 9): owner preparation depends on the existing approval command and producer staying the single source of bundle rules; a change to either applies to both paths. The admission function and its public reads require a boundary/security review before release.
 
 ## Open Questions
 
@@ -74,6 +98,7 @@ command boundary rather than introducing a parallel persistence mechanism.
 - Are upload limits, retention, and operational-cost ownership explicitly approved?
 - Where and how is ingestion job state persisted, including retry metadata, idempotency, and validated results?
 - Who owns final approval of the deployment and operational configuration?
+- Amendment (item 9): where are owner-confirmed dietary codes and photo alt text captured (S09 has no field yet)? Owner photos are served at original size as a temporary limitation; resizing to the `card-480` / `detail-1280` variants will reuse the Python asset pipeline (`assets.py`), not an encoder in the Worker (Sai, 2026-11-17).
 - Has the complete controlled menu-ingestion workflow been accepted, including submission, extraction, report persistence, validated draft creation, queue acknowledgement, retries, dead-letter handling, and cross-venue isolation?
 
 ## Verification
@@ -88,3 +113,4 @@ command boundary rather than introducing a parallel persistence mechanism.
 - Complete a controlled, authorized synthetic menu test covering submission, extraction, private report persistence, validated database drafts, and acknowledgement. Also test duplicate delivery, conflicting source hashes, report-storage failure, timeout/retry/DLQ handling, and cross-venue isolation.
 - Confirm that extracted dishes remain `needs_review` and that no ingestion path bypasses human approval or automatically publishes dishes.
 - Keep real submissions disabled until the complete controlled workflow and required operational configuration have been reviewed and accepted.
+- Amendment (item 9): database tests cover owner-only preparation, canonical revisions, partial-failure retry, reopening on edit and no publication; a hosted staging run (upload, verify, prepare, S13 publish, diner) remains required.

@@ -16,7 +16,11 @@ function fakeClient(permission: string | null, reportRows: Record<string, unknow
     if (text.includes('app_private.staff_membership')) {
       return { rows: permission === null ? [] : [{ permission }] };
     }
-    if (text.includes('app_private.owner_observation_v1')) return { rows: reportRows };
+    if (
+      text.includes('app_private.owner_observation_v1') ||
+      text.includes('app_private.owner_test_observation_v1')
+    )
+      return { rows: reportRows };
     return { rows: [] };
   });
   return { client: { query } as unknown as Client, statements, query };
@@ -41,6 +45,49 @@ function reportRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe('readOwnerReport ownership check', () => {
+  it('reads only the test observation view when explicitly selected internally', async () => {
+    const { client, statements } = fakeClient('owner');
+    await readOwnerReport(client, 'actor-1', venueId, new Date(), 'synthetic', {
+      trafficClass: 'test',
+    });
+    expect(
+      statements.some((s) => s.includes('FROM app_private.owner_test_observation_v1 obs')),
+    ).toBe(true);
+    expect(statements.some((s) => s.includes('FROM app_private.owner_observation_v1 obs'))).toBe(
+      false,
+    );
+  });
+
+  it('keeps direct synthetic fixture readers on live facts by default', async () => {
+    const { client, statements } = fakeClient('owner');
+    await readOwnerReport(client, 'actor-1', venueId, new Date(), 'synthetic');
+    expect(statements.some((s) => s.includes('FROM app_private.owner_observation_v1 obs'))).toBe(
+      true,
+    );
+  });
+
+  it('preserves suppression and ingestion provenance on the test path', async () => {
+    const { client } = fakeClient('owner', [reportRow()]);
+    const report = OwnerDishReportSchema.parse(
+      await readOwnerReport(
+        client,
+        'actor-1',
+        venueId,
+        new Date('2026-11-06T10:00:00Z'),
+        'synthetic',
+        { trafficClass: 'test' },
+      ),
+    );
+    expect(report.report_metadata.freshness).toEqual({
+      is_stale: null,
+      last_event_ingested_at: '2026-11-06T09:00:00.000Z',
+    });
+    expect(report.dishes[0]?.metrics.active_sessions).toEqual({
+      value: null,
+      status: 'SUPPRESSED',
+    });
+  });
+
   it('lets an owner read, inside one read-only transaction with the actor set first', async () => {
     const { client, statements } = fakeClient('owner');
     await readOwnerReport(client, 'actor-1', venueId, new Date('2026-11-04T10:00:00Z'));
@@ -321,8 +368,8 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(sql).toContain('opened.local_sequence < comp_order.local_sequence');
     expect(sql).toContain('FROM app_private.observation_event event');
     expect(sql).toContain('participant.dish_id');
-    expect(sql).toContain('obs.occurred_at >= $2 AND obs.occurred_at <= $3');
-    expect(sql).toContain('act.occurred_at >= $2 AND act.occurred_at <= $3');
+    expect(sql).toContain('obs.occurred_at >= $2 AND obs.occurred_at < $3');
+    expect(sql).toContain('act.occurred_at >= $2 AND act.occurred_at < $3');
     expect(reportQuery?.[1]).toEqual([venueId, new Date('2026-11-05T10:00:00Z'), now]);
     expect(sql).toContain('GROUP BY obs.dish_id, obs.session_id');
     expect(sql).toContain('COUNT(DISTINCT');

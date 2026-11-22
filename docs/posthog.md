@@ -137,3 +137,16 @@ Once real dish callers exist, exploratory counts of `dish_open` and `portion_com
 A production owner dashboard still requires server-verified venue access, validated evidence, agreed metric denominators and minimum-ten-eligible-session suppression from [ADR 0006](adr/0006-orders-and-measurement.md). No owner report/query endpoint or dashboard is claimed here. Ingredient rates, saves, order linkage, revenue and causal lift cannot be calculated from this slice.
 
 References: [PostHog capture API](https://posthog.com/docs/api/capture), [anonymous events](https://posthog.com/docs/data/anonymous-vs-identified-events), [IP storage controls](https://posthog.com/docs/privacy/data-storage).
+
+
+## Consent-listener ordering
+
+The shared dispatch synchronizes the adapter from the current consent gate immediately before capture. A screen may emit its initial menu view from an earlier-registered consent listener; that event must reach both destinations. The real-adapter unit regression checks initial consent and re-consent with matching event IDs, and the SDK browser test uses the same screen-before-adapter order. Privacy signals, fixture mode and publication suspension keep their existing gates. Hosted destination persistence remains a separate acceptance check.
+
+## Published diner actions
+
+Production starts both configured destinations after a published menu verifies in a standalone page on the exact diner origin. The embedded Screen 13 phone preview stays usable and sends no analytics. Do Not Track and Global Privacy Control still prevent capture in both destinations. PostHog uses a random visit ID held in memory and disables person profiles. The production browser check intercepts both destinations, matches the first menu view by event ID and verifies Global Privacy Control.
+
+- `dish_portion_opened` fires once each time a published 2.5D preview successfully renders. Loading, a photo fallback, switching preview controls and opening the camera portal generate no additional portion open. The existing `dish_activity_checkpoint` still measures cumulative active time.
+- `dish_compared` fires after Compare displays the result. A diner can compare the starting dish with up to two choices. Each newly displayed anchor/choice pair gets one row in both destinations under the same `comparison_id`. Count distinct `comparison_id` values filtered to `compare_action = 'start'` for total completed comparisons. Raw event counts measure displayed pairs. Replacing records only affected pairs. Returning from details or cancelling Replace creates no new pair.
+- These actions follow the same browser privacy gate as the first menu view. PostHog receives the allowlisted properties and event ID. On the production diner origin it can receive the public venue and publication UUIDs for a matching verified delivery. These client dimensions support internal filtering. The canonical path derives venue and publication authority from the verified menu token and persists a separately typed portion-opening observation.

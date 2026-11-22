@@ -6,6 +6,8 @@ import { type ExtractionSource, readExtractionCapability } from './extraction-ca
 type Stub = { fetch(request: Request): Promise<Response> };
 export type ExtractionHostEnv = {
   APP_ENV: string;
+  EXTRACTION_PRODUCTION_ENABLED?: string;
+  EXTRACTION_PRODUCTION_PORTION_ONLY?: string;
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
   EXTRACTION_SOURCE_ORIGIN: string;
@@ -39,17 +41,33 @@ const pipelineVariables = [
   'a2agent_api_MODEL',
 ] as const;
 
+export const MAX_PROVIDER_CALLS_PER_RUN = 2;
+
+const budgetKeyPattern = /^[A-Za-z0-9:_-]{1,128}$/;
+const providerNamePattern = /^[A-Za-z0-9._-]{1,64}$/;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function productionPortionOnly(env: ExtractionHostEnv) {
+  return env.APP_ENV === 'production' && env.EXTRACTION_PRODUCTION_PORTION_ONLY === 'true';
+}
+
 export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
   envVars: Record<string, string>;
   private readiness: Promise<void> | undefined;
+  private budgetSchemaReady = false;
 
   constructor(ctx: DurableObjectState, env: ExtractionHostEnv) {
     super(ctx, env);
     this.envVars = {
       EXTRACTION_SERVICE_SECRET: env.EXTRACTION_SERVICE_SECRET ?? '',
       EXTRACTION_SOURCE_ORIGIN: env.EXTRACTION_SOURCE_ORIGIN,
+      EXTRACTION_ENVIRONMENT: env.APP_ENV,
+      PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
+      U2NET_HOME: '/app/models',
       ...Object.fromEntries(
-        pipelineVariables.flatMap((key) => (env[key] ? [[key, env[key]]] : [])),
+        productionPortionOnly(env)
+          ? []
+          : pipelineVariables.flatMap((key) => (env[key] ? [[key, env[key]]] : [])),
       ),
     };
     if (ctx.container?.running) {
@@ -67,7 +85,7 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
         image,
         instance: 'standard-1',
         env: this.envVars,
-        enableInternet: true,
+        enableInternet: !productionPortionOnly(this.env),
       });
     }
     await container.setInactivityTimeout(60_000);
@@ -89,7 +107,157 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
     throw new Error('Extraction container did not become ready');
   }
 
+  private ensureBudgetSchema(): void {
+    if (this.budgetSchemaReady) return;
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS provider_call_budget (
+        run_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        job_id TEXT NOT NULL,
+        max_calls INTEGER NOT NULL,
+        used_calls INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS provider_call_reservations (
+        reservation_key TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        granted INTEGER NOT NULL,
+        used_calls INTEGER NOT NULL,
+        max_calls INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+  }
+
+  private async handleBudgetReserve(request: Request): Promise<Response> {
+    const tenantId = request.headers.get('x-tenant-id') ?? '';
+    const jobId = request.headers.get('x-job-id') ?? '';
+    if (!uuidPattern.test(tenantId) || !uuidPattern.test(jobId)) {
+      return json('forbidden', 403);
+    }
+    const rawBody = await request.text();
+    if (!rawBody || rawBody.length > 4096) {
+      return json('invalid_request', 400);
+    }
+    let payload: { reservation_key?: unknown; provider?: unknown };
+    try {
+      payload = JSON.parse(rawBody) as { reservation_key?: unknown; provider?: unknown };
+    } catch {
+      return json('invalid_request', 400);
+    }
+    const reservationKey =
+      typeof payload.reservation_key === 'string' ? payload.reservation_key : '';
+    const provider = typeof payload.provider === 'string' ? payload.provider : '';
+    if (!budgetKeyPattern.test(reservationKey) || !providerNamePattern.test(provider)) {
+      return json('invalid_request', 400);
+    }
+    const runId = `${tenantId}:${jobId}`;
+    const outcome = this.ctx.storage.transactionSync(() => {
+      this.ensureBudgetSchema();
+      const existing = this.ctx.storage.sql
+        .exec<{ run_id: string; granted: number; used_calls: number; max_calls: number }>(
+          'SELECT run_id, granted, used_calls, max_calls FROM provider_call_reservations WHERE reservation_key = ?',
+          reservationKey,
+        )
+        .toArray()[0];
+      if (existing) {
+        if (existing.run_id !== runId) {
+          return { status: 403, body: { error: 'reservation_scope_mismatch' } };
+        }
+        return {
+          status: existing.granted === 1 ? 200 : 429,
+          body: {
+            granted: existing.granted === 1,
+            ...(existing.granted === 1 ? {} : { error: 'provider_call_budget_exhausted' }),
+            run_id: runId,
+            used_calls: existing.used_calls,
+            max_calls: existing.max_calls,
+            remaining_calls: Math.max(0, existing.max_calls - existing.used_calls),
+            reservation_key: reservationKey,
+          },
+        };
+      }
+      const now = new Date().toISOString();
+      this.ctx.storage.sql.exec(
+        'INSERT OR IGNORE INTO provider_call_budget (run_id, tenant_id, job_id, max_calls, used_calls, created_at) VALUES (?, ?, ?, ?, 0, ?)',
+        runId,
+        tenantId,
+        jobId,
+        MAX_PROVIDER_CALLS_PER_RUN,
+        now,
+      );
+      const budget = this.ctx.storage.sql
+        .exec<{ max_calls: number; used_calls: number }>(
+          'SELECT max_calls, used_calls FROM provider_call_budget WHERE run_id = ?',
+          runId,
+        )
+        .toArray()[0];
+      if (!budget) {
+        throw new Error('Failed to load provider call budget row');
+      }
+      if (budget.used_calls < budget.max_calls) {
+        const nextUsed = budget.used_calls + 1;
+        this.ctx.storage.sql.exec(
+          'UPDATE provider_call_budget SET used_calls = ? WHERE run_id = ?',
+          nextUsed,
+          runId,
+        );
+        this.ctx.storage.sql.exec(
+          'INSERT INTO provider_call_reservations (reservation_key, run_id, provider, granted, used_calls, max_calls, created_at) VALUES (?, ?, ?, 1, ?, ?, ?)',
+          reservationKey,
+          runId,
+          provider,
+          nextUsed,
+          budget.max_calls,
+          now,
+        );
+        return {
+          status: 200,
+          body: {
+            granted: true,
+            run_id: runId,
+            used_calls: nextUsed,
+            max_calls: budget.max_calls,
+            remaining_calls: Math.max(0, budget.max_calls - nextUsed),
+            reservation_key: reservationKey,
+          },
+        };
+      }
+      this.ctx.storage.sql.exec(
+        'INSERT INTO provider_call_reservations (reservation_key, run_id, provider, granted, used_calls, max_calls, created_at) VALUES (?, ?, ?, 0, ?, ?, ?)',
+        reservationKey,
+        runId,
+        provider,
+        budget.used_calls,
+        budget.max_calls,
+        now,
+      );
+      return {
+        status: 429,
+        body: {
+          granted: false,
+          error: 'provider_call_budget_exhausted',
+          run_id: runId,
+          used_calls: budget.used_calls,
+          max_calls: budget.max_calls,
+          remaining_calls: 0,
+          reservation_key: reservationKey,
+        },
+      };
+    });
+    this.budgetSchemaReady = true;
+    return Response.json(outcome.body, {
+      status: outcome.status,
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  }
+
   async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === '/_budget/reserve' && request.method === 'POST') {
+      return this.handleBudgetReserve(request);
+    }
     this.readiness ??= this.waitForReady().finally(() => {
       this.readiness = undefined;
     });
@@ -97,12 +265,13 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
     // Retry only readiness probes; an extraction POST must be forwarded once.
     return this.ctx
       .container!.getTcpPort(8080)
-      .fetch(new Request(`http://container${new URL(request.url).pathname}`, request));
+      .fetch(new Request(`http://container${url.pathname}`, request));
   }
 }
 
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const sourcePath = new RegExp(`^/sources/(${uuid})/(${uuid})$`);
+const portionPath = new RegExp(`^/v1/portion-uploads/(${uuid})/(${uuid})$`);
 const json = (error: string, status: number) =>
   Response.json(
     { error },
@@ -113,8 +282,47 @@ const json = (error: string, status: number) =>
   );
 
 const maxBundleBytes = 32_000_000;
+const maxPortionSourceBytes = 12_000_000;
+const maxPortionResponseBytes = 300_000;
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+async function readPortionBytes(
+  body: ReadableStream<Uint8Array> | null,
+  limit: number,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  if (!body) return new Uint8Array();
+  const reader = body.getReader();
+  const cancel = () => void reader.cancel().catch(() => {});
+  signal.addEventListener('abort', cancel, { once: true });
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      signal.throwIfAborted();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
 
 async function safeErrorResponse(response: Response): Promise<Response> {
   const status = response.status >= 400 && response.status < 600 ? response.status : 502;
@@ -266,17 +474,20 @@ async function retainArtifacts(
 
 export default {
   async fetch(request: Request, env: ExtractionHostEnv): Promise<Response> {
+    const environment = env.APP_ENV;
     const secret = env.EXTRACTION_SERVICE_SECRET;
     const signingSecret = env.EXTRACTION_SOURCE_SIGNING_SECRET;
+    const portionOnly = productionPortionOnly(env);
     if (
-      env.APP_ENV !== 'staging' ||
+      (environment !== 'staging' &&
+        !(environment === 'production' && env.EXTRACTION_PRODUCTION_ENABLED === 'true')) ||
       !secret ||
       secret.length < 48 ||
-      !signingSecret ||
-      signingSecret.length < 48 ||
-      signingSecret === secret
+      (!portionOnly && (!signingSecret || signingSecret.length < 48 || signingSecret === secret))
     )
       return json('not_configured', 503);
+    const containerName =
+      environment === 'production' ? 'production-extractor' : 'staging-extractor';
     const supplied = new TextEncoder().encode(request.headers.get('authorization') ?? '');
     const expected = new TextEncoder().encode(`Bearer ${secret}`);
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
@@ -285,11 +496,44 @@ export default {
     const url = new URL(request.url);
     if (url.search) return json('invalid_request', 400);
     try {
+      if (portionPath.test(url.pathname) && request.method === 'POST') {
+        const signal = AbortSignal.timeout(220_000);
+        if (
+          !/^application\/octet-stream(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')
+        )
+          return json('unsupported_media_type', 415);
+        if (Number(request.headers.get('content-length')) > maxPortionSourceBytes)
+          return json('request_too_large', 413);
+        const photo = await readPortionBytes(request.body, maxPortionSourceBytes, signal);
+        if (!photo) return json('request_too_large', 413);
+        if (!photo.byteLength) return json('empty_photo', 400);
+        const headers = new Headers(request.headers);
+        headers.delete('Content-Length');
+        const response = await env.EXTRACTOR.getByName(containerName).fetch(
+          new Request(url, { method: 'POST', headers, body: photo, signal, redirect: 'manual' }),
+        );
+        const bytes = await readPortionBytes(response.body, maxPortionResponseBytes, signal);
+        if (!bytes || !response.headers.get('content-type')?.startsWith('application/json'))
+          return json('portion_unavailable', 502);
+        const bounded = new Response(bytes, { status: response.status, headers: response.headers });
+        if (!response.ok) return await safeErrorResponse(bounded);
+        return new Response(bytes, {
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+        });
+      }
+      if (portionOnly) {
+        if (url.pathname === '/health' && request.method === 'GET')
+          return await env.EXTRACTOR.getByName(containerName).fetch(request);
+        return json('not_found', 404);
+      }
+      if (!signingSecret) return json('not_configured', 503);
       const source = sourcePath.exec(url.pathname);
       if (source && request.method === 'GET') {
         const scope = await readExtractionCapability(
           request.headers.get('x-source-capability') ?? '',
           signingSecret,
+          undefined,
+          environment,
         );
         if (
           !scope ||
@@ -336,6 +580,33 @@ export default {
           },
         });
       }
+      if (url.pathname === '/budget/reserve' && request.method === 'POST') {
+        const scope = await readExtractionCapability(
+          request.headers.get('x-source-capability') ?? '',
+          signingSecret,
+          undefined,
+          environment,
+        );
+        if (
+          !scope ||
+          scope.tenantId !== request.headers.get('x-tenant-id') ||
+          scope.jobId !== request.headers.get('x-job-id') ||
+          scope.sourceHash !== request.headers.get('x-source-hash')
+        )
+          return json('forbidden', 403);
+        const body = await request.text();
+        return await env.EXTRACTOR.getByName(containerName).fetch(
+          new Request('http://extractor/_budget/reserve', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Tenant-ID': scope.tenantId,
+              'X-Job-ID': scope.jobId,
+            },
+            body,
+          }),
+        );
+      }
       if (
         (url.pathname === '/extract' && request.method === 'POST') ||
         (url.pathname === '/health' && request.method === 'GET')
@@ -344,6 +615,8 @@ export default {
           const scope = await readExtractionCapability(
             request.headers.get('x-source-capability') ?? '',
             signingSecret,
+            undefined,
+            environment,
           );
           if (
             !scope ||
@@ -358,10 +631,10 @@ export default {
           const forwarded = new Request(request);
           forwarded.headers.set('X-Source-Hash', scope.sourceHash);
           forwarded.headers.set('X-Extraction-Artifact-Bundle', '1');
-          const response = await env.EXTRACTOR.getByName('staging-extractor').fetch(forwarded);
+          const response = await env.EXTRACTOR.getByName(containerName).fetch(forwarded);
           return await retainArtifacts(response, env, scope);
         }
-        return await env.EXTRACTOR.getByName('staging-extractor').fetch(request);
+        return await env.EXTRACTOR.getByName(containerName).fetch(request);
       }
       return json('not_found', 404);
     } catch {

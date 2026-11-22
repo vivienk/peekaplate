@@ -50,13 +50,24 @@ jobs:
               - 'packages/analytics/**'
               - 'packages/tokens/**'
               - 'tests/e2e/**'
+              - 'tests/fixtures/portion/**'
+              - 'tests/owner-ai-browser/**'
+              - 'tests/restaurant-links/**'
               - 'tests/review-preview/**'
               - 'processing/src/peekaplate_processing/review_preview*.py'
               - 'playwright.review-preview.config.ts'
               - 'scripts/check-bundle*'
+              - 'scripts/node-ts-hooks.mjs'
               - 'scripts/verify*'
               - 'playwright.config.ts'
               - 'playwright.posthog.config.ts'
+              - 'playwright.auth.config.ts'
+              - 'playwright.owner-ai.config.ts'
+              - 'playwright.workspace.config.ts'
+              - 'playwright.portion-published.config.ts'
+              - 'playwright.restaurant-links.config.ts'
+              - 'scripts/prepare-app-site*'
+              - 'scripts/serve-restaurant-routing-test.mjs'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
@@ -114,39 +125,83 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify test:db
 
-  browser:
+  browser-core:
     needs: changes
-    if: needs.changes.outputs.browser == 'true'
+    if: &browser_selected needs.changes.outputs.browser == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - &browser_checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - &browser_pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 11.25.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - &browser_node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.16.0
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm verify test:e2e
+      - &browser_install
+        run: pnpm install --frozen-lockfile
+      - &browser_chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm verify test:e2e:core
+
+  browser-workspace:
+    needs: changes
+    if: *browser_selected
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - *browser_checkout
+      - *browser_pnpm
+      - *browser_node
+      - *browser_install
+      - *browser_chromium
+      - run: pnpm verify test:e2e:workspace
+
+  browser-flows:
+    needs: changes
+    if: *browser_selected
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - *browser_checkout
+      - *browser_pnpm
+      - *browser_node
+      - *browser_install
+      - *browser_chromium
+      - run: pnpm verify test:e2e:flows
       - name: Offline dish review preview
         run: pnpm exec playwright test --config playwright.review-preview.config.ts
 
   ci:
     if: always()
-    needs: [changes, quality, database, browser]
+    needs: [changes, quality, database, browser-core, browser-workspace, browser-flows]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
       - name: Require every applicable check
+        shell: bash
         env:
           CHANGES: ${{ needs.changes.result }}
           QUALITY: ${{ needs.quality.result }}
+          DATABASE_SELECTED: ${{ needs.changes.outputs.db }}
           DATABASE: ${{ needs.database.result }}
-          BROWSER: ${{ needs.browser.result }}
+          BROWSER_SELECTED: ${{ needs.changes.outputs.browser }}
+          BROWSER_CORE: ${{ needs.browser-core.result }}
+          BROWSER_WORKSPACE: ${{ needs.browser-workspace.result }}
+          BROWSER_FLOWS: ${{ needs.browser-flows.result }}
         run: |
+          require_lane() {
+            case "$2:$3" in
+              true:success|false:skipped) return 0 ;;
+              *) printf '%s reported %s with path selection %s\n' "$1" "$3" "$2" >&2; return 1 ;;
+            esac
+          }
           test "$CHANGES" = success
           test "$QUALITY" = success
-          test "$DATABASE" = success -o "$DATABASE" = skipped
-          test "$BROWSER" = success -o "$BROWSER" = skipped
+          require_lane database "$DATABASE_SELECTED" "$DATABASE"
+          require_lane browser-core "$BROWSER_SELECTED" "$BROWSER_CORE"
+          require_lane browser-workspace "$BROWSER_SELECTED" "$BROWSER_WORKSPACE"
+          require_lane browser-flows "$BROWSER_SELECTED" "$BROWSER_FLOWS"

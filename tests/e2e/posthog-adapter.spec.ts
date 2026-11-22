@@ -78,6 +78,14 @@ test('the actual diner banner dispatches one live event to the real SDK and cano
   const { requests } = await open(page, () => 200);
   await page.evaluate(async () => {
     const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
+    // The real screen subscribes before the app connects its PostHog adapter.
+    tracking.onTrackingAllowedChange((allowed) => {
+      if (allowed)
+        tracking.track('menu_viewed', {
+          publication_revision_id: 'a5000000-0000-4000-8000-000000000001',
+          entry_source: 'qr',
+        });
+    });
     tracking.connectPostHogFromEnv({
       MODE: 'staging',
       VITE_POSTHOG_ENABLED: 'true',
@@ -96,7 +104,7 @@ test('the actual diner banner dispatches one live event to the real SDK and cano
     );
   });
   expect(requests).toHaveLength(0);
-  await page.getByRole('button', { name: 'Allow optional analytics', exact: true }).click();
+  await page.getByRole('button', { name: 'Yes, allow optional analytics', exact: true }).click();
   const emit = () =>
     page.evaluate(async () => {
       const { track } = await import(/* @vite-ignore */ '/src/tracking/index.ts');
@@ -105,7 +113,6 @@ test('the actual diner banner dispatches one live event to the real SDK and cano
         entry_source: 'qr',
       });
     });
-  await emit();
   await expect.poll(() => requests.length).toBe(1);
   await page.clock.runFor(5000);
   const canonical = () =>
@@ -129,6 +136,7 @@ test('the actual diner banner dispatches one live event to the real SDK and cano
   });
   expect(JSON.stringify(sent)).not.toContain(observation.session_id);
   expect(JSON.stringify(sent)).not.toContain(observation.producer_id);
+  await page.getByRole('button', { name: 'Analytics preferences' }).click();
   await page.getByRole('button', { name: 'Turn off optional analytics' }).click();
   await emit();
   await page.clock.runFor(5000);

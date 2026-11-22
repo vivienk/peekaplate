@@ -1,5 +1,5 @@
 import type { MenuExtractionResult } from '@peekaplate/contracts';
-import { mintExtractionCapability } from '../extraction-capability.js';
+import { type ExtractionEnvironment, mintExtractionCapability } from '../extraction-capability.js';
 import { IngestionError, type MenuIngestionJobRow } from './repository.js';
 
 /**
@@ -10,6 +10,7 @@ import { IngestionError, type MenuIngestionJobRow } from './repository.js';
 export const DEFAULT_EXTRACTION_TIMEOUT_MS = 720_000;
 
 export type HttpExtractorConfig = {
+  environment?: ExtractionEnvironment | undefined;
   serviceUrl: string;
   authToken?: string | undefined;
   sourceSigningSecret?: string | undefined;
@@ -70,6 +71,8 @@ export function createHttpPythonExtractor(config: HttpExtractorConfig) {
             sourceHash: job.source_hash,
           },
           config.sourceSigningSecret,
+          undefined,
+          config.environment,
         );
         headers['X-Source-Capability'] = capability;
       } catch (err: unknown) {
