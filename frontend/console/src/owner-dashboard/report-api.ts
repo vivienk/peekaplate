@@ -33,8 +33,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 export function reportUrl(apiBase: string, venueId: string): string {
   const base = apiBase.replace(/\/+$/, '');
-  const source = base === PRODUCTION_OWNER_API_ORIGIN ? 'production' : 'synthetic';
-  return `${base}/api/v1/venues/${encodeURIComponent(venueId)}/analytics/dishes?source=${source}`;
+  const query =
+    base === PRODUCTION_OWNER_API_ORIGIN
+      ? 'source=production&displayActions=true'
+      : 'source=synthetic';
+  return `${base}/api/v1/venues/${encodeURIComponent(venueId)}/analytics/dishes?${query}`;
 }
 
 export async function fetchOwnerReport({

@@ -161,7 +161,14 @@ async function measureReport(
   const internal = buildInternalReport(result.rows, venueId, now, source, durationMs);
   const displayActions =
     isBatch && liveEvidence
-      ? await readOwnerReportDisplayActions(client, venueId, windowStart, now, liveEvidence)
+      ? await readOwnerReportDisplayActions(
+          client,
+          venueId,
+          windowStart,
+          now,
+          liveEvidence,
+          new Set(internal.dishes.map((dish) => String(dish.dish_id))),
+        )
       : undefined;
   return toOwnerReport({
     ...internal,

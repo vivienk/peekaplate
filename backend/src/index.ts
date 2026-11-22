@@ -1536,6 +1536,23 @@ export function createApp(services: Dependencies = dependencies) {
     const venueId = scope.data.venueId.toLowerCase();
     const report = await services.readOwnerReport(actorId, venueId, now, env, source);
     c.header('Cache-Control', 'no-store');
+    if (source === 'production' && c.req.query('displayActions') !== 'true') {
+      const legacy = OwnerDishReportSchema.parse(report);
+      const missing = { value: null, status: 'MISSING' } as const;
+      return c.json({
+        ...legacy,
+        dishes: legacy.dishes.map(({ display_actions: _, ...dish }) => dish),
+        ...(legacy.summary
+          ? {
+              summary: {
+                ...legacy.summary,
+                current: { ...legacy.summary.current, portion_previews_shown: missing },
+                baseline: { ...legacy.summary.baseline, portion_previews_shown: missing },
+              },
+            }
+          : {}),
+      });
+    }
     if (env.OWNER_AI_RESPONSES_ENABLED === 'true' && env.OWNER_AI_REPORT_REFERENCE_SECRET) {
       try {
         const parsedReport = OwnerDishReportSchema.parse(report);

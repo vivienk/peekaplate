@@ -150,6 +150,7 @@ test('production deep links resume after sign-in and keep orientation through br
       json = { schemaVersion: 1, actions: [] };
     } else if (pathname.endsWith('/analytics/dishes')) {
       expect(searchParams.get('source')).toBe('production');
+      expect(searchParams.get('displayActions')).toBe('true');
       reportReads++;
       json = {
         ...UNEEZA_REPORT,

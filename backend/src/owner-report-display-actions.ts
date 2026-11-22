@@ -49,6 +49,7 @@ export async function readOwnerReportDisplayActions(
   start: Date,
   end: Date,
   evidence: OwnerReportLiveEvidence,
+  reportableDishes: ReadonlySet<string>,
 ) {
   const { rows } = await client.query<Row>(query, [
     venueId,
@@ -81,7 +82,10 @@ export async function readOwnerReportDisplayActions(
       portionTotal = cell;
       continue;
     }
-    if (row.metric === 'portion_previews_shown' && cell.status === 'SUPPRESSED')
+    if (
+      row.metric === 'portion_previews_shown' &&
+      (cell.status === 'SUPPRESSED' || !reportableDishes.has(row.dishId))
+    )
       protectedPortionDish = true;
     byDish.set(row.dishId, { ...byDish.get(row.dishId), [row.metric]: cell });
   }

@@ -66,7 +66,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       await admin.end();
     });
 
-    async function createVenue(name: string) {
+    async function createVenue(name: string, hasPortion = false) {
       const venueId = crypto.randomUUID();
       const actorId = crypto.randomUUID();
       const dishId = crypto.randomUUID();
@@ -111,6 +111,31 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
                   allergens: [],
                   dietary: [],
                   images: null,
+                  ...(hasPortion
+                    ? {
+                        portion: {
+                          schema_version: 1,
+                          dish_id: dishId,
+                          dish_revision_id: revision.revisionId,
+                          width: 480,
+                          height: 480,
+                          layers: [
+                            {
+                              url: 'https://assets.invalid/background.webp',
+                              sha256: 'a'.repeat(64),
+                              size_bytes: 90,
+                              depth: 0,
+                            },
+                            {
+                              url: 'https://assets.invalid/foreground.webp',
+                              sha256: 'b'.repeat(64),
+                              size_bytes: 90,
+                              depth: 1,
+                            },
+                          ],
+                        },
+                      }
+                    : {}),
                 },
               ],
             },
@@ -172,6 +197,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       occurredAt: string,
       production = true,
       save = false,
+      preview = false,
     ) {
       const sessionId = crypto.randomUUID();
       const producerId = crypto.randomUUID();
@@ -199,6 +225,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
             save_available: true,
           },
         },
+        ...(preview ? [{ type: 'dish_portion_opened' as const, payload: dish }] : []),
         ...(save
           ? [
               {
@@ -338,6 +365,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           new Date(today),
           new Date(latestEnd),
           { start: new Date(today), events, publications: [published] },
+          new Set([anchor.id, sideA.id, sideB.id]),
         );
         const observed = { value: 10, status: 'NORMAL' };
         expect(result.portionTotal).toEqual(observed);
@@ -362,23 +390,33 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
               },
             ],
           },
+          new Set([anchor.id, sideA.id, sideB.id]),
         );
         expect(smallComplement.portionTotal).toEqual({ value: null, status: 'SUPPRESSED' });
         expect(smallComplement.byDish.get(anchor.id)?.portion_previews_shown).toEqual(observed);
+        const omittedDish = await readOwnerReportDisplayActions(
+          runtime,
+          venue.venueId,
+          new Date(today),
+          new Date(latestEnd),
+          { start: new Date(today), events, publications: [published] },
+          new Set(),
+        );
+        expect(omittedDish.portionTotal).toEqual({ value: null, status: 'SUPPRESSED' });
       } finally {
         await runtime.query('ROLLBACK');
       }
     });
 
     it('seals matching production batches, uses canonical previous UTC data, and isolates two restaurants', async () => {
-      const venue = await createVenue('Production report fixture');
+      const venue = await createVenue('Production report fixture', true);
       const otherVenue = await createVenue('Other production report fixture');
       const postHogEvents: LivePostHogOwnerEvent[] = [];
       const otherEvents: LivePostHogOwnerEvent[] = [];
       for (let index = 0; index < 10; index++) {
         await visit(venue, oldest);
         await visit(venue, reportStart);
-        postHogEvents.push(...(await visit(venue, today, true, index === 0)));
+        postHogEvents.push(...(await visit(venue, today, true, index === 0, true)));
         otherEvents.push(...(await visit(otherVenue, today)));
       }
       await visit(venue, today); // No PostHog evidence at the UTC midnight boundary.
@@ -436,9 +474,9 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           throw new Error('Unexpected network request in production report fixture');
         });
 
-        const request = (suffix: string, bearer: string, id = venue.venueId) =>
+        const request = (suffix: string, bearer: string, id = venue.venueId, extended = true) =>
           app.request(
-            `/api/v1/venues/${id}/analytics/dishes${suffix}?source=production`,
+            `/api/v1/venues/${id}/analytics/dishes${suffix}?source=production${extended ? '&displayActions=true' : ''}`,
             {
               headers: { Authorization: `Bearer ${bearer}`, Origin: 'https://peekaplate.app' },
             },
@@ -469,9 +507,22 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           report.dishes.map(({ dish_id, metrics }) => [dish_id, metrics.active_sessions]),
         ).toEqual([[venue.dishId, { value: 10, status: 'NORMAL' }]]);
         expect(report.dishes[0]?.metrics.save_rate).toEqual({ value: null, status: 'SUPPRESSED' });
+        expect(report.dishes[0]?.display_actions?.portion_previews_shown).toEqual({
+          value: 10,
+          status: 'NORMAL',
+        });
         expect(report.summary?.current).toMatchObject({
           menu_sessions: { value: 10, status: 'NORMAL' },
           dish_opens: { value: 10, status: 'NORMAL' },
+          portion_previews_shown: { value: 10, status: 'NORMAL' },
+        });
+        const legacy = OwnerDishReportSchema.parse(
+          await (await request('', token, venue.venueId, false)).json(),
+        );
+        expect(legacy.dishes[0]?.display_actions).toBeUndefined();
+        expect(legacy.summary?.current.portion_previews_shown).toEqual({
+          value: null,
+          status: 'MISSING',
         });
         expect(report.summary?.baseline).toMatchObject({
           menu_sessions: { value: 10, status: 'NORMAL' },
