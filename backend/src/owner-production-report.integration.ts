@@ -13,6 +13,7 @@ import { FakeR2ArchiveStorage } from './consumer/r2-storage';
 import { createDishRevision } from './dish-command';
 import { createApp } from './index';
 import { bundleKey, PREPARED_BUNDLE_PATH } from './owner-prepare';
+import { readOwnerReportDisplayActions } from './owner-report-display-actions';
 import type { LivePostHogOwnerEvent } from './owner-report-posthog';
 import { approveMenuRevision, publishMenu } from './publication-command';
 
@@ -38,6 +39,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       APP_ENV: 'production',
       OWNER_WORKFLOW_ENABLED: 'true',
       OWNER_PRODUCTION_REPORTS_ENABLED: 'true',
+      OWNER_REPORT_DISPLAY_ACTIONS_ENABLED: 'true',
       AUTH_ISSUER: 'https://owner-report-fixture.invalid/auth/v1',
       HYPERDRIVE: { connectionString: runtimeUrl! },
       POSTHOG_PROJECT_ID: '12',
@@ -65,7 +67,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       await admin.end();
     });
 
-    async function createVenue(name: string) {
+    async function createVenue(name: string, hasPortion = false) {
       const venueId = crypto.randomUUID();
       const actorId = crypto.randomUUID();
       const dishId = crypto.randomUUID();
@@ -110,6 +112,31 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
                   allergens: [],
                   dietary: [],
                   images: null,
+                  ...(hasPortion
+                    ? {
+                        portion: {
+                          schema_version: 1,
+                          dish_id: dishId,
+                          dish_revision_id: revision.revisionId,
+                          width: 480,
+                          height: 480,
+                          layers: [
+                            {
+                              url: 'https://assets.invalid/background.webp',
+                              sha256: 'a'.repeat(64),
+                              size_bytes: 90,
+                              depth: 0,
+                            },
+                            {
+                              url: 'https://assets.invalid/foreground.webp',
+                              sha256: 'b'.repeat(64),
+                              size_bytes: 90,
+                              depth: 1,
+                            },
+                          ],
+                        },
+                      }
+                    : {}),
                 },
               ],
             },
@@ -171,6 +198,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       occurredAt: string,
       production = true,
       save = false,
+      preview = false,
     ) {
       const sessionId = crypto.randomUUID();
       const producerId = crypto.randomUUID();
@@ -198,6 +226,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
             save_available: true,
           },
         },
+        ...(preview ? [{ type: 'dish_portion_opened' as const, payload: dish }] : []),
         ...(save
           ? [
               {
@@ -243,15 +272,152 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       return evidence;
     }
 
+    it('counts only approved 2.5D renders and deduplicates comparison pairs within a start', async () => {
+      const venue = await createVenue('Display action fixture');
+      const anchor = { id: venue.dishId, revision: venue.dishRevisionId, has_portion: true };
+      const sideA = { id: crypto.randomUUID(), revision: crypto.randomUUID(), has_portion: false };
+      const sideB = { id: crypto.randomUUID(), revision: crypto.randomUUID(), has_portion: false };
+      const published = { publicationId: venue.publicationId, dishes: [anchor, sideA, sideB] };
+      const events: LivePostHogOwnerEvent[] = [];
+      const add = async (
+        eventType: 'dish_portion_opened' | 'dish_compared',
+        payload: Record<string, unknown>,
+        sessionId: string,
+        corroborated = true,
+      ) => {
+        const eventId = crypto.randomUUID();
+        const result = await consumer.processMessage(
+          ObservationQueueMessageSchema.parse({
+            kind: 'observation.v2',
+            tenantId: venue.venueId,
+            eventId,
+            sessionId,
+            producerId: crypto.randomUUID(),
+            localSequence: 1,
+            schemaVersion: 'observation.v2',
+            authorizedPublicationId: venue.publicationId,
+            occurredAt: today,
+            firstReceivedAt: today,
+            type: eventType,
+            payload,
+            traffic_class: 'live',
+            sourceEnvironment: 'production',
+          }),
+        );
+        expect(result).toEqual({ status: 'acknowledged', reason: 'persisted' });
+        if (corroborated) events.push({ eventId, publicationId: venue.publicationId, eventType });
+      };
+      const portion = { dish_id: anchor.id, dish_revision_id: anchor.revision };
+      for (let index = 0; index < 10; index++) {
+        const sessionId = crypto.randomUUID();
+        const comparison_id = crypto.randomUUID();
+        await add('dish_portion_opened', portion, sessionId);
+        for (const entry of [sideA, sideB]) {
+          await add(
+            'dish_compared',
+            {
+              ...portion,
+              other_dish_id: entry.id,
+              other_dish_revision_id: entry.revision,
+              comparison_id,
+              compare_action: 'start',
+              save_available: true,
+            },
+            sessionId,
+          );
+        }
+        await add(
+          'dish_compared',
+          {
+            ...portion,
+            other_dish_id: sideA.id,
+            other_dish_revision_id: sideA.revision,
+            comparison_id,
+            compare_action: 'replace',
+            save_available: true,
+          },
+          sessionId,
+        );
+      }
+      await add('dish_portion_opened', portion, crypto.randomUUID(), false);
+      await add(
+        'dish_portion_opened',
+        {
+          dish_id: anchor.id,
+          dish_revision_id: crypto.randomUUID(),
+        },
+        crypto.randomUUID(),
+      );
+      await add(
+        'dish_portion_opened',
+        {
+          dish_id: sideA.id,
+          dish_revision_id: sideA.revision,
+        },
+        crypto.randomUUID(),
+      );
+
+      await runtime.query('BEGIN READ ONLY');
+      try {
+        await runtime.query("SELECT set_config('app.tenant_id', $1, true)", [venue.venueId]);
+        const result = await readOwnerReportDisplayActions(
+          runtime,
+          venue.venueId,
+          new Date(today),
+          new Date(latestEnd),
+          { start: new Date(today), events, publications: [published] },
+          new Set([anchor.id, sideA.id, sideB.id]),
+        );
+        const observed = { value: 10, status: 'NORMAL' };
+        expect(result.portionTotal).toEqual(observed);
+        expect(result.byDish.get(anchor.id)).toEqual({
+          comparisons_started: observed,
+          portion_previews_shown: observed,
+        });
+        expect(result.byDish.get(sideA.id)).toEqual({ comparisons_started: observed });
+        expect(result.byDish.get(sideB.id)).toEqual({ comparisons_started: observed });
+        const smallComplement = await readOwnerReportDisplayActions(
+          runtime,
+          venue.venueId,
+          new Date(today),
+          new Date(latestEnd),
+          {
+            start: new Date(today),
+            events,
+            publications: [
+              {
+                ...published,
+                dishes: [anchor, { ...sideA, has_portion: true }, sideB],
+              },
+            ],
+          },
+          new Set([anchor.id, sideA.id, sideB.id]),
+        );
+        expect(smallComplement.portionTotal).toEqual({ value: null, status: 'SUPPRESSED' });
+        expect(smallComplement.byDish.get(anchor.id)?.portion_previews_shown).toEqual(observed);
+        const omittedDish = await readOwnerReportDisplayActions(
+          runtime,
+          venue.venueId,
+          new Date(today),
+          new Date(latestEnd),
+          { start: new Date(today), events, publications: [published] },
+          new Set(),
+        );
+        expect(omittedDish.portionTotal).toEqual({ value: null, status: 'SUPPRESSED' });
+      } finally {
+        await runtime.query('ROLLBACK');
+      }
+    });
+
     it('seals matching production batches, uses canonical previous UTC data, and isolates two restaurants', async () => {
-      const venue = await createVenue('Production report fixture');
+      const venue = await createVenue('Production report fixture', true);
       const otherVenue = await createVenue('Other production report fixture');
       const postHogEvents: LivePostHogOwnerEvent[] = [];
       const otherEvents: LivePostHogOwnerEvent[] = [];
       for (let index = 0; index < 10; index++) {
         await visit(venue, oldest);
         await visit(venue, reportStart);
-        postHogEvents.push(...(await visit(venue, today, true, index === 0)));
+        postHogEvents.push(...(await visit(venue, today, true, index === 0, true)));
         otherEvents.push(...(await visit(otherVenue, today)));
       }
       await visit(venue, today); // No PostHog evidence at the UTC midnight boundary.
@@ -309,13 +475,19 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           throw new Error('Unexpected network request in production report fixture');
         });
 
-        const request = (suffix: string, bearer: string, id = venue.venueId) =>
+        const request = (
+          suffix: string,
+          bearer: string,
+          id = venue.venueId,
+          extended = true,
+          enabled = 'true',
+        ) =>
           app.request(
-            `/api/v1/venues/${id}/analytics/dishes${suffix}?source=production`,
+            `/api/v1/venues/${id}/analytics/dishes${suffix}?source=production${extended ? '&displayActions=true' : ''}`,
             {
               headers: { Authorization: `Bearer ${bearer}`, Origin: 'https://peekaplate.app' },
             },
-            env,
+            { ...env, OWNER_REPORT_DISPLAY_ACTIONS_ENABLED: enabled },
           );
 
         for (const suffix of ['', '/export']) {
@@ -342,10 +514,27 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           report.dishes.map(({ dish_id, metrics }) => [dish_id, metrics.active_sessions]),
         ).toEqual([[venue.dishId, { value: 10, status: 'NORMAL' }]]);
         expect(report.dishes[0]?.metrics.save_rate).toEqual({ value: null, status: 'SUPPRESSED' });
+        expect(report.dishes[0]?.display_actions?.portion_previews_shown).toEqual({
+          value: 10,
+          status: 'NORMAL',
+        });
         expect(report.summary?.current).toMatchObject({
           menu_sessions: { value: 10, status: 'NORMAL' },
           dish_opens: { value: 10, status: 'NORMAL' },
+          portion_previews_shown: { value: 10, status: 'NORMAL' },
         });
+        const legacy = OwnerDishReportSchema.parse(
+          await (await request('', token, venue.venueId, false)).json(),
+        );
+        expect(legacy.dishes[0]?.display_actions).toBeUndefined();
+        expect(legacy.summary?.current.portion_previews_shown).toEqual({
+          value: null,
+          status: 'MISSING',
+        });
+        const rolledBack = OwnerDishReportSchema.parse(
+          await (await request('', token, venue.venueId, true, 'false')).json(),
+        );
+        expect(rolledBack).toEqual(legacy);
         expect(report.summary?.baseline).toMatchObject({
           menu_sessions: { value: 10, status: 'NORMAL' },
           dish_opens: { value: 10, status: 'NORMAL' },

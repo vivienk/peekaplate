@@ -79,7 +79,7 @@ const summaryMetrics = (allowSmallCounts: boolean) =>
     menu_sessions: summaryCount(allowSmallCounts),
     dish_opens: summaryCount(allowSmallCounts),
     avg_interaction_time_seconds: metric(averageValue()),
-    portion_previews_shown: unavailableSummaryMetric,
+    portion_previews_shown: allowSmallCounts ? summaryCount(false) : unavailableSummaryMetric,
     verified_orders: unavailableSummaryMetric,
   });
 function summarySchema(allowSmallCounts: boolean) {
@@ -216,6 +216,12 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
                 engagement_rate: rate(),
                 save_rate: rate(),
               }),
+              display_actions: z
+                .strictObject({
+                  portion_previews_shown: summaryCount(false).optional(),
+                  comparisons_started: summaryCount(false).optional(),
+                })
+                .optional(),
             })
             .superRefine((dish, ctx) => {
               // ADR 0015 privacy floor: behavioral values are shown only from ten active sessions.
@@ -301,6 +307,22 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
     })
     .superRefine((report, ctx) => {
       const metadata = report.report_metadata;
+      const batch =
+        report.source === 'production' &&
+        metadata.calculation_version === OWNER_PRODUCTION_BATCH_VERSION;
+      if (
+        report.dishes.some(
+          ({ display_actions, evidence_state }) =>
+            display_actions !== undefined && (!batch || evidence_state !== 'NORMAL'),
+        )
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['dishes'],
+          message:
+            'Display-action counts require a reportable dish in a completed production batch',
+        });
+      }
       if (
         metadata.report_status !== 'EMPTY' &&
         metadata.freshness.last_event_ingested_at === null &&
@@ -314,11 +336,7 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
       }
       const summary = report.summary;
       if (!summary) return;
-      if (
-        (report.source !== 'production' ||
-          metadata.calculation_version !== OWNER_PRODUCTION_BATCH_VERSION) &&
-        !OwnerReportSummarySchema.safeParse(summary).success
-      )
+      if (!batch && !OwnerReportSummarySchema.safeParse(summary).success)
         ctx.addIssue({
           code: 'custom',
           path: ['summary'],

@@ -32,8 +32,8 @@ export const REPORT_PUBLICATIONS = `report_publications AS MATERIALIZED (
     SELECT "publicationId" AS publication_id, dishes
     FROM jsonb_to_recordset($6::jsonb) AS p("publicationId" uuid, dishes jsonb)
   ), report_dishes AS MATERIALIZED (
-    SELECT p.publication_id, d.id, d.revision
-    FROM report_publications p, jsonb_to_recordset(p.dishes) AS d(id uuid, revision uuid)
+    SELECT p.publication_id, d.id, d.revision, d.has_portion
+    FROM report_publications p, jsonb_to_recordset(p.dishes) AS d(id uuid, revision uuid, has_portion boolean)
   )`;
 
 export const REPORT_PUBLICATION_FILTER = `

@@ -69,7 +69,7 @@ describe('fetchOwnerReport (S3-RES-03)', () => {
     const fetch = respond(200, report);
     expect(await request(fetch, { apiBase })).toMatchObject({ kind: 'ready', report });
     expect(fetch).toHaveBeenCalledWith(
-      `https://api.peekaplate.app/api/v1/venues/${VENUE}/analytics/dishes?source=production`,
+      `https://api.peekaplate.app/api/v1/venues/${VENUE}/analytics/dishes?source=production&displayActions=true`,
       expect.objectContaining({ cache: 'no-store' }),
     );
     expect(await request(respond(200, UNEEZA_REPORT), { apiBase })).toEqual({ kind: 'invalid' });

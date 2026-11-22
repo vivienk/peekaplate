@@ -4,7 +4,7 @@
 // from Uneeza's synthetic P0 v2 data, labelled as such.
 import { type OwnerDishReport, OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { type ReactNode, useEffect, useState } from 'react';
-import { LivePerf } from './pages';
+import { type LiveMenuRow, LivePerf } from './pages';
 import { fetchOwnerReport, type ReportState } from './report-api';
 import { Note } from './ui';
 import { UNEEZA_REPORT } from './uneeza-report';
@@ -174,8 +174,10 @@ export function ReportView({
   refreshing = false,
   refreshControl,
   presentation = 'data',
+  savedMenu = [],
 }: {
   state: ReportState;
+  savedMenu?: readonly Pick<LiveMenuRow, 'id' | 'name'>[];
   saved?: boolean;
   onRetry?: () => void;
   refreshing?: boolean;
@@ -189,6 +191,7 @@ export function ReportView({
         saved={saved}
         presentation={presentation}
         refreshControl={refreshControl}
+        savedMenu={savedMenu}
       />
     );
   return (
@@ -263,8 +266,10 @@ function ReportTable({
   saved,
   presentation,
   refreshControl,
+  savedMenu,
 }: {
   report: OwnerDishReport;
+  savedMenu: readonly Pick<LiveMenuRow, 'id' | 'name'>[];
   saved: boolean;
   presentation: 'data' | 'performance';
   refreshControl?: ReactNode;
@@ -274,6 +279,7 @@ function ReportTable({
     return (
       <LivePerf
         report={r}
+        savedMenu={savedMenu}
         headerAction={refreshControl}
         period={`${fmt(m.date_window.start_time)} – ${fmt(m.date_window.end_time)} (end exclusive)`}
         summary={`${m.coverage.measurable_dishes_count} measurable · report ${m.report_status.toLowerCase()} · ${freshnessLabel(m.freshness.is_stale)}`}
@@ -282,6 +288,11 @@ function ReportTable({
             <Note kind="warn">Saved copy of a report: synthetic test data. Not real diners.</Note>
           ) : r.source === 'synthetic' ? (
             <Note kind="warn">Synthetic test data from the report API. Not real diners.</Note>
+          ) : m.calculation_version === 'production.batch.v1' ? (
+            <Note>
+              Each completed five-minute batch needs at least ten eligible visits per dish. Overview
+              shows restaurant totals.
+            </Note>
           ) : (
             <Note>Today uses matched PostHog events. Earlier UTC days use Supabase.</Note>
           )

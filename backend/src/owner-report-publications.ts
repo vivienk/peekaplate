@@ -12,7 +12,7 @@ const MAX_PUBLICATIONS = 16;
 
 export type ReportPublication = {
   publicationId: string;
-  dishes: { id: string; revision: string }[];
+  dishes: { id: string; revision: string; has_portion: boolean }[];
 };
 
 /** Caller already owns the authorized restaurant's reporting transaction. */
@@ -86,6 +86,7 @@ export async function readReportPublications(
           .map((dish) => ({
             id: dish.dish_id,
             revision: dish.dish_revision_id,
+            has_portion: dish.complete && Boolean(dish.portion),
           })),
       ),
     });

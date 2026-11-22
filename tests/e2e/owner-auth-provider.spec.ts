@@ -156,17 +156,27 @@ test('production deep links resume after sign-in and keep orientation through br
       json = { schemaVersion: 1, actions: [] };
     } else if (pathname.endsWith('/analytics/dishes')) {
       expect(searchParams.get('source')).toBe('production');
+      expect(searchParams.get('displayActions')).toBe('true');
       reportReads++;
       json = {
         ...UNEEZA_REPORT,
         source: 'production',
         venue_id: venue.venueId,
         dishes: UNEEZA_REPORT.dishes.map((dish, index) =>
-          index === 0 ? { ...dish, name: 'Fixture lentil soup' } : dish,
+          index === 0
+            ? {
+                ...dish,
+                name: 'Fixture lentil soup',
+                display_actions: {
+                  portion_previews_shown: { value: 12, status: 'NORMAL' },
+                  comparisons_started: { value: 10, status: 'NORMAL' },
+                },
+              }
+            : dish,
         ),
         report_metadata: {
           ...UNEEZA_REPORT.report_metadata,
-          calculation_version: 'production.v1',
+          calculation_version: 'production.batch.v1',
         },
       };
     } else return route.fulfill({ status: 404, headers, json: { error: 'unexpected_path' } });
@@ -180,6 +190,16 @@ test('production deep links resume after sign-in and keep orientation through br
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(`${productionOrigin}/dish-performance`);
   await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
+  await page.getByRole('button', { name: '2.5D previews', exact: true }).click();
+  await page.getByRole('button', { name: 'View as table', exact: true }).click();
+  await expect(
+    page.getByRole('row', { name: 'Fixture lentil soup 12', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Comparisons started', exact: true }).click();
+  await expect(
+    page.getByRole('row', { name: 'Fixture lentil soup 10', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Show chart', exact: true }).click();
   const nav = page.getByRole('navigation', { name: 'Workspace' });
   const visit = async (label: string, path: string, heading: string) => {
     await nav.getByRole('button', { name: label, exact: true }).click();

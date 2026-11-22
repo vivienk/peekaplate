@@ -1494,6 +1494,7 @@ function PerfFrame({
   setQ,
   tab,
   setTab,
+  tabs = TABS,
   action,
   body,
 }: {
@@ -1507,6 +1508,7 @@ function PerfFrame({
   setQ: (value: string) => void;
   tab: string;
   setTab: (value: string) => void;
+  tabs?: ReadonlyArray<readonly [string, string]>;
   action?: ReactNode;
   body: ReactNode;
 }) {
@@ -1531,7 +1533,7 @@ function PerfFrame({
         <div className="scrollx dtable">{table}</div>
       </section>
       <div className="tabs" role="group" aria-label="Metric" style={{ margin: 0 }}>
-        {TABS.map(([k, l]) => (
+        {tabs.map(([k, l]) => (
           <button type="button" key={k} aria-pressed={tab === k} onClick={() => setTab(k)}>
             {l}
           </button>
@@ -1583,6 +1585,7 @@ export function LivePerf({
   headerAction,
   columns,
   display,
+  savedMenu = [],
 }: {
   report: OwnerDishReport;
   period: string;
@@ -1598,34 +1601,61 @@ export function LivePerf({
     cell: OwnerDishReport['dishes'][number]['metrics']['open_rate'],
     kind: 'count' | 'seconds' | 'rate',
   ) => ReactNode;
+  savedMenu?: readonly Pick<LiveMenuRow, 'id' | 'name'>[];
 }) {
   const [q, setQ] = useState('');
-  const [tab, setTab] = useState('views');
-  const dishes = report.dishes.filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()));
-  const column = columns.find(
-    ([key]) => key === (tab === 'views' ? 'open_rate' : 'avg_interaction_time_seconds'),
-  );
-  const supported = tab === 'views' || tab === 'time';
+  const [tab, setTab] = useState('open_rate');
+  const batch =
+    report.source === 'production' &&
+    report.report_metadata.calculation_version === 'production.batch.v1';
+  type Dish = OwnerDishReport['dishes'][number];
+  type Metric = keyof Dish['metrics'] | keyof NonNullable<Dish['display_actions']>;
+  const metrics: [Metric, string, 'count' | 'seconds' | 'rate'][] = batch
+    ? [
+        ...columns,
+        ['portion_previews_shown', '2.5D previews', 'count'],
+        ['comparisons_started', 'Comparisons started', 'count'],
+      ]
+    : columns;
+  const search = q.trim().toLowerCase();
+  const dishes = report.dishes.filter((d) => d.name.toLowerCase().includes(search));
+  const menuMatches = savedMenu.filter((dish) => dish.name.toLowerCase().includes(search));
+  const column = metrics.find(([key]) => key === tab) ?? metrics[0];
+  const metricCopy: Record<Metric, string> = {
+    active_sessions: 'Sessions with an eligible dish card exposure.',
+    open_rate: 'Share of exposed visits that opened this dish.',
+    avg_interaction_time_seconds: 'Average active seconds from completed timed openings.',
+    timing_coverage: 'Share of dish openings with usable timing.',
+    save_rate: 'Share of exposed visits that directly saved this dish.',
+    engagement_rate: 'Share of eligible opening sessions that engaged with this dish.',
+    portion_previews_shown:
+      'Actual 2.5D previews that rendered; photo and camera fallbacks are excluded.',
+    comparisons_started:
+      'Rendered comparison starts involving this dish. Replacing a dish keeps the same comparison.',
+  };
+  const missing = { value: null, status: 'MISSING' } as const;
+  const cellFor = (dish: Dish, key: Metric) =>
+    key === 'portion_previews_shown' || key === 'comparisons_started'
+      ? (dish.display_actions?.[key] ?? missing)
+      : dish.metrics[key];
   const body =
-    supported && column ? (
+    column && dishes.length ? (
       <ChartCard
-        title={tab === 'views' ? 'Open rate' : 'Average time interacting'}
-        sub={
-          tab === 'views'
-            ? 'Share of visits that opened each dish; opening counts are unavailable.'
-            : 'Average active seconds from completed timed openings.'
-        }
+        title={column[1]}
+        sub={metricCopy[column[0]]}
         head={['Dish', column[1]]}
-        rows={dishes.map((d) => [d.name, display(d.metrics[column[0]], column[2])])}
+        rows={dishes.map((d) => [d.name, display(cellFor(d, column[0]), column[2])])}
       >
         <HBars
           legend={false}
           max={
-            tab === 'views' ? 1 : Math.max(1, ...dishes.map((d) => d.metrics[column[0]].value ?? 0))
+            column[2] === 'rate'
+              ? 1
+              : Math.max(1, ...dishes.map((d) => cellFor(d, column[0]).value ?? 0))
           }
           segs={[{ name: column[1], color: 'var(--pp-color-orange-600)' }]}
           rows={dishes.map((d) => {
-            const cell = d.metrics[column[0]];
+            const cell = cellFor(d, column[0]);
             const visible = cell.status === 'NORMAL' || cell.status === 'VALID_ZERO';
             return {
               id: d.dish_id,
@@ -1640,20 +1670,27 @@ export function LivePerf({
     ) : (
       <section className="card">
         <div className="card-h">
-          <h3>{TABS.find(([key]) => key === tab)?.[1]}</h3>
+          <h3>{column?.[1] ?? 'Dish measurements'}</h3>
         </div>
         <div className="empty">
-          These measurements are not available in this report. No values are inferred.
+          {report.dishes.length
+            ? 'No dishes match your search.'
+            : batch
+              ? 'Dish metrics appear when enough eligible visits are recorded in a completed batch.'
+              : 'Measurements are unavailable for this report period.'}
         </div>
       </section>
     );
   return (
     <PerfFrame
       period={period}
-      description="Views and time interacting, labelled by how much we know. Orders and other measurements appear only when supported by the report."
+      description="Review visits, open rates and engagement by dish. Verified orders need linked order records."
       summary={
         <>
-          {dishes.length} of {report.dishes.length} dishes · {summary}
+          {report.dishes.length
+            ? `${dishes.length} of ${report.dishes.length} reporting dishes · `
+            : ''}
+          {summary}
         </>
       }
       notice={notice}
@@ -1662,6 +1699,7 @@ export function LivePerf({
       setQ={setQ}
       tab={tab}
       setTab={setTab}
+      tabs={metrics.map(([key, label]) => [key, label])}
       body={body}
       table={
         <>
@@ -1684,16 +1722,26 @@ export function LivePerf({
                   </td>
                   {columns.map(([key, , kind]) => (
                     <td key={key} className="r num">
-                      {display(d.metrics[key], kind)}
+                      {display(d.metrics[key] ?? missing, kind)}
                     </td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
-          {dishes.length === 0 && (
+          {!report.dishes.length && menuMatches.length > 0 && (
             <div className="empty">
-              {report.dishes.length
+              <p>Saved menu</p>
+              <ul>
+                {menuMatches.map(({ id, name }) => (
+                  <li key={id}>{name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {dishes.length === 0 && (report.dishes.length > 0 || menuMatches.length === 0) && (
+            <div className="empty">
+              {report.dishes.length || savedMenu.length
                 ? 'No dishes match your search.'
                 : 'Numbers will appear here once measurable report data is available.'}
             </div>

@@ -10,6 +10,7 @@ import {
   OWNER_BATCH_SETTLE_MS,
   readBatchedOwnerReport,
 } from './owner-report-batches';
+import { readOwnerReportDisplayActions } from './owner-report-display-actions';
 import {
   liveEvidenceParameters,
   type OwnerReportLiveEvidence,
@@ -28,6 +29,7 @@ export type OwnerReportSource = 'production' | 'synthetic';
 type ReportOptions = {
   trafficClass?: 'live' | 'test';
   includeSummary?: boolean;
+  includeDisplayActions?: boolean;
   syntheticSeal?: string;
   validationNow?: Date;
   readTodayEvents?: (venueId: string, start: Date, end: Date) => Promise<LivePostHogOwnerEvent[]>;
@@ -130,9 +132,10 @@ async function measureReport(
     : options.trafficClass === 'test'
       ? TEST_OWNER_REPORT_QUERY
       : OWNER_REPORT_QUERY;
+  const windowStart = new Date(now.getTime() - durationMs);
   const result = await client.query(query, [
     venueId,
-    new Date(now.getTime() - durationMs),
+    windowStart,
     now,
     ...(liveEvidence ? liveEvidenceParameters(liveEvidence) : []),
   ]);
@@ -157,8 +160,27 @@ async function measureReport(
       validationNow: options.validationNow ?? new Date(),
     }));
   const internal = buildInternalReport(result.rows, venueId, now, source, durationMs);
+  const displayActions =
+    isBatch && options.includeDisplayActions && liveEvidence
+      ? await readOwnerReportDisplayActions(
+          client,
+          venueId,
+          windowStart,
+          now,
+          liveEvidence,
+          new Set(internal.dishes.map((dish) => String(dish.dish_id))),
+        )
+      : undefined;
   return toOwnerReport({
     ...internal,
+    ...(displayActions
+      ? {
+          dishes: internal.dishes.map((dish) => {
+            const activity = displayActions.byDish.get(String(dish.dish_id));
+            return activity ? { ...dish, display_actions: activity } : dish;
+          }),
+        }
+      : {}),
     report_metadata: {
       ...internal.report_metadata,
       freshness: {
@@ -168,7 +190,19 @@ async function measureReport(
         is_stale: complete ? false : null,
       },
     },
-    ...(summary ? { summary } : {}),
+    ...(summary
+      ? {
+          summary: displayActions
+            ? {
+                ...summary,
+                current: {
+                  ...summary.current,
+                  portion_previews_shown: displayActions.portionTotal,
+                },
+              }
+            : summary,
+        }
+      : {}),
   });
 }
 

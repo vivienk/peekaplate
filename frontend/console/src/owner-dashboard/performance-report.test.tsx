@@ -49,4 +49,31 @@ describe('authored performance presentation with report API data', () => {
       expect(page).not.toContain('0%');
     }
   });
+
+  it('shows the saved menu independently when a completed production batch has no reportable dishes', () => {
+    const report = OwnerDishReportSchema.parse({
+      ...REPORT,
+      source: 'production',
+      report_metadata: {
+        ...REPORT.report_metadata,
+        calculation_version: 'production.batch.v1',
+        report_status: 'EMPTY',
+        coverage: { total_dishes_monitored: 0, measurable_dishes_count: 0 },
+        freshness: { last_event_ingested_at: null, is_stale: null },
+      },
+      dishes: [],
+    });
+    const markup = renderToStaticMarkup(
+      <ReportView
+        state={{ kind: 'ready', report }}
+        presentation="performance"
+        savedMenu={[{ id: 'draft-id', name: 'QA Lentil Soup' }]}
+      />,
+    );
+    expect(markup).toContain('Saved menu');
+    expect(markup).toContain('QA Lentil Soup');
+    expect(markup).toContain('Dish metrics appear when enough eligible visits');
+    expect(markup).not.toContain('0 of 0 dishes');
+    expect(markup).not.toContain('View as table');
+  });
 });
