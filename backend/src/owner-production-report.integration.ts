@@ -1,4 +1,9 @@
-import { ObservationQueueMessageSchema, OwnerDishReportSchema } from '@peekaplate/contracts';
+import {
+  canonicalJson,
+  ObservationQueueMessageSchema,
+  OwnerDishReportSchema,
+  sha256,
+} from '@peekaplate/contracts';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -7,7 +12,9 @@ import { QueueConsumer } from './consumer/queue-consumer';
 import { FakeR2ArchiveStorage } from './consumer/r2-storage';
 import { createDishRevision } from './dish-command';
 import { createApp } from './index';
+import { bundleKey, PREPARED_BUNDLE_PATH } from './owner-prepare';
 import type { LivePostHogOwnerEvent } from './owner-report-posthog';
+import { approveMenuRevision, publishMenu } from './publication-command';
 
 const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -21,10 +28,12 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       r2Storage: new FakeR2ArchiveStorage(),
       repository: new PostgresObservationRepository(runtime),
     });
-    const now = new Date('2035-02-03T12:00:00.000Z');
-    const oldest = '2035-02-01T12:00:00.000Z';
-    const reportStart = '2035-02-02T12:00:00.000Z';
+    const now = new Date('2035-02-03T00:06:00.000Z');
+    const latestEnd = '2035-02-03T00:05:00.000Z';
+    const oldest = '2035-02-02T23:50:00.000Z';
+    const reportStart = '2035-02-02T23:55:00.000Z';
     const today = '2035-02-03T00:00:00.000Z';
+    const bundles = new Map<string, ArrayBuffer>();
     const env = {
       APP_ENV: 'production',
       OWNER_WORKFLOW_ENABLED: 'true',
@@ -33,6 +42,17 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       HYPERDRIVE: { connectionString: runtimeUrl! },
       POSTHOG_PROJECT_ID: '12',
       POSTHOG_OWNER_REPORT_READ_KEY: 'phx_local_fixture',
+      INGESTION_REPORTS_BUCKET: {
+        get: async (key: string) => {
+          const bytes = bundles.get(key);
+          return bytes ? { arrayBuffer: async () => bytes } : null;
+        },
+        put: async (key: string, bytes: ArrayBuffer) => {
+          if (bundles.has(key)) return null;
+          bundles.set(key, bytes);
+          return {};
+        },
+      },
     };
     const app = createApp();
 
@@ -49,7 +69,6 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       const venueId = crypto.randomUUID();
       const actorId = crypto.randomUUID();
       const dishId = crypto.randomUUID();
-      const publicationId = crypto.randomUUID();
       await admin.query('INSERT INTO app_private.venues(id,name) VALUES($1,$2)', [venueId, name]);
       await admin.query(
         "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES($1,$2,'owner')",
@@ -62,10 +81,97 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         name,
         description: 'Synthetic database fixture.',
       });
-      return { venueId, actorId, dishId, dishRevisionId: revision.revisionId, publicationId };
+      const menuId = crypto.randomUUID();
+      const menuRevisionId = crypto.randomUUID();
+      const contentApprovalId = crypto.randomUUID();
+      const assetApprovalId = crypto.randomUUID();
+      const bytes = new TextEncoder().encode(
+        canonicalJson({
+          schema_version: 1,
+          venue_id: venueId,
+          menu_id: menuId,
+          menu_revision_id: menuRevisionId,
+          restaurant: { name, logo: null },
+          categories: [
+            {
+              category_id: crypto.randomUUID(),
+              name: 'Mains',
+              dishes: [
+                {
+                  dish_id: dishId,
+                  dish_revision_id: revision.revisionId,
+                  complete: true,
+                  name,
+                  description: 'Synthetic fixture dish.',
+                  ingredients: [
+                    { ingredient_id: crypto.randomUUID(), name: 'Rice', description: null },
+                  ],
+                  price: { amount: '5', currency: 'USD' },
+                  allergens: [],
+                  dietary: [],
+                  images: null,
+                },
+              ],
+            },
+          ],
+        }),
+      );
+      await admin.query(
+        `INSERT INTO app_private.menu_review_subject
+          (tenant_id, menu_id, menu_revision_id, content_approval_id, content_hash, asset_approval_id, asset_manifest_hash)
+          VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [
+          venueId,
+          menuId,
+          menuRevisionId,
+          contentApprovalId,
+          await sha256(bytes),
+          assetApprovalId,
+          'a'.repeat(64),
+        ],
+      );
+      await admin.query(
+        `INSERT INTO app_private.public_menu_bundle (tenant_id, menu_id, menu_revision_id, bundle_url)
+         VALUES ($1,$2,$3,$4)`,
+        [
+          venueId,
+          menuId,
+          menuRevisionId,
+          `https://api.peekaplate.app${PREPARED_BUNDLE_PATH}/${venueId}/${menuId}/${menuRevisionId}.json`,
+        ],
+      );
+      const storageKey = bundleKey(venueId, menuId, menuRevisionId);
+      bundles.set(storageKey, Uint8Array.from(bytes).buffer);
+      const approval = await approveMenuRevision(runtime, actorId, venueId, {
+        menuId,
+        menuRevisionId,
+        contentApprovalId,
+        assetApprovalId,
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+      });
+      const { publicationId } = await publishMenu(runtime, actorId, venueId, {
+        menuId,
+        approvalId: approval.approvalId,
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+      });
+      return {
+        venueId,
+        actorId,
+        dishId,
+        dishRevisionId: revision.revisionId,
+        publicationId,
+        storageKey,
+      };
     }
 
-    async function visit(venue: Awaited<ReturnType<typeof createVenue>>, occurredAt: string) {
+    async function visit(
+      venue: Awaited<ReturnType<typeof createVenue>>,
+      occurredAt: string,
+      production = true,
+      save = false,
+    ) {
       const sessionId = crypto.randomUUID();
       const producerId = crypto.randomUUID();
       const exposureId = crypto.randomUUID();
@@ -92,6 +198,19 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
             save_available: true,
           },
         },
+        ...(save
+          ? [
+              {
+                type: 'dish_saved' as const,
+                payload: {
+                  ...dish,
+                  save_origin: 'direct',
+                  save_surface: 'menu_card',
+                  shortlist_size: 1,
+                },
+              },
+            ]
+          : []),
       ] as const;
       const evidence: LivePostHogOwnerEvent[] = [];
       for (const [localSequence, event] of events.entries()) {
@@ -109,6 +228,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           firstReceivedAt: occurredAt,
           ...event,
           traffic_class: 'live',
+          ...(production ? { sourceEnvironment: 'production' } : {}),
         });
         expect(await consumer.processMessage(envelope)).toEqual({
           status: 'acknowledged',
@@ -123,7 +243,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       return evidence;
     }
 
-    it('keeps canonical history, counts only matching current UTC events, and denies cross-tenant access', async () => {
+    it('seals matching production batches, uses canonical previous UTC data, and isolates two restaurants', async () => {
       const venue = await createVenue('Production report fixture');
       const otherVenue = await createVenue('Other production report fixture');
       const postHogEvents: LivePostHogOwnerEvent[] = [];
@@ -131,10 +251,14 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       for (let index = 0; index < 10; index++) {
         await visit(venue, oldest);
         await visit(venue, reportStart);
-        postHogEvents.push(...(await visit(venue, today)));
+        postHogEvents.push(...(await visit(venue, today, true, index === 0)));
         otherEvents.push(...(await visit(otherVenue, today)));
       }
       await visit(venue, today); // No PostHog evidence at the UTC midnight boundary.
+      await visit(venue, reportStart, false); // Legacy history has no production provenance.
+      postHogEvents.push(...(await visit(venue, today, false)));
+      const mismatchedDish = await visit({ ...venue, dishRevisionId: crypto.randomUUID() }, today);
+      postHogEvents.push(...mismatchedDish.filter((event) => event.eventType !== 'menu_viewed'));
       for (const event of await visit(venue, today)) {
         postHogEvents.push({ ...event, publicationId: otherVenue.publicationId });
       }
@@ -144,7 +268,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           eventType: event.eventType === 'menu_viewed' ? 'dish_viewed' : 'menu_viewed',
         });
       }
-      postHogEvents.push(...(await visit(venue, now.toISOString())));
+      postHogEvents.push(...(await visit(venue, latestEnd)));
       postHogEvents.push(otherEvents[0]!, {
         eventId: crypto.randomUUID(),
         publicationId: venue.publicationId,
@@ -161,7 +285,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
             .setIssuer(env.AUTH_ISSUER)
             .setAudience('authenticated')
             .setSubject(actorId)
-            .setExpirationTime('5m')
+            .setExpirationTime('15m')
             .sign(keys.privateKey);
         const token = await issueToken(venue.actorId);
         const otherToken = await issueToken(otherVenue.actorId);
@@ -209,29 +333,35 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         const report = OwnerDishReportSchema.parse(await response.json());
         expect(report.venue_id).toBe(venue.venueId);
         expect(report.source).toBe('production');
+        expect(report.report_metadata.calculation_version).toBe('production.batch.v1');
         expect(report.report_metadata.freshness).toEqual({
           last_event_ingested_at: null,
           is_stale: null,
         });
         expect(
           report.dishes.map(({ dish_id, metrics }) => [dish_id, metrics.active_sessions]),
-        ).toEqual([[venue.dishId, { value: 20, status: 'NORMAL' }]]);
+        ).toEqual([[venue.dishId, { value: 10, status: 'NORMAL' }]]);
+        expect(report.dishes[0]?.metrics.save_rate).toEqual({ value: null, status: 'SUPPRESSED' });
         expect(report.summary?.current).toMatchObject({
-          menu_sessions: { value: 20, status: 'NORMAL' },
-          dish_opens: { value: 20, status: 'NORMAL' },
+          menu_sessions: { value: 10, status: 'NORMAL' },
+          dish_opens: { value: 10, status: 'NORMAL' },
         });
         expect(report.summary?.baseline).toMatchObject({
           menu_sessions: { value: 10, status: 'NORMAL' },
           dish_opens: { value: 10, status: 'NORMAL' },
         });
         expect(report.summary?.daily_opens?.current).toEqual([
-          { start_time: reportStart, end_time: today, opens: { value: 10, status: 'NORMAL' } },
           {
             start_time: today,
-            end_time: now.toISOString(),
+            end_time: latestEnd,
             opens: { value: 10, status: 'NORMAL' },
           },
         ]);
+        expect(report.summary?.daily_opens?.baseline).toEqual([
+          { start_time: reportStart, end_time: today, opens: { value: 10, status: 'NORMAL' } },
+        ]);
+        postHogEvents.push(...(await visit(venue, today)));
+        expect(await (await request('', token)).json()).toEqual(report);
 
         const csv = await request('/export', token);
         expect(csv.status).toBe(200);
@@ -246,15 +376,15 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           venue_id: venue.venueId,
           source: 'production',
           dish_id: venue.dishId,
-          active_sessions: '20',
+          active_sessions: '10',
           active_sessions_status: 'NORMAL',
         });
-        expect(postHog).toHaveBeenCalledTimes(2);
+        expect(postHog).toHaveBeenCalledTimes(1);
         for (const [, init] of postHog.mock.calls) {
           expect(JSON.parse(String(init?.body)).query.values).toEqual({
             venue_id: venue.venueId,
             window_start: '2035-02-03 00:00:00.000',
-            window_end: '2035-02-03 12:00:00.000',
+            window_end: '2035-02-03 00:05:00.000',
           });
         }
         const otherResponse = await request('', otherToken, otherVenue.venueId);
@@ -264,7 +394,38 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         expect(
           otherReport.dishes.map(({ dish_id, metrics }) => [dish_id, metrics.active_sessions]),
         ).toEqual([[otherVenue.dishId, { value: 10, status: 'NORMAL' }]]);
-        expect(postHog).toHaveBeenCalledTimes(3);
+        expect(postHog).toHaveBeenCalledTimes(2);
+
+        for (let index = 0; index < 10; index++) {
+          postHogEvents.push(...(await visit(venue, latestEnd)));
+          if (index === 0) otherEvents.push(...(await visit(otherVenue, latestEnd)));
+        }
+        vi.setSystemTime(new Date('2035-02-03T00:11:00.000Z'));
+        const nextResponse = await request('', token);
+        expect(nextResponse.status).toBe(200);
+        const refreshed = OwnerDishReportSchema.parse(await nextResponse.json());
+        expect(refreshed.summary?.current.dish_opens).toEqual({ value: 11, status: 'NORMAL' });
+        expect(refreshed.summary?.baseline.dish_opens).toEqual({ value: 10, status: 'NORMAL' });
+        const otherNextResponse = await request('', otherToken, otherVenue.venueId);
+        expect(otherNextResponse.status).toBe(200);
+        const otherRefreshed = OwnerDishReportSchema.parse(await otherNextResponse.json());
+        expect(otherRefreshed.summary?.current.dish_opens).toEqual({
+          value: 1,
+          status: 'NORMAL',
+        });
+        expect(otherRefreshed.summary?.current.menu_sessions).toEqual({
+          value: 1,
+          status: 'NORMAL',
+        });
+        expect(otherRefreshed.summary?.daily_opens?.current[0]?.opens).toEqual({
+          value: 1,
+          status: 'NORMAL',
+        });
+        expect(otherRefreshed.dishes).toEqual([]);
+        expect(otherRefreshed.summary?.baseline.dish_opens).toEqual({
+          value: 10,
+          status: 'NORMAL',
+        });
       } finally {
         vi.unstubAllGlobals();
         vi.useRealTimers();

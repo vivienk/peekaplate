@@ -63,6 +63,7 @@ export interface LiveDashboardInput {
   summary?: OwnerDishReport['summary'];
   summaryFreshness?: boolean | null | undefined;
   summarySource?: OwnerDishReport['source'] | undefined;
+  summaryBatch?: boolean;
 }
 
 type OverviewSummary = NonNullable<OwnerDishReport['summary']>;
@@ -210,6 +211,10 @@ export function Overview({
   const dailyValue = (bucket: NonNullable<OverviewSummary['daily_opens']>['current'][number]) =>
     bucket.opens.value ??
     (bucket.opens.status === 'SUPPRESSED' ? 'Not enough visits yet' : 'Unavailable');
+  const batches = live?.summaryBatch && daily ? [...daily.baseline, ...daily.current] : undefined;
+  const batchLabels = batches?.map(
+    ({ end_time }) => `${end_time.slice(5, 10)} ${end_time.slice(11, 16)} UTC`,
+  );
   const sorted = bySort('open');
   const planned = INSIGHTS.filter((i) => acts[i.id]?.status === 'planned').length;
   return (
@@ -230,8 +235,9 @@ export function Overview({
       )}
       {live?.summary && live.summarySource === 'production' && (
         <Note icon="info">
-          Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow
-          for delivery delays when comparing periods.
+          {live.summaryBatch
+            ? 'Refresh shows the latest completed five-minute batch. Dish-level rates need enough visits.'
+            : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
         </Note>
       )}
       {(live || !empty) && (
@@ -305,7 +311,7 @@ export function Overview({
         <div className="stack">
           {(live || !empty) && (
             <ChartCard
-              title="Dish opens by day"
+              title={live?.summaryBatch ? 'Dish opens by batch' : 'Dish opens by day'}
               tag={
                 <Lab
                   k={
@@ -320,60 +326,76 @@ export function Overview({
                 />
               }
               {...(live && {
-                sub: 'UTC days clipped to each reporting period. Unavailable measurements are gaps, not zero.',
+                sub: live.summaryBatch
+                  ? 'Completed five-minute UTC batches. Unavailable measurements are gaps.'
+                  : 'UTC days clipped to each reporting period. Unavailable measurements are gaps, not zero.',
               })}
               head={
-                live
-                  ? ['UTC bucket', 'Current period', 'Previous period']
-                  : ['Day', 'This week', 'Last week']
+                live?.summaryBatch
+                  ? ['UTC batch', 'Dish opens']
+                  : live
+                    ? ['UTC bucket', 'Current period', 'Previous period']
+                    : ['Day', 'This week', 'Last week']
               }
               rows={
-                live
-                  ? (daily?.current.map((bucket, i) => [
-                      dailyLabels![i],
-                      dailyValue(bucket),
-                      daily.baseline[i] ? dailyValue(daily.baseline[i]!) : 'Unavailable',
-                    ]) ?? [])
-                  : DAYS.map((d, i) => [d, DAILY_NOW[i], DAILY_PREV[i]])
+                batches
+                  ? batches.map((bucket) => [overviewWindow(bucket), dailyValue(bucket)])
+                  : live
+                    ? (daily?.current.map((bucket, i) => [
+                        dailyLabels![i],
+                        dailyValue(bucket),
+                        daily.baseline[i] ? dailyValue(daily.baseline[i]!) : 'Unavailable',
+                      ]) ?? [])
+                    : DAYS.map((d, i) => [d, DAILY_NOW[i], DAILY_PREV[i]])
               }
             >
               {live && !daily ? (
                 <div className="empty">Daily openings unavailable.</div>
               ) : (
                 <LineChart
-                  labels={live ? (dailyLabels ?? []) : DAYS}
+                  labels={batchLabels ?? (live ? (dailyLabels ?? []) : DAYS)}
                   unit=""
                   desc={
-                    live
-                      ? 'Dish opens by clipped UTC day, current period compared with previous period'
-                      : 'Dish opens by day, this week compared with last week'
+                    batches
+                      ? 'Dish opens for the previous and latest completed UTC batches'
+                      : live
+                        ? 'Dish opens by clipped UTC day, current period compared with previous period'
+                        : 'Dish opens by day, this week compared with last week'
                   }
                   series={
-                    live && daily
+                    batches
                       ? [
                           {
-                            name: 'Current period',
+                            name: 'Dish opens',
                             color: 'var(--c1)',
-                            values: daily.current.map((bucket) => bucket.opens.value),
-                          },
-                          {
-                            name: 'Previous period',
-                            color: 'var(--cg)',
-                            values: daily.baseline.map((bucket) => bucket.opens.value),
-                            dash: '5 4',
-                            label: false,
+                            values: batches.map((bucket) => bucket.opens.value),
                           },
                         ]
-                      : [
-                          { name: 'This week', color: 'var(--c1)', values: DAILY_NOW },
-                          {
-                            name: 'Last week',
-                            color: 'var(--cg)',
-                            values: DAILY_PREV,
-                            dash: '5 4',
-                            label: false,
-                          },
-                        ]
+                      : live && daily
+                        ? [
+                            {
+                              name: 'Current period',
+                              color: 'var(--c1)',
+                              values: daily.current.map((bucket) => bucket.opens.value),
+                            },
+                            {
+                              name: 'Previous period',
+                              color: 'var(--cg)',
+                              values: daily.baseline.map((bucket) => bucket.opens.value),
+                              dash: '5 4',
+                              label: false,
+                            },
+                          ]
+                        : [
+                            { name: 'This week', color: 'var(--c1)', values: DAILY_NOW },
+                            {
+                              name: 'Last week',
+                              color: 'var(--cg)',
+                              values: DAILY_PREV,
+                              dash: '5 4',
+                              label: false,
+                            },
+                          ]
                   }
                 />
               )}

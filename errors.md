@@ -5483,3 +5483,39 @@ portion-only binding serves the existing private upload path while denying
 OCR, source and budget endpoints. The Python startup regression and Worker
 route and credential-scope tests cover the boundary. Hosted validation is
 pending.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-22T05:38:04.684Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-22T05:45:49.556Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-22T05:49:29.193Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-22T05:50:20.723Z","exitCode":1}
+```
+
+The batch integration fixture advanced its clock five minutes while using a five-minute JWT.
+The next request reached authentication with an expired fixture token. The fixture now covers both
+reporting intervals with one test session and asserts HTTP status before parsing the report. Grouped
+type checking also caught the Workers decoder options and invalid temporary error types. The batch
+decoder supplies `ignoreBOM`, and unavailable production evidence uses `AuthUnavailableError`.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-22T05:52:18.337Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-22T06:00:05.014Z","exitCode":1}
+```

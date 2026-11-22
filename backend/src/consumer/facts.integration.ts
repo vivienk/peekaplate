@@ -215,6 +215,23 @@ it('backfills old accepted rows idempotently from the original archive and keeps
   ).toBe(0);
 });
 
+it.each([undefined, 'production'] as const)(
+  'keeps the first archived source environment %s across replays',
+  async (sourceEnvironment) => {
+    const envelope = await message('menu_viewed', 'live');
+    await historic(sourceEnvironment ? { ...envelope, sourceEnvironment } : envelope);
+    const retry: ObservationQueueMessage = sourceEnvironment
+      ? envelope
+      : { ...envelope, sourceEnvironment: 'production' };
+    expect((await consumer.processMessage(retry)).status).toBe('acknowledged');
+    const result = await admin.query<{ source_environment: string | null }>(
+      'SELECT source_environment FROM app_private.observation_event WHERE tenant_id=$1 AND event_id=$2',
+      [tenantId, envelope.eventId],
+    );
+    expect(result.rows).toEqual([{ source_environment: sourceEnvironment ?? null }]);
+  },
+);
+
 it('rolls back index and event when a detail check fails; retries never hide that failure', async () => {
   const envelope = await message('dish_detail_opened');
   const invalid = { ...envelope, payload: { ...envelope.payload, source: 'direct' } };

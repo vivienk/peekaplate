@@ -793,6 +793,7 @@ export const ObservationQueueMessageSchema = z
     producerId: observationUuid,
     localSequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     traffic_class: z.enum(['live', 'test', 'demo']).default('live'),
+    sourceEnvironment: z.literal('production').optional(),
     payload: z.record(z.string(), z.unknown()),
     firstReceivedAt: z.iso.datetime({ offset: true }),
   })

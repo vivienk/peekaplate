@@ -741,6 +741,7 @@ function LiveDashboardReport({
     summary: report?.summary,
     summaryFreshness: report?.report_metadata.freshness.is_stale,
     summarySource: report?.source,
+    summaryBatch: report?.report_metadata.calculation_version === 'production.batch.v1',
     period: report ? reportPeriod(report.report_metadata.date_window) : undefined,
   };
   return (
@@ -863,6 +864,9 @@ const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
 // Report windows are end-exclusive, so the last day shown is the millisecond before the end.
 function reportPeriod(window: { start_time: string; end_time: string }): string {
   const start = new Date(window.start_time);
+  if (Date.parse(window.end_time) - start.getTime() === 300_000) {
+    return `${window.start_time.slice(0, 10)} · ${window.start_time.slice(11, 16)}–${window.end_time.slice(11, 16)} UTC`;
+  }
   const end = new Date(Math.max(start.getTime(), new Date(window.end_time).getTime() - 1));
   return PERIOD_FORMAT.formatRange(start, end);
 }

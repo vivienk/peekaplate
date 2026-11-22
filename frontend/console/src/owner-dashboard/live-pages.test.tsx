@@ -1,4 +1,7 @@
-import { OwnerReportSummarySchema } from '@peekaplate/contracts/owner-report';
+import {
+  OwnerReportSummarySchema,
+  ProductionBatchSummarySchema,
+} from '@peekaplate/contracts/owner-report';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { Actions, Overview, Report } from './pages';
@@ -21,6 +24,44 @@ const noSamples = (html: string) => {
 };
 
 describe('authored dashboard pages with live inputs', () => {
+  it('plots one verified opening under its own UTC batch across midnight', () => {
+    const absent = { value: null, status: 'MISSING' };
+    const currentWindow = { start_time: '2026-11-21T00:00:00Z', end_time: '2026-11-21T00:05:00Z' };
+    const previousWindow = { start_time: '2026-11-20T23:55:00Z', end_time: '2026-11-21T00:00:00Z' };
+    const metrics = (count: number) => ({
+      menu_sessions: { value: count, status: 'NORMAL' },
+      dish_opens: { value: count, status: 'NORMAL' },
+      avg_interaction_time_seconds: absent,
+      portion_previews_shown: absent,
+      verified_orders: absent,
+    });
+    const input = {
+      periods: { current: currentWindow, baseline: previousWindow },
+      current: metrics(1),
+      baseline: metrics(12),
+      daily_opens: {
+        current: [{ ...currentWindow, opens: metrics(1).dish_opens }],
+        baseline: [{ ...previousWindow, opens: metrics(12).dish_opens }],
+      },
+    };
+    expect(OwnerReportSummarySchema.safeParse(input).success).toBe(false);
+    const html = renderToStaticMarkup(
+      <Overview
+        {...common}
+        live={{
+          ...identity,
+          menu: [],
+          summarySource: 'production',
+          summaryBatch: true,
+          summary: ProductionBatchSummarySchema.parse(input),
+        }}
+      />,
+    );
+    expect(html).toContain('Dish opens by batch');
+    expect(html).toContain('11-21 00:00 UTC');
+    expect(html).toContain('11-21 00:05 UTC');
+    expect(html).toContain('<div class="v num">1</div>');
+  });
   it('renders actual menu identity without prototype images or aggregate metrics', () => {
     const html = renderToStaticMarkup(
       <Overview

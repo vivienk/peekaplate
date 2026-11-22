@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "9ea7b0d019aade985f780511c4899babcd31c7184dc12b899042a8cebdcea787"
+      "sourceFingerprint": "605303da11583eff9d2e3ac76197f8f8210c80eb571ba5c8a0f42f8c40c66d1a"
     },
     {
       "id": "tokens",
@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "de10a01e3260ba914c380e192536e3be38746ca94176c0166f4358dac38726d5"
+      "sourceFingerprint": "1c513e3e0f73197bd034faa6b999bc5e2bb70691f6f3433b332949cd7af0696e"
     },
     {
       "id": "backend",
@@ -507,6 +507,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-report.test.ts",
         "backend/src/owner-report.ts",
         "backend/src/owner-report-evidence.ts",
+        "backend/src/owner-report-batches.ts",
+        "backend/src/owner-report-publications.ts",
         "backend/src/owner-report-posthog.ts",
         "backend/src/owner-report-posthog.test.ts",
         "backend/src/owner-production-report.integration.ts",
@@ -744,7 +746,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "be6348c3e47ef77d3516b63d58a37e4eb909b90bd31e85165b8dd70b02c80155"
+      "sourceFingerprint": "860e07e96c73ac0cbd3b96003e1960b82ca169f50f4a03754cf421a8f001f244"
     },
     {
       "id": "database",
@@ -796,7 +798,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner-venue-creation.sql",
         "backend/src/owner-report-summary.integration.ts",
         "migrations/20261121100000_first_owner_venue.sql",
-        "migrations/20261121110000_observation_portion_opening.sql"
+        "migrations/20261121110000_observation_portion_opening.sql",
+        "migrations/20261121120000_observation_production_source.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -807,7 +810,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "ace8065acd82be3d69181f2686e61c29f379984047a712caffe6ed37196201e8"
+      "sourceFingerprint": "1e5bf7445999456b43585663a3a33a1eb59e171f41db04ed2b0a476e6cd7be19"
     },
     {
       "id": "measurement",
@@ -906,7 +909,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "88dfa79593ef590e3d177ef0f37a43d52f8706d872d43eafb2bf0409ebf6dec2"
+      "sourceFingerprint": "f8e957ac13fe958f3a04711f4550ac94cc5840c7dbf8dd3635a3bc9aaf4ca3ee"
     },
     {
       "id": "agents",
@@ -1264,10 +1267,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database",
         "delivery"
       ],
-      "summary": "Production owner pages use the existing screens and authenticated routes. Actions reads accept the exact production owner origin under the owner workflow gate and still require current restaurant ownership. Reports use canonical Supabase facts, corroborate current-day events in PostHog and keep AI freshness unknown until proven.",
+      "summary": "Production reports use fixed five-minute UTC batches sealed once in the private bucket. The reader requires owner membership, attested production facts, verified approvals and exact PostHog matches for same-day events. Earlier UTC batches use canonical Supabase. Proposed ADR 0018 permits venue-wide visit and open totals down to one while dish rates and timing retain their floors. Production activation and AI remain gated.",
       "files": [
         "docs/production-release.md",
         "docs/adr/0017-production-owner-report-sources.md",
+        "docs/adr/0018-production-batch-counts.md",
         "backend/src/owner-production-report.integration.ts",
         "backend/src/owner-actions-cors.test.ts",
         "backend/src/owner-workflow-environment.ts",
