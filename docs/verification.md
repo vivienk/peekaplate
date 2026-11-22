@@ -16,7 +16,7 @@ Reviewed baseline: [PeekaPlate Orchestration + V1 Team Plan](https://claude.ai/a
 
 ## Purpose and latency of existing CI jobs
 
-`quality` always checks formatting, strict types, unit/script tests, builds, context and PR documentation. Code/build results are not hidden behind a missing PR section. `changes` selects `database` and `browser` for their relevant paths; dependency/CI changes exercise both. `ci` is the only aggregate check to require. No extra review job, paid model call, browser dump or per-platform build matrix is added.
+`quality` always checks formatting, strict types, unit and script tests, builds, context and PR documentation. `changes` selects the database and three parallel browser jobs for their relevant paths. Dependency and CI changes exercise them all. `ci` is the only aggregate check to require. Locally, `pnpm verify test:e2e` runs the same three browser scripts in sequence. CI also runs the offline dish review preview once.
 
 The database lane applies the previous schema, preserves a synthetic row through the forward migration, checks SQL policies, exercises the actual local Worker against PostgreSQL and runs the local startup/demo/cleanup path. These use disposable Docker databases and local signing keys; no provider credentials are required.
 
