@@ -116,9 +116,8 @@ export async function readLivePostHogOwnerEvents(
     !/^ph[xs]_[A-Za-z0-9_-]+$/.test(readKey) ||
     readKey !== readKey.trim() ||
     !uuid.safeParse(venueId).success ||
-    starts % DAY_MS !== 0 ||
     ends < starts ||
-    ends - starts > DAY_MS
+    (starts < ends && Math.floor(starts / DAY_MS) !== Math.floor((ends - 1) / DAY_MS))
   ) {
     throw new OwnerReportPostHogUnavailableError();
   }

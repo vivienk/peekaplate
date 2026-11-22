@@ -195,6 +195,7 @@ export type Bindings = {
   APP_ENV?: string;
   OWNER_WORKFLOW_ENABLED?: string;
   OWNER_PRODUCTION_REPORTS_ENABLED?: string;
+  PRODUCTION_OBSERVATION_PROVENANCE_ENABLED?: string;
   DINER_PUBLIC_ORIGIN?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
@@ -692,7 +693,15 @@ const dependencies: Dependencies = {
   consumeObservationRateLimit: consumeJtiRateLimit,
   async enqueueObservation(message, env) {
     if (!env.OBSERVATION_QUEUE) throw new MenuTokenUnavailableError();
-    await env.OBSERVATION_QUEUE.send(ObservationQueueEnvelopeSchema.parse(message));
+    // The public DTO cannot carry this marker. This call follows exact issuer verification.
+    const envelope =
+      message.kind === 'observation.v2' &&
+      env.APP_ENV === 'production' &&
+      env.PRODUCTION_OBSERVATION_PROVENANCE_ENABLED === 'true' &&
+      env.MENU_TOKEN_ISSUER === 'https://api.peekaplate.app/'
+        ? { ...message, sourceEnvironment: 'production' }
+        : message;
+    await env.OBSERVATION_QUEUE.send(ObservationQueueEnvelopeSchema.parse(envelope));
   },
   async execute(actorId, venueId, input, env) {
     const connectionString =
@@ -795,6 +804,10 @@ const dependencies: Dependencies = {
       if (source === 'production' && productionOwnerReportingEnabled(env)) {
         return await queryOwnerReport(client, actorId, venueId, now, source, {
           includeSummary: true,
+          productionPublications: {
+            storage: preparedStorage(env),
+            origin: 'https://api.peekaplate.app',
+          },
           readTodayEvents: async (venueId, start, end) => {
             if (!env.POSTHOG_OWNER_REPORT_READ_KEY || !env.POSTHOG_PROJECT_ID)
               throw new AuthUnavailableError();

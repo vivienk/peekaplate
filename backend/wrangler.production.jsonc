@@ -97,6 +97,7 @@
     "APP_ENV": "production",
     "OWNER_WORKFLOW_ENABLED": "false",
     "OWNER_PRODUCTION_REPORTS_ENABLED": "false",
+    "PRODUCTION_OBSERVATION_PROVENANCE_ENABLED": "false",
     "POSTHOG_PROJECT_ID": "675372",
     "MENU_TOKEN_ISSUER": "https://api.peekaplate.app/",
     "DINER_PUBLIC_ORIGIN": "https://diner.peekaplate.app",

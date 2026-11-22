@@ -94,7 +94,6 @@ describe('production owner report PostHog query', () => {
     { readKey: '' },
     { readKey: 'phc_capture_key' },
     { venueId: 'untrusted-venue' },
-    { windowStart: '2026-11-21T01:00:00.000Z' },
     { windowEnd: '2026-11-21T10:30:13.456-07:00' },
     { windowEnd: '2026-11-20T23:59:59.999Z' },
     { windowEnd: '2026-11-22T00:00:00.001Z' },
@@ -104,6 +103,24 @@ describe('production owner report PostHog query', () => {
       OwnerReportPostHogUnavailableError,
     );
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('queries the requested sub-day batch with end-exclusive UTC bounds', async () => {
+    const fetcher = provider(Response.json({ results: [] }));
+    await expect(
+      readLivePostHogOwnerEvents(
+        {
+          ...scope,
+          windowStart: '2026-11-21T10:30:00.000Z',
+          windowEnd: '2026-11-21T10:35:00.000Z',
+        },
+        fetcher,
+      ),
+    ).resolves.toEqual([]);
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)).query.values).toMatchObject({
+      window_start: '2026-11-21 10:30:00.000',
+      window_end: '2026-11-21 10:35:00.000',
+    });
   });
 
   it.each([

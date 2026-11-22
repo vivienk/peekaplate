@@ -43,7 +43,7 @@ import { loadApprovedDishSources } from './bundle-producer/repository';
 import { type MenuBundleRequest, MenuBundleRequestSchema } from './bundle-producer/request';
 import { IngestionError } from './ingestion/repository';
 import { exportApprovedPrivatePortion, previewKey } from './owner-portion-preview';
-import { readPublicMenu } from './public-menu';
+import { type PublicMenuRecord, readPublicMenu } from './public-menu';
 import { beginAuthorizedOwner } from './publication-command';
 
 export const PREPARED_BUNDLE_PATH = '/public/prepared-bundles';
@@ -535,6 +535,15 @@ async function readPublishedSnapshot(
   // Reuse the publication -> approval -> exact bundle join used by the public menu envelope.
   const menu = await readPublicMenu(client, venueId, menuId);
   if (!menu) return null;
+  return verifyPublishedSnapshot(storage, menu);
+}
+
+type PublishedSnapshot = Pick<PublicMenuRecord, 'venueId' | 'menuId' | 'menuRevisionId'> & {
+  bundle: Pick<PublicMenuRecord['bundle'], 'url' | 'contentHash'>;
+};
+
+export async function verifyPublishedSnapshot(storage: PreparedStorage, menu: PublishedSnapshot) {
+  const { venueId, menuId } = menu;
   const origin = new URL(menu.bundle.url).origin;
   if (
     menu.bundle.url !==

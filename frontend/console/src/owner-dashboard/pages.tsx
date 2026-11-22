@@ -63,6 +63,7 @@ export interface LiveDashboardInput {
   summary?: OwnerDishReport['summary'];
   summaryFreshness?: boolean | null | undefined;
   summarySource?: OwnerDishReport['source'] | undefined;
+  summaryBatch?: boolean;
 }
 
 type OverviewSummary = NonNullable<OwnerDishReport['summary']>;
@@ -230,8 +231,9 @@ export function Overview({
       )}
       {live?.summary && live.summarySource === 'production' && (
         <Note icon="info">
-          Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow
-          for delivery delays when comparing periods.
+          {live.summaryBatch
+            ? 'Refresh shows the latest completed five-minute batch. Counts need at least ten eligible visits.'
+            : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
         </Note>
       )}
       {(live || !empty) && (
