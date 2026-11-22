@@ -38,6 +38,23 @@ optional fields and can recover unique source-supported prices using existing
 OCR geometry as described in [processing behavior](processing-v3.md#prices).
 A human must inspect the menu and correct the remaining draft values.
 
+### Automatic checks are not owner approval
+
+Automatic extraction and verification checks assess source processing,
+field presence, structural validity and unresolved information. A successful
+check means only that the available data passed those checks; it does not
+confirm that the extracted facts are correct, approve a dish, or authorize
+publication.
+
+Missing required fields and unresolved ingredient or allergen information
+must remain visible for owner review. In particular, an unavailable or
+unreviewed allergen declaration (`allergens: null`) is not an empty reviewed
+declaration (`allergens: []`) and must never be presented as allergen-free.
+
+A dish draft still requires explicit owner acceptance. Menu approval and
+publication are separate owner-authorized actions. Automatic checks cannot
+perform or substitute for any of these actions.
+
 ## Versioned contract
 
 The consumer schema is `ReviewCandidateResultSchema`, exported from

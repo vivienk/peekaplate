@@ -41,6 +41,7 @@ export type BundleDiagnosticCode =
   | 'ingredients_missing'
   | 'alt_missing'
   | 'asset_missing'
+  | 'allergens_unreviewed'
   | 'asset_revision_mismatch';
 
 export type BundleDiagnostic = { dishId: string; code: BundleDiagnosticCode };
@@ -121,6 +122,9 @@ export async function produceMenuBundle(
         continue;
       }
       const built = await buildDish(input, requested, source, assets);
+      if (requested.allergens === null) {
+        diagnostics.push({ dishId: requested.dish_id, code: 'allergens_unreviewed' });
+      }
       diagnostics.push(...built.gaps.map((code) => ({ dishId: requested.dish_id, code })));
       categoryDishes.push(built.dish);
       if (built.asset) assetEntries.push(built.asset);

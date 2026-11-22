@@ -249,10 +249,23 @@ describe('S4-RES bundle producer: AC-S1 shape', () => {
       complete: false,
     });
     expect(Object.keys(dishes(result)[1] ?? {})).toHaveLength(3);
-    expect(result.diagnostics).toEqual([
-      { dishId: SOUP, code: 'alt_missing' },
-      { dishId: SOUP, code: 'asset_missing' },
-    ]);
+
+    expect(result.diagnostics).toContainEqual({
+      dishId: SOUP,
+      code: 'alt_missing',
+    });
+    expect(result.diagnostics).toContainEqual({
+      dishId: SOUP,
+      code: 'asset_missing',
+    });
+    expect(result.diagnostics).toContainEqual({
+      dishId: SOUP,
+      code: 'allergens_unreviewed',
+    });
+    expect(result.diagnostics).toContainEqual({
+      dishId: CHICKEN,
+      code: 'allergens_unreviewed',
+    });
   });
 
   it('hashes the exact canonical bytes and derives approvals and the URL from them', async () => {
@@ -569,11 +582,31 @@ describe('S4-RES bundle producer: AC-S3 rejection and placeholders', () => {
     expect(result.diagnostics).toContainEqual({ dishId: CHICKEN, code: 'candidate_rejected' });
   });
 
-  it('keeps unreviewed allergens null instead of an empty list', async () => {
+  it('flags unreviewed allergens without making an otherwise complete dish incomplete', async () => {
     const result = await produceDefault();
     const chicken = dishes(result)[2];
-    expect(chicken?.complete && chicken.allergens).toBeNull();
+
+    expect(chicken).toMatchObject({
+      complete: true,
+      allergens: null,
+    });
     expect(new TextDecoder().decode(result.bytes)).toContain('"allergens":null');
+    expect(result.diagnostics).toContainEqual({
+      dishId: CHICKEN,
+      code: 'allergens_unreviewed',
+    });
+  });
+
+  it('does not flag an explicitly reviewed empty allergen declaration', async () => {
+    const input = requestInput();
+    (input.categories[1]?.dishes[0] as Record<string, unknown>).allergens = [];
+
+    const result = await produceMenuBundle(parseRequest(input), sources(), assets());
+
+    expect(result.diagnostics).not.toContainEqual({
+      dishId: CHICKEN,
+      code: 'allergens_unreviewed',
+    });
   });
 
   it('never copies private review or extraction fields into the bundle bytes', async () => {
