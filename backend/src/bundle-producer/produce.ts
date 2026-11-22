@@ -173,7 +173,7 @@ export async function produceMenuBundle(
           `Dish ${source.dishId} category differs from its approved revision`,
         );
       const built = await buildDish(input, requested, source, assets, options);
-            const effectiveAllergens =
+      const effectiveAllergens =
         source.approvedAllergens === undefined ? requested.allergens : source.approvedAllergens;
       if (effectiveAllergens === null) {
         diagnostics.push({ dishId: requested.dish_id, code: 'allergens_unreviewed' });
