@@ -742,7 +742,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c213ee9f4ce4834c200ef86a5269a176ea2f3d46691b5fbcc24156a2478eeeab"
+      "sourceFingerprint": "367327211b6734391a61ce115673e7e734123dd5c97c296cbc6a928c6c987114"
     },
     {
       "id": "database",
@@ -1276,11 +1276,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database",
         "delivery"
       ],
-      "summary": "The production candidate adds auth-gated owner page URLs, reuses the authored pages and scopes current reporting to PostHog event tuples corroborated by canonical Supabase facts. Earlier UTC events come from canonical storage. Production wiring is gated and AI uses the same signed snapshot with unknown freshness until proven.",
+      "summary": "Production owner pages use the existing screens and authenticated routes. Actions reads accept the exact production owner origin under the owner workflow gate and still require current restaurant ownership. Reports use canonical Supabase facts, corroborate current-day events in PostHog and keep AI freshness unknown until proven.",
       "files": [
         "docs/production-release.md",
         "docs/adr/0017-production-owner-report-sources.md",
         "backend/src/owner-production-report.integration.ts",
+        "backend/src/owner-actions-cors.test.ts",
         "backend/src/owner-workflow-environment.ts",
         "backend/wrangler.production.jsonc"
       ],

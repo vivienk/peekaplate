@@ -5463,3 +5463,12 @@ The second overlapped the unit suite and hit the 15-second owner summary fixture
 deadline. The following database-only `pnpm verify test:db` passed all 199
 integration tests and the local Worker demo. Run these suites separately on this
 workstation. No test deadline or database behavior was changed.
+
+### ERR-20261121-ACTIONS-001 | Production owner Actions preflight had no allowed origin
+
+The Actions list only allowed the previous development and staging origins.
+An app-level regression reproduced the missing production CORS header. The
+route now uses the existing owner console origin policy for GET and OPTIONS.
+Production also requires the owner workflow flag. Bearer verification and
+restaurant owner authorization remain required. The focused CORS, service, and
+client tests passed. Hosted verification remains pending.
