@@ -793,3 +793,33 @@ it('publishes approved serving count and refuses calibration for another serving
     expect(dish).not.toHaveProperty('serving_count');
   }
 });
+it('uses the approved unavailable allergen declaration over a requested empty list', async () => {
+  const input = requestInput();
+  (input.categories[1]?.dishes[0] as Record<string, unknown>).allergens = [];
+
+  const result = await produceMenuBundle(
+    parseRequest(input),
+    sources({ [CHICKEN]: { approvedAllergens: null } }),
+    assets(),
+  );
+
+  expect(dishes(result).find((dish) => dish.dish_id === CHICKEN)?.allergens).toBeNull();
+  expect(result.diagnostics).toContainEqual({
+    dishId: CHICKEN,
+    code: 'allergens_unreviewed',
+  });
+});
+
+it('uses the approved empty allergen declaration over a requested null value', async () => {
+  const result = await produceMenuBundle(
+    parseRequest(requestInput()),
+    sources({ [CHICKEN]: { approvedAllergens: [] } }),
+    assets(),
+  );
+
+  expect(dishes(result).find((dish) => dish.dish_id === CHICKEN)?.allergens).toEqual([]);
+  expect(result.diagnostics).not.toContainEqual({
+    dishId: CHICKEN,
+    code: 'allergens_unreviewed',
+  });
+});

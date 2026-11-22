@@ -172,9 +172,9 @@ export async function produceMenuBundle(
           'invalid_request',
           `Dish ${source.dishId} category differs from its approved revision`,
         );
-      const built = await buildDish(input, requested, source, assets, options);
       const effectiveAllergens =
         source.approvedAllergens === undefined ? requested.allergens : source.approvedAllergens;
+      const built = await buildDish(input, requested, source, assets, effectiveAllergens, options);
       if (effectiveAllergens === null) {
         diagnostics.push({ dishId: requested.dish_id, code: 'allergens_unreviewed' });
       }
@@ -245,6 +245,7 @@ async function buildDish(
   requested: MenuBundleRequestDish,
   source: ApprovedDishSource,
   assets: ReadonlyMap<string, VerifiedT0Asset>,
+  effectiveAllergens: MenuBundleRequestDish['allergens'],
   options: ProduceOptions,
 ): Promise<{
   dish: PublicMenuDish;
@@ -438,8 +439,7 @@ async function buildDish(
       description,
       price: { amount: price.amount, currency },
       ingredients,
-      allergens:
-        source.approvedAllergens === undefined ? requested.allergens : source.approvedAllergens,
+      allergens: effectiveAllergens,
       dietary: requested.dietary,
       images,
     },

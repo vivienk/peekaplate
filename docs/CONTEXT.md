@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "3d1dafc2c8fb0c7ef444b0a20ef8a127c9daa6191e98e9947b204ad69802affe"
+      "sourceFingerprint": "46a9e6736ef6c96ab2d8c1df326b37bec18a1bdb016b5fbcd1d2d540dcebbacd"
     },
     {
       "id": "tokens",
@@ -747,7 +747,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "43b601ec4d2038bbaebb3b1fa605c98910b24d445002fe5949beb76ca3cb50f9"
+      "sourceFingerprint": "444e78d7bb4c02a72f296e71f6bb7ae34667b4bf708d30da2ffe69f50c890e33"
     },
     {
       "id": "database",
@@ -1108,7 +1108,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "6a979cc3343cdf00757fa254f93fb5b265495cd77e621c12f29e7e89a594c332"
+      "sourceFingerprint": "e0dfbb3a1db2983482ca634e7cd5039aae5d71872090ef298ca8820aee089318"
     },
     {
       "id": "assets",

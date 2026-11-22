@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import pg from 'pg';
+import { writeHandoffImmutable } from '../src/bundle-producer/handoff-file';
 import {
   type PreparedPortionFile,
   prepareApprovedPortion,
@@ -245,9 +246,9 @@ async function main() {
     };
     await mkdir(values.out, { recursive: true });
     await writeImmutable(join(values.out, `${produced.menuRevisionId}.json`), produced.bytes);
-    await writeImmutable(
+    await writeHandoffImmutable(
       join(values.out, `${produced.menuRevisionId}.handoff.json`),
-      new TextEncoder().encode(`${JSON.stringify(handoff, null, 2)}\n`),
+      handoff,
     );
     const admission = values.admit
       ? await admitMenuBundleHandoff(client, {
