@@ -5,7 +5,11 @@ import { AuthUnavailableError } from './auth';
 import { CommandError } from './dish-command';
 import { verifySyntheticCompleteness } from './owner-ai/synthetic-completeness';
 import type { PreparedStorage } from './owner-prepare';
-import { OWNER_BATCH_MS, readBatchedOwnerReport } from './owner-report-batches';
+import {
+  OWNER_BATCH_MS,
+  OWNER_BATCH_SETTLE_MS,
+  readBatchedOwnerReport,
+} from './owner-report-batches';
 import {
   liveEvidenceParameters,
   type OwnerReportLiveEvidence,
@@ -69,7 +73,7 @@ export async function readOwnerReport(
             venueId,
             now,
             options.productionPublications.storage,
-            (end) => measureReport(client, venueId, end, source, options, OWNER_BATCH_MS, now),
+            (end) => measureReport(client, venueId, end, source, options, OWNER_BATCH_MS),
           )
         : await measureReport(client, venueId, now, source, options);
     await client.query('COMMIT');
@@ -94,9 +98,10 @@ async function measureReport(
   source: OwnerReportSource,
   options: ReportOptions,
   durationMs = 86_400_000,
-  requestTime = now,
 ) {
-  const today = new Date(requestTime);
+  const isBatch = durationMs === OWNER_BATCH_MS;
+  // Earliest release time makes source selection stable across UTC midnight.
+  const today = new Date(now.getTime() + (isBatch ? OWNER_BATCH_SETTLE_MS : 0));
   today.setUTCHours(0, 0, 0, 0);
   let liveEvidence: OwnerReportLiveEvidence | undefined;
   if (source === 'production' && options.readTodayEvents) {
@@ -139,6 +144,7 @@ async function measureReport(
         options.trafficClass ?? 'live',
         liveEvidence,
         durationMs,
+        isBatch,
       )
     : undefined;
   const complete =
@@ -395,12 +401,20 @@ function rateMetric(
   denominator: number,
   belowDishFloor: boolean,
   eligibleSessions: number,
+  protectSmallPartitions = false,
 ) {
   if (belowDishFloor)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (denominator === 0)
     return { value: null, status: 'NOT_MEASURABLE', eligible_sessions: eligibleSessions };
   if (eligibleSessions < 10)
+    return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
+  if (
+    protectSmallPartitions &&
+    numerator > 0 &&
+    numerator < denominator &&
+    Math.min(numerator, denominator - numerator) < 10
+  )
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (numerator === 0)
     return { value: 0, status: 'VALID_ZERO', eligible_sessions: eligibleSessions };
@@ -438,6 +452,8 @@ function buildInternalReport(
   durationMs = 86_400_000,
 ) {
   const start = new Date(now.getTime() - durationMs);
+  const isBatch = durationMs === OWNER_BATCH_MS;
+  const visibleRows = isBatch ? rows.filter((row) => Number(row.total_sessions) >= 10) : rows;
   const lastEventIngestedAt = rows.reduce<string | null>((latest, row) => {
     const timestamp = timestampOrNull(row.last_event_ingested_at);
     return timestamp && (!latest || timestamp > latest) ? timestamp : latest;
@@ -448,7 +464,7 @@ function buildInternalReport(
     venue_id: venueId,
     source,
     report_metadata: {
-      calculation_version: durationMs === OWNER_BATCH_MS ? 'production.batch.v1' : `${source}.v1`,
+      calculation_version: isBatch ? 'production.batch.v1' : `${source}.v1`,
       generated_at: now.toISOString(),
       date_window: {
         duration_hours: Math.floor(durationMs / 3_600_000),
@@ -456,16 +472,17 @@ function buildInternalReport(
         end_time: now.toISOString(),
       },
       coverage: {
-        total_dishes_monitored: rows.length,
-        measurable_dishes_count: rows.filter((row) => Number(row.total_sessions) >= 10).length,
+        total_dishes_monitored: visibleRows.length,
+        measurable_dishes_count: visibleRows.filter((row) => Number(row.total_sessions) >= 10)
+          .length,
       },
       freshness: {
         is_stale: null,
         last_event_ingested_at: lastEventIngestedAt,
       },
-      report_status: rows.length === 0 ? 'EMPTY' : 'NORMAL',
+      report_status: visibleRows.length === 0 ? 'EMPTY' : 'NORMAL',
     },
-    dishes: rows.map((row) => {
+    dishes: visibleRows.map((row) => {
       const totalSessions = Number(row.total_sessions);
       const openEligibleSessions = Number(row.open_eligible_sessions);
       const timedSessions = Number(row.timed_sessions);
@@ -490,24 +507,28 @@ function buildInternalReport(
             Number(row.total_openings),
             belowDishFloor,
             openEligibleSessions,
+            isBatch,
           ),
           open_rate: rateMetric(
             Number(row.exposed_open_sessions),
             totalSessions,
             belowDishFloor,
             totalSessions,
+            isBatch,
           ),
           engagement_rate: rateMetric(
             Number(row.engaged_sessions),
             openEligibleSessions,
             belowDishFloor,
             openEligibleSessions,
+            isBatch,
           ),
           save_rate: rateMetric(
             Number(row.saved_sessions),
             totalSessions,
             belowDishFloor,
             totalSessions,
+            isBatch,
           ),
         },
       };

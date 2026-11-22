@@ -66,75 +66,84 @@ const averageValue = () => z.number().min(0).max(MAX_AVERAGE_ACTIVE_SECONDS);
 
 const summaryWindow = z.strictObject({ start_time: z.iso.datetime(), end_time: z.iso.datetime() });
 const unavailableSummaryMetric = z.strictObject({ value: z.null(), status: z.literal('MISSING') });
-const summaryCount = () =>
+const summaryCount = (allowSmallCounts: boolean) =>
   count().refine(
-    (cell) => !shows(cell.status) || (cell.value !== null && cell.value >= PRIVACY_FLOOR_SESSIONS),
+    (cell) =>
+      allowSmallCounts ||
+      !shows(cell.status) ||
+      (cell.value !== null && cell.value >= PRIVACY_FLOOR_SESSIONS),
     { message: 'A visible summary count must meet the ten-session floor' },
   );
-const summaryMetrics = z.strictObject({
-  menu_sessions: summaryCount(),
-  dish_opens: summaryCount(),
-  avg_interaction_time_seconds: metric(averageValue()),
-  portion_previews_shown: unavailableSummaryMetric,
-  verified_orders: unavailableSummaryMetric,
-});
-export const OwnerReportSummarySchema = z
-  .strictObject({
-    periods: z.strictObject({ current: summaryWindow, baseline: summaryWindow }),
-    current: summaryMetrics,
-    baseline: summaryMetrics,
-    daily_opens: z
-      .strictObject({
-        current: z
-          .array(summaryWindow.extend({ opens: summaryCount() }))
-          .min(1)
-          .max(2),
-        baseline: z
-          .array(summaryWindow.extend({ opens: summaryCount() }))
-          .min(1)
-          .max(2),
-      })
-      .optional(),
-  })
-  .superRefine((summary, ctx) => {
-    if (!summary.daily_opens) return;
-    for (const period of ['current', 'baseline'] as const) {
-      const buckets = summary.daily_opens[period];
-      let cursor = Date.parse(summary.periods[period].start_time);
-      const end = Date.parse(summary.periods[period].end_time);
-      for (const bucket of buckets) {
-        const nextMidnight = Math.floor(cursor / 86400000) * 86400000 + 86400000;
+const summaryMetrics = (allowSmallCounts: boolean) =>
+  z.strictObject({
+    menu_sessions: summaryCount(allowSmallCounts),
+    dish_opens: summaryCount(allowSmallCounts),
+    avg_interaction_time_seconds: metric(averageValue()),
+    portion_previews_shown: unavailableSummaryMetric,
+    verified_orders: unavailableSummaryMetric,
+  });
+function summarySchema(allowSmallCounts: boolean) {
+  return z
+    .strictObject({
+      periods: z.strictObject({ current: summaryWindow, baseline: summaryWindow }),
+      current: summaryMetrics(allowSmallCounts),
+      baseline: summaryMetrics(allowSmallCounts),
+      daily_opens: z
+        .strictObject({
+          current: z
+            .array(summaryWindow.extend({ opens: summaryCount(allowSmallCounts) }))
+            .min(1)
+            .max(2),
+          baseline: z
+            .array(summaryWindow.extend({ opens: summaryCount(allowSmallCounts) }))
+            .min(1)
+            .max(2),
+        })
+        .optional(),
+    })
+    .superRefine((summary, ctx) => {
+      if (!summary.daily_opens) return;
+      for (const period of ['current', 'baseline'] as const) {
+        const buckets = summary.daily_opens[period];
+        let cursor = Date.parse(summary.periods[period].start_time);
+        const end = Date.parse(summary.periods[period].end_time);
+        for (const bucket of buckets) {
+          const nextMidnight = Math.floor(cursor / 86400000) * 86400000 + 86400000;
+          if (
+            Date.parse(bucket.start_time) !== cursor ||
+            Date.parse(bucket.end_time) !== Math.min(nextMidnight, end) ||
+            cursor >= end
+          )
+            ctx.addIssue({
+              code: 'custom',
+              path: ['daily_opens', period],
+              message: 'Daily buckets must cover clipped UTC days in the report period',
+            });
+          cursor = Date.parse(bucket.end_time);
+        }
+        if (cursor !== end)
+          ctx.addIssue({
+            code: 'custom',
+            path: ['daily_opens', period],
+            message: 'Daily buckets must cover the whole period',
+          });
         if (
-          Date.parse(bucket.start_time) !== cursor ||
-          Date.parse(bucket.end_time) !== Math.min(nextMidnight, end) ||
-          cursor >= end
+          buckets.some((bucket) => bucket.opens.status === 'SUPPRESSED') &&
+          (buckets.some((bucket) => bucket.opens.value !== null) ||
+            Object.values(summary[period]).some((cell) => cell.value !== null))
         )
           ctx.addIssue({
             code: 'custom',
             path: ['daily_opens', period],
-            message: 'Daily buckets must cover clipped UTC days in the report period',
+            message:
+              'Protected daily buckets require complementary suppression of the series and totals',
           });
-        cursor = Date.parse(bucket.end_time);
       }
-      if (cursor !== end)
-        ctx.addIssue({
-          code: 'custom',
-          path: ['daily_opens', period],
-          message: 'Daily buckets must cover the whole period',
-        });
-      if (
-        buckets.some((bucket) => bucket.opens.status === 'SUPPRESSED') &&
-        (buckets.some((bucket) => bucket.opens.value !== null) ||
-          Object.values(summary[period]).some((cell) => cell.value !== null))
-      )
-        ctx.addIssue({
-          code: 'custom',
-          path: ['daily_opens', period],
-          message:
-            'Protected daily buckets require complementary suppression of the series and totals',
-        });
-    }
-  });
+    });
+}
+export const OwnerReportSummarySchema = summarySchema(false);
+export const ProductionBatchSummarySchema = summarySchema(true);
+export const OWNER_PRODUCTION_BATCH_VERSION = 'production.batch.v1';
 export type OwnerReportSummary = z.infer<typeof OwnerReportSummarySchema>;
 
 // The rates and the average: the metrics whose own cohort is checked against the floor.
@@ -162,7 +171,7 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
       schema_version: z.literal('owner_report.v1'),
       venue_id: z.uuid(),
       source: z.enum(['synthetic', 'production']),
-      summary: OwnerReportSummarySchema.optional(),
+      summary: ProductionBatchSummarySchema.optional(),
       report_metadata: z.strictObject({
         calculation_version: z.string(),
         generated_at: z.iso.datetime(),
@@ -305,6 +314,16 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
       }
       const summary = report.summary;
       if (!summary) return;
+      if (
+        (report.source !== 'production' ||
+          metadata.calculation_version !== OWNER_PRODUCTION_BATCH_VERSION) &&
+        !OwnerReportSummarySchema.safeParse(summary).success
+      )
+        ctx.addIssue({
+          code: 'custom',
+          path: ['summary'],
+          message: 'Only the completed production batch can expose sub-ten restaurant totals',
+        });
       const at = Date.parse;
       const current = summary.periods.current;
       const baseline = summary.periods.baseline;

@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "2f9381841612b7c5a60cc21fd34216142d62bd999d2c6392d66598996a90d3aa"
+      "sourceFingerprint": "605303da11583eff9d2e3ac76197f8f8210c80eb571ba5c8a0f42f8c40c66d1a"
     },
     {
       "id": "tokens",
@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "14c859e1e44750cd8238251b746baa4f552c66087e2679f6819df0512eb5e944"
+      "sourceFingerprint": "1c513e3e0f73197bd034faa6b999bc5e2bb70691f6f3433b332949cd7af0696e"
     },
     {
       "id": "backend",
@@ -746,7 +746,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "0b0cc29ea22992f51ad345bde484a9531977b33d76af1bd4e19805610ac34be0"
+      "sourceFingerprint": "d0312b1a46d1b36b1f707401ae23eda0bce4eb42b334612dcbdc221fd1355453"
     },
     {
       "id": "database",
@@ -909,7 +909,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "2710328db67c45071e24fb9c92274437203e6fabc9041ad1b56487b5359a0a01"
+      "sourceFingerprint": "f8e957ac13fe958f3a04711f4550ac94cc5840c7dbf8dd3635a3bc9aaf4ca3ee"
     },
     {
       "id": "agents",
@@ -1267,10 +1267,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database",
         "delivery"
       ],
-      "summary": "Production reports use fixed five-minute UTC batches sealed once in the private bucket. The reader requires owner membership, attested production facts, verified approved publications and exact PostHog matches for the current UTC day. Older UTC batches use canonical Supabase. Production collection and report enablement remain operator-gated. AI freshness remains unknown.",
+      "summary": "Production reports use fixed five-minute UTC batches sealed once in the private bucket. The reader requires owner membership, attested production facts, verified approvals and exact PostHog matches for same-day events. Earlier UTC batches use canonical Supabase. Proposed ADR 0018 permits venue-wide visit and open totals down to one while dish rates and timing retain their floors. Production activation and AI remain gated.",
       "files": [
         "docs/production-release.md",
         "docs/adr/0017-production-owner-report-sources.md",
+        "docs/adr/0018-production-batch-counts.md",
         "backend/src/owner-production-report.integration.ts",
         "backend/src/owner-actions-cors.test.ts",
         "backend/src/owner-workflow-environment.ts",

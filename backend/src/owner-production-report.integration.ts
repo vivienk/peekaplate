@@ -170,6 +170,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       venue: Awaited<ReturnType<typeof createVenue>>,
       occurredAt: string,
       production = true,
+      save = false,
     ) {
       const sessionId = crypto.randomUUID();
       const producerId = crypto.randomUUID();
@@ -197,6 +198,19 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
             save_available: true,
           },
         },
+        ...(save
+          ? [
+              {
+                type: 'dish_saved' as const,
+                payload: {
+                  ...dish,
+                  save_origin: 'direct',
+                  save_surface: 'menu_list',
+                  shortlist_size: 1,
+                },
+              },
+            ]
+          : []),
       ] as const;
       const evidence: LivePostHogOwnerEvent[] = [];
       for (const [localSequence, event] of events.entries()) {
@@ -237,7 +251,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       for (let index = 0; index < 10; index++) {
         await visit(venue, oldest);
         await visit(venue, reportStart);
-        postHogEvents.push(...(await visit(venue, today)));
+        postHogEvents.push(...(await visit(venue, today, true, index === 0)));
         otherEvents.push(...(await visit(otherVenue, today)));
       }
       await visit(venue, today); // No PostHog evidence at the UTC midnight boundary.
@@ -327,6 +341,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         expect(
           report.dishes.map(({ dish_id, metrics }) => [dish_id, metrics.active_sessions]),
         ).toEqual([[venue.dishId, { value: 10, status: 'NORMAL' }]]);
+        expect(report.dishes[0]?.metrics.save_rate).toEqual({ value: null, status: 'SUPPRESSED' });
         expect(report.summary?.current).toMatchObject({
           menu_sessions: { value: 10, status: 'NORMAL' },
           dish_opens: { value: 10, status: 'NORMAL' },
@@ -383,7 +398,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
 
         for (let index = 0; index < 10; index++) {
           postHogEvents.push(...(await visit(venue, latestEnd)));
-          if (index < 9) otherEvents.push(...(await visit(otherVenue, latestEnd)));
+          if (index === 0) otherEvents.push(...(await visit(otherVenue, latestEnd)));
         }
         vi.setSystemTime(new Date('2035-02-03T00:11:00.000Z'));
         const nextResponse = await request('', token);
@@ -395,9 +410,18 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         expect(otherNextResponse.status).toBe(200);
         const otherRefreshed = OwnerDishReportSchema.parse(await otherNextResponse.json());
         expect(otherRefreshed.summary?.current.dish_opens).toEqual({
-          value: null,
-          status: 'SUPPRESSED',
+          value: 1,
+          status: 'NORMAL',
         });
+        expect(otherRefreshed.summary?.current.menu_sessions).toEqual({
+          value: 1,
+          status: 'NORMAL',
+        });
+        expect(otherRefreshed.summary?.daily_opens?.current[0]?.opens).toEqual({
+          value: 1,
+          status: 'NORMAL',
+        });
+        expect(otherRefreshed.dishes).toEqual([]);
         expect(otherRefreshed.summary?.baseline.dish_opens).toEqual({
           value: 10,
           status: 'NORMAL',

@@ -3,7 +3,7 @@ import { AuthUnavailableError } from './auth';
 import type { PreparedStorage } from './owner-prepare';
 
 export const OWNER_BATCH_MS = 5 * 60_000;
-const SETTLE_MS = 60_000;
+export const OWNER_BATCH_SETTLE_MS = 60_000;
 const MAX_REPORT_BYTES = 2_000_000;
 
 export async function readBatchedOwnerReport(
@@ -12,7 +12,8 @@ export async function readBatchedOwnerReport(
   storage: PreparedStorage,
   measure: (end: Date) => Promise<OwnerDishReport>,
 ): Promise<OwnerDishReport> {
-  const lastEnd = Math.floor((now.getTime() - SETTLE_MS) / OWNER_BATCH_MS) * OWNER_BATCH_MS;
+  const lastEnd =
+    Math.floor((now.getTime() - OWNER_BATCH_SETTLE_MS) / OWNER_BATCH_MS) * OWNER_BATCH_MS;
   const current = await readOrSeal(lastEnd);
   const previous = await readOrSeal(lastEnd - OWNER_BATCH_MS);
   if (!current.summary || !previous.summary) throw new AuthUnavailableError();

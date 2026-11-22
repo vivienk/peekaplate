@@ -1,6 +1,7 @@
 import {
   type OwnerReportSummary,
   OwnerReportSummarySchema,
+  ProductionBatchSummarySchema,
 } from '@peekaplate/contracts/owner-report';
 import type { Client } from 'pg';
 import {
@@ -101,7 +102,7 @@ function dailyRows(row: Row | undefined): DailyRow[] | undefined {
     };
   });
 }
-function metrics(row: Row | undefined): OwnerReportSummary['current'] {
+function metrics(row: Row | undefined, productionBatch: boolean): OwnerReportSummary['current'] {
   const missing = { value: null, status: 'MISSING' } as const;
   if (!row)
     return {
@@ -134,9 +135,13 @@ function metrics(row: Row | undefined): OwnerReportSummary['current'] {
       throw new Error('Missing measured summary value');
     return { value: number, status: number === 0 ? 'VALID_ZERO' : 'NORMAL' } as const;
   };
+  const capturedCount = (count: number) =>
+    count === 0
+      ? ({ value: null, status: 'NOT_MEASURABLE' } as const)
+      : ({ value: count, status: 'NORMAL' } as const);
   return {
-    menu_sessions: value(menus, menus),
-    dish_opens: value(opens, openingSessions),
+    menu_sessions: productionBatch ? capturedCount(menus) : value(menus, menus),
+    dish_opens: productionBatch ? capturedCount(opens) : value(opens, openingSessions),
     avg_interaction_time_seconds: value(
       row.average_active_seconds === null ? null : Number(row.average_active_seconds),
       timedSessions,
@@ -153,6 +158,7 @@ export async function readOwnerReportSummary(
   trafficClass: 'live' | 'test',
   liveEvidence?: OwnerReportLiveEvidence,
   durationMs = 86_400_000,
+  productionBatch = false,
 ): Promise<OwnerReportSummary> {
   const start = new Date(now.getTime() - durationMs);
   const result = await client.query(
@@ -165,8 +171,8 @@ export async function readOwnerReportSummary(
   );
   const currentRow = result.rows.find((row) => row.period === 'current');
   const baselineRow = result.rows.find((row) => row.period === 'baseline');
-  const current = metrics(currentRow);
-  const baseline = metrics(baselineRow);
+  const current = metrics(currentRow, productionBatch);
+  const baseline = metrics(baselineRow, productionBatch);
   const daily = (row: Row | undefined, totals: OwnerReportSummary['current']) =>
     dailyRows(row)?.map((bucket) => ({
       start_time: bucket.start_time,
@@ -180,7 +186,8 @@ export async function readOwnerReportSummary(
     }));
   const currentDaily = daily(currentRow, current);
   const baselineDaily = daily(baselineRow, baseline);
-  return OwnerReportSummarySchema.parse({
+  const schema = productionBatch ? ProductionBatchSummarySchema : OwnerReportSummarySchema;
+  return schema.parse({
     periods: {
       current: { start_time: start.toISOString(), end_time: now.toISOString() },
       baseline: {
