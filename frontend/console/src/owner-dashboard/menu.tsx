@@ -61,9 +61,7 @@ export function MenuList({
               </span>
               <span className="dn">
                 {m.name}
-                <small>
-                  {m.ing.length} ingredients
-                </small>
+                <small>{m.ing.length} ingredients</small>
                 {INSIGHTS.filter(
                   (i) => i.dish === m.id && acts[i.id] && acts[i.id]?.status === 'planned',
                 ).map((i) => (

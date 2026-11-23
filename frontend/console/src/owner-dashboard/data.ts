@@ -381,7 +381,8 @@ export const ANSWERS: Record<string, () => Answer> = {
     };
   },
   orders: () => ({
-    short: 'Verified orders are unavailable. No eligible verified order or checkout source is connected to this report.',
+    short:
+      'Verified orders are unavailable. No eligible verified order or checkout source is connected to this report.',
     secs: [
       {
         k: 'unk',
@@ -391,7 +392,9 @@ export const ANSWERS: Record<string, () => Answer> = {
         ],
       },
     ],
-    ev: ['Verified orders: MISSING — no verified order or checkout source is present in the supported event data.'],
+    ev: [
+      'Verified orders: MISSING — no verified order or checkout source is present in the supported event data.',
+    ],
     follow: ['top', 'interact'],
   }),
   interact: () => ({
@@ -423,16 +426,12 @@ export const ANSWERS: Record<string, () => Answer> = {
     secs: [
       {
         k: 'obs',
-        items: [
-          `${p.fb} taps on “View in 2.5D” for the Salmon Poke Bowl showed the photo only`,
-        ],
+        items: [`${p.fb} taps on “View in 2.5D” for the Salmon Poke Bowl showed the photo only`],
       },
       { k: 'unk', items: ['We do not know how the photo fallback affected a completed action.'] },
       {
         k: 'rsn',
-        items: [
-          'Add a 2.5D preview for the Salmon Poke Bowl first (most taps).',
-        ],
+        items: ['Add a 2.5D preview for the Salmon Poke Bowl first (most taps).'],
       },
     ],
     ev: ['Both come from the report. Nothing is sent to diners.', EVT],
@@ -501,7 +500,9 @@ export const ANSWERS: Record<string, () => Answer> = {
       },
       {
         k: 'unk',
-        items: ['Verified orders are unavailable because no eligible order or checkout source is connected.'],
+        items: [
+          'Verified orders are unavailable because no eligible order or checkout source is connected.',
+        ],
       },
       {
         k: 'rsn',
@@ -512,7 +513,8 @@ export const ANSWERS: Record<string, () => Answer> = {
     follow: ['top', 'interact'],
   }),
   cant: () => ({
-    short: 'I can answer questions about supported menu activity, but verified orders are unavailable because no eligible order or checkout source is connected.',
+    short:
+      'I can answer questions about supported menu activity, but verified orders are unavailable because no eligible order or checkout source is connected.',
     secs: [
       {
         k: 'unk',
@@ -558,7 +560,12 @@ for (const d of DISH) {
             : `${d.fb} taps on “View in 2.5D” showed the photo (no preview yet)`,
         ],
       },
-      { k: 'unk', items: ['Verified orders are unavailable because no eligible order or checkout source is connected.'] },
+      {
+        k: 'unk',
+        items: [
+          'Verified orders are unavailable because no eligible order or checkout source is connected.',
+        ],
+      },
       { k: 'rsn', items: ['The data does not point to a clear reason, so I won’t offer one.'] },
     ],
     ev: [EVT],

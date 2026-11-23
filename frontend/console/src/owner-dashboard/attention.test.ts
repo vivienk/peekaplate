@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANSWERS, attentionRanking, DISH, QUICK, type Dish } from './data';
+import { ANSWERS, attentionRanking, DISH, type Dish, QUICK } from './data';
 
 const dish = (over: Partial<Dish>): Dish => ({ ...(DISH[0] as Dish), ...over });
 
@@ -41,7 +41,6 @@ describe('Which dishes are getting the most attention?', () => {
   });
 });
 
-
 describe('verified-order availability', () => {
   it('reports verified orders as unavailable rather than inventing a value', () => {
     const answer = ANSWERS.orders!();
@@ -49,9 +48,7 @@ describe('verified-order availability', () => {
     expect(answer.short).toContain('Verified orders are unavailable');
     expect(answer.short).toContain('No eligible verified order or checkout source');
     expect(answer.secs.map((section) => section.k)).not.toContain('ver');
-    expect(answer.secs.flatMap((section) => section.items).join(' ')).toContain(
-      'status MISSING',
-    );
+    expect(answer.secs.flatMap((section) => section.items).join(' ')).toContain('status MISSING');
     expect(answer.ev.join(' ')).toContain('MISSING');
   });
 

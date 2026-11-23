@@ -697,7 +697,8 @@ export function Report({
               </table>
             </div>
             <p className="rpt-note">
-              Verified order outcomes are unavailable; views and comparisons do not establish orders.
+              Verified order outcomes are unavailable; views and comparisons do not establish
+              orders.
             </p>
           </>
         )}
@@ -750,8 +751,8 @@ export function Report({
           <>
             <p className="rpt-rec">{a.text}</p>
             <p className="rpt-why">
-              <b>Why:</b> Avocado Toast had 298 detail views and 47 comparison participations.
-              These are engagement signals and do not establish completed orders.
+              <b>Why:</b> Avocado Toast had 298 detail views and 47 comparison participations. These
+              are engagement signals and do not establish completed orders.
             </p>
             {a.status === 'suggested' ? (
               <div className="row">
@@ -1260,8 +1261,8 @@ export function DishDetail({
         </section>
       )}
       <Note icon="info">
-        Opens show attention, not preference.{' '}
-        Verified order outcomes are unavailable because no eligible order or checkout source is connected.
+        Opens show attention, not preference. Verified order outcomes are unavailable because no
+        eligible order or checkout source is connected.
       </Note>
     </div>
   );
