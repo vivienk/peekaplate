@@ -602,9 +602,7 @@ export const ANSWERS: Record<string, () => Answer> = {
     secs: [
       {
         k: 'unk',
-        items: [
-          'Try a question about opens, comparisons, 2.5D previews, or the weekly change.',
-        ],
+        items: ['Try a question about opens, comparisons, 2.5D previews, or the weekly change.'],
       },
     ],
     ev: [EVT],
