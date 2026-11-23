@@ -42,6 +42,7 @@ import {
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
+  resolveServingCount,
   type SubmitMenuIngestionRequest,
   SubmitMenuIngestionRequestSchema,
   type SubmitOrderDeletionResponse,
@@ -105,6 +106,8 @@ import {
   submitOrderDataDeletionRequest as submitOrderDataDeletionRequestService,
   verifyVenueOrderDeletion as verifyVenueOrderDeletionService,
 } from './order-ingestion/service';
+
+import { registerDishAssistanceRoutes } from './owner-ai/dish-assistance';
 import {
   mintOwnerReportReference,
   OWNER_REPORT_REFERENCE_HEADER,
@@ -128,12 +131,23 @@ import {
   readPreparedPreviewAsset,
 } from './owner-prepare';
 import { fetchPreparedMenu, listPreparedMenus, type OwnHost } from './owner-publication';
-import { readOwnerReport as queryOwnerReport } from './owner-report';
+import { type OwnerReportSource, readOwnerReport as queryOwnerReport } from './owner-report';
 import {
   buildOwnerReportExportFilename,
   type ExportableOwnerReport,
   serializeOwnerReportCsv,
 } from './owner-report-export';
+import {
+  OwnerReportPostHogUnavailableError,
+  readLivePostHogOwnerEvents,
+} from './owner-report-posthog';
+import { registerOwnerVenueCreation } from './owner-venue-create';
+import {
+  ownerWorkflowAvailable,
+  PRODUCTION_DINER_ORIGIN,
+  PRODUCTION_OWNER_ORIGIN,
+  productionOwnerReportingEnabled,
+} from './owner-workflow-environment';
 import { listOwnerVenues } from './owner-workspace';
 import {
   createPublicMenuResponse,
@@ -163,9 +177,13 @@ import { verifyTeamCollaborator } from './team-auth';
 
 export { authorizeStaffVenue } from './staff-venue';
 
-export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = [
-  '00000000-0000-4000-8000-000000000123',
-];
+import {
+  configuredSyntheticReportVenues,
+  SYNTHETIC_REPORT_VENUE_ALLOWLIST,
+  syntheticReportTrafficClass,
+} from './owner-report-scope';
+
+export { SYNTHETIC_REPORT_VENUE_ALLOWLIST } from './owner-report-scope';
 
 export type Bindings = {
   OWNER_AI_RESPONSES_ENABLED?: string;
@@ -175,12 +193,17 @@ export type Bindings = {
   OWNER_AI_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   INGREDIENT_ARTWORK_ENABLED?: string;
   APP_ENV?: string;
+  OWNER_WORKFLOW_ENABLED?: string;
+  OWNER_PRODUCTION_REPORTS_ENABLED?: string;
+  OWNER_REPORT_DISPLAY_ACTIONS_ENABLED?: string;
+  PRODUCTION_OBSERVATION_PROVENANCE_ENABLED?: string;
   DINER_PUBLIC_ORIGIN?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
   LOCAL_DATABASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
   POSTHOG_PROJECT_ID?: string;
+  POSTHOG_OWNER_REPORT_READ_KEY?: string;
   TEAM_GITHUB_TOKEN?: string;
   LOCAL_GITHUB_API_URL?: string;
   MENU_TOKEN_ISSUER?: string;
@@ -267,6 +290,9 @@ export type Bindings = {
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
   EXTRACTION_TIMEOUT_MS?: string;
+  OWNER_AI_DISH_ASSISTANCE_ENABLED?: string;
+  OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL?: string;
+  SYNTHETIC_REPORT_VENUE_IDS?: string;
 };
 
 type Dependencies = {
@@ -309,7 +335,7 @@ type Dependencies = {
     venueId: string,
     now: Date,
     env: Bindings,
-    source: 'synthetic',
+    source: OwnerReportSource,
   ) => ReturnType<typeof queryOwnerReport>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
   verifyMenu?: (authorization: string, env: Bindings) => Promise<MenuAuthority>;
@@ -510,6 +536,7 @@ export const DINER_CORS_ALLOWED_ORIGINS = [
 ] as const;
 
 function allowedDinerOrigin(origin: string, env: Bindings | undefined) {
+  if (env?.APP_ENV === 'production') return origin === PRODUCTION_DINER_ORIGIN ? origin : undefined;
   return DINER_CORS_ALLOWED_ORIGINS.some((allowed) => allowed === origin) ||
     (env?.APP_ENV === 'staging' &&
       env.DINER_PUBLIC_ORIGIN === 'https://routing-staging.peekaplate-diner-staging.pages.dev' &&
@@ -521,7 +548,7 @@ function allowedDinerOrigin(origin: string, env: Bindings | undefined) {
 function dinerLinkResponse(link: { path: string }, env: Bindings) {
   const origin =
     env.APP_ENV === 'production'
-      ? 'https://peekaplate.app'
+      ? PRODUCTION_DINER_ORIGIN
       : env.APP_ENV === 'local'
         ? 'http://127.0.0.1:5186'
         : env.APP_ENV === 'staging' &&
@@ -545,6 +572,26 @@ export const CONSOLE_REPORT_CORS_ALLOWED_ORIGINS = [
   'https://peekaplate-console-staging.pages.dev',
   'http://127.0.0.1:5174',
 ] as const;
+
+function ownerConsoleOrigin(origin: string, env: Bindings | undefined) {
+  if (env?.APP_ENV === 'production')
+    return ownerWorkflowAvailable(env) && origin === PRODUCTION_OWNER_ORIGIN ? origin : undefined;
+  return CONSOLE_REPORT_CORS_ALLOWED_ORIGINS.some((allowed) => allowed === origin)
+    ? origin
+    : undefined;
+}
+
+function ownerReportRequestSource(url: string, env: Bindings): OwnerReportSource | null {
+  const sources = new URL(url).searchParams.getAll('source');
+  if (sources.length !== 1) return null;
+  if (env.APP_ENV === 'production')
+    return productionOwnerReportingEnabled(env) && sources[0] === 'production'
+      ? 'production'
+      : null;
+  return ['staging', 'local'].includes(env.APP_ENV ?? '') && sources[0] === 'synthetic'
+    ? 'synthetic'
+    : null;
+}
 
 /**
  * Native rate limiting for token-scoped observation ingestion.
@@ -647,7 +694,15 @@ const dependencies: Dependencies = {
   consumeObservationRateLimit: consumeJtiRateLimit,
   async enqueueObservation(message, env) {
     if (!env.OBSERVATION_QUEUE) throw new MenuTokenUnavailableError();
-    await env.OBSERVATION_QUEUE.send(ObservationQueueEnvelopeSchema.parse(message));
+    // The public DTO cannot carry this marker. This call follows exact issuer verification.
+    const envelope =
+      message.kind === 'observation.v2' &&
+      env.APP_ENV === 'production' &&
+      env.PRODUCTION_OBSERVATION_PROVENANCE_ENABLED === 'true' &&
+      env.MENU_TOKEN_ISSUER === 'https://api.peekaplate.app/'
+        ? { ...message, sourceEnvironment: 'production' }
+        : message;
+    await env.OBSERVATION_QUEUE.send(ObservationQueueEnvelopeSchema.parse(envelope));
   },
   async execute(actorId, venueId, input, env) {
     const connectionString =
@@ -743,7 +798,48 @@ const dependencies: Dependencies = {
     const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await client.connect();
-      return await queryOwnerReport(client, actorId, venueId, now, source);
+      const syntheticReport =
+        source === 'synthetic' &&
+        ['local', 'staging'].includes(env.APP_ENV ?? '') &&
+        configuredSyntheticReportVenues(env).includes(venueId.toLowerCase());
+      if (source === 'production' && productionOwnerReportingEnabled(env)) {
+        return await queryOwnerReport(client, actorId, venueId, now, source, {
+          includeSummary: true,
+          includeDisplayActions: env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED === 'true',
+          productionPublications: {
+            storage: preparedStorage(env),
+            origin: 'https://api.peekaplate.app',
+          },
+          readTodayEvents: async (venueId, start, end) => {
+            if (!env.POSTHOG_OWNER_REPORT_READ_KEY || !env.POSTHOG_PROJECT_ID)
+              throw new AuthUnavailableError();
+            try {
+              return await readLivePostHogOwnerEvents({
+                projectId: env.POSTHOG_PROJECT_ID,
+                readKey: env.POSTHOG_OWNER_REPORT_READ_KEY,
+                venueId,
+                windowStart: start.toISOString(),
+                windowEnd: end.toISOString(),
+              });
+            } catch (error) {
+              if (error instanceof OwnerReportPostHogUnavailableError)
+                throw new AuthUnavailableError();
+              throw error;
+            }
+          },
+        });
+      }
+      if (!syntheticReport) throw new AuthUnavailableError();
+      return await queryOwnerReport(client, actorId, venueId, now, source, {
+        trafficClass: syntheticReportTrafficClass(venueId),
+        includeSummary: true,
+        ...(env.APP_ENV === 'staging' && env.OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL
+          ? {
+              syntheticSeal: env.OWNER_AI_SYNTHETIC_COMPLETENESS_SEAL,
+              validationNow: new Date(),
+            }
+          : {}),
+      });
     } finally {
       await client.end();
     }
@@ -866,21 +962,8 @@ export async function approveDishDraftAtomic(
   try {
     await client.query('BEGIN');
     started = true;
-    await client.query("SET LOCAL statement_timeout = '5s'");
-    await client.query("SET LOCAL lock_timeout = '3s'");
-    await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
+    await authorizeStaffVenue(client, actorId, venueId, true);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
-
-    const membership = await client.query<{ permission: string }>(
-      `SELECT permission
-       FROM app_private.staff_membership
-       WHERE tenant_id = $1 AND actor_id = $2
-       FOR SHARE`,
-      [venueId, actorId],
-    );
-    if (!['owner', 'editor'].includes(membership.rows[0]?.permission ?? '')) {
-      throw new CommandError('forbidden', 403);
-    }
 
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `command:${venueId}:${actorId}:${options.commandId}`,
@@ -1027,19 +1110,35 @@ export async function approveDishDraftAtomic(
       throw new IngestionError('draft_incomplete', 409);
     }
     const approvedPhotoId = manual?.photoId ?? corrected.photo_id ?? null;
+    const portionCalibration = manual ? manual.portionCalibration : corrected.portion_calibration;
+    if (portionCalibration && !approvedPhotoId)
+      throw new IngestionError('portion_calibration_mismatch', 409);
     if (approvedPhotoId) {
-      const photo = await client.query(
-        'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
+      const photo = await client.query<{ id: string; source_hash: string }>(
+        'SELECT id,source_hash FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
         [venueId, draftId, approvedPhotoId],
       );
       if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
+      if (portionCalibration && photo.rows[0]?.source_hash !== portionCalibration.source_sha256)
+        throw new IngestionError('portion_calibration_mismatch', 409);
     }
 
     const newDishId = options.preparedDishId ?? crypto.randomUUID();
     const revisionCommandId = crypto.randomUUID();
+    // Match the reviewed people count when legacy work is approved directly from S10.
+    // Resolution is recorded only in this new revision, never written back into old drafts.
+    const servingCount = resolveServingCount(
+      manual ? manual.servingCount : resolved.serving_count,
+      manual ? manual.servingSize : corrected.serving_size,
+      portionCalibration,
+    );
     const facts = manual
       ? {
-          ...(manual.servingCount !== undefined ? { servingCount: manual.servingCount } : {}),
+          ...(manual.portionCalibration !== undefined
+            ? { portionCalibration: manual.portionCalibration }
+            : {}),
+          ...(manual.servingSize !== undefined ? { servingSize: manual.servingSize } : {}),
+          ...(servingCount !== undefined ? { servingCount } : {}),
           category: manual.category,
           priceAmount: manual.priceAmount,
           priceCurrency: manual.priceCurrency,
@@ -1049,9 +1148,13 @@ export async function approveDishDraftAtomic(
         }
       : reviewed
         ? {
-            ...(resolved.serving_count !== undefined
-              ? { servingCount: resolved.serving_count }
+            ...(corrected.portion_calibration !== undefined
+              ? { portionCalibration: corrected.portion_calibration }
               : {}),
+            ...(corrected.serving_size !== undefined
+              ? { servingSize: corrected.serving_size }
+              : {}),
+            ...(servingCount !== undefined ? { servingCount } : {}),
             category: resolved.category,
             priceAmount: resolved.price_amount,
             priceCurrency: resolved.price_currency,
@@ -1144,6 +1247,7 @@ export function createApp(services: Dependencies = dependencies) {
     verify: services.verify,
     ...(services.readOwnerReport ? { readReport: services.readOwnerReport } : {}),
     allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
+    allowedOrigin: ownerConsoleOrigin,
     syntheticVenues: SYNTHETIC_REPORT_VENUE_ALLOWLIST,
     ...(services.now ? { now: services.now } : {}),
   });
@@ -1157,16 +1261,15 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/staff/venues',
     cors({
-      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
-      allowMethods: ['GET', 'OPTIONS'],
-      allowHeaders: ['Authorization'],
+      origin: (origin, c) => ownerConsoleOrigin(origin, c.env),
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type'],
       maxAge: 86400,
     }),
   );
   app.get('/staff/venues', async (c) => {
     const env = c.env ?? {};
-    if (!['local', 'staging'].includes(env.APP_ENV ?? ''))
-      return c.json({ error: 'not_found' }, 404);
+    if (!ownerWorkflowAvailable(env)) return c.json({ error: 'not_found' }, 404);
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization))
       return c.json({ error: 'unauthorized' }, 401);
@@ -1179,6 +1282,12 @@ export function createApp(services: Dependencies = dependencies) {
     });
     if (!response.success) throw new AuthUnavailableError();
     return c.json(response.data);
+  });
+  registerOwnerVenueCreation(app, {
+    verify: services.verify,
+    database: withDatabase,
+    allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
+    productionOrigin: PRODUCTION_OWNER_ORIGIN,
   });
   app.get('/.well-known/jwks.json', async (c) => {
     if (!services.readMenuJwks) throw new AuthUnavailableError();
@@ -1234,17 +1343,33 @@ export function createApp(services: Dependencies = dependencies) {
     )
       return next();
     return cors({
-      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      origin: (origin, context) => ownerConsoleOrigin(origin, context.env),
       allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
       allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
       exposeHeaders: ['Location'],
       maxAge: 86400,
     })(c, next);
   });
+  app.use(
+    '/venues/:venueId/owner-insight-actions',
+    cors({
+      origin: (origin, c) => ownerConsoleOrigin(origin, c.env),
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
   registerOwnerMenuRoutes(app, {
     verify: services.verify,
     authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
     database: withDatabase,
+  });
+  registerDishAssistanceRoutes(app, {
+    verify: services.verify,
+    authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
+    database: withDatabase,
+    allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
+    approvedVenues: SYNTHETIC_REPORT_VENUE_ALLOWLIST,
   });
   app.use(
     '/public/*',
@@ -1379,11 +1504,10 @@ export function createApp(services: Dependencies = dependencies) {
     const result = await services.readAnalytics(projectId, kind, parsed.data, env);
     return c.json(TeamAnalyticsResponseSchema.parse(result));
   });
-  // CORS only: authentication, the synthetic-source rule and venue access below are unchanged.
   app.use(
     '/api/v1/venues/:venueId/analytics/dishes',
     cors({
-      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) => ownerConsoleOrigin(origin, c.env),
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Authorization'],
       exposeHeaders: [OWNER_REPORT_REFERENCE_HEADER],
@@ -1399,37 +1523,48 @@ export function createApp(services: Dependencies = dependencies) {
     const scope = VenueScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
     const env = c.env ?? {};
-    const sources = new URL(c.req.url).searchParams.getAll('source');
-    if (
-      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
-      sources.length !== 1 ||
-      sources[0] !== 'synthetic'
-    ) {
+    const source = ownerReportRequestSource(c.req.url, env);
+    if (!source) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
-    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
-      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
-    });
-    if (!approvedSyntheticVenue.success) {
-      return c.json({ error: 'service_unavailable' }, 503);
-    }
-    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
-      approvedSyntheticVenue.data.venueId.toLowerCase(),
-    );
     if (
-      !isSyntheticVenue ||
-      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
+      source === 'synthetic' &&
+      !configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())
     ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
     const now = services.now?.() ?? new Date();
-    const venueId = approvedSyntheticVenue.data.venueId;
-    const report = await services.readOwnerReport(actorId, venueId, now, env, 'synthetic');
+    const venueId = scope.data.venueId.toLowerCase();
+    const report = await services.readOwnerReport(actorId, venueId, now, env, source);
+    c.header('Cache-Control', 'no-store');
+    let responseReport = report;
+    if (
+      source === 'production' &&
+      (env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED !== 'true' ||
+        c.req.query('displayActions') !== 'true')
+    ) {
+      const legacy = OwnerDishReportSchema.parse(report);
+      const missing = { value: null, status: 'MISSING' } as const;
+      responseReport = {
+        ...legacy,
+        dishes: legacy.dishes.map(({ display_actions: _, ...dish }) => dish),
+        ...(legacy.summary
+          ? {
+              summary: {
+                ...legacy.summary,
+                current: { ...legacy.summary.current, portion_previews_shown: missing },
+                baseline: { ...legacy.summary.baseline, portion_previews_shown: missing },
+              },
+            }
+          : {}),
+      };
+    }
     if (env.OWNER_AI_RESPONSES_ENABLED === 'true' && env.OWNER_AI_REPORT_REFERENCE_SECRET) {
       try {
+        const parsedReport = OwnerDishReportSchema.parse(report);
         const reference = await mintOwnerReportReference(
-          OwnerDishReportSchema.parse(report),
+          parsedReport,
           { actorId, venueId },
           env.OWNER_AI_REPORT_REFERENCE_SECRET,
           now,
@@ -1439,12 +1574,12 @@ export function createApp(services: Dependencies = dependencies) {
         // The owner can still read the authorized report when its optional AI reference is unavailable.
       }
     }
-    return c.json(report);
+    return c.json(responseReport);
   });
   app.use(
     '/api/v1/venues/:venueId/analytics/dishes/export',
     cors({
-      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) => ownerConsoleOrigin(origin, c.env),
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Authorization'],
       maxAge: 86400,
@@ -1459,36 +1594,23 @@ export function createApp(services: Dependencies = dependencies) {
     const scope = VenueScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
     const env = c.env ?? {};
-    const sources = new URL(c.req.url).searchParams.getAll('source');
-    if (
-      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
-      sources.length !== 1 ||
-      sources[0] !== 'synthetic'
-    ) {
+    const source = ownerReportRequestSource(c.req.url, env);
+    if (!source) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
-    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
-      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
-    });
-    if (!approvedSyntheticVenue.success) {
-      return c.json({ error: 'service_unavailable' }, 503);
-    }
-    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
-      approvedSyntheticVenue.data.venueId.toLowerCase(),
-    );
     if (
-      !isSyntheticVenue ||
-      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
+      source === 'synthetic' &&
+      !configuredSyntheticReportVenues(env).includes(scope.data.venueId.toLowerCase())
     ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
     const report = await services.readOwnerReport(
       actorId,
-      approvedSyntheticVenue.data.venueId,
+      scope.data.venueId.toLowerCase(),
       services.now?.() ?? new Date(),
       env,
-      'synthetic',
+      source,
     );
     const typedReport = report as ExportableOwnerReport;
     const csv = serializeOwnerReportCsv(typedReport);
@@ -1647,8 +1769,7 @@ export function createApp(services: Dependencies = dependencies) {
     '/venues/:venueId/prepared-menus/:menuId/:revisionId/assets/:assetId/:file',
   ]) {
     app.get(path, async (c) => {
-      if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
-        return c.json({ error: 'not_found' }, 404);
+      if (!ownerWorkflowAvailable(c.env)) return c.json({ error: 'not_found' }, 404);
       const authorization = c.req.header('Authorization');
       if (!authorization || !/^Bearer \S+$/i.test(authorization))
         return c.json({ error: 'unauthorized' }, 401);
@@ -1691,8 +1812,7 @@ export function createApp(services: Dependencies = dependencies) {
   // Part A: after S10/S11 verification the owner's verified dishes become a prepared menu for
   // S13. Owner-only (checked again inside the admit function); never approves or publishes.
   app.post('/venues/:venueId/prepared-menus/prepare', async (c) => {
-    if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
-      return c.json({ error: 'not_found' }, 404);
+    if (!ownerWorkflowAvailable(c.env)) return c.json({ error: 'not_found' }, 404);
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization))
       return c.json({ error: 'unauthorized' }, 401);
@@ -1729,11 +1849,14 @@ export function createApp(services: Dependencies = dependencies) {
   });
 
   app.get('/venues/:venueId/owner-insight-actions', async (c) => {
+    const env = c.env ?? {};
+    if (env.APP_ENV === 'production' && !ownerWorkflowAvailable(env))
+      return c.json({ error: 'not_found' }, 404);
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
       return c.json({ error: 'unauthorized' }, 401);
     }
-    const actorId = await services.verify(authorization, c.env ?? {});
+    const actorId = await services.verify(authorization, env);
     const scope = VenueScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
 
@@ -1745,12 +1868,7 @@ export function createApp(services: Dependencies = dependencies) {
     }
     if (!services.listOwnerActions) throw new AuthUnavailableError();
 
-    const result = await services.listOwnerActions(
-      actorId,
-      scope.data.venueId,
-      query.data,
-      c.env ?? {},
-    );
+    const result = await services.listOwnerActions(actorId, scope.data.venueId, query.data, env);
     return c.json(result);
   });
 
@@ -1860,8 +1978,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
 
   app.post('/venues/:venueId/menus/uploads', async (c) => {
-    if (c.env?.APP_ENV !== 'staging' && c.env?.APP_ENV !== 'local')
-      return c.json({ error: 'not_found' }, 404);
+    if (!ownerWorkflowAvailable(c.env)) return c.json({ error: 'not_found' }, 404);
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization))
       return c.json({ error: 'unauthorized' }, 401);
@@ -2453,6 +2570,7 @@ export async function handleQueueBatch(
       (env.EXTRACTION_SERVICE_URL
         ? createHttpPythonExtractor({
             serviceUrl: env.EXTRACTION_SERVICE_URL,
+            environment: env.APP_ENV === 'production' ? 'production' : 'staging',
             ...(env.EXTRACTION_SERVICE_SECRET !== undefined
               ? { authToken: env.EXTRACTION_SERVICE_SECRET }
               : {}),
@@ -2525,7 +2643,7 @@ export function createWorker(
       await observationQueue(batch, env);
     }
   };
-  return Object.assign(app, { queue, scheduled: handleScheduled });
+  return Object.assign(app, { queue, scheduled });
 }
 
 export {
@@ -2601,6 +2719,11 @@ export const handleScheduled = async (
 
   const hasOrderStorage = hasListAndDelete(orderStorage);
   const hasStagingStorage = hasStagingMethods(stagingStorage);
+  const stagingEnabled = [
+    env.MENU_STAGING_RETENTION_DAYS,
+    env.MENU_STAGING_REJECTED_RETENTION_DAYS,
+    env.MENU_STAGING_ORPHAN_GRACE_DAYS,
+  ].some((value) => value !== undefined);
   const hasArtworkStorage =
     env.INGREDIENT_ARTWORK_ENABLED === 'true' && hasListAndDelete(artworkStorage);
 
@@ -2694,48 +2817,35 @@ export const handleScheduled = async (
       }
     }
 
-    // Configurable staging menu photo cleanup (Category 1 promoted, Category 2 rejected, Category 3 orphan)
-    const stagingRetentionDays = env.MENU_STAGING_RETENTION_DAYS
-      ? Number.parseInt(env.MENU_STAGING_RETENTION_DAYS, 10)
-      : undefined;
-    const stagingRejectedDays = env.MENU_STAGING_REJECTED_RETENTION_DAYS
-      ? Number.parseInt(env.MENU_STAGING_REJECTED_RETENTION_DAYS, 10)
-      : undefined;
-    const stagingOrphanDays = env.MENU_STAGING_ORPHAN_GRACE_DAYS
-      ? Number.parseInt(env.MENU_STAGING_ORPHAN_GRACE_DAYS, 10)
-      : undefined;
-    const stagingDryRun = env.MENU_STAGING_CLEANUP_DRY_RUN === 'true';
-
-    if (
-      hasStagingMethods(stagingStorage) &&
-      (stagingRetentionDays !== undefined ||
-        stagingRejectedDays !== undefined ||
-        stagingOrphanDays !== undefined)
-    ) {
+    if (stagingEnabled && hasStagingStorage) {
       try {
         const { cleanupStagedMenuPhotos } = await import('./owner-menu-retention');
-        const stagingResult = await cleanupStagedMenuPhotos({
-          storage: stagingStorage,
+        await cleanupStagedMenuPhotos({
+          storage: {
+            put: stagingStorage.put.bind(stagingStorage),
+            get: stagingStorage.get.bind(stagingStorage),
+            list: stagingStorage.list.bind(stagingStorage),
+            delete: stagingStorage.delete.bind(stagingStorage),
+          },
           client,
           retentionConfig: {
-            promotedRetentionDays: stagingRetentionDays,
-            rejectedRetentionDays: stagingRejectedDays ?? 0,
-            orphanGraceDays: stagingOrphanDays ?? 0,
+            promotedRetentionDays: parseNonNegativeIntEnv(
+              env.MENU_STAGING_RETENTION_DAYS,
+              'invalid_staging_retention',
+            ),
+            rejectedRetentionDays:
+              parseNonNegativeIntEnv(
+                env.MENU_STAGING_REJECTED_RETENTION_DAYS,
+                'invalid_staging_retention',
+              ) ?? 0,
+            orphanGraceDays:
+              parseNonNegativeIntEnv(
+                env.MENU_STAGING_ORPHAN_GRACE_DAYS,
+                'invalid_staging_retention',
+              ) ?? 0,
           },
-          dryRun: stagingDryRun,
+          dryRun: env.MENU_STAGING_CLEANUP_DRY_RUN === 'true',
         });
-        if (
-          stagingResult.promotedDeleted > 0 ||
-          stagingResult.rejectedDeleted > 0 ||
-          stagingResult.orphansDeleted > 0
-        ) {
-          console.log(
-            JSON.stringify({
-              event: 'menu_staging_cleanup',
-              ...stagingResult,
-            }),
-          );
-        }
       } catch {
         console.error(JSON.stringify({ event: 'menu_staging_cleanup_error' }));
       }
@@ -2773,7 +2883,7 @@ export const handleScheduled = async (
   }
 };
 
-export const scheduled = handleScheduled;
+export const scheduled = (event: unknown, env: Bindings) => handleScheduled(event, env);
 
 const defaultApp = createApp();
 const defaultObservationQueue = createObservationQueueHandler();

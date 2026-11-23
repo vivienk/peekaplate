@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../style.css';
+import { PRODUCTION_OWNER_API_ORIGIN, readWorkspaceApiBase } from '../owner/api-origin';
 import { OwnerWorkspace } from '../owner/OwnerWorkspace';
-import { readWorkspaceApiBase } from '../owner/workspace-api';
+import { OWNER_AUTH_PATH, OWNER_PAGE_PATHS, ownerPageForPath } from '../owner/routes';
 import { isAuthCallbackPath, readConfirmationCode } from './callback';
 import { OwnerAuth } from './OwnerAuth';
 import {
@@ -15,28 +16,52 @@ import {
 const isConfirmation = isAuthCallbackPath(window.location.pathname, 'confirmation');
 const isRecovery = isAuthCallbackPath(window.location.pathname, 'recovery');
 const isCallback = isConfirmation || isRecovery;
+const production = window.location.origin === 'https://peekaplate.app';
+const automaticConfirmation = production && isConfirmation;
 let confirmationCode = isCallback
   ? readConfirmationCode(window.location.href, isRecovery ? 'recovery' : 'confirmation')
   : null;
 // No query-controlled redirects. Callback code stays in this tab's memory, never rendered/stored.
 if (window.location.search || window.location.hash)
-  window.history.replaceState(null, '', window.location.pathname);
+  window.history.replaceState(
+    isCallback ? null : window.history.state,
+    '',
+    window.location.pathname,
+  );
 const config = readOwnerAuthConfig(import.meta.env, window.location.origin);
 const runtime = config ? connectOwnerAuth(config) : null;
-const apiBase = readWorkspaceApiBase(import.meta.env.VITE_PUBLIC_API_URL);
+const configuredApi = readWorkspaceApiBase(import.meta.env.VITE_PUBLIC_API_URL);
+const productionApi = configuredApi === PRODUCTION_OWNER_API_ORIGIN;
+const apiBase = production === productionApi ? configuredApi : null;
 // The owner AI panel stays off unless this console build turns it on (see docs/owner-ai-responses.md).
 const aiEnabled = import.meta.env.VITE_OWNER_AI_ENABLED === 'true';
+const dishAssistanceEnabled = import.meta.env.VITE_OWNER_AI_DISH_ASSISTANCE_ENABLED === 'true';
+
+function returnToSignIn() {
+  if (!ownerPageForPath(window.location.pathname)) return;
+  window.history.replaceState(window.history.state, '', OWNER_AUTH_PATH);
+  document.title = 'PeekaPlate · Owner sign in';
+}
 
 function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   const [owner, setOwner] = useState<SignedInOwner | null>(null);
   const [message, setMessage] = useState('');
   const [callbackState, setCallbackState] = useState(
-    isCallback ? (confirmationCode ? 'ready' : 'invalid') : 'none',
+    isCallback
+      ? confirmationCode
+        ? automaticConfirmation
+          ? 'confirming'
+          : 'ready'
+        : 'invalid'
+      : 'none',
   );
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(!isCallback);
   const identityGeneration = useRef(0);
+  // Keep only the initial exact page for this document; previous sessions cannot leave a target.
+  const requestedPage = useRef(production ? ownerPageForPath(window.location.pathname) : undefined);
+  const confirmationPending = useRef<AbortController | null>(null);
   const refreshOwner = useCallback(async () => {
     const generation = ++identityGeneration.current;
     setOwner(null);
@@ -44,8 +69,14 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
     try {
       const current = await auth.signedInOwner();
       if (generation === identityGeneration.current) {
+        if (current) {
+          const page = requestedPage.current;
+          requestedPage.current = undefined;
+          if (page && window.location.pathname === OWNER_AUTH_PATH)
+            window.history.replaceState(window.history.state, '', OWNER_PAGE_PATHS[page]);
+          setMessage('');
+        }
         setOwner(current);
-        if (current) setMessage('');
       }
     } catch {
       if (generation === identityGeneration.current) setOwner(null);
@@ -73,10 +104,12 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   }, [auth]);
 
   useEffect(() => {
+    if (!isCallback || callbackState === 'none') return;
     function rejectChangedCallback() {
+      confirmationPending.current?.abort();
       confirmationCode = null;
       window.history.replaceState(null, '', window.location.pathname);
-      if (isCallback) setCallbackState('invalid');
+      setCallbackState('invalid');
     }
     window.addEventListener('hashchange', rejectChangedCallback);
     window.addEventListener('popstate', rejectChangedCallback);
@@ -84,7 +117,32 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
       window.removeEventListener('hashchange', rejectChangedCallback);
       window.removeEventListener('popstate', rejectChangedCallback);
     };
-  }, []);
+  }, [callbackState]);
+
+  useEffect(() => {
+    const code = confirmationCode;
+    if (!automaticConfirmation || !code) return;
+    const controller = new AbortController();
+    confirmationPending.current = controller;
+    // Let effect cleanup cancel a discarded mount before the one-use code is exchanged.
+    queueMicrotask(async () => {
+      if (controller.signal.aborted) return;
+      confirmationCode = null;
+      const result = await auth.confirmEmail(code, controller.signal);
+      if (controller.signal.aborted) return;
+      if (result.kind === 'confirmed') window.location.replace(OWNER_AUTH_PATH);
+      else setCallbackState('invalid');
+    });
+    window.addEventListener(
+      'pagehide',
+      () => {
+        controller.abort();
+        setCallbackState('invalid');
+      },
+      { signal: controller.signal },
+    );
+    return () => controller.abort();
+  }, [auth]);
 
   useEffect(() => {
     const restore = !isCallback || callbackState === 'none';
@@ -100,10 +158,24 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
     };
   }, [auth, callbackState, refreshOwner]);
 
+  useEffect(() => {
+    if (!production || loading || owner || callbackState !== 'none') return;
+    returnToSignIn();
+    window.addEventListener('popstate', returnToSignIn);
+    return () => window.removeEventListener('popstate', returnToSignIn);
+  }, [callbackState, loading, owner]);
+
   async function signedIn() {
     await refreshOwner();
     setCallbackState('none');
   }
+
+  if (callbackState === 'confirming')
+    return (
+      <main>
+        <p role="status">Confirming your email…</p>
+      </main>
+    );
 
   if (isRecovery && (callbackState === 'recovery' || callbackState === 'invalid'))
     return (
@@ -164,7 +236,7 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
           </button>
         )}
         <p>
-          <a href="/owner-auth.html">Back to sign in</a>
+          <a href={production ? OWNER_AUTH_PATH : '/owner-auth.html'}>Back to sign in</a>
         </p>
       </main>
     );
@@ -184,7 +256,9 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
           auth={auth}
           owner={owner}
           apiBase={apiBase}
+          production={production}
           aiEnabled={aiEnabled}
+          dishAssistanceEnabled={dishAssistanceEnabled}
           onSessionExpired={sessionExpired}
           onSignOut={() => {
             void signOut();
@@ -205,6 +279,7 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Owner auth root is missing');
+if (production && !runtime) returnToSignIn();
 createRoot(root).render(
   runtime ? (
     <LiveOwnerAuth auth={runtime} />

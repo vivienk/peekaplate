@@ -7,10 +7,12 @@ import {
   dishFromManualDraft,
   dishFromReviewItem,
   emptyManualDish,
+  invalidateChangedCalibration,
   manualSaveCommand,
   reviewCorrection,
 } from './dishForm';
 import { EXTRACTION_ID, reviewSession } from './fixtures.test-helpers';
+import { calibrationPhotoId, confirmedCalibration } from './portionCalibration.test-helpers';
 
 const firstItem = () => {
   const item = reviewSession().items[0];
@@ -19,6 +21,24 @@ const firstItem = () => {
 };
 
 describe('dishFromReviewItem', () => {
+  it('defaults an unread currency to the USD pilot policy without claiming OCR evidence', () => {
+    const item = firstItem();
+    item.effective.price_currency = null;
+    const form = dishFromReviewItem(EXTRACTION_ID, item);
+    expect(form.priceCurrency).toBe('USD');
+    expect(form.source).toMatchObject({ currencyDefaulted: true });
+    expect(reviewCorrection(item, form)).toMatchObject({ price_currency: 'USD' });
+    expect(firstItem().effective.price_currency).toBe('CAD');
+    expect(emptyManualDish().priceCurrency).toBe('USD');
+    const manual = emptyManualDish();
+    manual.priceCurrency = '';
+    expect(
+      manualSaveCommand(manual, 0, '00000000-0000-4000-8000-000000000001').fields.priceCurrency,
+    ).toBe('USD');
+    expect(approvalIssues(manual)).not.toContain('currency');
+    manual.priceCurrency = 'not-a-code';
+    expect(approvalIssues(manual)).toContain('currency');
+  });
   it('prefills Screen 9 from OCR and keeps unread values unknown', () => {
     // Garden Soup: two printed prices ("8.50 / 12.50 CAD"), so no single amount, and no ingredients.
     const form = dishFromReviewItem(EXTRACTION_ID, firstItem());
@@ -50,6 +70,22 @@ describe('dishFromReviewItem', () => {
 });
 
 describe('reviewCorrection', () => {
+  it('saves proposed facts without leaking editor AI display markers into the command', () => {
+    const form = {
+      ...emptyManualDish(),
+      aiIng: ['Carrot'],
+      aiAlg: ['milk'],
+      aiUsed: true,
+      ingredients: { status: 'proposed' as const, items: ['Carrot'] },
+      allergens: { status: 'proposed' as const, items: ['milk' as const] },
+    };
+    const saved = manualSaveCommand(form, 0, '00000000-0000-4000-8000-000000000001');
+    expect(saved.fields.ingredients.status).toBe('proposed');
+    expect(saved.fields.allergens.status).toBe('proposed');
+    expect(saved.fields).not.toHaveProperty('aiIng');
+    expect(saved.fields).not.toHaveProperty('aiAlg');
+    expect(saved.fields).not.toHaveProperty('aiUsed');
+  });
   it('saves and reloads reviewed serving size, allergens and the private photo reference', () => {
     const item = firstItem();
     const form = {
@@ -185,7 +221,7 @@ describe('approval', () => {
     expect(approvalIssues(form)).toEqual(['price']);
     form.priceAmount = '8.5';
     expect(approvalIssues(form)).toEqual([]);
-    expect(approvalIssues(emptyManualDish())).toEqual(['name', 'category', 'price', 'currency']);
+    expect(approvalIssues(emptyManualDish())).toEqual(['name', 'category', 'price']);
     if (form.source) form.source.rejected = true;
     expect(approvalIssues(form)).toContain('rejected');
   });
@@ -243,5 +279,90 @@ describe('serving count from Screen 9', () => {
     expect(reviewCorrection(item, { ...resumed, servingCount: '' })).toMatchObject({
       serving_count: null,
     });
+  });
+});
+
+describe('optional photo-bound plate size from Screen 9', () => {
+  it('requires fresh confirmation for a changed photo but keeps it through unrelated text edits', () => {
+    const form = {
+      ...emptyManualDish(),
+      servingSize: '28',
+      photoId: calibrationPhotoId,
+      portionCalibration: confirmedCalibration,
+    };
+    expect(
+      invalidateChangedCalibration(form, { ...form, photoId: crypto.randomUUID() }),
+    ).toHaveProperty('portionCalibration', null);
+    expect(invalidateChangedCalibration(form, { ...form, name: 'Renamed soup' })).toHaveProperty(
+      'portionCalibration',
+      confirmedCalibration,
+    );
+  });
+
+  it('saves and reloads manual calibration independently of an unknown people count', () => {
+    const form = {
+      ...emptyManualDish(),
+      servingSize: '28 cm',
+      photoId: calibrationPhotoId,
+      portionCalibration: confirmedCalibration,
+    };
+    const command = manualSaveCommand(form, 0, crypto.randomUUID());
+    expect(command.fields.portionCalibration).toEqual(confirmedCalibration);
+    expect(command.fields.servingCount).toBeNull();
+    const saved = dishFromManualDraft({
+      id: 'd1',
+      draft_id: 'd1',
+      job_id: null,
+      origin: 'manual',
+      draft_version: 1,
+      name: null,
+      category: null,
+      description: null,
+      price_amount: null,
+      price_currency: null,
+      ingredients: null,
+      source_text: null,
+      review_warnings: [],
+      review_status: 'pending',
+      manual_fields: command.fields,
+    });
+    expect(saved.portionCalibration).toEqual(confirmedCalibration);
+  });
+
+  it('corrects, reloads, and explicitly clears extracted calibration', () => {
+    const item = firstItem();
+    const form = {
+      ...dishFromReviewItem(EXTRACTION_ID, item),
+      servingSize: '28',
+      photoId: calibrationPhotoId,
+      portionCalibration: confirmedCalibration,
+    };
+    expect(reviewCorrection(item, form)).toMatchObject({
+      serving_size: '28',
+      photo_id: calibrationPhotoId,
+      portion_calibration: confirmedCalibration,
+    });
+    item.effective = {
+      ...item.effective,
+      serving_size: '28',
+      photo_id: calibrationPhotoId,
+      portion_calibration: confirmedCalibration,
+    };
+    const saved = dishFromReviewItem(EXTRACTION_ID, item);
+    expect(saved.portionCalibration).toEqual(confirmedCalibration);
+    expect(reviewCorrection(item, saved)).toBeNull();
+    expect(reviewCorrection(item, { ...saved, portionCalibration: null })).toEqual({
+      portion_calibration: null,
+    });
+  });
+
+  it.each(['1 bowl', '28', '28 cm'])('never confirms a legacy label just by parsing %s', (size) => {
+    const command = manualSaveCommand(
+      { ...emptyManualDish(), servingSize: size },
+      0,
+      crypto.randomUUID(),
+    );
+    expect(command.fields).not.toHaveProperty('portionCalibration');
+    expect(command.fields.servingSize).toBe(size);
   });
 });

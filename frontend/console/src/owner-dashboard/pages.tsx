@@ -1,3 +1,4 @@
+import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
 // Owner Dashboard screens: welcome, overview, report, dish performance, dish detail, actions.
 import { type ReactNode, useState } from 'react';
 import type { Chat } from './chat';
@@ -52,6 +53,65 @@ export type Page =
   | 'dish';
 export type Acts = Record<string, ActionState>;
 export type SetAct = (id: string, v: ActionState) => void;
+
+/** Explicit live inputs never fall back to the prototype's restaurant or evidence. */
+export interface LiveDashboardInput {
+  restaurantName: string;
+  period?: string | undefined;
+  reportContent?: ReactNode;
+  reportRefresh?: ReactNode;
+  summary?: OwnerDishReport['summary'];
+  summaryFreshness?: boolean | null | undefined;
+  summarySource?: OwnerDishReport['source'] | undefined;
+  summaryBatch?: boolean;
+}
+
+type OverviewSummary = NonNullable<OwnerDishReport['summary']>;
+type OverviewMetric = keyof OverviewSummary['current'];
+function overviewMetric(summary: OverviewSummary | undefined, key: OverviewMetric) {
+  const display = (
+    cell: OverviewSummary['current'][OverviewMetric] | undefined,
+    withUnit = true,
+  ) => {
+    if ((cell?.status === 'NORMAL' || cell?.status === 'VALID_ZERO') && cell.value !== null)
+      return `${key === 'avg_interaction_time_seconds' ? cell.value : cell.value.toLocaleString('en-US')}${withUnit && key === 'avg_interaction_time_seconds' ? ' s' : ''}`;
+    switch (cell?.status) {
+      case 'SUPPRESSED':
+        return 'Not enough visits yet';
+      case 'NOT_MEASURABLE':
+        return 'Not measurable';
+      case 'STALE':
+        return 'Out of date';
+      case 'EVIDENCE_CHECK_FAILED':
+        return 'Couldn’t verify';
+      default:
+        return 'Unavailable';
+    }
+  };
+  const current = summary?.current[key];
+  const observed = current?.status === 'NORMAL' || current?.status === 'VALID_ZERO';
+  return {
+    value: display(current, false),
+    ...(observed && key === 'avg_interaction_time_seconds' ? { unit: 's' } : {}),
+    foot: `Previous period: ${display(summary?.baseline[key])}`,
+    tag: <Lab k={observed ? (key === 'verified_orders' ? 'ver' : 'obs') : 'unk'} />,
+  };
+}
+const overviewWindow = (period: { start_time: string; end_time: string }) =>
+  `${period.start_time.replace('T', ' ').replace(/\.000Z$|Z$/, ' UTC')} – ${period.end_time.replace('T', ' ').replace(/\.000Z$|Z$/, ' UTC')}`;
+export interface LiveMenuRow {
+  id: string;
+  name: string;
+  category: string;
+  priceLabel: string;
+  imageUrl?: string | null;
+}
+export interface LiveSavedAction {
+  id: string;
+  title: string;
+  text: string;
+  status: ActionState['status'] | 'active' | 'archived';
+}
 
 export function Welcome({ go }: { go: (p: Page) => void }) {
   return (
@@ -134,98 +194,211 @@ export function Overview({
   acts,
   openDish,
   openInsight,
+  live,
 }: {
   go: (p: Page) => void;
   sim: { scn: Scenario };
   acts: Acts;
   openDish: (id: string) => void;
   openInsight: (id: string) => void;
+  live?: LiveDashboardInput & { menu: readonly LiveMenuRow[] };
 }) {
-  const empty = sim.scn === 'empty';
+  const empty = !!live || sim.scn === 'empty';
+  const daily = live?.summary?.daily_opens;
+  const dailyLabels = daily?.current.map(
+    (bucket) => `${bucket.start_time.slice(11, 16)}–${bucket.end_time.slice(11, 16)} UTC`,
+  );
+  const dailyValue = (bucket: NonNullable<OverviewSummary['daily_opens']>['current'][number]) =>
+    bucket.opens.value ??
+    (bucket.opens.status === 'SUPPRESSED' ? 'Not enough visits yet' : 'Unavailable');
+  const batches = live?.summaryBatch && daily ? [...daily.baseline, ...daily.current] : undefined;
+  const batchLabels = batches?.map(
+    ({ end_time }) => `${end_time.slice(5, 10)} ${end_time.slice(11, 16)} UTC`,
+  );
   const sorted = bySort('open');
   const planned = INSIGHTS.filter((i) => acts[i.id]?.status === 'planned').length;
   return (
     <div className="stack">
       <div className="pagehead">
-        <span className="eyebrow">Overview · {REST.period}</span>
-        <h1>How your menu did this week</h1>
+        <span className="eyebrow">Overview · {live ? live.restaurantName : REST.period}</span>
+        <h1>{live ? 'How your menu did this period' : 'How your menu did this week'}</h1>
+        {live?.reportRefresh}
       </div>
-      {empty ? (
+      {empty && (
         <Note icon="info">
-          No diner data yet. Your dishes are listed below with no numbers. Data appears once diners
-          use the menu.
+          {live
+            ? live.summary
+              ? `Current period: ${overviewWindow(live.summary.periods.current)}. Previous period: ${overviewWindow(live.summary.periods.baseline)}. ${live.summaryFreshness === null || live.summaryFreshness === undefined ? 'Freshness not known.' : live.summaryFreshness ? 'Report is out of date.' : 'Report is up to date.'}`
+              : 'Summary unavailable. Your saved dishes are listed below; no measurements are inferred.'
+            : 'No diner data yet. Your dishes are listed below with no numbers. Data appears once diners use the menu.'}
         </Note>
-      ) : (
+      )}
+      {live?.summary && live.summarySource === 'production' && (
+        <Note icon="info">
+          {live.summaryBatch
+            ? 'Refresh shows the latest completed five-minute batch. Dish-level rates need enough visits.'
+            : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
+        </Note>
+      )}
+      {(live || !empty) && (
         <div className="kpis">
           <Kpi
             label="Menu sessions"
-            value={SESSIONS.now}
-            foot={
-              <>
-                <Delta a={SESSIONS.now} b={SESSIONS.prev} /> vs last week
-              </>
-            }
-            tag={<Lab k="obs" />}
+            {...(live
+              ? overviewMetric(live.summary, 'menu_sessions')
+              : {
+                  value: SESSIONS.now,
+                  foot: (
+                    <>
+                      <Delta a={SESSIONS.now} b={SESSIONS.prev} /> vs last week
+                    </>
+                  ),
+                  tag: <Lab k="obs" />,
+                })}
           />
           <Kpi
             label="Dish opens"
-            value={T.open}
-            foot={
-              <>
-                <Delta a={T.open} b={PREV.open} /> vs last week
-              </>
-            }
-            tag={<Lab k="obs" />}
+            {...(live
+              ? overviewMetric(live.summary, 'dish_opens')
+              : {
+                  value: T.open,
+                  foot: (
+                    <>
+                      <Delta a={T.open} b={PREV.open} /> vs last week
+                    </>
+                  ),
+                  tag: <Lab k="obs" />,
+                })}
           />
           <Kpi
             label="Avg time interacting"
-            value={T.time}
-            unit="s"
-            foot={`${T.time - PREV.time > 0 ? '+' : ''}${T.time - PREV.time} s vs last week`}
-            tag={<Lab k="obs" />}
+            {...(live
+              ? overviewMetric(live.summary, 'avg_interaction_time_seconds')
+              : {
+                  value: T.time,
+                  unit: 's',
+                  foot: `${T.time - PREV.time > 0 ? '+' : ''}${T.time - PREV.time} s vs last week`,
+                  tag: <Lab k="obs" />,
+                })}
           />
           <Kpi
             label="2.5D previews shown"
-            value={T.p25}
-            foot={
-              <>
-                <Delta a={T.p25} b={PREV.p25} /> vs last week
-              </>
-            }
-            tag={<Lab k="obs" />}
+            {...(live
+              ? overviewMetric(live.summary, 'portion_previews_shown')
+              : {
+                  value: T.p25,
+                  foot: (
+                    <>
+                      <Delta a={T.p25} b={PREV.p25} /> vs last week
+                    </>
+                  ),
+                  tag: <Lab k="obs" />,
+                })}
           />
           <Kpi
             label="Verified orders on record"
-            value={T.ord}
-            foot={`${T.withRec} of ${DISH.length} dishes have a record`}
-            tag={<Lab k="ver" />}
+            {...(live
+              ? overviewMetric(live.summary, 'verified_orders')
+              : {
+                  value: T.ord,
+                  foot: `${T.withRec} of ${DISH.length} dishes have a record`,
+                  tag: <Lab k="ver" />,
+                })}
           />
         </div>
       )}
       <div className="grid g-main">
         <div className="stack">
-          {!empty && (
+          {(live || !empty) && (
             <ChartCard
-              title="Dish opens by day"
-              tag={<Lab k="obs" />}
-              head={['Day', 'This week', 'Last week']}
-              rows={DAYS.map((d, i) => [d, DAILY_NOW[i], DAILY_PREV[i]])}
+              title={live?.summaryBatch ? 'Dish opens by batch' : 'Dish opens by day'}
+              tag={
+                <Lab
+                  k={
+                    !live ||
+                    (daily &&
+                      [...daily.current, ...daily.baseline].some(
+                        (bucket) => bucket.opens.value !== null,
+                      ))
+                      ? 'obs'
+                      : 'unk'
+                  }
+                />
+              }
+              {...(live && {
+                sub: live.summaryBatch
+                  ? 'Completed five-minute UTC batches. Unavailable measurements are gaps.'
+                  : 'UTC days clipped to each reporting period. Unavailable measurements are gaps, not zero.',
+              })}
+              head={
+                live?.summaryBatch
+                  ? ['UTC batch', 'Dish opens']
+                  : live
+                    ? ['UTC bucket', 'Current period', 'Previous period']
+                    : ['Day', 'This week', 'Last week']
+              }
+              rows={
+                batches
+                  ? batches.map((bucket) => [overviewWindow(bucket), dailyValue(bucket)])
+                  : live
+                    ? (daily?.current.map((bucket, i) => [
+                        dailyLabels![i],
+                        dailyValue(bucket),
+                        daily.baseline[i] ? dailyValue(daily.baseline[i]!) : 'Unavailable',
+                      ]) ?? [])
+                    : DAYS.map((d, i) => [d, DAILY_NOW[i], DAILY_PREV[i]])
+              }
             >
-              <LineChart
-                labels={DAYS}
-                unit=""
-                desc="Dish opens by day, this week compared with last week"
-                series={[
-                  { name: 'This week', color: 'var(--c1)', values: DAILY_NOW },
-                  {
-                    name: 'Last week',
-                    color: 'var(--cg)',
-                    values: DAILY_PREV,
-                    dash: '5 4',
-                    label: false,
-                  },
-                ]}
-              />
+              {live && !daily ? (
+                <div className="empty">Daily openings unavailable.</div>
+              ) : (
+                <LineChart
+                  labels={batchLabels ?? (live ? (dailyLabels ?? []) : DAYS)}
+                  unit=""
+                  desc={
+                    batches
+                      ? 'Dish opens for the previous and latest completed UTC batches'
+                      : live
+                        ? 'Dish opens by clipped UTC day, current period compared with previous period'
+                        : 'Dish opens by day, this week compared with last week'
+                  }
+                  series={
+                    batches
+                      ? [
+                          {
+                            name: 'Dish opens',
+                            color: 'var(--c1)',
+                            values: batches.map((bucket) => bucket.opens.value),
+                          },
+                        ]
+                      : live && daily
+                        ? [
+                            {
+                              name: 'Current period',
+                              color: 'var(--c1)',
+                              values: daily.current.map((bucket) => bucket.opens.value),
+                            },
+                            {
+                              name: 'Previous period',
+                              color: 'var(--cg)',
+                              values: daily.baseline.map((bucket) => bucket.opens.value),
+                              dash: '5 4',
+                              label: false,
+                            },
+                          ]
+                        : [
+                            { name: 'This week', color: 'var(--c1)', values: DAILY_NOW },
+                            {
+                              name: 'Last week',
+                              color: 'var(--cg)',
+                              values: DAILY_PREV,
+                              dash: '5 4',
+                              label: false,
+                            },
+                          ]
+                  }
+                />
+              )}
             </ChartCard>
           )}
           <section className="card ov-dishes">
@@ -238,33 +411,57 @@ export function Overview({
               </Btn>
             </div>
             <div className="dlist">
-              {(empty ? DISH : sorted).map((d) => (
-                <button
-                  type="button"
-                  key={d.id}
-                  className="drow"
-                  onClick={() => openDish(d.id)}
-                  aria-label={d.name + (empty ? '' : `, ${d.open} opens`)}
-                >
-                  <Thumb id={d.id} />
-                  <span className="dn">
-                    {d.name}
-                    <small>
-                      {d.cat} · {money(d.price)}
-                    </small>
-                  </span>
-                  <span className="hidem">
-                    {empty ? (
-                      <span className="muted">No data yet</span>
-                    ) : (
-                      <Spark values={d.weekly} />
-                    )}
-                  </span>
-                  <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
-                    {empty ? '' : `${d.open} opens`}
-                  </span>
-                </button>
-              ))}
+              {live && live.menu.length === 0 && (
+                <div className="empty">No saved dishes available.</div>
+              )}
+              {live
+                ? live.menu.map((d) => (
+                    <button
+                      type="button"
+                      key={d.id}
+                      className="drow"
+                      onClick={() => openDish(d.id)}
+                      aria-label={d.name}
+                    >
+                      <span className="thumb">
+                        {d.imageUrl ? <img src={d.imageUrl} alt="" /> : <Icon n="menu" />}
+                      </span>
+                      <span className="dn">
+                        {d.name}
+                        <small>
+                          {d.category} · {d.priceLabel}
+                        </small>
+                      </span>
+                      <span className="hidem muted">Open saved dishes</span>
+                    </button>
+                  ))
+                : (empty ? DISH : sorted).map((d) => (
+                    <button
+                      type="button"
+                      key={d.id}
+                      className="drow"
+                      onClick={() => openDish(d.id)}
+                      aria-label={d.name + (empty ? '' : `, ${d.open} opens`)}
+                    >
+                      <Thumb id={d.id} />
+                      <span className="dn">
+                        {d.name}
+                        <small>
+                          {d.cat} · {money(d.price)}
+                        </small>
+                      </span>
+                      <span className="hidem">
+                        {empty ? (
+                          <span className="muted">No data yet</span>
+                        ) : (
+                          <Spark values={d.weekly} />
+                        )}
+                      </span>
+                      <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
+                        {empty ? '' : `${d.open} opens`}
+                      </span>
+                    </button>
+                  ))}
             </div>
           </section>
         </div>
@@ -277,7 +474,11 @@ export function Overview({
               {!empty && <ReportVersionBadge scn={sim.scn} />}
             </div>
             {empty ? (
-              <div className="empty">The first report appears after diners use the menu.</div>
+              <div className="empty">
+                {live
+                  ? 'No validated insights are available here. Open the report to check its availability.'
+                  : 'The first report appears after diners use the menu.'}
+              </div>
             ) : sim.scn === 'B' ? (
               <p>
                 There is not enough data this week for a full report. Counts only, no suggestion.
@@ -315,7 +516,7 @@ export function Overview({
                 )}
               </div>
             )}
-            {!empty && (
+            {(!empty || live) && (
               <div className="row" style={{ marginTop: 16 }}>
                 <Btn kind="primary" size="lg" type="button" onClick={() => go('report')}>
                   Open the AI Insight Report
@@ -330,7 +531,7 @@ export function Overview({
               </div>
             </div>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span>{planned} planned</span>
+              <span>{live ? 'See saved actions' : `${planned} planned`}</span>
               <Btn kind="outlined" size="md" type="button" onClick={() => go('actions')}>
                 View actions
               </Btn>
@@ -381,10 +582,12 @@ export function Report({
   go,
   acts,
   setAct,
+  live,
 }: {
   go: (p: Page) => void;
   acts: Acts;
   setAct: SetAct;
+  live?: LiveDashboardInput;
 }) {
   const [why, setWhy] = useState(false);
   const [mode, setMode] = useState<'view' | 'edit'>('view');
@@ -415,7 +618,9 @@ export function Report({
               className="eyebrow"
               style={{ textTransform: 'none', letterSpacing: 0, fontSize: 13, fontWeight: 500 }}
             >
-              Report · 1–14 Sep 2025
+              {live
+                ? `Report · ${live.restaurantName}${live.period ? ` · ${live.period}` : ''}`
+                : 'Report · 1–14 Sep 2025'}
             </span>
             <h1>Menu activity report</h1>
           </div>
@@ -429,58 +634,83 @@ export function Report({
             Why am I seeing this?
           </Btn>
         </div>
-        {why && <EvidencePanel />}
+        {live?.reportRefresh}
+        {why &&
+          (live ? (
+            <div className="ins-box" role="region" aria-label="Why am I seeing this?">
+              Only validated report measurements are shown. Missing or suppressed evidence is not a
+              measured zero.
+            </div>
+          ) : (
+            <EvidencePanel />
+          ))}
       </div>
       <section className="card" aria-labelledby="rs-h">
         <div className="row" style={{ gap: 10 }}>
           <h2 id="rs-h">Summary</h2>
-          <span className="lab good">
-            <span className="dot" />
-            Evidence checked
-          </span>
+          {!live && (
+            <span className="lab good">
+              <span className="dot" />
+              Evidence checked
+            </span>
+          )}
         </div>
-        <p className="rpt-sum">
-          During 1–14 Sep 2025, diners opened dish details <B>1,494 times</B> across <B>5 dishes</B>{' '}
-          and started <B>111 comparisons</B>. Harvest Power Bowl received the most detail views (
-          <B>412</B>); Garden Avocado Salad had the most comparison participations: <B>78</B>.
-          Sample order records exist for 3 of 5 dishes; Avocado Toast and Berry Pancake Stack have
-          none (unknown).
-        </p>
+        {live ? (
+          <p className="rpt-sum">
+            {live.reportContent
+              ? 'Report availability and dish measurements are shown below. No aggregate totals or generated recommendations are inferred.'
+              : 'Report unavailable. No validated report has been loaded for this restaurant.'}
+          </p>
+        ) : (
+          <p className="rpt-sum">
+            During 1–14 Sep 2025, diners opened dish details <B>1,494 times</B> across{' '}
+            <B>5 dishes</B> and started <B>111 comparisons</B>. Harvest Power Bowl received the most
+            detail views (<B>412</B>); Garden Avocado Salad had the most comparison participations:{' '}
+            <B>78</B>. Sample order records exist for 3 of 5 dishes; Avocado Toast and Berry Pancake
+            Stack have none (unknown).
+          </p>
+        )}
       </section>
       <section className="card" aria-labelledby="rd-h">
         <h2 id="rd-h">Dish numbers</h2>
-        <div className="scrollx">
-          <table className="tbl rpt-tbl">
-            <thead>
-              <tr>
-                <th>Dish</th>
-                <th className="r">Detail views</th>
-                <th className="r">Repeat opens</th>
-                <th className="r">Comparison participations</th>
-                <th className="r">Avg. active time</th>
-                <th className="r">Ordered items</th>
-              </tr>
-            </thead>
-            <tbody>
-              {RPT_ROWS.map((r) => (
-                <tr key={r[0]}>
-                  <td>{r[0]}</td>
-                  <td className="r num">{r[1]}</td>
-                  <td className="r num">{r[2]}</td>
-                  <td className="r num">{r[3]}</td>
-                  <td className="r num">{r[4]}</td>
-                  <td className="r">
-                    {r[5] === null ? <Lab k="unk" /> : <span className="num">{r[5]}</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="rpt-note">
-          <b>Unknown outcomes:</b> Avocado Toast and Berry Pancake Stack have no sample order
-          record, so the outcome is unknown, not zero and not rejected.
-        </p>
+        {live ? (
+          (live.reportContent ?? <div className="empty">Report unavailable</div>)
+        ) : (
+          <>
+            <div className="scrollx">
+              <table className="tbl rpt-tbl">
+                <thead>
+                  <tr>
+                    <th>Dish</th>
+                    <th className="r">Detail views</th>
+                    <th className="r">Repeat opens</th>
+                    <th className="r">Comparison participations</th>
+                    <th className="r">Avg. active time</th>
+                    <th className="r">Ordered items</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {RPT_ROWS.map((r) => (
+                    <tr key={r[0]}>
+                      <td>{r[0]}</td>
+                      <td className="r num">{r[1]}</td>
+                      <td className="r num">{r[2]}</td>
+                      <td className="r num">{r[3]}</td>
+                      <td className="r num">{r[4]}</td>
+                      <td className="r">
+                        {r[5] === null ? <Lab k="unk" /> : <span className="num">{r[5]}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="rpt-note">
+              <b>Unknown outcomes:</b> Avocado Toast and Berry Pancake Stack have no sample order
+              record, so the outcome is unknown, not zero and not rejected.
+            </p>
+          </>
+        )}
       </section>
       <section
         className={`card rpt-act${a.status === 'dismissed' ? ' dismissed' : ''}`}
@@ -490,12 +720,14 @@ export function Report({
           <h2 id="ra-h">
             <Icon n="spark" s={17} /> Suggested action
           </h2>
-          <span className={`lab ${st[1]}`}>
+          <span className={`lab ${live ? 'st' : st[1]}`}>
             <span className="dot" />
-            {st[0]}
+            {live ? 'No suggestion available' : st[0]}
           </span>
         </div>
-        {mode === 'edit' ? (
+        {live ? (
+          <p className="rpt-rec">No validated suggested action is available here.</p>
+        ) : mode === 'edit' ? (
           <div className="field">
             <label htmlFor="rep-ed">Edit the wording</label>
             <textarea id="rep-ed" value={t} onChange={(e) => setT(e.target.value)} />
@@ -847,27 +1079,17 @@ export function Perf({
     </th>
   );
   return (
-    <div className="stack">
-      <div className="pagehead">
-        <span className="eyebrow">Dish performance · {REST.period}</span>
-        <h1>What diners did with each dish</h1>
-        <p className="lede">
-          Views, time interacting and orders, labelled by how much we know. A dish that was viewed
-          but not ordered is not assumed to be rejected.
-        </p>
-      </div>
-      <section className="card" aria-labelledby="ad-h">
-        <div className="card-h">
-          <div>
-            <h3 id="ad-h">All dishes</h3>
-            <div className="sub" aria-live="polite">
-              {needle
-                ? `${sorted.length} of ${DISH.length} dishes`
-                : `${DISH.length} dishes · select a dish for details`}
-            </div>
-          </div>
-        </div>
-        <div className="scrollx dtable">
+    <PerfFrame
+      period={REST.period}
+      description="Views, time interacting and orders, labelled by how much we know. A dish that was viewed but not ordered is not assumed to be rejected."
+      summary={
+        needle
+          ? `${sorted.length} of ${DISH.length} dishes`
+          : `${DISH.length} dishes · select a dish for details`
+      }
+      table={
+        <>
+          {' '}
           <table className="tbl">
             <thead>
               <tr>
@@ -918,46 +1140,13 @@ export function Perf({
             </tbody>
           </table>
           {sorted.length === 0 && <div className="empty">No dishes match “{q.trim()}”.</div>}
-        </div>
-      </section>
-      <div className="tabs" role="group" aria-label="Metric" style={{ margin: 0 }}>
-        {TABS.map(([k, l]) => (
-          <button type="button" key={k} aria-pressed={tab === k} onClick={() => setTab(k)}>
-            {l}
-          </button>
-        ))}
-      </div>
-      <div className="ctlrow">
-        <div className="dsearch">
-          <Icon n="search" s={16} />
-          <label className="sr" htmlFor="dish-q">
-            Search dishes
-          </label>
-          <input
-            id="dish-q"
-            type="search"
-            placeholder="Search dishes…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setQ('');
-            }}
-            autoComplete="off"
-          />
-          {q && (
-            <button
-              type="button"
-              className="dclear"
-              aria-label="Clear search"
-              onClick={() => {
-                setQ('');
-                document.getElementById('dish-q')?.focus();
-              }}
-            >
-              <Icon n="x" s={15} />
-            </button>
-          )}
-        </div>
+        </>
+      }
+      q={q}
+      setQ={setQ}
+      tab={tab}
+      setTab={setTab}
+      action={
         <Btn
           kind="primary"
           size="md"
@@ -973,9 +1162,9 @@ export function Perf({
         >
           Ask AI about this dish
         </Btn>
-      </div>
-      {body}
-    </div>
+      }
+      body={body}
+    />
   );
 }
 
@@ -1159,18 +1348,31 @@ export function Actions({
   editDish,
   sim,
   openInsight,
+  live,
 }: {
   acts: Acts;
   setAct: SetAct;
   editDish: (id: string, from?: string) => void;
   sim: { scn: Scenario };
   openInsight: (id: string) => void;
+  live?: LiveDashboardInput & {
+    actions?: readonly LiveSavedAction[];
+    actionsStatus?: 'loading' | 'unavailable' | 'ready';
+  };
 }) {
-  const list = INSIGHTS.map((i) => ({
-    i,
-    a: acts[i.id] || ({ status: 'suggested', text: i.action } as ActionState),
-  }));
+  const list = live
+    ? (live.actions ?? []).map((action) => ({
+        i: { id: action.id, title: action.title, dish: '' },
+        a: { status: action.status, text: action.text } as ActionState,
+      }))
+    : INSIGHTS.map((i) => ({
+        i,
+        a: acts[i.id] || ({ status: 'suggested', text: i.action } as ActionState),
+      }));
   const lbl: Record<string, string> = {
+    approved: 'Approved',
+    active: 'Active',
+    archived: 'Archived',
     suggested: 'Not reviewed',
     planned: 'Planned',
     done: 'Done · owner-reported',
@@ -1179,19 +1381,30 @@ export function Actions({
   return (
     <div className="stack">
       <div className="pagehead">
-        <span className="eyebrow">Actions</span>
+        <span className="eyebrow">Actions{live ? ` · ${live.restaurantName}` : ''}</span>
         <h1>What you decided to do</h1>
         <p className="lede">
           Approving an action means you plan to do it. It is not proof the action was done, and
           nothing is sent to diners.
         </p>
       </div>
-      {sim.scn === 'C' && (
+      {!live && sim.scn === 'C' && (
         <Note kind="warn" icon="warn">
           This week’s suggestions are on hold because the evidence check did not pass.
         </Note>
       )}
       <div className="stack">
+        {live && list.length === 0 && (
+          <section className="card">
+            <div className="empty">
+              {live.actionsStatus === 'loading'
+                ? 'Loading saved actions…'
+                : live.actionsStatus === 'unavailable'
+                  ? 'Saved actions unavailable. No action records could be loaded.'
+                  : 'No saved actions are available for this restaurant.'}
+            </div>
+          </section>
+        )}
         {list.map(({ i, a }) => (
           <section key={i.id} className="card">
             <div className="card-h">
@@ -1205,47 +1418,49 @@ export function Actions({
                 {lbl[a.status]}
               </span>
             </div>
-            <div className="row">
-              {a.status === 'suggested' && (
-                <Btn kind="primary" size="md" type="button" onClick={() => openInsight(i.id)}>
-                  Review in report
-                </Btn>
-              )}
-              <Btn kind="outlined" size="md" type="button" onClick={() => openInsight(i.id)}>
-                Open insight
-              </Btn>
-              {a.status === 'planned' && (
-                <>
-                  <Btn
-                    kind="primary"
-                    size="md"
-                    type="button"
-                    onClick={() => setAct(i.id, { ...a, status: 'done', date: 'Oct 11, 2026' })}
-                  >
-                    Log as done
+            {!live && (
+              <div className="row">
+                {a.status === 'suggested' && (
+                  <Btn kind="primary" size="md" type="button" onClick={() => openInsight(i.id)}>
+                    Review in report
                   </Btn>
+                )}
+                <Btn kind="outlined" size="md" type="button" onClick={() => openInsight(i.id)}>
+                  Open insight
+                </Btn>
+                {a.status === 'planned' && (
+                  <>
+                    <Btn
+                      kind="primary"
+                      size="md"
+                      type="button"
+                      onClick={() => setAct(i.id, { ...a, status: 'done', date: 'Oct 11, 2026' })}
+                    >
+                      Log as done
+                    </Btn>
+                    <Btn
+                      kind="outlined"
+                      size="md"
+                      type="button"
+                      onClick={() => editDish(i.dish, i.id)}
+                    >
+                      Edit this dish
+                    </Btn>
+                  </>
+                )}
+                {a.status === 'done' && <span className="muted">Logged {a.date}</span>}
+                {(a.status === 'planned' || a.status === 'done' || a.status === 'dismissed') && (
                   <Btn
                     kind="outlined"
                     size="md"
                     type="button"
-                    onClick={() => editDish(i.dish, i.id)}
+                    onClick={() => setAct(i.id, { ...a, status: 'suggested' })}
                   >
-                    Edit this dish
+                    Reset
                   </Btn>
-                </>
-              )}
-              {a.status === 'done' && <span className="muted">Logged {a.date}</span>}
-              {(a.status === 'planned' || a.status === 'done' || a.status === 'dismissed') && (
-                <Btn
-                  kind="outlined"
-                  size="md"
-                  type="button"
-                  onClick={() => setAct(i.id, { ...a, status: 'suggested' })}
-                >
-                  Reset
-                </Btn>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </section>
         ))}
       </div>
@@ -1265,5 +1480,274 @@ export function Actions({
         </p>
       </section>
     </div>
+  );
+}
+
+function PerfFrame({
+  period,
+  description,
+  summary,
+  table,
+  notice,
+  headerAction,
+  q,
+  setQ,
+  tab,
+  setTab,
+  tabs = TABS,
+  action,
+  body,
+}: {
+  period: string;
+  description: ReactNode;
+  summary: ReactNode;
+  table: ReactNode;
+  notice?: ReactNode;
+  headerAction?: ReactNode;
+  q: string;
+  setQ: (value: string) => void;
+  tab: string;
+  setTab: (value: string) => void;
+  tabs?: ReadonlyArray<readonly [string, string]>;
+  action?: ReactNode;
+  body: ReactNode;
+}) {
+  return (
+    <div className="performance-page stack">
+      <div className="pagehead">
+        <span className="eyebrow">Dish performance · {period}</span>
+        <h1>What diners did with each dish</h1>
+        <p className="lede">{description}</p>
+        {headerAction}
+      </div>
+      {notice}
+      <section className="card" aria-labelledby="ad-h">
+        <div className="card-h">
+          <div>
+            <h2 id="ad-h">All dishes</h2>
+            <div className="sub" aria-live="polite">
+              {summary}
+            </div>
+          </div>
+        </div>
+        <div className="scrollx dtable">{table}</div>
+      </section>
+      <div className="tabs" role="group" aria-label="Metric" style={{ margin: 0 }}>
+        {tabs.map(([k, l]) => (
+          <button type="button" key={k} aria-pressed={tab === k} onClick={() => setTab(k)}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="ctlrow">
+        <div className="dsearch">
+          <Icon n="search" s={16} />
+          <label className="sr" htmlFor="dish-q">
+            Search dishes
+          </label>
+          <input
+            id="dish-q"
+            type="search"
+            placeholder="Search dishes…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setQ('');
+            }}
+            autoComplete="off"
+          />
+          {q && (
+            <button
+              type="button"
+              className="dclear"
+              aria-label="Clear search"
+              onClick={() => {
+                setQ('');
+                document.getElementById('dish-q')?.focus();
+              }}
+            >
+              <Icon n="x" s={15} />
+            </button>
+          )}
+        </div>
+        {action}
+      </div>
+      {body}
+    </div>
+  );
+}
+
+export function LivePerf({
+  report,
+  period,
+  summary,
+  notice,
+  headerAction,
+  columns,
+  display,
+  savedMenu = [],
+}: {
+  report: OwnerDishReport;
+  period: string;
+  summary: ReactNode;
+  notice: ReactNode;
+  headerAction?: ReactNode;
+  columns: [
+    keyof OwnerDishReport['dishes'][number]['metrics'],
+    string,
+    'count' | 'seconds' | 'rate',
+  ][];
+  display: (
+    cell: OwnerDishReport['dishes'][number]['metrics']['open_rate'],
+    kind: 'count' | 'seconds' | 'rate',
+  ) => ReactNode;
+  savedMenu?: readonly Pick<LiveMenuRow, 'id' | 'name'>[];
+}) {
+  const [q, setQ] = useState('');
+  const [tab, setTab] = useState('open_rate');
+  const batch =
+    report.source === 'production' &&
+    report.report_metadata.calculation_version === 'production.batch.v1';
+  type Dish = OwnerDishReport['dishes'][number];
+  type Metric = keyof Dish['metrics'] | keyof NonNullable<Dish['display_actions']>;
+  const metrics: [Metric, string, 'count' | 'seconds' | 'rate'][] = batch
+    ? [
+        ...columns,
+        ['portion_previews_shown', '2.5D previews', 'count'],
+        ['comparisons_started', 'Comparisons started', 'count'],
+      ]
+    : columns;
+  const search = q.trim().toLowerCase();
+  const dishes = report.dishes.filter((d) => d.name.toLowerCase().includes(search));
+  const menuMatches = savedMenu.filter((dish) => dish.name.toLowerCase().includes(search));
+  const column = metrics.find(([key]) => key === tab) ?? metrics[0];
+  const metricCopy: Record<Metric, string> = {
+    active_sessions: 'Sessions with an eligible dish card exposure.',
+    open_rate: 'Share of exposed visits that opened this dish.',
+    avg_interaction_time_seconds: 'Average active seconds from completed timed openings.',
+    timing_coverage: 'Share of dish openings with usable timing.',
+    save_rate: 'Share of exposed visits that directly saved this dish.',
+    engagement_rate: 'Share of eligible opening sessions that engaged with this dish.',
+    portion_previews_shown:
+      'Actual 2.5D previews that rendered; photo and camera fallbacks are excluded.',
+    comparisons_started:
+      'Rendered comparison starts involving this dish. Replacing a dish keeps the same comparison.',
+  };
+  const missing = { value: null, status: 'MISSING' } as const;
+  const cellFor = (dish: Dish, key: Metric) =>
+    key === 'portion_previews_shown' || key === 'comparisons_started'
+      ? (dish.display_actions?.[key] ?? missing)
+      : dish.metrics[key];
+  const body =
+    column && dishes.length ? (
+      <ChartCard
+        title={column[1]}
+        sub={metricCopy[column[0]]}
+        head={['Dish', column[1]]}
+        rows={dishes.map((d) => [d.name, display(cellFor(d, column[0]), column[2])])}
+      >
+        <HBars
+          legend={false}
+          max={
+            column[2] === 'rate'
+              ? 1
+              : Math.max(1, ...dishes.map((d) => cellFor(d, column[0]).value ?? 0))
+          }
+          segs={[{ name: column[1], color: 'var(--pp-color-orange-600)' }]}
+          rows={dishes.map((d) => {
+            const cell = cellFor(d, column[0]);
+            const visible = cell.status === 'NORMAL' || cell.status === 'VALID_ZERO';
+            return {
+              id: d.dish_id,
+              label: d.name,
+              vals: visible && cell.value !== null ? [cell.value] : [],
+              text: display(cell, column[2]),
+              ...(!visible ? { none: display(cell, column[2]) as string } : {}),
+            };
+          })}
+        />
+      </ChartCard>
+    ) : (
+      <section className="card">
+        <div className="card-h">
+          <h3>{column?.[1] ?? 'Dish measurements'}</h3>
+        </div>
+        <div className="empty">
+          {report.dishes.length
+            ? 'No dishes match your search.'
+            : batch
+              ? 'Dish metrics appear when enough eligible visits are recorded in a completed batch.'
+              : 'Measurements are unavailable for this report period.'}
+        </div>
+      </section>
+    );
+  return (
+    <PerfFrame
+      period={period}
+      description="Review visits, open rates and engagement by dish. Verified orders need linked order records."
+      summary={
+        <>
+          {report.dishes.length
+            ? `${dishes.length} of ${report.dishes.length} reporting dishes · `
+            : ''}
+          {summary}
+        </>
+      }
+      notice={notice}
+      headerAction={headerAction}
+      q={q}
+      setQ={setQ}
+      tab={tab}
+      setTab={setTab}
+      tabs={metrics.map(([key, label]) => [key, label])}
+      body={body}
+      table={
+        <>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Dish</th>
+                {columns.map(([key, label]) => (
+                  <th key={key} className="r">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dishes.map((d) => (
+                <tr key={d.dish_id}>
+                  <td>
+                    <b>{d.name}</b>
+                  </td>
+                  {columns.map(([key, , kind]) => (
+                    <td key={key} className="r num">
+                      {display(d.metrics[key] ?? missing, kind)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!report.dishes.length && menuMatches.length > 0 && (
+            <div className="empty">
+              <p>Saved menu</p>
+              <ul>
+                {menuMatches.map(({ id, name }) => (
+                  <li key={id}>{name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {dishes.length === 0 && (report.dishes.length > 0 || menuMatches.length === 0) && (
+            <div className="empty">
+              {report.dishes.length || savedMenu.length
+                ? 'No dishes match your search.'
+                : 'Numbers will appear here once measurable report data is available.'}
+            </div>
+          )}
+        </>
+      }
+    />
   );
 }

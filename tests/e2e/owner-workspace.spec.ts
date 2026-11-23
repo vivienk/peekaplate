@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
-import type { RestaurantProfile } from '@peekaplate/contracts';
+import type { OwnerDishFields, RestaurantProfile } from '@peekaplate/contracts';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
 import type { DishDraft, MenuJob } from '../../frontend/console/src/owner-menu/api';
 import { JOB, reviewSession } from '../../frontend/console/src/owner-menu/fixtures.test-helpers';
+import { OwnerDishReportSchema } from '../../packages/contracts/src/owner-report';
 
 const origin = 'http://127.0.0.1:5174';
 // Narrow main releases omit preview-only demo entries; runtime journeys still always run.
@@ -61,7 +62,10 @@ function claims(authorization: string | undefined): { sub?: string; version?: nu
   }
 }
 
-async function fixture(context: BrowserContext) {
+const reportReference = (actor: string, venueId: string) =>
+  `synthetic-report-reference.${actor}.${venueId}`;
+
+async function fixture(context: BrowserContext, reportReady = false) {
   const state = {
     venues: [venue],
     reportStatus: 200,
@@ -108,13 +112,59 @@ async function fixture(context: BrowserContext) {
     delayReport: false,
     releaseReport: () => {},
     apiCalls: [] as Array<{ path: string; actor: string; version: number }>,
-    analyses: [] as Array<{ venueId: string; actor: string; body: unknown }>,
+    analyses: [] as Array<{ venueId: string; actor: string; body: unknown; reference?: string }>,
     analysisStatus: 200,
     delayAnalysis: false,
     releaseAnalysis: () => {},
     // The analysis snapshot period; by default the same as the report on screen (UNEEZA_REPORT).
     analysisWindow: { start: '2026-10-19T07:00:00Z', end: '2026-10-20T07:00:00Z' },
   };
+  // Reporting journeys start with saved, verified dishes. Empty/unverified setup tests keep
+  // the default fixture; verification does not imply approval or publication.
+  if (reportReady) {
+    for (const restaurant of [venue, otherVenue]) {
+      const id = crypto.randomUUID();
+      const photoId = crypto.randomUUID();
+      state.photos.set(
+        photoId,
+        Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+          'base64',
+        ),
+      );
+      state.drafts[restaurant.venueId] = [
+        {
+          id,
+          draft_id: id,
+          job_id: null,
+          origin: 'manual',
+          draft_version: 1,
+          name: 'Fictional Lentil Soup',
+          category: 'Soup',
+          description: 'Slow cooked lentil soup with herbs.',
+          price_amount: '9.50',
+          price_currency: 'USD',
+          ingredients: ['lentils'],
+          source_text: null,
+          review_warnings: [],
+          review_status: 'pending',
+          verification_status: 'verified',
+          manual_fields: {
+            name: 'Fictional Lentil Soup',
+            category: 'Soup',
+            description: 'Slow cooked lentil soup with herbs.',
+            priceAmount: '9.50',
+            priceCurrency: 'USD',
+            servingSize: '1 bowl',
+            servingCount: 1,
+            ingredients: { status: 'confirmed', items: ['lentils'] },
+            allergens: { status: 'confirmed', items: [] },
+            photoId,
+          },
+        },
+      ];
+    }
+  }
   await context.route('https://auth-fixture.supabase.co/auth/v1/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.split('/').at(-1);
@@ -165,7 +215,12 @@ async function fixture(context: BrowserContext) {
     const analysis = url.pathname.match(/^\/api\/v1\/venues\/([0-9a-f-]{36})\/ai\/analysis$/);
     if (analysis && request.method() === 'POST') {
       const body = request.postDataJSON();
-      state.analyses.push({ venueId: analysis[1] ?? '', actor, body });
+      state.analyses.push({
+        venueId: analysis[1] ?? '',
+        actor,
+        body,
+        reference: request.headers()['x-owner-report-ref'],
+      });
       if (state.analysisStatus !== 200)
         return route.fulfill({
           status: state.analysisStatus,
@@ -537,7 +592,11 @@ async function fixture(context: BrowserContext) {
           state.reportStatus === 200
             ? { ...UNEEZA_REPORT, venue_id: url.pathname.split('/')[4] }
             : { error: 'synthetic_denial' },
-        headers: { 'Access-Control-Allow-Origin': origin },
+        headers: {
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Expose-Headers': 'X-Owner-Report-Ref',
+          'X-Owner-Report-Ref': reportReference(actor, url.pathname.split('/')[4]!),
+        },
       });
     }
   });
@@ -557,8 +616,8 @@ async function acknowledgeDish(page: Page) {
 
 // Fill the additional fields required by the authored S09, without replacing values under test.
 async function completeRequiredDish(page: Page) {
-  const serving = page.getByRole('textbox', { name: /^Serving Size/ });
-  if (!(await serving.inputValue())) await serving.fill('1 bowl');
+  const serving = page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true });
+  if (!(await serving.inputValue())) await serving.fill('1');
   const price = page.getByRole('textbox', { name: /^Price/ });
   if (!(await price.inputValue())) await price.fill('9.50');
   const category = page.getByRole('combobox', { name: 'Category' });
@@ -590,6 +649,27 @@ async function signIn(page: Page, email = 'owner@example.test', openMenu = true)
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
   }
 }
+
+test('staging workspace does not resume a production deep link after sign-in', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await page.goto(`${origin}/dish-performance`);
+  await expect(page.getByLabel('Email address')).toBeVisible();
+  await expect(page).toHaveURL(`${origin}/dish-performance`);
+  await page.getByLabel('Email address').fill('owner@example.test');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(
+    page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', {
+      name: 'Restaurant Setup',
+    }),
+  ).toHaveAttribute('aria-current', 'page');
+  await expect(page).toHaveURL(`${origin}/dish-performance`);
+  expect(state.apiCalls.some((call) => call.path.endsWith('/analytics/dishes'))).toBe(false);
+});
 
 async function addCategory(page: Page, category: string) {
   await page.getByRole('combobox', { name: 'Category' }).click();
@@ -671,7 +751,11 @@ async function preparedPublication(context: BrowserContext, privatePhotos = fals
     previewPhotoReads: 0,
     previewPhotoAuth: [] as string[],
     publicPhotoReads: 0,
-    prepareFailure: false as false | 'unavailable' | 'menu_not_verified',
+    prepareFailure: false as false | 'unavailable' | 'menu_not_verified' | 'not_found',
+    historicalFirst: false,
+    preparedMatch: 'exact' as 'exact' | 'missing' | 'ambiguous',
+    previewRequests: [] as string[],
+    preparedMenu: menu,
   };
   const headers = { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*' };
   await context.route('**/venues/*/prepared-menus**', async (route) => {
@@ -707,7 +791,12 @@ async function preparedPublication(context: BrowserContext, privatePhotos = fals
       state.prepares += 1;
       return state.prepareFailure
         ? route.fulfill({
-            status: state.prepareFailure === 'menu_not_verified' ? 409 : 503,
+            status:
+              state.prepareFailure === 'menu_not_verified'
+                ? 409
+                : state.prepareFailure === 'not_found'
+                  ? 404
+                  : 503,
             json: { error: state.prepareFailure },
             headers,
           })
@@ -727,10 +816,41 @@ async function preparedPublication(context: BrowserContext, privatePhotos = fals
       publicationVersion: state.publicationVersion,
       publishedRevisionId: state.publicationVersion ? menu.menuRevisionId : null,
     };
+    const historical = {
+      ...menu,
+      menuRevisionId: id(8),
+      publishedRevisionId: id(8),
+      publicationVersion: 1,
+    };
+    const menus =
+      state.preparedMatch === 'missing'
+        ? [historical]
+        : state.preparedMatch === 'ambiguous'
+          ? [liveMenu, { ...liveMenu }]
+          : state.historicalFirst
+            ? [historical, liveMenu]
+            : [liveMenu];
+    if (!new URL(route.request().url()).pathname.endsWith('prepared-menus')) {
+      const path = new URL(route.request().url()).pathname;
+      state.previewRequests.push(path);
+      const selected = menus.find((item) =>
+        path.endsWith(`/${item.menuId}/${item.menuRevisionId}`),
+      );
+      if (!selected) return route.fulfill({ status: 404, json: { error: 'not_found' }, headers });
+      return route.fulfill({
+        json: {
+          menu: selected,
+          content: {
+            ...content,
+            menu_id: selected.menuId,
+            menu_revision_id: selected.menuRevisionId,
+          },
+        },
+        headers,
+      });
+    }
     return route.fulfill({
-      json: new URL(route.request().url()).pathname.endsWith('prepared-menus')
-        ? { menus: [liveMenu] }
-        : { menu: liveMenu, content },
+      json: { menus },
       headers,
     });
   });
@@ -826,7 +946,7 @@ test('private prepared photos use owner-authenticated blobs and are revoked on l
   });
   await signIn(page);
   await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
-  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
   const image = page.getByRole('img', { name: 'Labelled synthetic test image' });
   await expect(image).toBeVisible();
   const blob = await image.getAttribute('src');
@@ -857,7 +977,9 @@ for (const width of [1440, 390]) {
     const state = await preparedPublication(context);
     await signIn(page);
     await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
-    await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Preview your menu', exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Synthetic Garden Soup' })).toBeVisible();
     await expect(
       page.getByText('Fictional soup used only for testing.', { exact: true }),
@@ -904,9 +1026,50 @@ for (const width of [1440, 390]) {
     await expect(page.getByRole('heading', { name: 'Your menu is live' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await page.getByRole('button', { name: 'Review and publish' }).click();
-    await page.getByRole('button', { name: /Preview prepared menu 1/ }).click();
     await expect(page.getByRole('heading', { name: 'Your menu is live' })).toBeVisible();
     expect(state.publishes).toHaveLength(1);
+  });
+}
+
+test('preparation opens its exact snapshot after an older published entry without a chooser or publication', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  const state = await preparedPublication(context);
+  state.historicalFirst = true;
+  await signIn(page);
+  await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
+  const draftMenu = page.getByRole('region', { name: 'Draft diner menu' });
+  await expect(draftMenu.getByRole('heading', { name: 'Synthetic Garden Soup' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Preview prepared menu/ })).toHaveCount(0);
+  expect(state.previewRequests).toEqual([
+    `/venues/${venue.venueId}/prepared-menus/${state.preparedMenu.menuId}/${state.preparedMenu.menuRevisionId}`,
+  ]);
+  expect(state.prepares).toBe(1);
+  expect(state.approvals).toEqual([]);
+  expect(state.publishes).toEqual([]);
+});
+
+for (const outcome of ['not_found', 'missing', 'ambiguous'] as const) {
+  test(`preparation preserves explicit selection when its result is ${outcome}`, async ({
+    context,
+    page,
+  }) => {
+    await fixture(context);
+    const state = await preparedPublication(context);
+    if (outcome === 'not_found') state.prepareFailure = outcome;
+    else state.preparedMatch = outcome;
+    await signIn(page);
+    await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
+    await expect(page.getByRole('list', { name: 'Prepared menus' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Preview prepared menu/ }).first()).toBeVisible();
+    await expect(page.locator('.pp-menu-preview__phone')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toHaveCount(0);
+    expect(state.previewRequests).toEqual([]);
+    expect(state.approvals).toEqual([]);
+    expect(state.publishes).toEqual([]);
   });
 }
 
@@ -919,7 +1082,7 @@ test('prepared publication retries the same command and a failed link read never
   state.approvalTimeout = true;
   await signIn(page);
   await page.getByRole('button', { name: 'Review and publish' }).click();
-  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
   await expect(page.getByRole('alert')).toContainText('We couldn’t publish your menu');
@@ -943,7 +1106,7 @@ test('prepared publication conflict requires a fresh preview and denied access c
   state.conflict = true;
   await signIn(page);
   await page.getByRole('button', { name: 'Review and publish' }).click();
-  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Publish Menu', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Publish Menu' }).click();
   await expect(
@@ -1015,7 +1178,7 @@ test('menu typography and locked-page copy keep the authored live boundary', asy
     '28px',
   );
   await expect(page.locator('.owner-nav-hint')).toHaveText(
-    'Some screens are not connected in this workspace yet.',
+    'Verify every saved dish to open the dashboard. Publication remains a separate step.',
   );
   state.venues = [{ ...venue, permission: 'editor' }];
   await openAccount(page);
@@ -1025,6 +1188,114 @@ test('menu typography and locked-page copy keep the authored live boundary', asy
     'true',
   );
   await expect(page.locator('.owner-nav-hint')).not.toContainText('after you publish');
+});
+
+test('live image source previews decode and release their blobs on replace, remove and sign-out', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  await page.addInitScript(() => {
+    const original = URL.revokeObjectURL.bind(URL);
+    (window as unknown as { revokedSourceUrls: string[] }).revokedSourceUrls = [];
+    URL.revokeObjectURL = (url) => {
+      (window as unknown as { revokedSourceUrls: string[] }).revokedSourceUrls.push(url);
+      original(url);
+    };
+  });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByText('Upload photos/PDF', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const image = {
+    name: 'source.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  };
+  const upload = async (name: string) => {
+    await page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles({ ...image, name });
+    const preview = page.getByRole('img', { name: `Preview of ${name}`, exact: true });
+    await expect(preview).toBeVisible();
+    await expect
+      .poll(() => preview.evaluate((element) => (element as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    return (await preview.getAttribute('src'))!;
+  };
+  const revoked = (url: string) =>
+    page.evaluate(
+      (value) =>
+        (window as unknown as { revokedSourceUrls: string[] }).revokedSourceUrls.includes(value),
+      url,
+    );
+  const first = await upload('source.png');
+  expect(first).toMatch(/^blob:/);
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Replace source.png', exact: true }).click(),
+  ]);
+  await chooser.setFiles({ ...image, name: 'replacement.png' });
+  const replacement = page.getByRole('img', { name: 'Preview of replacement.png', exact: true });
+  await expect(replacement).toBeVisible();
+  await expect.poll(() => revoked(first)).toBe(true);
+  const second = (await replacement.getAttribute('src'))!;
+  await page.getByRole('button', { name: 'Remove replacement.png', exact: true }).click();
+  await expect(replacement).toHaveCount(0);
+  await expect.poll(() => revoked(second)).toBe(true);
+  const last = await upload('final.png');
+  await openAccount(page);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect.poll(() => revoked(last)).toBe(true);
+});
+
+test('leaving an image selection ignores delayed group creation', async ({ context, page }) => {
+  const state = await fixture(context);
+  let started = false;
+  let release = () => {};
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let finished = false;
+  await page.route('**/upload-groups', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    started = true;
+    await waiting;
+    await route.fallback();
+    finished = true;
+  });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByText('Upload photos/PDF', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  try {
+    await page
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles({
+        name: 'pending.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from('synthetic pending source'),
+      });
+    await expect.poll(() => started).toBe(true);
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Choose how to add your menu', exact: true }),
+    ).toBeVisible();
+  } finally {
+    release();
+  }
+  await expect.poll(() => finished).toBe(true);
+  await expect.poll(() => state.jobs[venue.venueId]?.length).toBe(1);
+  expect(state.jobs[venue.venueId]?.[0]?.source_uploaded).toBe(false);
+  await expect(page.locator('.pp-onboard-preview__image')).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Choose how to add your menu', exact: true }),
+  ).toBeVisible();
 });
 
 test('a browser file with no MIME keeps original bytes and a declared PDF upload', async ({
@@ -1164,6 +1435,14 @@ for (const width of [1440, 390]) {
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await expect(page.getByText('Queued for processing', { exact: true })).toBeVisible();
     await capture('menu-processing');
+    // The synthetic worker finishes without extracted dishes; the owner adds a manual dish next.
+    // Pending extraction must never be used to unlock reporting.
+    state.jobs[venue.venueId] = state.jobs[venue.venueId]!.map((job) => ({
+      ...job,
+      status: 'complete',
+      started_at: '2026-11-15T00:00:01Z',
+      finished_at: '2026-11-15T00:00:02Z',
+    }));
     await page.getByRole('button', { name: 'View saved dishes', exact: true }).click();
     await page.getByRole('button', { name: 'Add dish', exact: true }).click();
     await capture('dish-empty');
@@ -1178,9 +1457,13 @@ for (const width of [1440, 390]) {
       page.getByText('Draft saved. This has not approved or published your menu.'),
     ).toBeVisible();
     await capture('dish-saved');
-    await page.getByRole('button', { name: 'Save and Exit', exact: true }).click();
+    expect(state.verificationCommands).toEqual([]);
+    await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
+    await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await capture('menu-saved');
+    expect(state.apiCalls.some((call) => /publications|\/approvals$/.test(call.path))).toBe(false);
     await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
     await expect(page.getByRole('table')).toBeVisible();
     await capture('owner-report');
@@ -1437,28 +1720,31 @@ test('manual dish and original private photo survive save and reload', async ({
   expect([...state.photos.values()][0]).toEqual(original);
   expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
     allergens: { status: 'unknown', items: [] },
-    servingSize: '1 bowl',
+    servingSize: '1',
+    servingCount: 1,
   });
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Price/ })).toHaveValue('9.50');
-  await page.getByRole('spinbutton', { name: 'People served', exact: true }).fill('2');
+  await page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true }).fill('2');
   await acknowledgeDish(page);
   await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
   await expect(
     page.getByText('Draft saved. This has not approved or published your menu.'),
   ).toBeVisible();
   expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
-    servingSize: '1 bowl',
+    servingSize: '2',
     servingCount: 2,
   });
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveValue(
-    '2',
-  );
+  await expect(
+    page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true }),
+  ).toHaveValue('2');
+  // Serving size is the only portion input; there is no separate people-served count.
+  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveCount(0);
   await expect(page.getByRole('img', { name: 'Private draft dish' })).toBeVisible();
   const license = page.getByRole('checkbox', {
     name: 'I have the right to use this photo.',
@@ -1739,7 +2025,7 @@ test('real SDK sign-in opens the server restaurant shell and authenticated repor
   context,
   page,
 }, testInfo) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
   await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
@@ -1750,7 +2036,7 @@ test('real SDK sign-in opens the server restaurant shell and authenticated repor
   await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'AI Insight Report', exact: true }),
-  ).toHaveAttribute('aria-disabled', 'true');
+  ).not.toHaveAttribute('aria-disabled', 'true');
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   await expect(
     page.getByText('Synthetic test data from the report API. Not real diners.'),
@@ -1784,7 +2070,7 @@ test('multiple restaurants require selection and a switch removes the old report
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.venues = [venue, otherVenue];
   await signIn(page, undefined, false);
   await expect(page.getByRole('heading', { name: 'Choose a restaurant' })).toBeVisible();
@@ -1802,7 +2088,7 @@ test('editor access does not enable owner-only reports or publication', async ({
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.venues = [{ ...venue, permission: 'editor' }];
   await signIn(page, undefined, false);
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
@@ -1832,7 +2118,7 @@ test('report revocation refreshes membership and clears private state', async ({
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-shell')).toBeVisible();
   state.reportStatus = 403;
@@ -1846,7 +2132,7 @@ test('an expired identity removes the shell before an API request can use it', a
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-shell')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reload saved work', exact: true })).toBeVisible();
@@ -1877,7 +2163,7 @@ test('a different account signing in in another tab replaces old state and a lat
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
   state.delayReport = true;
@@ -1993,7 +2279,7 @@ test('the AI panel opens beside the live report and uses only the signed-in owne
   context,
   page,
 }, testInfo) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
   await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
@@ -2007,7 +2293,12 @@ test('the AI panel opens beside the live report and uses only the signed-in owne
   await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
   const soup = UNEEZA_REPORT.dishes.find((d) => d.name === 'Soup');
   expect(state.analyses).toEqual([
-    { venueId: venue.venueId, actor: ownerId, body: { dishId: soup?.dish_id, goal: 'menu' } },
+    {
+      venueId: venue.venueId,
+      actor: ownerId,
+      body: { dishId: soup?.dish_id, goal: 'menu' },
+      reference: reportReference(ownerId, venue.venueId),
+    },
   ]);
   const axe = await new AxeBuilder({ page }).exclude('.owner-brand__name').analyze();
   expect(axe.violations).toEqual([]);
@@ -2020,7 +2311,7 @@ test('switching restaurant clears the AI result and asks only for the new restau
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.venues = [venue, otherVenue];
   await signIn(page, undefined, false);
   await openAccount(page);
@@ -2040,7 +2331,7 @@ test('switching restaurant clears the AI result and asks only for the new restau
 });
 
 test('editor access shows no AI panel', async ({ context, page }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.venues = [{ ...venue, permission: 'editor' }];
   await signIn(page);
   await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
@@ -2048,11 +2339,38 @@ test('editor access shows no AI panel', async ({ context, page }) => {
   expect(state.analyses).toEqual([]);
 });
 
+test('the typed AI question displays its matching focus and rejects a different time window', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const question = panel.getByRole('textbox', { name: 'Ask a report question' });
+  await expect(panel.getByLabel('Review focus')).toHaveValue('menu');
+  await question.fill('How is engagement for this dish?');
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+  expect(state.analyses[0]?.body).toMatchObject({ goal: 'engagement' });
+  for (const unsupported of [
+    'How was engagement yesterday?',
+    'Show engagement on Monday',
+    'Show menu engagement on November 18',
+  ]) {
+    await question.fill(unsupported);
+    await panel.getByRole('button', { name: 'Review report' }).click();
+    await expect(panel.getByRole('alert')).toContainText('The review uses the displayed dish');
+    await expect(panel.getByRole('heading', { name: 'Suggested review' })).toHaveCount(0);
+  }
+  expect(state.analyses).toHaveLength(1);
+});
+
 test('the AI panel shows the report period and an honest error when the review fails', async ({
   context,
   page,
 }) => {
-  await fixture(context);
+  await fixture(context, true);
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
@@ -2076,7 +2394,7 @@ test('an analysis for a different period than the report on screen shows no sugg
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   // Deliberately different UTC start and end from the report on screen (Oct 19 07:00 – Oct 20 07:00).
   state.analysisWindow = { start: '2026-11-11T12:00:00Z', end: '2026-11-12T12:00:00Z' };
   await signIn(page);
@@ -2120,7 +2438,7 @@ test('analysis denial clears the private report and refreshes restaurant access'
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
@@ -2137,7 +2455,7 @@ test('the panel distinguishes its server-read analysis period from the displayed
   context,
   page,
 }) => {
-  await fixture(context);
+  await fixture(context, true);
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
@@ -2157,7 +2475,7 @@ test('a pending analysis cannot restore private output after sign-out and anothe
   context,
   page,
 }) => {
-  const state = await fixture(context);
+  const state = await fixture(context, true);
   state.delayAnalysis = true;
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
@@ -2182,7 +2500,7 @@ test('the live owner AI panel stays usable on mobile with accessible controls', 
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await fixture(context);
+  await fixture(context, true);
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
@@ -2231,6 +2549,7 @@ test('authored S10 verifies actual saved drafts without publication and preserve
         priceAmount: '9.50',
         priceCurrency: 'CAD',
         servingSize: '1 bowl',
+        servingCount: 1,
         ingredients: { status: 'confirmed', items: ['lentils'] },
         allergens: { status: 'confirmed', items: [] },
         photoId,
@@ -2253,18 +2572,19 @@ test('authored S10 verifies actual saved drafts without publication and preserve
   await expect(page.locator('.review-table')).toBeVisible();
   await expect(page.getByRole('main')).toHaveCount(1);
 
+  // The background refresh after a remove no longer locks the list (Adam's slow-delete finding):
+  // while it is still running, the next remove and Undo work straight away.
   state.delayJobs = true;
   const jobsReadsBeforeRemoval = state.jobsReads;
   await page.getByRole('button', { name: 'Remove Fictional Salad', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expect.poll(() => state.jobsReads).toBeGreaterThan(jobsReadsBeforeRemoval);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
   await expect(
     page.getByRole('button', { name: 'Remove Fictional Lentil Soup', exact: true }),
-  ).toBeDisabled();
-  await expect.poll(() => state.jobsReads).toBeGreaterThan(jobsReadsBeforeRemoval);
+  ).toBeEnabled();
   state.delayJobs = false;
   state.releaseJobs();
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Remove Fictional Salad', exact: true }),
@@ -2613,6 +2933,7 @@ test('completing verification does not prepare or approve anything', async ({ co
         priceAmount: '9.50',
         priceCurrency: 'CAD',
         servingSize: '1 bowl',
+        servingCount: 1,
         ingredients: { status: 'confirmed', items: ['lentils'] },
         allergens: { status: 'confirmed', items: [] },
         photoId: crypto.randomUUID(),
@@ -2659,9 +2980,266 @@ test('Review and publish prepares the menu, shows a failure and retries with Pre
   // Preparing approved and published nothing: S13 still needs the explicit Publish.
   expect(state.approvals).toEqual([]);
   expect(state.publishes).toEqual([]);
-  await page.getByRole('button', { name: 'Preview prepared menu 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Preview your menu', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish Menu', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Preview prepared menu/ })).toHaveCount(0);
   expect(state.publishes).toEqual([]);
+});
+
+test('retries failed 2.5D generation for an unchanged saved photo without duplicate requests', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const id = crypto.randomUUID();
+  const photoId = crypto.randomUUID();
+  const image = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  state.photos.set(photoId, image);
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: null,
+      origin: 'manual',
+      draft_version: 2,
+      name: 'Fictional Lentil Soup',
+      category: 'Soup',
+      description: 'Slow cooked lentil soup with herbs.',
+      price_amount: '9.50',
+      price_currency: 'CAD',
+      ingredients: ['lentils'],
+      source_text: null,
+      review_warnings: [],
+      review_status: 'pending',
+      verification_status: 'not_verified',
+      manual_fields: {
+        name: 'Fictional Lentil Soup',
+        category: 'Soup',
+        description: 'Slow cooked lentil soup with herbs.',
+        priceAmount: '9.50',
+        priceCurrency: 'CAD',
+        servingSize: '1 bowl',
+        servingCount: 1,
+        ingredients: { status: 'confirmed', items: ['lentils'] },
+        allergens: { status: 'confirmed', items: [] },
+        photoId,
+      },
+    },
+  ];
+  let generations = 0;
+  const headers = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+  await context.route(
+    `${api}/venues/${venue.venueId}/drafts/${id}/photos/${photoId}/portion**`,
+    async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+      if (new URL(route.request().url()).pathname.endsWith('/image'))
+        return route.fulfill({ body: image, contentType: 'image/webp', headers });
+      generations++;
+      return route.fulfill({
+        json: {
+          portionReview: {
+            status: generations === 1 ? 'failed' : 'needs_review',
+            dish_id: id,
+            draft_revision_id: photoId,
+            approved: false,
+          },
+        },
+        headers,
+      });
+    },
+  );
+  await signIn(page);
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(
+    page.getByText(
+      '2.5D processing failed. Please try another photo. The original photo is retained.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole('progressbar', { name: '2.5D preview processing' })).toBeVisible();
+  expect(generations).toBe(1);
+  await page.getByRole('button', { name: 'Save photo and generate 2.5D', exact: true }).click();
+  await expect(
+    page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup' }),
+  ).toBeVisible();
+  const portionCard = page.getByRole('region', { name: '2.5D preview', exact: true });
+  const portionImage = portionCard.getByRole('img', {
+    name: 'Review-only 2.5D preview of Fictional Lentil Soup',
+  });
+  await expect(portionImage).toBeVisible();
+  const imageBounds = await portionImage.boundingBox();
+  expect(imageBounds?.height).toBeGreaterThan(0);
+  expect(imageBounds?.height).toBeLessThanOrEqual(120);
+  expect(generations).toBe(2);
+  await page.getByRole('textbox', { name: /^Dish name/ }).fill('Fictional Lentil Soup updated');
+  await expect(
+    page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup updated' }),
+  ).toBeVisible();
+  expect(generations).toBe(2);
+});
+
+test('Screen 9 people count stays separate from a saved 28 cm plate and clears confirmation on edits', async ({
+  context,
+  page,
+}, testInfo) => {
+  const state = await fixture(context, true);
+  const draft = state.drafts[venue.venueId]![0]!;
+  const fields = draft.manual_fields as OwnerDishFields;
+  const photoId = fields.photoId!;
+  fields.servingSize = '1';
+  fields.servingCount = 1;
+  const original = Buffer.from(
+    await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 640;
+      const drawing = canvas.getContext('2d')!;
+      drawing.fillStyle = '#eee9de';
+      drawing.fillRect(0, 0, 640, 640);
+      drawing.beginPath();
+      drawing.arc(320, 320, 256, 0, Math.PI * 2);
+      drawing.fillStyle = '#fffdf7';
+      drawing.fill();
+      drawing.strokeStyle = '#8c8170';
+      drawing.lineWidth = 4;
+      drawing.stroke();
+      drawing.fillStyle = '#5b5143';
+      drawing.font = '24px sans-serif';
+      drawing.textAlign = 'center';
+      drawing.fillText('SYNTHETIC PLATE', 320, 330);
+      return canvas.toDataURL('image/png').split(',')[1]!;
+    }),
+    'base64',
+  );
+  state.photos.set(photoId, original);
+  const headers = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+  await context.route(
+    `${api}/venues/${venue.venueId}/drafts/${draft.id}/photos/${photoId}/portion**`,
+    (route) =>
+      route.request().method() === 'OPTIONS'
+        ? route.fulfill({ status: 204, headers })
+        : route.fulfill({
+            json: {
+              portionReview: {
+                status: 'failed',
+                dish_id: draft.id,
+                draft_revision_id: photoId,
+                approved: false,
+              },
+            },
+            headers,
+          }),
+  );
+  await signIn(page);
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  const people = page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true });
+  const plate = page.getByRole('textbox', { name: 'Plate size (cm)', exact: true });
+  const confirm = page.getByRole('checkbox', {
+    name: 'I measured this plate and matched its boundary to this photo.',
+    exact: true,
+  });
+  await expect(people).toHaveValue('1');
+  await expect(page.getByRole('spinbutton', { name: 'People served', exact: true })).toHaveCount(0);
+  await expect(plate).toHaveValue('');
+  await expect(confirm).toBeDisabled();
+  await plate.fill('28');
+  await expect(confirm).toBeEnabled();
+  await expect(confirm).not.toBeChecked();
+  await confirm.check();
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  expect(state.drafts[venue.venueId]![0]!.manual_fields).toMatchObject({
+    servingSize: '1',
+    servingCount: 1,
+    portionCalibration: {
+      shape: 'round',
+      width_mm: 280,
+      depth_mm: 280,
+      source_sha256: createHash('sha256').update(original).digest('hex'),
+      source_width_px: 640,
+      source_height_px: 640,
+      boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+      confirmed: true,
+    },
+  });
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(people).toHaveValue('1');
+  await expect(plate).toHaveValue('28');
+  await expect(confirm).toBeChecked();
+  await page.screenshot({ path: testInfo.outputPath('serving-size-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
+  await page.screenshot({ path: testInfo.outputPath('serving-size-mobile.png'), fullPage: true });
+
+  await test.step('Reject a fractional people count without saving the draft', async () => {
+    const savedVersion = state.drafts[venue.venueId]![0]!.draft_version;
+    await people.fill('1.5');
+    await acknowledgeDish(page);
+    await expect(
+      page.getByRole('button', { name: 'Continue to review', exact: true }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    // Continue is aria-disabled for invalid fields. Enter still exercises form validation;
+    // locator.click() would wait for the button to become enabled until the test times out.
+    await people.press('Enter');
+    await expect(page.getByText('Enter a whole number of people from 1 to 100')).toBeVisible();
+    expect(state.drafts[venue.venueId]![0]!.draft_version).toBe(savedVersion);
+  });
+  await people.fill('2');
+  await expect(plate).toHaveValue('28');
+  await expect(confirm).not.toBeChecked();
+  await confirm.check();
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  expect(state.drafts[venue.venueId]![0]!.manual_fields).toMatchObject({
+    servingSize: '2',
+    servingCount: 2,
+    portionCalibration: { width_mm: 280, depth_mm: 280 },
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(people).toHaveValue('2');
+  await expect(plate).toHaveValue('28');
+  await expect(confirm).toBeChecked();
+  await plate.fill('30 × 20 cm');
+  await expect(confirm).not.toBeChecked();
+  await expect(confirm).toBeEnabled();
+  await confirm.check();
+  const left = page.getByRole('spinbutton', { name: 'Plate boundary left (%)', exact: true });
+  await left.fill('95');
+  await expect(confirm).not.toBeChecked();
+  await expect(confirm).toBeDisabled();
+  await expect(page.getByText(/Keep the whole boundary inside the photo/)).toBeVisible();
+  await left.fill('10');
+  await confirm.check();
+  await page.getByLabel('Dish photo', { exact: true }).setInputFiles({
+    name: 'replacement-synthetic.png',
+    mimeType: 'image/png',
+    buffer: original,
+  });
+  await expect(confirm).not.toBeChecked();
+  await expect(confirm).toBeDisabled();
+  await expect(
+    page.getByText('Save the new photo before confirming its measurements.'),
+  ).toBeVisible();
 });
 
 test('a dish approved by an earlier preparation can still be edited (Back/Edit)', async ({
@@ -2694,6 +3272,7 @@ test('a dish approved by an earlier preparation can still be edited (Back/Edit)'
         priceAmount: '9.50',
         priceCurrency: 'CAD',
         servingSize: '1 bowl',
+        servingCount: 1,
         ingredients: { status: 'confirmed', items: ['lentils'] },
         allergens: { status: 'confirmed', items: [] },
         photoId: null,
@@ -2706,4 +3285,378 @@ test('a dish approved by an earlier preparation can still be edited (Back/Edit)'
   await expect(edit).toBeEnabled();
   await edit.click();
   await expect(page.getByRole('heading', { name: 'Edit dish' })).toBeVisible();
+});
+
+test('Overview uses validated KPI cards and clears their values across restaurant and session changes', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  state.venues = [venue, otherVenue];
+  const missing = { value: null, status: 'MISSING' };
+  const current = {
+    menu_sessions: { value: 31, status: 'NORMAL' },
+    dish_opens: { value: 42, status: 'NORMAL' },
+    avg_interaction_time_seconds: { value: 0, status: 'VALID_ZERO' },
+    portion_previews_shown: missing,
+    verified_orders: missing,
+  };
+  const summary = {
+    periods: {
+      current: { start_time: '2026-10-19T07:00:00.000Z', end_time: '2026-10-20T07:00:00.000Z' },
+      baseline: { start_time: '2026-10-18T07:00:00.000Z', end_time: '2026-10-19T07:00:00.000Z' },
+    },
+    current,
+    baseline: {
+      ...current,
+      menu_sessions: { value: 20, status: 'NORMAL' },
+      avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+    },
+  };
+  let venueMetric = 31;
+  let delayVenue = false;
+  let firstRequests = 0;
+  const releaseLate = Promise.withResolvers<void>();
+  const finishedLate = Promise.withResolvers<void>();
+  const secondStarted = Promise.withResolvers<void>();
+  const releaseSecond = Promise.withResolvers<void>();
+  await context.route(`${api}/api/v1/venues/*/analytics/dishes*`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const id = new URL(route.request().url()).pathname.split('/')[4];
+    const reportSummary = {
+      ...summary,
+      current: { ...current, menu_sessions: { value: venueMetric, status: 'NORMAL' } },
+    };
+    const late = id === venue.venueId && delayVenue;
+    if (id === venue.venueId) firstRequests++;
+    if (late) await releaseLate.promise;
+    if (id === otherVenue.venueId) {
+      secondStarted.resolve();
+      await releaseSecond.promise;
+    }
+    try {
+      await route.fulfill({
+        json: OwnerDishReportSchema.parse({
+          ...UNEEZA_REPORT,
+          venue_id: id,
+          ...(id === venue.venueId ? { summary: reportSummary } : {}),
+        }),
+        headers: { 'Access-Control-Allow-Origin': origin },
+      });
+    } finally {
+      if (late) finishedLate.resolve();
+    }
+  });
+  await signIn(page, undefined, false);
+  await openAccount(page);
+  await page.getByLabel('Restaurant', { exact: true }).selectOption(venue.venueId);
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  const cards = page.locator('.owner-dashboard-content .kpis > .kpi');
+  await expect(cards).toHaveCount(5);
+  await expect(cards.nth(0).locator('.v')).toHaveText('31');
+  await expect(cards.nth(0).locator('.d')).toHaveText('Previous period: 20');
+  await expect(cards.nth(1).locator('.v')).toHaveText('42');
+  await expect(cards.nth(2).locator('.v')).toHaveText('0s');
+  await expect(cards.nth(2).locator('.d')).toHaveText('Previous period: Not enough visits yet');
+  await expect(cards.nth(3).locator('.v')).toHaveText('Unavailable');
+  await expect(cards.nth(4).locator('.v')).toHaveText('Unavailable');
+  await expect(page.getByRole('heading', { name: 'How your menu did this period' })).toBeVisible();
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+  await expect(refresh).toBeEnabled();
+  venueMetric = 57;
+  await refresh.click();
+  await expect(cards.nth(0).locator('.v')).toHaveText('57');
+  const requestsBeforeDelay = firstRequests;
+  venueMetric = 78;
+  delayVenue = true;
+  try {
+    await refresh.click();
+    await expect.poll(() => firstRequests).toBe(requestsBeforeDelay + 1);
+    await expect(refresh).toBeDisabled();
+    await expect(cards.nth(0).locator('.v')).toHaveText('57');
+    await openAccount(page);
+    await page.getByLabel('Restaurant', { exact: true }).selectOption(otherVenue.venueId);
+    await expect(cards).toHaveCount(0);
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await secondStarted.promise;
+    await expect(cards.nth(0).locator('.v')).toHaveText('Unavailable');
+    releaseSecond.resolve();
+    await expect(refresh).toBeEnabled();
+    releaseLate.resolve();
+    await finishedLate.promise;
+    await expect(cards.nth(0).locator('.v')).toHaveText('Unavailable');
+  } finally {
+    releaseLate.resolve();
+    releaseSecond.resolve();
+  }
+  await openAccount(page);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(cards).toHaveCount(0);
+});
+
+test('Refresh report recovers an unavailable report and clears values when it becomes unavailable', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  state.reportStatus = 503;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+  await expect(refresh).toBeEnabled();
+  await expect(page.getByText('Reports aren’t available for this restaurant yet.')).toBeVisible();
+  await expect(page.getByRole('table')).toHaveCount(0);
+  state.reportStatus = 200;
+  await refresh.click();
+  await expect(page.getByRole('table').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'AI Insight Report', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Menu activity report' })).toBeVisible();
+  await expect(page.getByRole('table')).toBeVisible();
+  state.reportStatus = 503;
+  await refresh.click();
+  await expect(page.getByText('Reports aren’t available for this restaurant yet.')).toBeVisible();
+  await expect(page.getByRole('table')).toHaveCount(0);
+  await expect(refresh).toBeEnabled();
+  await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
+});
+
+test('Refresh report rejects a wrong-venue response and recovers with the correct venue', async ({
+  context,
+  page,
+}) => {
+  await fixture(context, true);
+  let reportVenueId = venue.venueId;
+  let dishName = 'Initial report bowl';
+  await context.route(`${api}/api/v1/venues/${venue.venueId}/analytics/dishes*`, (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({
+          json: {
+            ...UNEEZA_REPORT,
+            venue_id: reportVenueId,
+            dishes: UNEEZA_REPORT.dishes.map((dish, index) =>
+              index === 0 ? { ...dish, name: dishName } : dish,
+            ),
+          },
+          headers: { 'Access-Control-Allow-Origin': origin },
+        })
+      : route.fallback(),
+  );
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const table = page.getByRole('table').first();
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+  await expect(table).toContainText('Initial report bowl');
+
+  reportVenueId = otherVenue.venueId;
+  dishName = 'Other venue bowl';
+  await refresh.click();
+  await expect(page.getByText('We couldn’t verify this report, so it isn’t shown.')).toBeVisible();
+  await expect(table).toHaveCount(0);
+  await expect(page.getByText('Other venue bowl', { exact: true })).toHaveCount(0);
+  await expect(refresh).toBeEnabled();
+
+  reportVenueId = venue.venueId;
+  dishName = 'Refreshed report bowl';
+  await refresh.click();
+  await expect(table).toContainText('Refreshed report bowl');
+  await expect(table).not.toContainText('Initial report bowl');
+});
+
+test('staging creation retries the same command, opens S05 and keeps the next actor isolated', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  state.venues = [];
+  const created = {
+    ...venue,
+    venueId: '44444444-4444-4444-8444-444444444444',
+    name: 'Synthetic self-service cafe',
+  };
+  const requests: Array<{
+    commandId: string;
+    name: string;
+    actor: string | undefined;
+    keys: string[];
+  }> = [];
+  await context.route(`${api}/staff/venues`, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    const body = route.request().postDataJSON();
+    requests.push({
+      ...body,
+      actor: claims(route.request().headers().authorization).sub,
+      keys: Object.keys(body).sort(),
+    });
+    // Model a committed request whose response was lost; retry must reuse its command.
+    state.venues = [created];
+    return route.fulfill({
+      status: requests.length === 1 ? 500 : 201,
+      json: requests.length === 1 ? { error: 'unavailable' } : { venue: created },
+      headers: { 'Access-Control-Allow-Origin': origin },
+    });
+  });
+  await signIn(page, undefined, false);
+  await page
+    .getByRole('button', { name: 'Create test restaurant (Staging testing)', exact: true })
+    .click();
+  await page.getByLabel('Test restaurant name (Staging testing)').fill(`  ${created.name}  `);
+  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Retry with the same name');
+  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Restaurant name', exact: true })).toBeVisible();
+  expect(requests).toHaveLength(2);
+  expect(requests[0]).toEqual(requests[1]);
+  expect(requests[0]).toMatchObject({
+    name: created.name,
+    actor: ownerId,
+    keys: ['commandId', 'name'],
+  });
+  expect(state.apiCalls.some((call) => call.path === `/venues/${created.venueId}/profile`)).toBe(
+    true,
+  );
+  expect(state.apiCalls.some((call) => /publications|\/approvals$/.test(call.path))).toBe(false);
+  await page.getByLabel('Owner account', { exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await signIn(page, 'other@example.test', false);
+  await page.getByLabel('Owner account', { exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Restaurant', exact: true })).toHaveValue(
+    otherVenue.venueId,
+  );
+  await expect(page.getByRole('option', { name: created.name, exact: true })).toHaveCount(0);
+});
+
+test('staging quota failure preserves the existing restaurant and unknown access offers no creation', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  let creates = 0;
+  await context.route(`${api}/staff/venues`, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    creates++;
+    return route.fulfill({
+      status: 429,
+      json: { error: 'restaurant_limit_reached' },
+      headers: { 'Access-Control-Allow-Origin': origin },
+    });
+  });
+  await signIn(page, undefined, false);
+  await page.getByLabel('Owner account', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Create test restaurant (Staging testing)', exact: true })
+    .click();
+  await page
+    .getByLabel('Test restaurant name (Staging testing)')
+    .fill('Another synthetic restaurant');
+  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('limit has been reached');
+  await expect(page.getByRole('combobox', { name: 'Restaurant', exact: true })).toHaveValue(
+    venue.venueId,
+  );
+  expect(creates).toBe(1);
+  state.invalidActor = true;
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Restaurant workspace unavailable' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: /Create test restaurant/ })).toHaveCount(0);
+});
+
+test('a delayed creation response cannot select a restaurant after the actor signs out', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  state.venues = [];
+  let started = false;
+  let release = () => {};
+  await context.route(`${api}/staff/venues`, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    await new Promise<void>((resolve) => {
+      release = resolve;
+      started = true;
+    });
+    await route
+      .fulfill({ status: 201, json: { venue }, headers: { 'Access-Control-Allow-Origin': origin } })
+      .catch(() => {});
+  });
+  await signIn(page, undefined, false);
+  await page
+    .getByRole('button', { name: 'Create test restaurant (Staging testing)', exact: true })
+    .click();
+  await page
+    .getByLabel('Test restaurant name (Staging testing)')
+    .fill('Delayed synthetic restaurant');
+  await page.getByRole('button', { name: 'Create test restaurant', exact: true }).click();
+  await expect.poll(() => started).toBe(true);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await signIn(page, 'other@example.test', false);
+  release();
+  await page.getByLabel('Owner account', { exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Restaurant', exact: true })).toHaveValue(
+    otherVenue.venueId,
+  );
+  await expect(page.getByRole('option', { name: venue.name, exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Test restaurant name (Staging testing)')).toHaveCount(0);
+});
+
+test('removes several dishes in a row without waiting for each refresh', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const base = {
+    job_id: null,
+    origin: 'manual',
+    draft_version: 1,
+    category: 'Soup',
+    description: 'Synthetic dish.',
+    price_amount: '9.50',
+    price_currency: 'CAD',
+    ingredients: ['lentils'],
+    source_text: null,
+    review_warnings: [],
+    review_status: 'pending',
+    verification_status: 'not_verified',
+  };
+  state.drafts[venue.venueId] = ['Fictional One', 'Fictional Two', 'Fictional Three'].map(
+    (name) => {
+      const id = crypto.randomUUID();
+      return {
+        ...base,
+        id,
+        draft_id: id,
+        name,
+        manual_fields: {
+          name,
+          category: 'Soup',
+          description: 'Synthetic dish.',
+          priceAmount: '9.50',
+          priceCurrency: 'CAD',
+          servingSize: '1 bowl',
+          ingredients: { status: 'confirmed', items: ['lentils'] },
+          allergens: { status: 'confirmed', items: [] },
+        },
+      };
+    },
+  ) as never;
+  await signIn(page, undefined, false);
+  await page.getByRole('button', { name: 'Edit: Add your menu', exact: true }).click();
+  await expect(page.locator('.review-table')).toBeVisible();
+  // Hold every refresh: before, each remove waited for it and the next click was ignored.
+  state.delayJobs = true;
+  for (const name of ['Fictional One', 'Fictional Two']) {
+    await page.getByRole('button', { name: `Remove ${name}`, exact: true }).click();
+    await expect(page.getByRole('button', { name: `Remove ${name}`, exact: true })).toHaveCount(0);
+  }
+  await expect
+    .poll(() => state.drafts[venue.venueId]!.filter((draft) => draft.removed_at).length)
+    .toBe(2);
+  await expect(
+    page.getByRole('button', { name: 'Remove Fictional Three', exact: true }),
+  ).toBeVisible();
+  state.delayJobs = false;
+  state.releaseJobs();
 });

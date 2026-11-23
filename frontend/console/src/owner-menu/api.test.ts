@@ -16,10 +16,13 @@ function fakeFetch(responses: Array<{ status: number; body: unknown } | Error>) 
   return { calls, fetchImpl };
 }
 
-function client(responses: Array<{ status: number; body: unknown } | Error>) {
+function client(
+  responses: Array<{ status: number; body: unknown } | Error>,
+  baseUrl = 'https://peekaplate-api-staging.vxkong.workers.dev/',
+) {
   const fake = fakeFetch(responses);
   const api = createOwnerMenuClient({
-    baseUrl: 'https://peekaplate-api-staging.vxkong.workers.dev/',
+    baseUrl,
     getToken: () => 'staff-token',
     fetch: fake.fetchImpl,
   });
@@ -46,6 +49,41 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('owner menu client', () => {
+  it('accepts the API’s S13 share link only on the matching diner host', async () => {
+    const path = '/diner/riverview_cafe';
+    const production = `https://diner.peekaplate.app${path}`;
+    const staging = `https://routing-staging.peekaplate-diner-staging.pages.dev${path}`;
+    const response = (url: string) => ({ status: 200, body: { path, url } });
+    const { api } = client(
+      [
+        production,
+        staging,
+        `${production}?token=invalid`,
+        production.replace(path, '/diner/other'),
+      ].map(response),
+      'https://api.peekaplate.app',
+    );
+    await expect(api.dinerLink(VENUE, JOB)).resolves.toBe(production);
+    for (let i = 0; i < 3; i++) {
+      await expect(api.dinerLink(VENUE, JOB)).rejects.toMatchObject({ code: 'invalid_response' });
+    }
+    const stage = client([response(staging), response(production)]).api;
+    await expect(stage.dinerLink(VENUE, JOB)).resolves.toBe(staging);
+    await expect(stage.dinerLink(VENUE, JOB)).rejects.toMatchObject({ code: 'invalid_response' });
+  });
+
+  it('preserves the exact prepared menu identity for the S13 handoff', async () => {
+    const prepared = { menuId: VENUE, menuRevisionId: JOB, completeDishes: 1 };
+    const { api } = client([{ status: 200, body: prepared }]);
+    await expect(api.prepareMenu(VENUE)).resolves.toEqual(prepared);
+    const missingIdentity = client([
+      { status: 200, body: { menuRevisionId: JOB, completeDishes: 1 } },
+    ]);
+    await expect(missingIdentity.api.prepareMenu(VENUE)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
+
   it('reads prepared preview photos only through the authenticated exact-snapshot blob route', async () => {
     const calls: Call[] = [];
     const origin = 'https://peekaplate-api-staging.vxkong.workers.dev';

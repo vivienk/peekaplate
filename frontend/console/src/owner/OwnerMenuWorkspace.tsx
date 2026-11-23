@@ -6,7 +6,7 @@ import type {
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { AddMenuLink } from '../onboarding/AddMenuLink';
 import { ChooseMenuSource, type MenuSource } from '../onboarding/ChooseMenuSource';
-import type { RestaurantDetails as Details } from '../onboarding/details';
+import { type RestaurantDetails as Details, EMPTY_DETAILS } from '../onboarding/details';
 import { MenuProcessing } from '../onboarding/MenuProcessing';
 import { menuFileKind } from '../onboarding/menu-source';
 import { OnboardingLayout } from '../onboarding/OnboardingLayout';
@@ -35,12 +35,19 @@ import {
 } from '../owner-menu/dishForm';
 import { evidenceExcerpts } from '../owner-menu/evidence';
 import { errorMessage, menuProcessingState } from '../owner-menu/jobs';
+import {
+  type CalibrationPhoto,
+  calibrationMatchesPhoto,
+  readCalibrationPhoto,
+} from '../owner-menu/portionCalibration';
 import { Button } from '../ui';
 import { FirstDashboardContent } from './FirstDashboard';
+import { type MenuSnapshot, menuSnapshot } from './menu-snapshot';
 import { OwnerPublish } from './OwnerPublish';
 import { draftToReviewDish } from './review/fromDishDraft';
 import { ReviewDishes } from './review/MenuReview';
 import { initialReview, isMenuReady } from './review/reviewDishes';
+import { restaurantDetailsSavedMessage, restaurantDetailsSaver } from './workspace-api';
 import '../onboarding/onboarding.css';
 import './review/review.css';
 import { useHeadingFocus } from '../onboarding/useHeadingFocus';
@@ -53,7 +60,13 @@ type Editing = {
   saved: string;
   session?: ExtractionReviewSessionResponse;
 };
-type FileSelection = { files: File[]; groupKey: string; fileKeys: string[]; groupId?: string };
+type FileSelection = {
+  files: File[];
+  previewUrls: (string | null)[];
+  groupKey: string;
+  fileKeys: string[];
+  groupId?: string;
+};
 
 // Dropped files may lack a MIME. Declare the UI-accepted kind without changing bytes;
 // the server still verifies the actual signature and manifest hash.
@@ -66,6 +79,7 @@ function typedMenuFile(file: File): File {
 }
 
 export function OwnerMenuWorkspace({
+  active = true,
   apiBase,
   actorId,
   venueId,
@@ -74,13 +88,18 @@ export function OwnerMenuWorkspace({
   section,
   navigation,
   detailsRequested = false,
+  offerInitialDetails = false,
+  firstProfileStatus,
   getAccessToken,
   onAccessFailure,
   onDirtyChange,
   renderShell,
   accountActions,
   onSetupChange,
+  onMenuChange,
+  dishAssistanceEnabled = false,
 }: {
+  active?: boolean;
   apiBase: string;
   actorId: string;
   venueId: string;
@@ -89,17 +108,25 @@ export function OwnerMenuWorkspace({
   section: 'overview' | 'menu';
   navigation: number;
   detailsRequested?: boolean;
+  offerInitialDetails?: boolean;
+  firstProfileStatus?: RestaurantProfile['status'] | undefined;
   getAccessToken: () => Promise<string | null>;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
   onDirtyChange: (dirty: boolean) => void;
   renderShell: (content: ReactNode) => ReactNode;
   accountActions: ReactNode;
   onSetupChange?: (setup: RestaurantSetup | null) => void;
+  onMenuChange?: (menu: MenuSnapshot | null) => void;
+  dishAssistanceEnabled?: boolean;
 }) {
   const runtime = useRef<Active | null>(null);
   const running = useRef(false);
   const commands = useRef(new Map<string, string>());
   const selection = useRef<FileSelection | null>(null);
+  const clearSelection = useCallback(() => {
+    for (const url of selection.current?.previewUrls ?? []) if (url) URL.revokeObjectURL(url);
+    selection.current = null;
+  }, []);
   const readGeneration = useRef(0);
   const urlAttempt = useRef<{ url: string; key: string } | null>(null);
   const photoAttempt = useRef<{ file: File; key: string } | null>(null);
@@ -111,7 +138,9 @@ export function OwnerMenuWorkspace({
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(
+    firstProfileStatus ? restaurantDetailsSavedMessage(firstProfileStatus) : '',
+  );
   const [view, setRawView] = useState<
     | 'overview'
     | 'details'
@@ -124,8 +153,8 @@ export function OwnerMenuWorkspace({
     | 'edit'
     | 'processing'
     | 'publish'
-  >('overview');
-  useHeadingFocus(view);
+  >(firstProfileStatus ? 'sources' : 'overview');
+  useHeadingFocus(firstProfileStatus && !loaded ? 'loading' : view);
   const viewGeneration = useRef(0);
   const setView = useCallback((next: typeof view) => {
     viewGeneration.current++;
@@ -134,8 +163,14 @@ export function OwnerMenuWorkspace({
   const [processingIds, setProcessingIds] = useState<string[]>([]);
   const [uploads, setUploads] = useState<MenuUpload[]>([]);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const latestEditing = useRef(editing);
+  latestEditing.current = editing;
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [calibrationPhoto, setCalibrationPhoto] = useState<
+    (CalibrationPhoto & { draftId: string }) | undefined
+  >(undefined);
+  const [calibrationPhotoUnavailable, setCalibrationPhotoUnavailable] = useState(false);
   const [portionReview, setPortionReview] = useState<
     | {
         status: 'processing' | 'needs_review' | 'failed';
@@ -145,6 +180,7 @@ export function OwnerMenuWorkspace({
       }
     | undefined
   >(undefined);
+  const [portionRetry, setPortionRetry] = useState(0);
   // The dish form (S09) returns to where it was opened: S10 review or S06 source choice
   // (Rania, #213 review). null = opened from the Menu list, which it returns to.
   const [editBack, setEditBack] = useState<'review' | 'sources' | null>(null);
@@ -162,7 +198,9 @@ export function OwnerMenuWorkspace({
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [setup, setSetup] = useState<RestaurantSetup | null>(null);
   const [profileUnavailable, setProfileUnavailable] = useState(false);
-  const profilePhotoAttempt = useRef<{ file: File; key: string } | null>(null);
+  const [saveDetails] = useState(restaurantDetailsSaver);
+  const initialDetails = useRef(offerInitialDetails && !firstProfileStatus && !detailsRequested);
+  const initialNavigation = useRef(navigation);
   const [detailsPhotoUrl, setDetailsPhotoUrl] = useState<string | null>(null);
   // S9: dishes the owner reviewed in this session, and the state of the "I have reviewed" checkbox.
   const [reviewedIds, setReviewedIds] = useState<ReadonlySet<string>>(new Set());
@@ -186,6 +224,7 @@ export function OwnerMenuWorkspace({
   const failure = useCallback(
     (reason: unknown) => {
       if (reason instanceof OwnerMenuApiError && reason.code === 'aborted') return;
+      onMenuChange?.(null);
       if (reason instanceof OwnerMenuApiError && (reason.status === 401 || reason.status === 403)) {
         setDrafts([]);
         setReviews({});
@@ -207,7 +246,7 @@ export function OwnerMenuWorkspace({
             : 'We could not complete that request. Try again.',
         );
     },
-    [onAccessFailure, onSetupChange],
+    [onAccessFailure, onSetupChange, onMenuChange],
   );
   const load = useCallback(
     async (active: Active) => {
@@ -291,13 +330,34 @@ export function OwnerMenuWorkspace({
       setReviewUnavailable(unavailable);
       setJobs(nextJobs);
       setDrafts(nextDrafts);
+      if (initialDetails.current) {
+        initialDetails.current = false;
+        const saved = metadata?.[1];
+        if (
+          !metadata?.[0] &&
+          saved?.detailsStatus === 'missing' &&
+          !saved.menuAdded &&
+          !saved.published &&
+          !nextJobs.length
+        )
+          setView('details');
+      }
+      onMenuChange?.(
+        menuSnapshot(
+          venueId,
+          nextDrafts,
+          nextReviews,
+          unavailable || nextJobs.some((job) => ['queued', 'running'].includes(job.status)),
+        ),
+      );
       setLoaded(true);
       return nextDrafts;
     },
-    [venueId, current, command, onSetupChange],
+    [venueId, current, command, onSetupChange, onMenuChange, setView],
   );
   useEffect(() => {
     void actorId;
+    setUploads([]);
     const controller = new AbortController();
     const active = {
       controller,
@@ -313,16 +373,27 @@ export function OwnerMenuWorkspace({
     });
     return () => {
       controller.abort();
+      clearSelection();
       if (runtime.current === active) runtime.current = null;
     };
-  }, [actorId, apiBase, getAccessToken, load, current, failure]);
+  }, [actorId, apiBase, getAccessToken, load, current, failure, clearSelection]);
   useEffect(() => {
-    setView(detailsRequested ? 'details' : section === 'menu' ? 'list' : 'overview');
+    if (initialNavigation.current !== navigation || section !== 'overview' || detailsRequested)
+      initialDetails.current = false;
+    setView(
+      detailsRequested
+        ? 'details'
+        : firstProfileStatus
+          ? 'sources'
+          : section === 'menu'
+            ? 'list'
+            : 'overview',
+    );
     setEditing(null);
     setPendingPhoto(null);
     setEditBack(null);
     setVerified(false);
-  }, [section, navigation, detailsRequested, setView]);
+  }, [section, navigation, detailsRequested, firstProfileStatus, setView]);
 
   useEffect(() => {
     const active = runtime.current;
@@ -352,23 +423,52 @@ export function OwnerMenuWorkspace({
     const id = editing?.form.photoId;
     let objectUrl: string | null = null;
     let disposed = false;
+    const controller = new AbortController();
     setPhotoUrl(null);
+    setCalibrationPhoto(undefined);
+    setCalibrationPhotoUnavailable(false);
     if (pendingPhoto) {
       objectUrl = URL.createObjectURL(pendingPhoto);
       setPhotoUrl(objectUrl);
     } else if (active && id && editing)
       void active.client
         .readDraftPhoto(venueId, editing.id, id)
-        .then((blob) => {
+        .then(async (blob) => {
           if (disposed || !current(active)) return;
           objectUrl = URL.createObjectURL(blob);
           setPhotoUrl(objectUrl);
+          try {
+            const source = await readCalibrationPhoto(
+              blob,
+              id,
+              objectUrl,
+              AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
+            );
+            if (disposed || !current(active)) return;
+            setCalibrationPhoto({ ...source, draftId: editing.id });
+            setEditing((latest) => {
+              if (
+                latest?.id !== editing.id ||
+                latest.form.photoId !== id ||
+                !latest.form.portionCalibration ||
+                calibrationMatchesPhoto(latest.form.portionCalibration, source)
+              )
+                return latest;
+              return { ...latest, form: { ...latest.form, portionCalibration: null } };
+            });
+          } catch {
+            if (!disposed && current(active)) setCalibrationPhotoUnavailable(true);
+          }
         })
         .catch((reason) => {
-          if (!disposed && current(active)) failure(reason);
+          if (!disposed && current(active)) {
+            setCalibrationPhotoUnavailable(true);
+            failure(reason);
+          }
         });
     return () => {
       disposed = true;
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [pendingPhoto, editing?.form.photoId, editing?.id, venueId, current, failure]);
@@ -392,7 +492,8 @@ export function OwnerMenuWorkspace({
         if (result.status === 'failed') {
           setPortionReview({
             status: 'failed',
-            message: 'The 2.5D cutout could not be generated. The original photo is retained.',
+            message:
+              '2.5D processing failed. Please try another photo. The original photo is retained.',
           });
           return;
         }
@@ -405,7 +506,8 @@ export function OwnerMenuWorkspace({
         if (!disposed && current(active)) {
           setPortionReview({
             status: 'failed',
-            message: '2.5D processing is unavailable. The original photo is retained.',
+            message:
+              '2.5D processing failed. Please try again or use another photo. The original photo is retained.',
           });
         }
       });
@@ -413,7 +515,7 @@ export function OwnerMenuWorkspace({
       disposed = true;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
-  }, [view, editing?.id, editing?.form.photoId, pendingPhoto, venueId, current]);
+  }, [view, editing?.id, editing?.form.photoId, pendingPhoto, venueId, current, portionRetry]);
 
   const dirty =
     (view === 'details' && detailsDirty) ||
@@ -451,6 +553,14 @@ export function OwnerMenuWorkspace({
     }
   };
   const reload = () => void run((active) => load(active));
+  // Adam's staging test: waiting for the full reload after each remove made deletes take 5-7 s and
+  // silently ignored the next click. The removal response already carries the saved row, so the
+  // list updates at once and the rest refreshes in the background. A later command supersedes this
+  // read (readGeneration), and the server still rejects stale versions.
+  const refreshLater = (active: Active) =>
+    void load(active).catch((reason) => {
+      if (current(active)) failure(reason);
+    });
   useEffect(() => {
     if (view !== 'processing') return;
     const active = runtime.current;
@@ -505,7 +615,7 @@ export function OwnerMenuWorkspace({
     setView('edit');
   };
   const nextSource = (next?: MenuSource) => {
-    selection.current = null;
+    clearSelection();
     setUploads([]);
     if (next === 'manual') {
       setEditBack('sources');
@@ -539,12 +649,17 @@ export function OwnerMenuWorkspace({
         setError('Choose a PDF, JPEG or PNG menu source.');
         return;
       }
-      if (!retry)
+      if (!retry) {
+        clearSelection();
         selection.current = {
           files,
+          previewUrls: files.map((file) =>
+            file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+          ),
           groupKey: newIdempotencyKey(),
           fileKeys: files.map(() => newIdempotencyKey()),
         };
+      }
       const selected = selection.current;
       if (!selected) return;
       const rows: MenuUpload[] = selected.files.map((file, index) => ({
@@ -553,10 +668,12 @@ export function OwnerMenuWorkspace({
         size: file.size,
         kind: file.type === 'application/pdf' ? 'pdf' : 'image',
         status: 'uploading',
+        previewUrl: selected.previewUrls[index],
       }));
       setUploads(rows);
       try {
         const hashes = await Promise.all(selected.files.map(sha256Hex));
+        if (!current(active) || selection.current !== selected) return;
         const group = await active.client.createUploadGroup(venueId, {
           idempotencyKey: selected.groupKey,
           files: selected.files.map((file, index) => ({
@@ -564,6 +681,7 @@ export function OwnerMenuWorkspace({
             sourceHash: hashes[index]!,
           })),
         });
+        if (!current(active) || selection.current !== selected) return;
         selected.groupId = group.id;
         if (current(active)) setProcessingIds(group.jobs.map((job) => job.id));
         for (const [index, file] of selected.files.entries()) {
@@ -574,17 +692,17 @@ export function OwnerMenuWorkspace({
             file,
             selected.fileKeys[index]!,
           );
-          if (!current(active)) return;
+          if (!current(active) || selection.current !== selected) return;
           rows[index] = { ...rows[index]!, status: 'uploaded' };
           setUploads([...rows]);
         }
         await load(active);
       } catch (reason) {
-        if (current(active))
+        if (current(active) && selection.current === selected)
           setUploads(
             rows.map((row) => (row.status === 'uploaded' ? row : { ...row, status: 'failed' })),
           );
-        throw reason;
+        if (current(active) && selection.current === selected) throw reason;
       }
     });
   const openDraft = (draft: DishDraft) => {
@@ -626,8 +744,9 @@ export function OwnerMenuWorkspace({
         );
       await load(active);
     });
-    if (!cancelled || generation !== viewGeneration.current) return;
-    selection.current = null;
+    if (!cancelled || generation !== viewGeneration.current || selection.current !== selected)
+      return;
+    clearSelection();
     setUploads([]);
     if (files.length) uploadFiles(files);
   };
@@ -726,6 +845,9 @@ export function OwnerMenuWorkspace({
       setNotice('Draft saved. This has not approved or published your menu.');
       // Explicit 2.5D preparation remains on S09 while the saved photo generates.
       // Normal Continue to review retains the authored S09 -> S10 navigation.
+      // A new photo already triggers generation; retry explicitly only for the saved photo.
+      if (stayOnEditor && !pendingPhoto && editing.form.photoId)
+        setPortionRetry((attempt) => attempt + 1);
       if (!stayOnEditor) {
         setEditing(null);
         setPendingPhoto(null);
@@ -799,14 +921,23 @@ export function OwnerMenuWorkspace({
       setVerified(true);
     });
 
-  if (!loaded)
-    return renderShell(
+  if (!active) return null;
+  if (!loaded) {
+    const loading = (
       <section>
         <h1>Opening your menu workspace</h1>
         <p role={error ? 'alert' : 'status'}>{error ?? 'Loading saved sources and dishes…'}</p>
         {error && <Button onClick={reload}>Try again</Button>}
-      </section>,
+      </section>
     );
+    return firstProfileStatus ? (
+      <OnboardingLayout restaurantName={shownName} accountActions={accountActions}>
+        {loading}
+      </OnboardingLayout>
+    ) : (
+      renderShell(loading)
+    );
+  }
   const activeJobs = jobs.filter((job) => ['queued', 'running'].includes(job.status));
   const item = editing?.session?.items.find(
     (value) => value.candidate.candidate_id === editing.form.source?.candidateId,
@@ -818,7 +949,10 @@ export function OwnerMenuWorkspace({
           onDirtyChange={setDetailsDirty}
           key={`${venueId}:${profile?.version ?? 0}:${navigation}`}
           mode={details && !detailsFromSources ? 'dashboard' : 'onboarding'}
-          saved={details ?? undefined}
+          saved={
+            details ??
+            (offerInitialDetails ? { ...EMPTY_DETAILS, name: restaurantName } : undefined)
+          }
           savedPhotoUrl={detailsPhotoUrl}
           savedPhotoId={profile?.fields.photoId ?? null}
           saving={busy}
@@ -841,29 +975,10 @@ export function OwnerMenuWorkspace({
               return;
             }
             void run(async (active) => {
-              let photoId = profile?.fields.photoId ?? null;
-              if (photo) {
-                if (profilePhotoAttempt.current?.file !== photo)
-                  profilePhotoAttempt.current = { file: photo, key: newIdempotencyKey() };
-                photoId = (
-                  await active.client.uploadProfilePhoto(
-                    venueId,
-                    photo,
-                    profilePhotoAttempt.current.key,
-                  )
-                ).id;
-              }
-              const fields = { ...next, photoId };
-              await active.client.saveProfile(venueId, {
-                commandId: command('profile', [profile?.version ?? 0, fields]),
-                expectedVersion: profile?.version ?? 0,
-                fields,
-              });
+              const savedProfile = await saveDetails(active.client, venueId, next, photo, profile);
               await load(active);
               if (!current(active)) return;
-              setNotice(
-                'Restaurant details saved and submitted for team verification. This does not publish your menu.',
-              );
+              setNotice(restaurantDetailsSavedMessage(savedProfile?.status));
               if (viewGeneration.current !== generation) return;
               const continueOnboarding = detailsFromSources || !editingSaved;
               setDetailsFromSources(false);
@@ -906,7 +1021,7 @@ export function OwnerMenuWorkspace({
               setRemoved({ draft: saved, dish, index: reviewDrafts.indexOf(draft) });
               setVerified(false);
               setDrafts((rows) => rows.map((row) => (row.id === id ? saved : row)));
-              await load(active);
+              refreshLater(active);
             })
           }
           onUndoRemove={() =>
@@ -925,7 +1040,7 @@ export function OwnerMenuWorkspace({
               if (!current(active)) return;
               setRemoved(null);
               setDrafts((rows) => rows.map((row) => (row.id === draft.id ? saved : row)));
-              await load(active);
+              refreshLater(active);
             })
           }
           completing={busy}
@@ -987,7 +1102,11 @@ export function OwnerMenuWorkspace({
             if (selection.current) uploadFiles(selection.current.files, true);
           }}
           onContinue={() => setView('processing')}
-          onBack={() => setView('sources')}
+          onBack={() => {
+            clearSelection();
+            setUploads([]);
+            setView('sources');
+          }}
         />
       </>
     ) : view === 'processing' ? (
@@ -1034,7 +1153,84 @@ export function OwnerMenuWorkspace({
       <>
         <DishEditor
           value={editing.form}
+          {...(dishAssistanceEnabled && {
+            draftDescription: async () => {
+              const active = runtime.current;
+              const generation = viewGeneration.current;
+              if (!active || !current(active)) throw new Error('Workspace unavailable');
+              const result = await active.client.assistDish(venueId, editing.id, {
+                operation: 'description',
+                expectedVersion: editing.draft?.draft_version ?? 0,
+                requestId: newCommandId(),
+                facts: { description: editing.form.description },
+              });
+              if (
+                !current(active) ||
+                generation !== viewGeneration.current ||
+                latestEditing.current !== editing ||
+                result.operation !== 'description' ||
+                result.status !== 'review' ||
+                !result.description
+              )
+                throw new Error('No supported description suggestion');
+              return result.description;
+            },
+            // AI allergen guesses are proposals only: they stay unconfirmed until the owner
+            // ticks the review box, and an empty answer is never "no allergens".
+            suggestAllergens: async (name: string, ingredients: string[]) => {
+              const active = runtime.current;
+              const generation = viewGeneration.current;
+              if (!active || !current(active)) throw new Error('Workspace unavailable');
+              if (!name.trim()) throw new Error('Add the dish name first');
+              const result = await active.client.assistDish(venueId, editing.id, {
+                operation: 'allergens',
+                expectedVersion: editing.draft?.draft_version ?? 0,
+                requestId: newCommandId(),
+                facts: {
+                  name: name.trim(),
+                  ingredients: ingredients.slice(0, 100),
+                  ...(latestEditing.current?.form.description.trim() && {
+                    description: latestEditing.current.form.description.slice(0, 4000),
+                  }),
+                },
+              });
+              if (
+                !current(active) ||
+                generation !== viewGeneration.current ||
+                latestEditing.current !== editing ||
+                result.operation !== 'allergens'
+              )
+                throw new Error('Allergen suggestion is no longer current');
+              return result.allergens;
+            },
+            ...(editing.draft && {
+              suggestIngredients: async () => {
+                const active = runtime.current;
+                const generation = viewGeneration.current;
+                if (!active || !current(active)) throw new Error('Workspace unavailable');
+                const result = await active.client.assistDish(venueId, editing.id, {
+                  operation: 'ingredients',
+                  expectedVersion: editing.draft!.draft_version ?? 0,
+                  requestId: newCommandId(),
+                  facts: {},
+                });
+                if (
+                  !current(active) ||
+                  generation !== viewGeneration.current ||
+                  latestEditing.current !== editing ||
+                  result.operation !== 'ingredients'
+                )
+                  throw new Error('Ingredient suggestion is no longer current');
+                return result.ingredients;
+              },
+            }),
+          })}
           photoUrl={photoUrl}
+          {...(!pendingPhoto &&
+            calibrationPhoto?.draftId === editing.id &&
+            calibrationPhoto.photoId === editing.form.photoId && { calibrationPhoto })}
+          photoPending={Boolean(pendingPhoto)}
+          calibrationPhotoUnavailable={calibrationPhotoUnavailable}
           {...(portionReview ? { portionReview } : {})}
           onGeneratePortion={() => saveDish(true)}
           onApprovePortion={() => {
@@ -1087,6 +1283,11 @@ export function OwnerMenuWorkspace({
                     ['image/jpeg', 'image/png'].includes(file.type)
                   ) {
                     setPendingPhoto(file);
+                    setEditing((latest) =>
+                      latest
+                        ? { ...latest, form: { ...latest.form, portionCalibration: null } }
+                        : latest,
+                    );
                     setLicenseChecked(false);
                   } else if (file) setError('Choose a JPEG or PNG up to 12 MB.');
                 }}
@@ -1130,6 +1331,7 @@ export function OwnerMenuWorkspace({
     ) : view === 'publish' && canPublish ? (
       <OwnerPublish
         key={`${actorId}:${venueId}`}
+        restaurantName={shownName}
         apiBase={apiBase}
         actorId={actorId}
         venueId={venueId}
@@ -1291,7 +1493,7 @@ export function OwnerMenuWorkspace({
                       </span>
                       <span className="lab st">{draft.review_status}</span>
                       <span className="hidem">
-                        <span className="lab st">Not connected</span>
+                        <span className="lab st">Review in dish</span>
                       </span>
                       <Btn
                         kind="outlined"

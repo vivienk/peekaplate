@@ -103,3 +103,49 @@
 .pp-dish-editor .s09-btns {
   flex-wrap: wrap;
 }
+
+.pp-serving-calibration {
+  min-width: 0;
+  margin: var(--pp-space-16, 16px) 0;
+  padding: var(--pp-space-16, 16px);
+  border: 1px solid var(--pp-role-outline, #d4d4d8);
+  border-radius: var(--pp-radius-12, 12px);
+}
+
+.pp-serving-calibration legend {
+  padding: 0 4px;
+  font-weight: var(--pp-font-weight-semibold, 600);
+}
+
+.pp-serving-calibration__photo {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 12px 0;
+}
+
+.pp-serving-calibration__photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.pp-serving-calibration__boundary {
+  position: absolute;
+  border: 3px solid var(--pp-color-orange-500, #f97316);
+  box-shadow: 0 0 0 1px #fff;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.pp-serving-calibration__edges {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.pp-serving-calibration .s09-check {
+  min-height: 44px;
+  align-items: flex-start;
+}

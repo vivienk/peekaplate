@@ -1,7 +1,9 @@
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { PRODUCTION_OWNER_API_ORIGIN, readWorkspaceApiBase } from './src/owner/api-origin.ts';
+import { OWNER_AUTH_PATH, OWNER_PAGE_PATHS, ownerPageForPath } from './src/owner/routes.ts';
 
 // The synthetic demos (foundations, owner sign-in and the owner dashboard) are built only for PR
 // previews (deploy-preview.yml sets PEEKAPLATE_PREVIEW_DEMOS), so reviewers can inspect synthetic
@@ -11,7 +13,30 @@ import { defineConfig } from 'vite';
 const includeDemos = process.env.PEEKAPLATE_PREVIEW_DEMOS === 'true';
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 
-export default defineConfig(({ command }) => ({
+function ownerRoutes(production: boolean): Plugin {
+  return {
+    name: 'owner-routes',
+    configureServer(server) {
+      server.middlewares.use((request, _response, next) => {
+        if (request.url) {
+          const url = new URL(request.url, 'http://localhost');
+          if (ownerPageForPath(url.pathname)) request.url = `${OWNER_AUTH_PATH}.html${url.search}`;
+        }
+        next();
+      });
+    },
+    generateBundle() {
+      if (!production) return;
+      const redirects = [
+        `/ ${OWNER_AUTH_PATH} 302`,
+        ...Object.values(OWNER_PAGE_PATHS).map((path) => `${path} ${OWNER_AUTH_PATH} 200`),
+      ];
+      this.emitFile({ type: 'asset', fileName: '_redirects', source: `${redirects.join('\n')}\n` });
+    },
+  };
+}
+
+export default defineConfig(({ command, mode }) => ({
   define: {
     __OWNER_AI_LOCAL_PREVIEW__: JSON.stringify(
       command === 'serve' && process.env.OWNER_AI_LOCAL_PREVIEW === 'true',
@@ -31,7 +56,14 @@ export default defineConfig(({ command }) => ({
         },
       }
     : {}),
-  plugins: [react()],
+  plugins: [
+    react(),
+    !includeDemos &&
+      ownerRoutes(
+        readWorkspaceApiBase(loadEnv(mode, page('.')).VITE_PUBLIC_API_URL) ===
+          PRODUCTION_OWNER_API_ORIGIN,
+      ),
+  ],
   build: {
     rollupOptions: {
       input: {

@@ -1,10 +1,40 @@
 // Owner dish report (S3-RES-03 / S3-DATA-02).
 import { toOwnerReport } from '@peekaplate/contracts';
 import type { Client } from 'pg';
+import { AuthUnavailableError } from './auth';
 import { CommandError } from './dish-command';
+import { verifySyntheticCompleteness } from './owner-ai/synthetic-completeness';
+import type { PreparedStorage } from './owner-prepare';
+import {
+  OWNER_BATCH_MS,
+  OWNER_BATCH_SETTLE_MS,
+  readBatchedOwnerReport,
+} from './owner-report-batches';
+import { readOwnerReportDisplayActions } from './owner-report-display-actions';
+import {
+  liveEvidenceParameters,
+  type OwnerReportLiveEvidence,
+  PRODUCTION_REPORT_FILTER,
+  REPORT_PUBLICATION_FILTER,
+  REPORT_PUBLICATIONS,
+  TODAY_REPORT_EVIDENCE,
+} from './owner-report-evidence';
+import type { LivePostHogOwnerEvent } from './owner-report-posthog';
+import { readReportPublications } from './owner-report-publications';
+import { readOwnerReportSummary } from './owner-report-summary';
 
 const REPORT_PERMISSIONS = ['owner'];
-type OwnerReportSource = 'production' | 'synthetic';
+export type OwnerReportSource = 'production' | 'synthetic';
+
+type ReportOptions = {
+  trafficClass?: 'live' | 'test';
+  includeSummary?: boolean;
+  includeDisplayActions?: boolean;
+  syntheticSeal?: string;
+  validationNow?: Date;
+  readTodayEvents?: (venueId: string, start: Date, end: Date) => Promise<LivePostHogOwnerEvent[]>;
+  productionPublications?: { storage: PreparedStorage; origin: string };
+};
 
 export async function readOwnerReport(
   client: Client,
@@ -12,10 +42,15 @@ export async function readOwnerReport(
   venueId: string,
   now: Date,
   source: OwnerReportSource = 'production',
+  options: ReportOptions = {},
 ): Promise<unknown> {
   let started = false;
   try {
-    await client.query('BEGIN READ ONLY');
+    await client.query(
+      options.includeSummary || options.syntheticSeal
+        ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
+        : 'BEGIN READ ONLY',
+    );
     started = true;
     await client.query("SET LOCAL statement_timeout = '5s'");
     await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
@@ -34,14 +69,18 @@ export async function readOwnerReport(
     // Tenant scope is set only after the owner permission is confirmed.
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
-    const result = await client.query(OWNER_REPORT_QUERY, [
-      venueId,
-      new Date(now.getTime() - 24 * 60 * 60 * 1000),
-      now,
-    ]);
+    const report =
+      source === 'production' && options.readTodayEvents && options.productionPublications
+        ? await readBatchedOwnerReport(
+            venueId,
+            now,
+            options.productionPublications.storage,
+            (end) => measureReport(client, venueId, end, source, options, OWNER_BATCH_MS),
+          )
+        : await measureReport(client, venueId, now, source, options);
     await client.query('COMMIT');
     started = false;
-    return toOwnerReport(buildInternalReport(result.rows, venueId, now, source));
+    return report;
   } catch (error) {
     if (started) {
       try {
@@ -52,6 +91,119 @@ export async function readOwnerReport(
     }
     throw error;
   }
+}
+
+async function measureReport(
+  client: Client,
+  venueId: string,
+  now: Date,
+  source: OwnerReportSource,
+  options: ReportOptions,
+  durationMs = 86_400_000,
+) {
+  const isBatch = durationMs === OWNER_BATCH_MS;
+  // Earliest release time makes source selection stable across UTC midnight.
+  const today = new Date(now.getTime() + (isBatch ? OWNER_BATCH_SETTLE_MS : 0));
+  today.setUTCHours(0, 0, 0, 0);
+  let liveEvidence: OwnerReportLiveEvidence | undefined;
+  if (source === 'production' && options.readTodayEvents) {
+    if (!options.productionPublications) throw new AuthUnavailableError();
+    const { storage, origin } = options.productionPublications;
+    const starts = new Date(Math.max(today.getTime(), now.getTime() - durationMs));
+    const evidence = {
+      start: today,
+      events: now > starts ? await options.readTodayEvents(venueId, starts, now) : [],
+    };
+    liveEvidence = {
+      ...evidence,
+      publications: await readReportPublications(
+        client,
+        storage,
+        origin,
+        venueId,
+        now,
+        evidence,
+        durationMs,
+      ),
+    };
+  }
+  const query = liveEvidence
+    ? PRODUCTION_OWNER_REPORT_QUERY
+    : options.trafficClass === 'test'
+      ? TEST_OWNER_REPORT_QUERY
+      : OWNER_REPORT_QUERY;
+  const windowStart = new Date(now.getTime() - durationMs);
+  const result = await client.query(query, [
+    venueId,
+    windowStart,
+    now,
+    ...(liveEvidence ? liveEvidenceParameters(liveEvidence) : []),
+  ]);
+  const summary = options.includeSummary
+    ? await readOwnerReportSummary(
+        client,
+        venueId,
+        now,
+        options.trafficClass ?? 'live',
+        liveEvidence,
+        durationMs,
+        isBatch,
+      )
+    : undefined;
+  const complete =
+    source === 'synthetic' &&
+    options.trafficClass === 'test' &&
+    (await verifySyntheticCompleteness(client, {
+      ...(options.syntheticSeal ? { seal: options.syntheticSeal } : {}),
+      venueId,
+      anchor: now,
+      validationNow: options.validationNow ?? new Date(),
+    }));
+  const internal = buildInternalReport(result.rows, venueId, now, source, durationMs);
+  const displayActions =
+    isBatch && options.includeDisplayActions && liveEvidence
+      ? await readOwnerReportDisplayActions(
+          client,
+          venueId,
+          windowStart,
+          now,
+          liveEvidence,
+          new Set(internal.dishes.map((dish) => String(dish.dish_id))),
+        )
+      : undefined;
+  return toOwnerReport({
+    ...internal,
+    ...(displayActions
+      ? {
+          dishes: internal.dishes.map((dish) => {
+            const activity = displayActions.byDish.get(String(dish.dish_id));
+            return activity ? { ...dish, display_actions: activity } : dish;
+          }),
+        }
+      : {}),
+    report_metadata: {
+      ...internal.report_metadata,
+      freshness: {
+        last_event_ingested_at: liveEvidence
+          ? null
+          : internal.report_metadata.freshness.last_event_ingested_at,
+        is_stale: complete ? false : null,
+      },
+    },
+    ...(summary
+      ? {
+          summary: displayActions
+            ? {
+                ...summary,
+                current: {
+                  ...summary.current,
+                  portion_previews_shown: displayActions.portionTotal,
+                },
+              }
+            : summary,
+        }
+      : {}),
+  });
 }
 
 // D7 rates are formed from distinct session sets, not event counts.
@@ -248,7 +400,13 @@ const OWNER_REPORT_QUERY = `
     SELECT
       openings.dish_id,
       COUNT(*) AS total_openings,
-      COUNT(*) FILTER (WHERE openings.has_final_checkpoint) AS timed_openings
+      COUNT(*) FILTER (WHERE openings.has_final_checkpoint) AS timed_openings,
+      COUNT(DISTINCT openings.session_id) FILTER (
+        WHERE openings.has_final_checkpoint
+      ) AS timed_opening_sessions,
+      COUNT(DISTINCT openings.session_id) FILTER (
+        WHERE NOT openings.has_final_checkpoint
+      ) AS untimed_opening_sessions
     FROM opening_metrics openings
     GROUP BY openings.dish_id
   )
@@ -256,13 +414,28 @@ const OWNER_REPORT_QUERY = `
     metrics.*,
     timing.average_active_seconds,
     coverage.total_openings,
-    coverage.timed_openings
+    coverage.timed_openings,
+    coverage.timed_opening_sessions,
+    coverage.untimed_opening_sessions
   FROM dish_metrics metrics
   LEFT JOIN timing_metrics timing USING (dish_id)
   LEFT JOIN opening_coverage_metrics coverage USING (dish_id);
 `;
 
 type ReportRow = Record<string, unknown>;
+const TEST_OWNER_REPORT_QUERY = OWNER_REPORT_QUERY.replace(
+  'FROM app_private.owner_observation_v1 obs',
+  'FROM app_private.owner_test_observation_v1 obs',
+);
+// The capture provider supplies inclusion IDs. Canonical facts retain authority over scope and values.
+const PRODUCTION_OWNER_REPORT_QUERY = OWNER_REPORT_QUERY.replace(
+  'WITH filtered_observations AS',
+  `WITH ${TODAY_REPORT_EVIDENCE}, ${REPORT_PUBLICATIONS}, filtered_observations AS`,
+).replace(
+  'AND obs.dish_id IS NOT NULL',
+  `AND obs.dish_id IS NOT NULL AND dish.dish_id IS NOT NULL
+  ${PRODUCTION_REPORT_FILTER} ${REPORT_PUBLICATION_FILTER}`,
+);
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
 
 function rateMetric(
@@ -270,12 +443,20 @@ function rateMetric(
   denominator: number,
   belowDishFloor: boolean,
   eligibleSessions: number,
+  protectSmallPartitions = false,
 ) {
   if (belowDishFloor)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (denominator === 0)
     return { value: null, status: 'NOT_MEASURABLE', eligible_sessions: eligibleSessions };
   if (eligibleSessions < 10)
+    return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
+  if (
+    protectSmallPartitions &&
+    numerator > 0 &&
+    numerator < denominator &&
+    Math.min(numerator, denominator - numerator) < 10
+  )
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (numerator === 0)
     return { value: 0, status: 'VALID_ZERO', eligible_sessions: eligibleSessions };
@@ -310,8 +491,11 @@ function buildInternalReport(
   venueId: string,
   now: Date,
   source: OwnerReportSource = 'production',
+  durationMs = 86_400_000,
 ) {
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const start = new Date(now.getTime() - durationMs);
+  const isBatch = durationMs === OWNER_BATCH_MS;
+  const visibleRows = isBatch ? rows.filter((row) => Number(row.total_sessions) >= 10) : rows;
   const lastEventIngestedAt = rows.reduce<string | null>((latest, row) => {
     const timestamp = timestampOrNull(row.last_event_ingested_at);
     return timestamp && (!latest || timestamp > latest) ? timestamp : latest;
@@ -322,28 +506,34 @@ function buildInternalReport(
     venue_id: venueId,
     source,
     report_metadata: {
-      calculation_version: `${source}.v1`,
+      calculation_version: isBatch ? 'production.batch.v1' : `${source}.v1`,
       generated_at: now.toISOString(),
       date_window: {
-        duration_hours: 24,
-        start_time: yesterday.toISOString(),
+        duration_hours: Math.floor(durationMs / 3_600_000),
+        start_time: start.toISOString(),
         end_time: now.toISOString(),
       },
       coverage: {
-        total_dishes_monitored: rows.length,
-        measurable_dishes_count: rows.filter((row) => Number(row.total_sessions) >= 10).length,
+        total_dishes_monitored: visibleRows.length,
+        measurable_dishes_count: visibleRows.filter((row) => Number(row.total_sessions) >= 10)
+          .length,
       },
       freshness: {
         is_stale: null,
         last_event_ingested_at: lastEventIngestedAt,
       },
-      report_status: rows.length === 0 ? 'EMPTY' : 'NORMAL',
+      report_status: visibleRows.length === 0 ? 'EMPTY' : 'NORMAL',
     },
-    dishes: rows.map((row) => {
+    dishes: visibleRows.map((row) => {
       const totalSessions = Number(row.total_sessions);
       const openEligibleSessions = Number(row.open_eligible_sessions);
       const timedSessions = Number(row.timed_sessions);
       const belowDishFloor = totalSessions < 10;
+      const coverageHasSmallSessionGroup =
+        isBatch &&
+        [row.timed_opening_sessions, row.untimed_opening_sessions]
+          .map(Number)
+          .some((count) => count > 0 && count < 10);
 
       return {
         dish_id: row.dish_id,
@@ -362,26 +552,30 @@ function buildInternalReport(
           timing_coverage: rateMetric(
             Number(row.timed_openings),
             Number(row.total_openings),
-            belowDishFloor,
+            belowDishFloor || coverageHasSmallSessionGroup,
             openEligibleSessions,
+            isBatch,
           ),
           open_rate: rateMetric(
             Number(row.exposed_open_sessions),
             totalSessions,
             belowDishFloor,
             totalSessions,
+            isBatch,
           ),
           engagement_rate: rateMetric(
             Number(row.engaged_sessions),
             openEligibleSessions,
             belowDishFloor,
             openEligibleSessions,
+            isBatch,
           ),
           save_rate: rateMetric(
             Number(row.saved_sessions),
             totalSessions,
             belowDishFloor,
             totalSessions,
+            isBatch,
           ),
         },
       };

@@ -4,7 +4,8 @@
 // 1. Each verified, still-pending draft is approved through the existing approval command
 //    (approveDishDraftAtomic) with the owner's persisted verification and the exact draft/review
 //    versions. That command snapshots the approved facts (category, price, ingredients, confirmed
-//    allergens, serving count, selected photo) onto a canonical dish revision.
+//    allergens, serving count, confirmed photo measurements, selected photo) onto a canonical
+//    dish revision.
 // 2. The existing producer reads those canonical revisions (loadApprovedDishSources) and builds
 //    the bundle (produceMenuBundle), with owner-approved photos bound to each revision and the
 //    agreed text-only fallback for dishes without a photo.
@@ -16,13 +17,21 @@
 // or partial run is safe to repeat: approvals use deterministic command IDs and a stable dish ID
 // per draft, and already-approved dishes are included again on the next run.
 import {
+  canonicalJson,
+  type PlateCalibration,
   type PublicMenuContentBundle,
+  type PublicPortion,
   sha256,
   verifyPublicMenuContentBytes,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
+import {
+  type PreparedApprovedPortion,
+  prepareApprovedPortion,
+} from './bundle-producer/approved-portions';
 import { derivedUuid } from './bundle-producer/ids';
 import { logoDimensions } from './bundle-producer/logo-image';
+import { calibratedPhotoDimensions } from './bundle-producer/photo-dimensions';
 import {
   type ApprovedDishSource,
   type BundleDiagnostic,
@@ -33,7 +42,8 @@ import {
 import { loadApprovedDishSources } from './bundle-producer/repository';
 import { type MenuBundleRequest, MenuBundleRequestSchema } from './bundle-producer/request';
 import { IngestionError } from './ingestion/repository';
-import { readPublicMenu } from './public-menu';
+import { exportApprovedPrivatePortion, previewKey } from './owner-portion-preview';
+import { type PublicMenuRecord, readPublicMenu } from './public-menu';
 import { beginAuthorizedOwner } from './publication-command';
 
 export const PREPARED_BUNDLE_PATH = '/public/prepared-bundles';
@@ -77,6 +87,59 @@ export const assetUrl = (origin: string, venueId: string, photoId: string, hash:
   `${origin}${PREPARED_ASSET_PATH}/${venueId}/${photoId}/${hash}`;
 export const logoUrl = (origin: string, venueId: string, hash: string, extension: string) =>
   `${origin}${PREPARED_ASSET_PATH}/${venueId}/logo/${hash}.${extension}`;
+
+function portionStorage(storage: PreparedStorage) {
+  return {
+    get: async (key: string) => {
+      const object = await storage.get(key);
+      if (!object) return null;
+      const bytes = await object.arrayBuffer();
+      return { size: bytes.byteLength, arrayBuffer: async () => bytes };
+    },
+  };
+}
+
+type OwnerPortionSource = {
+  venueId: string;
+  dishId: string;
+  dishRevisionId: string;
+  draftId: string;
+  photoId: string;
+  sourceHash: string;
+  sourceStorageKey: string;
+  sourceContentType: string;
+  origin: string;
+  portionCalibration?: PlateCalibration | null;
+  servingCount?: number | null;
+};
+
+async function approvedOwnerPortion(storage: PreparedStorage, expected: OwnerPortionSource) {
+  const key = previewKey(expected.venueId, expected.draftId, expected.photoId, expected.sourceHash);
+  const artifact = await exportApprovedPrivatePortion(portionStorage(storage), key);
+  // The measurements come from approved facts (or the exact immutable published snapshot).
+  // Check the actual selected photo here, never the browser's declared source dimensions.
+  let sourceDimensions: { width: number; height: number } | undefined;
+  if (expected.portionCalibration) {
+    const source = await readHashedObject(storage, expected.sourceStorageKey, expected.sourceHash);
+    if (!source) throw new Error('owner_portion_source_unavailable');
+    sourceDimensions = calibratedPhotoDimensions(source, expected.sourceContentType);
+  }
+  return prepareApprovedPortion(
+    {
+      ...artifact,
+      venueId: expected.venueId,
+      dishId: expected.dishId,
+      dishRevisionId: expected.dishRevisionId,
+      publicationEligible: false,
+    },
+    {
+      ...expected,
+      ...(sourceDimensions ? { sourceDimensions } : {}),
+      assetBaseUrl: `${expected.origin}${PREPARED_ASSET_PATH}`,
+      layerUrl: (hash) => assetUrl(expected.origin, expected.venueId, expected.photoId, hash),
+    },
+  );
+}
 
 async function inOwnerRead<T>(
   client: Client,
@@ -169,13 +232,15 @@ async function readOwnerRestaurant(
 }
 
 /** The owner-selected photo of each approved revision, hash-checked against storage. */
+type PreparedOwnerPhoto = OwnerApprovedPhoto & { storageKey: string; contentType: string };
+
 async function readOwnerPhotos(
   client: Client,
   venueId: string,
   origin: string,
   storage: PreparedStorage,
   sources: ReadonlyMap<string, ApprovedDishSource>,
-): Promise<Map<string, OwnerApprovedPhoto>> {
+): Promise<Map<string, PreparedOwnerPhoto>> {
   const wanted = [...sources.values()].filter((source) => source.approvedPhotoId);
   if (wanted.length === 0) return new Map();
   const rows = await client.query<{
@@ -198,7 +263,7 @@ async function readOwnerPhotos(
       wanted.map((source) => source.approvedPhotoId),
     ],
   );
-  const photos = new Map<string, OwnerApprovedPhoto>();
+  const photos = new Map<string, PreparedOwnerPhoto>();
   for (const row of rows.rows) {
     const source = sources.get(row.dish_id);
     // Only the photo the owner selected on this exact revision (tenant- and draft-bound above).
@@ -213,6 +278,8 @@ async function readOwnerPhotos(
       photoId: row.id,
       url: assetUrl(origin, venueId, row.id, row.source_hash),
       sha256: row.source_hash,
+      storageKey: row.storage_key,
+      contentType: row.content_type,
       width: size.width,
       height: size.height,
     });
@@ -327,6 +394,36 @@ export async function prepareOwnerMenu(
     photos: await readOwnerPhotos(client, venueId, origin, storage, sources),
   }));
 
+  const portions = new Map<string, PreparedApprovedPortion>();
+  for (const draft of approved) {
+    const source = sources.get(draft.published_dish_id);
+    const photo = source && photos.get(source.dishId);
+    if (!source || !photo) continue;
+    const expected = {
+      venueId,
+      dishId: source.dishId,
+      dishRevisionId: source.dishRevisionId,
+      draftId: draft.id,
+      photoId: photo.photoId,
+      sourceHash: photo.sha256,
+      sourceStorageKey: photo.storageKey,
+      sourceContentType: photo.contentType,
+      ...(source.portionCalibration !== undefined
+        ? { portionCalibration: source.portionCalibration }
+        : {}),
+      ...(source.servingCount !== undefined ? { servingCount: source.servingCount } : {}),
+      origin,
+    };
+    const key = previewKey(venueId, draft.id, photo.photoId, photo.sha256);
+    // No private human approval means ordinary photo fallback; corrupt approval never publishes.
+    if (!(await storage.get(`${key}/approval.json`))) continue;
+    try {
+      portions.set(source.dishId, await approvedOwnerPortion(storage, expected));
+    } catch {
+      throw new IngestionError('approved_portion_unavailable', 409);
+    }
+  }
+
   const byCategory = new Map<string, MenuBundleRequest['categories'][number]['dishes']>();
   for (const draft of approved) {
     const source = sources.get(draft.published_dish_id);
@@ -339,6 +436,7 @@ export async function prepareOwnerMenu(
       dietary: [],
       image_alt: `Photo of ${source.name.trim()}`.slice(0, 500),
       t0_asset_id: null,
+      ...(portions.has(source.dishId) ? { portion: portions.get(source.dishId)!.portion } : {}),
     });
     byCategory.set(category, list);
   }
@@ -364,6 +462,7 @@ export async function prepareOwnerMenu(
   try {
     produced = await produceMenuBundle(request.data, sources, new Map(), {
       ownerPhotos: photos,
+      ownerPortions: portions,
       missingPhoto: 'text_only',
     });
   } catch (error) {
@@ -436,6 +535,15 @@ async function readPublishedSnapshot(
   // Reuse the publication -> approval -> exact bundle join used by the public menu envelope.
   const menu = await readPublicMenu(client, venueId, menuId);
   if (!menu) return null;
+  return verifyPublishedSnapshot(storage, menu);
+}
+
+type PublishedSnapshot = Pick<PublicMenuRecord, 'venueId' | 'menuId' | 'menuRevisionId'> & {
+  bundle: Pick<PublicMenuRecord['bundle'], 'url' | 'contentHash'>;
+};
+
+export async function verifyPublishedSnapshot(storage: PreparedStorage, menu: PublishedSnapshot) {
+  const { venueId, menuId } = menu;
   const origin = new URL(menu.bundle.url).origin;
   if (
     menu.bundle.url !==
@@ -487,7 +595,14 @@ export async function readPreparedBundle(
   return snapshot?.content.menu_revision_id === revisionId ? snapshot.bytes : null;
 }
 
-type AssetRow = { storage_key: string; content_type: string; hash: string };
+type AssetRow = {
+  storage_key: string;
+  content_type: string;
+  hash: string;
+  approvedPortion?: OwnerPortionSource & {
+    portion: PublicPortion;
+  };
+};
 
 async function snapshotAsset(
   client: Client,
@@ -497,6 +612,48 @@ async function snapshotAsset(
   file: string,
 ): Promise<AssetRow | null> {
   const url = `${origin}${PREPARED_ASSET_PATH}/${content.venue_id}/${assetId}/${file}`;
+  for (const category of content.categories)
+    for (const dish of category.dishes) {
+      if (!dish.complete || !dish.portion) continue;
+      const layer = dish.portion.layers.find((value) => value.url === url && value.sha256 === file);
+      if (!layer) continue;
+      // The hash-verified published approval binds this historical revision/photo. Draft edits
+      // and preparation must not change live bytes; private approval revocation still does.
+      const found = await client.query<{
+        draft_id: string;
+        source_hash: string;
+        storage_key: string;
+        content_type: string;
+      }>(
+        `SELECT p.draft_id,p.source_hash,p.storage_key,p.content_type FROM app_private.dish_draft_photo p
+        WHERE p.tenant_id=$1 AND p.id=$2 AND p.verification_status='verified'
+          AND p.storage_key='menu-assets/' || p.tenant_id || '/' || p.id || '/' || p.source_hash`,
+        [content.venue_id, assetId],
+      );
+      const row = found.rows[0];
+      if (!row) return null;
+      return {
+        storage_key: `${previewKey(content.venue_id, row.draft_id, assetId, row.source_hash)}/${layer.depth === 0 ? 'background.svg' : 'dish.webp'}`,
+        hash: file,
+        content_type: layer.depth === 0 ? 'image/svg+xml' : 'image/webp',
+        approvedPortion: {
+          venueId: content.venue_id,
+          dishId: dish.dish_id,
+          dishRevisionId: dish.dish_revision_id,
+          draftId: row.draft_id,
+          photoId: assetId,
+          sourceHash: row.source_hash,
+          sourceStorageKey: row.storage_key,
+          sourceContentType: row.content_type,
+          ...(dish.portion.physical_size
+            ? { portionCalibration: dish.portion.physical_size.plate }
+            : {}),
+          ...(dish.serving_count !== undefined ? { servingCount: dish.serving_count } : {}),
+          origin,
+          portion: dish.portion,
+        },
+      };
+    }
   const isLogo = assetId === 'logo';
   const selected = isLogo
     ? content.restaurant.logo?.url === url
@@ -531,6 +688,17 @@ async function snapshotAsset(
 
 async function assetBytes(storage: PreparedStorage, row: AssetRow | null) {
   if (!row) return null;
+  if (row.approvedPortion) {
+    try {
+      const prepared = await approvedOwnerPortion(storage, row.approvedPortion);
+      if (canonicalJson(prepared.portion) !== canonicalJson(row.approvedPortion.portion))
+        return null;
+      const file = prepared.files.find((value) => value.sha256 === row.hash);
+      return file ? { bytes: file.bytes, contentType: row.content_type } : null;
+    } catch {
+      return null;
+    }
+  }
   const bytes = await readHashedObject(storage, row.storage_key, row.hash);
   return bytes && imageDimensions(bytes, row.content_type)
     ? { bytes, contentType: row.content_type }

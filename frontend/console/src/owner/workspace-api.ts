@@ -1,5 +1,11 @@
-import { type OwnerVenue, OwnerWorkspaceResponseSchema } from '@peekaplate/contracts';
-
+import {
+  type OwnerVenue,
+  OwnerVenueSchema,
+  OwnerWorkspaceResponseSchema,
+  type RestaurantProfile,
+} from '@peekaplate/contracts';
+import { fieldError, type RestaurantDetails } from '../onboarding/details';
+import { newCommandId, newIdempotencyKey, type OwnerMenuClient } from '../owner-menu/api';
 import { readWorkspaceApiBase } from './api-origin';
 
 export { readWorkspaceApiBase } from './api-origin';
@@ -8,6 +14,98 @@ export type WorkspaceState =
   | { kind: 'loading' }
   | { kind: 'ready'; venues: OwnerVenue[] }
   | { kind: 'signed_out' | 'denied' | 'unavailable' | 'error' | 'invalid' };
+
+export type RestaurantCreationState =
+  | { kind: 'created'; venue: OwnerVenue }
+  | { kind: 'signed_out' | 'denied' | 'unavailable' | 'error' | 'invalid' | 'conflict' | 'quota' };
+
+export async function createRestaurant({
+  apiBase,
+  commandId,
+  name,
+  getAccessToken,
+  signal,
+  fetch: send = fetch,
+}: {
+  apiBase: string;
+  commandId: string;
+  name: string;
+  getAccessToken: () => Promise<string | null>;
+  signal: AbortSignal;
+  fetch?: typeof fetch;
+}): Promise<RestaurantCreationState> {
+  const origin = readWorkspaceApiBase(apiBase);
+  if (!origin) return { kind: 'unavailable' };
+  const trimmed = name.trim();
+  if (fieldError('name', trimmed) || !OwnerVenueSchema.shape.venueId.safeParse(commandId).success)
+    return { kind: 'invalid' };
+  try {
+    const token = await getAccessToken();
+    if (!token) return { kind: 'signed_out' };
+    if (signal.aborted) return { kind: 'error' };
+    const response = await send(`${origin}/staff/venues`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ commandId, name: trimmed }),
+      credentials: 'omit',
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.any([signal, AbortSignal.timeout(12_000)]),
+    });
+    if (response.status === 401) return { kind: 'signed_out' };
+    if (response.status === 403) return { kind: 'denied' };
+    if (response.status === 409) return { kind: 'conflict' };
+    if (response.status === 429) return { kind: 'quota' };
+    if (response.status === 404 || response.status === 503) return { kind: 'unavailable' };
+    if (!response.ok) return { kind: 'error' };
+    const body = await response.json();
+    const parsed = OwnerVenueSchema.safeParse(body?.venue);
+    if (!parsed.success || parsed.data.permission !== 'owner' || Object.keys(body).length !== 1)
+      return { kind: 'invalid' };
+    return { kind: 'created', venue: parsed.data };
+  } catch {
+    return { kind: 'error' };
+  }
+}
+
+export function restaurantDetailsSaver() {
+  let photoAttempt: { file: File; key: string } | undefined;
+  const commands = new Map<string, string>();
+  return async (
+    client: OwnerMenuClient,
+    venueId: string,
+    details: RestaurantDetails,
+    photo: File | null,
+    profile: RestaurantProfile | null,
+  ) => {
+    let photoId = profile?.fields.photoId ?? null;
+    if (photo) {
+      if (photoAttempt?.file !== photo) photoAttempt = { file: photo, key: newIdempotencyKey() };
+      photoId = (await client.uploadProfilePhoto(venueId, photo, photoAttempt.key)).id;
+    }
+    const fields = { ...details, photoId };
+    const expectedVersion = profile?.version ?? 0;
+    const key = JSON.stringify([venueId, expectedVersion, fields]);
+    let commandId = commands.get(key);
+    if (!commandId) {
+      commandId = newCommandId();
+      commands.set(key, commandId);
+    }
+    return client.saveProfile(venueId, { commandId, expectedVersion, fields });
+  };
+}
+
+export function restaurantDetailsSavedMessage(status?: RestaurantProfile['status']): string {
+  return status === 'verified'
+    ? 'Restaurant details saved. Verified. This does not publish your menu.'
+    : status === 'submitted'
+      ? 'Restaurant details saved and submitted for team verification. This does not publish your menu.'
+      : 'Restaurant details saved. Verification status unavailable.';
+}
 
 export async function fetchOwnerWorkspace({
   apiBase,

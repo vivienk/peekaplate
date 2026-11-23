@@ -69,15 +69,29 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
     recovery?.abort.abort();
     recovery = null;
   }
-  function providerClient(persistent: boolean, signal?: AbortSignal) {
+  function providerClient(persistent: boolean, signal?: AbortSignal, verifier?: string) {
+    const storageKey = 'peekaplate-owner-confirmation';
+    const memory = new Map<string, string>();
+    if (verifier) memory.set(`${storageKey}-code-verifier`, verifier);
     return createClient(config.url, config.publishableKey, {
       auth: {
         flowType: 'pkce',
         detectSessionInUrl: false,
         persistSession: persistent,
-        autoRefreshToken: persistent,
+        autoRefreshToken: persistent && !verifier,
         debug: false,
-        ...(!persistent ? { storageKey: 'peekaplate-owner-recovery' } : {}),
+        ...(verifier
+          ? {
+              storageKey,
+              storage: {
+                getItem: (key: string) => memory.get(key) ?? null,
+                setItem: (key: string, value: string) => void memory.set(key, value),
+                removeItem: (key: string) => void memory.delete(key),
+              },
+            }
+          : !persistent
+            ? { storageKey: 'peekaplate-owner-recovery' }
+            : {}),
       },
       global: {
         fetch: (input, init) =>
@@ -93,9 +107,29 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
     });
   }
   const client = providerClient(true);
-  client.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')
-      clearRecovery();
+  const sessionListeners = new Set<() => void>();
+  let lastAccessToken: string | undefined;
+  let lastActorId: string | undefined;
+  client.auth.onAuthStateChange((event, session) => {
+    const token = session?.access_token;
+    const actorId =
+      event !== 'SIGNED_OUT' && session && confirmed(session.user) ? session.user.id : undefined;
+    if (event === 'INITIAL_SESSION') {
+      lastAccessToken = token;
+      lastActorId = actorId;
+      return;
+    }
+    if (event !== 'SIGNED_OUT' && event !== 'SIGNED_IN' && event !== 'TOKEN_REFRESHED') return;
+    // Supabase re-emits SIGNED_IN with the same session when the tab regains focus.
+    if (event === 'SIGNED_IN' && token && token === lastAccessToken && actorId === lastActorId)
+      return;
+    const sameOwner = Boolean(token && actorId && actorId === lastActorId);
+    lastAccessToken = token;
+    lastActorId = actorId;
+    clearRecovery();
+    // Revalidate the new token on the next API call without remounting a same-owner draft.
+    if (sameOwner) return;
+    for (const listener of sessionListeners) listener();
   });
 
   async function signedInOwner(): Promise<SignedInOwner | null> {
@@ -105,28 +139,35 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
 
   async function accessTokenFor(actorId: string): Promise<string | null> {
     try {
-      const { data, error } = await client.auth.getSession();
-      const session = data.session;
-      if (error || !session || session.user.id !== actorId) return null;
-      const version = sessionVersion;
-      const checked = await client.auth.getUser(session.access_token);
-      return !checked.error &&
-        confirmed(checked.data.user) &&
-        checked.data.user.id === actorId &&
-        sessionVersion === version
-        ? session.access_token
-        : null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const version = sessionVersion;
+        const { data, error } = await client.auth.getSession();
+        const session = data.session;
+        if (error || !session || session.user.id !== actorId) return null;
+        if (sessionVersion !== version) {
+          if (lastActorId === actorId) continue;
+          return null;
+        }
+        const checked = await client.auth.getUser(session.access_token);
+        if (sessionVersion !== version && lastActorId === actorId) continue;
+        return !checked.error &&
+          confirmed(checked.data.user) &&
+          checked.data.user.id === actorId &&
+          sessionVersion === version
+          ? session.access_token
+          : null;
+      }
+      return null;
     } catch {
       return null;
     }
   }
 
   function onSessionChange(callback: () => void) {
-    const { data } = client.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED')
-        callback();
-    });
-    return () => data.subscription.unsubscribe();
+    sessionListeners.add(callback);
+    return () => {
+      sessionListeners.delete(callback);
+    };
   }
 
   async function signOut(): Promise<boolean> {
@@ -259,19 +300,50 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
     },
   };
 
-  async function confirmEmail(code: string): Promise<{ kind: 'confirmed' | 'invalid_link' }> {
+  async function confirmEmail(
+    code: string,
+    signal?: AbortSignal,
+  ): Promise<{ kind: 'confirmed' | 'invalid_link' }> {
     if (!code || code.length > 2048) return { kind: 'invalid_link' };
-    let recovery = false;
-    const { data: listener } = client.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') recovery = true;
+    let confirmationClient: SupabaseClient;
+    const project = new URL(config.url).hostname.split('.')[0];
+    const key = `sb-${project}-auth-token-code-verifier`;
+    let verifier: string | null = null;
+    try {
+      verifier = signal ? localStorage.getItem(key) : null;
+      if (signal && !verifier) return { kind: 'invalid_link' };
+      confirmationClient = verifier ? providerClient(true, signal, verifier) : client;
+    } catch {
+      return { kind: 'invalid_link' };
+    }
+    let exchangedToken: string | undefined;
+    let recoveryToken: string | undefined;
+    const { data: listener } = confirmationClient.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') recoveryToken = session?.access_token;
     });
     try {
-      const { error } = await client.auth.exchangeCodeForSession(code);
-      if (error) return { kind: 'invalid_link' };
-      const owner = !recovery ? await signedInOwner() : null;
-      const signedOut = await signOut();
-      return { kind: owner && signedOut ? 'confirmed' : 'invalid_link' };
+      const { data, error } = await confirmationClient.auth.exchangeCodeForSession(code);
+      if (error || !data.session) return { kind: 'invalid_link' };
+      exchangedToken = data.session.access_token;
+      // A rejected link or an older exchange must not clear a newer signup's verifier.
+      if (verifier && localStorage.getItem(key) === verifier) localStorage.removeItem(key);
+      const checked =
+        recoveryToken === exchangedToken
+          ? null
+          : await confirmationClient.auth.getUser(exchangedToken);
+      const owner =
+        checked &&
+        !checked.error &&
+        confirmed(checked.data.user) &&
+        checked.data.user.id === data.session.user.id;
+      const { data: current } = await confirmationClient.auth.getSession();
+      if (current.session?.access_token !== exchangedToken) return { kind: 'invalid_link' };
+      const signedOut = signal
+        ? !(await confirmationClient.auth.signOut({ scope: 'local' })).error
+        : await signOut();
+      return { kind: owner && signedOut && !signal?.aborted ? 'confirmed' : 'invalid_link' };
     } catch {
+      if (exchangedToken && !signal) await discardExchangedSession(exchangedToken).catch(() => {});
       return { kind: 'invalid_link' };
     } finally {
       listener.subscription.unsubscribe();

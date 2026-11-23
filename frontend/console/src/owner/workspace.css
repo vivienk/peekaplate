@@ -1,3 +1,4 @@
+@import "../owner-dashboard/performance.css";
 .owner-workspace-state {
   max-width: 48rem;
   margin: var(--pp-space-32) auto;

@@ -74,7 +74,8 @@ beforeAll(async () => {
           schema_version text NOT NULL CHECK (schema_version = 'observation.v2'),
           event_type text NOT NULL CHECK (event_type IN (
             'menu_viewed', 'dish_viewed', 'dish_detail_opened', 'dish_detail_closed',
-            'dish_activity_checkpoint', 'dish_compared', 'dish_saved', 'dish_unsaved', 'shortlist_viewed'
+            'dish_activity_checkpoint', 'dish_compared', 'dish_portion_opened', 'dish_saved',
+            'dish_unsaved', 'shortlist_viewed'
           )),
           authorized_publication_id uuid NOT NULL,
           occurred_at timestamptz NOT NULL,

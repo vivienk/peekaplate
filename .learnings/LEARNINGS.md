@@ -182,3 +182,33 @@ treating an external screenshot as a product defect.
 Related: frontend/console/owner-auth.html, frontend/console/src/auth/live.tsx,
 docs/review/owner-backend-screens/README.md.
 Pattern: tests.visual-entry-parity; first occurrence, no policy promotion.
+
+November 17 S09 follow-up: retaining a component name is insufficient when new
+media bypasses its existing size constraints. Populate the authored image area
+and check rendered bounds; do not add an unrestricted-height preview inside it.
+
+November 17 release follow-up: compare candidate files with the deployed main
+branch, not only develop. A selective promotion can otherwise remove main-only
+authored performance presentation and lazy camera cleanup even when develop
+tests pass. Preserve those implementations and rerun their original regressions;
+source provenance and a green feature branch do not establish release parity.
+
+## LRN-20261117-WORKER-REDIRECT · Test platform request options in workerd
+
+**Logged**: November 17, 2026 · **Status**: resolved · **Area**: tests
+
+Node fetch mocks accepted `redirect: 'error'`, but workerd rejected it before any
+outbound request. Use manual redirects with explicit non-success rejection at
+the Worker boundary. A regression must import the actual bridge and host under
+workerd; checking a mocked options object cannot establish platform support.
+Browser and Node-only callers have different capabilities and need not change.
+
+Related: backend/src/owner-portion-preview.test.ts,
+backend/src/owner-portion-preview.workerd-harness.ts.
+Pattern: tests.platform-options-not-mocked; first occurrence, no policy promotion.
+
+November 17 S13 follow-up: a preparation handoff must carry the exact returned
+menu/revision identity into the authored preview. Stopping at an intermediate
+historical picker hides the implemented screen; choosing the first snapshot
+can instead preview stale content. Test multiple snapshots and direct navigation,
+not only a successful manual click through an incidental wrapper.

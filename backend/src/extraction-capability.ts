@@ -4,7 +4,11 @@ export type ExtractionSource = { tenantId: string; jobId: string; sourceHash: st
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const lifetimeSeconds = 15 * 60;
 const issuer = 'peekaplate-api';
-const audience = 'peekaplate-extraction-staging';
+const extractionAudiences = {
+  staging: 'peekaplate-extraction-staging',
+  production: 'peekaplate-extraction-production',
+} as const;
+export type ExtractionEnvironment = keyof typeof extractionAudiences;
 function valid(source: ExtractionSource): boolean {
   return (
     uuid.test(source.tenantId) &&
@@ -23,13 +27,14 @@ export async function mintExtractionCapability(
   source: ExtractionSource,
   secret: string,
   now = Date.now(),
+  environment: ExtractionEnvironment = 'staging',
 ): Promise<string> {
   if (!valid(source)) throw new Error('Invalid source scope');
   const issued = Math.floor(now / 1000);
   return new SignJWT({ ...source, version: 1 })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(issuer)
-    .setAudience(audience)
+    .setAudience(extractionAudiences[environment])
     .setIssuedAt(issued)
     .setExpirationTime(issued + lifetimeSeconds)
     .sign(signingKey(secret));
@@ -39,13 +44,14 @@ export async function readExtractionCapability(
   token: string,
   secret: string,
   now = Date.now(),
+  environment: ExtractionEnvironment = 'staging',
 ): Promise<ExtractionSource | null> {
   try {
     if (!token || token.length > 4096) return null;
     const { payload } = await jwtVerify(token, signingKey(secret), {
       algorithms: ['HS256'],
       issuer,
-      audience,
+      audience: extractionAudiences[environment],
       currentDate: new Date(now),
     });
     const source = {

@@ -128,13 +128,13 @@
   border-collapse: collapse;
   text-align: left;
 }
-/* Figma column widths on the 1038px table: Dish 573, Category 106, Price 83, Status 161, Edit 115. */
+/* Keep the authored table; share the dish column's spare width with category labels. */
 .review-table thead th:nth-child(1) {
-  width: 55%;
+  width: 49%;
   border-top-left-radius: var(--pp-radius-12);
 }
 .review-table thead th:nth-child(2) {
-  width: 10%;
+  width: 16%;
 }
 .review-table thead th:nth-child(3) {
   width: 8%;
@@ -357,16 +357,18 @@
 .review-table tbody td {
   white-space: nowrap;
 }
+.review-table tbody td:nth-child(2) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.review-dish__name,
+.review-dish__meta {
+  overflow-wrap: anywhere;
+}
 @media (min-width: 70rem) {
   .review-table {
     table-layout: fixed;
   }
-}
-
-/* S8 "Pending Review" pill (Figma: blue label). */
-.review-status--information {
-  background: var(--pp-color-info-100);
-  color: var(--pp-role-on-surface);
 }
 
 .review-root :focus-visible {

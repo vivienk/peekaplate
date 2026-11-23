@@ -1,6 +1,9 @@
+export const PRODUCTION_OWNER_API_ORIGIN = 'https://api.peekaplate.app';
+
 const API_ORIGINS = new Set([
   'http://127.0.0.1:8787',
   'https://peekaplate-api-staging.vxkong.workers.dev',
+  PRODUCTION_OWNER_API_ORIGIN,
 ]);
 
 export function readWorkspaceApiBase(value: unknown): string | null {

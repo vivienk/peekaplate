@@ -89,9 +89,10 @@ PR preview builds force the connection off even if ambient config is present.
   that requested them. Use the newest link if several requests were made. A new
   device, blocked storage, expired/reused code or wrong flow must fail safely.
 - Callback pages remove query/fragment credentials from the address bar before
-  starting provider requests, use `no-referrer`, and contain no analytics. A user
-  selects Continue before exchanging a confirmation code. Arbitrary `next` URLs,
-  duplicate codes and implicit token fragments are rejected.
+  starting provider requests, use `no-referrer`, and contain no analytics.
+  Production signup confirmation automatically exchanges the email code in the
+  browser that started signup. Staging and local callbacks still use Continue.
+  Arbitrary `next` URLs, duplicate codes and implicit token fragments are rejected.
 - Confirmation verifies the user with Supabase, ends its callback session and
   returns to sign-in. It never accepts a pre-existing session as confirmation.
 - Sign-out ends this device's refresh session. Already-issued access JWTs can
@@ -247,3 +248,7 @@ The hosted 308 responses reproduced this gap after the first workspace release.
 The clean-path unit case and both SDK/browser flows fail before the correction
 and pass afterward. SDK browser responses are synthetic HTTP; this evidence
 does not establish fresh email delivery or a genuine hosted staff session.
+
+## Staging restaurant creation
+
+Confirmed staging/local users can choose Create test restaurant from the restaurant chooser, including an empty account. A single-restaurant account reaches the chooser through the existing Owner account menu. Creation assigns only the signed-in actor ownership of a new empty restaurant; signing in never grants access to another restaurant. Existing demo restaurants and credentials remain unchanged. The authoritative membership refresh opens the existing S05 details screen. This addition is staging testing UI, not a replacement onboarding design.

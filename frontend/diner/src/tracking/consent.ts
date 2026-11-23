@@ -51,7 +51,7 @@ export function readPrivacySignal(): boolean {
   }
 }
 
-// The diner's choice. Withdrawing it (false) stops collection and pending sends on both paths.
+// Enable verified production tracking or apply the staging choice. Browser privacy signals win.
 export function setTrackingAllowed(value: boolean): void {
   chosen = value;
   notify();

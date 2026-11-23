@@ -1,4 +1,8 @@
-import { isAllowedEvent, type P0EventName } from '@peekaplate/analytics/event-names';
+import {
+  isAllowedEvent,
+  P0_EVENT_NAMES,
+  type P0EventName,
+} from '@peekaplate/analytics/event-names';
 import { describe, expect, it } from 'vitest';
 import fixtures from '../../../../packages/contracts/fixtures/observation.v2/fixtures.json';
 import { buildEnvelope } from './envelope';
@@ -6,7 +10,7 @@ import type { Identity } from './identity';
 import { isValidObservation } from './validate';
 
 // The shared synthetic fixtures (packages/contracts/fixtures/observation.v2): one valid and one
-// invalid example per event type. Only the 8 P0 types reach validation; the allowlist drops the rest.
+// invalid example per event type. Only allowlisted diner types reach validation.
 type Fixture = {
   type: string;
   publication_revision_id: string;
@@ -20,7 +24,7 @@ const p0 = <T extends { type: string }>(items: T[]) =>
 
 describe('strict observation.v2 validation', () => {
   it('accepts every valid shared fixture for the P0 events', () => {
-    expect(p0(valid)).toHaveLength(8);
+    expect(p0(valid)).toHaveLength(P0_EVENT_NAMES.length);
     for (const event of p0(valid)) {
       expect(
         isValidObservation(event.type as P0EventName, event.publication_revision_id, event.payload),
@@ -31,7 +35,7 @@ describe('strict observation.v2 validation', () => {
 
   it('rejects every invalid shared fixture for the P0 events', () => {
     const cases = p0(invalid.map(({ name, event }) => ({ name, ...event })));
-    expect(cases).toHaveLength(8);
+    expect(cases).toHaveLength(P0_EVENT_NAMES.length);
     for (const event of cases) {
       expect(
         isValidObservation(event.type as P0EventName, event.publication_revision_id, event.payload),

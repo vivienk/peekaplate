@@ -5,8 +5,8 @@
 //   not produce allergen data. Saving sends only the changed fields as a review correction.
 // - A manual dish is the owner's own draft. Saving replaces the full field snapshot (PUT).
 //
-// Nothing here turns a missing or unknown value into a fact: an empty unknown allergen list is
-// never "no allergens", and approval keeps the staff-warning fallback until allergens are confirmed.
+// Missing currency uses the agreed USD pilot policy, not OCR evidence. An unknown allergen list
+// is never "no allergens"; approval keeps the staff warning until allergens are confirmed.
 import {
   type ApproveDishDraftRequest,
   type CandidateCorrectedFields,
@@ -16,6 +16,7 @@ import {
   type SaveOwnerDishDraft,
 } from '@peekaplate/contracts';
 import type { DishDraft } from './api';
+import { servingCountText, servingCountValue } from './servingCount';
 
 export type ValueStatus = 'unknown' | 'proposed' | 'confirmed';
 export type AllergenCode = OwnerDishFields['allergens']['items'][number];
@@ -29,9 +30,14 @@ export type DishForm = {
   priceAmount: string;
   priceCurrency: string;
   servingCount?: string;
+  portionCalibration?: OwnerDishFields['portionCalibration'];
   ingredients: { status: ValueStatus; items: string[] };
   allergens: { status: ValueStatus; items: AllergenCode[] };
   photoId: string | null;
+  // Editor-only AI markers; save commands persist review status, never these display tags.
+  aiIng?: string[];
+  aiAlg?: string[];
+  aiUsed?: boolean;
   // Extracted dishes only: where the values came from, kept visible next to the form.
   source: {
     extractionId: string;
@@ -39,13 +45,27 @@ export type DishForm = {
     reviewVersion: number;
     // The printed price as read ("8.50 / 12.50 CAD"), shown when no single amount was found.
     priceText: string | null;
+    currencyDefaulted?: boolean;
     // Fields OCR could not read or the owner marked incomplete, highlighted on the form.
     uncertainFields: string[];
     rejected: boolean;
   } | null;
 };
 
+// A confirmation describes one serving and one source photo, never future edits of either.
+export function invalidateChangedCalibration(previous: DishForm, next: DishForm): DishForm {
+  return previous.servingSize !== next.servingSize ||
+    previous.servingCount !== next.servingCount ||
+    previous.photoId !== next.photoId
+    ? { ...next, portionCalibration: null }
+    : next;
+}
+
 export const STAFF_ALLERGY_LINE = 'For allergy questions, please ask the restaurant staff.';
+
+// Preserve a known source currency; only an absent value uses the pilot default.
+export const pilotPriceCurrency = (currency: string | null | undefined): string =>
+  currency?.trim() || 'USD';
 
 export function emptyManualDish(): DishForm {
   return {
@@ -55,7 +75,7 @@ export function emptyManualDish(): DishForm {
     description: '',
     servingSize: '',
     priceAmount: '',
-    priceCurrency: '',
+    priceCurrency: 'USD',
     servingCount: '',
     ingredients: { status: 'unknown', items: [] },
     allergens: { status: 'unknown', items: [] },
@@ -78,7 +98,6 @@ export function dishFromReviewItem(
   if (!effective.category) uncertain.add('category');
   if (!effective.description) uncertain.add('description');
   if (effective.price_amount === null) uncertain.add('price_amount');
-  if (effective.price_currency === null) uncertain.add('price_currency');
   if (ingredients === null || ingredients.length === 0) uncertain.add('ingredients');
   return {
     origin: 'extracted',
@@ -87,8 +106,15 @@ export function dishFromReviewItem(
     description: text(effective.description),
     servingSize: text(effective.serving_size),
     priceAmount: text(effective.price_amount),
-    priceCurrency: text(effective.price_currency),
-    servingCount: effective.serving_count == null ? '' : String(effective.serving_count),
+    priceCurrency: pilotPriceCurrency(effective.price_currency),
+    servingCount: servingCountText(
+      effective.serving_count,
+      effective.serving_size,
+      effective.portion_calibration,
+    ),
+    ...(effective.portion_calibration !== undefined
+      ? { portionCalibration: effective.portion_calibration }
+      : {}),
     ingredients:
       ingredients && ingredients.length > 0
         ? { status: 'proposed', items: [...ingredients] }
@@ -101,6 +127,7 @@ export function dishFromReviewItem(
       candidateId: review.candidateId,
       reviewVersion: review.version,
       priceText: effective.price_text ?? null,
+      ...(!effective.price_currency && { currencyDefaulted: true }),
       uncertainFields: [...uncertain],
       rejected: review.reviewStatus === 'rejected',
     },
@@ -124,8 +151,15 @@ export function dishFromManualDraft(draft: DishDraft): DishForm {
     description: text(fields.description),
     servingSize: text(fields.servingSize),
     priceAmount: text(fields.priceAmount),
-    priceCurrency: text(fields.priceCurrency),
-    servingCount: fields.servingCount == null ? '' : String(fields.servingCount),
+    priceCurrency: pilotPriceCurrency(fields.priceCurrency),
+    servingCount: servingCountText(
+      fields.servingCount,
+      fields.servingSize,
+      fields.portionCalibration,
+    ),
+    ...(fields.portionCalibration !== undefined
+      ? { portionCalibration: fields.portionCalibration }
+      : {}),
     ingredients: { status: fields.ingredients.status, items: [...fields.ingredients.items] },
     allergens: { status: fields.allergens.status, items: [...fields.allergens.items] },
     photoId: fields.photoId,
@@ -157,22 +191,18 @@ export function manualSaveCommand(
       description: orNull(form.description),
       servingSize: orNull(form.servingSize),
       priceAmount: orNull(form.priceAmount),
-      priceCurrency: orNull(form.priceCurrency)?.toUpperCase() ?? null,
+      priceCurrency: pilotPriceCurrency(form.priceCurrency).toUpperCase(),
       ingredients: list(form.ingredients),
       allergens: list(form.allergens),
       photoId: form.photoId,
       ...(form.servingCount !== undefined
         ? { servingCount: servingCountValue(form.servingCount) }
         : {}),
+      ...(form.portionCalibration !== undefined
+        ? { portionCalibration: form.portionCalibration }
+        : {}),
     },
   };
-}
-
-function servingCountValue(value: string): number | null {
-  if (!value.trim()) return null;
-  if (!/^(?:[1-9]\d?|100)$/.test(value.trim()))
-    throw new Error('Serving size must be a whole number from 1 to 100.');
-  return Number(value);
 }
 
 // The review correction for an extracted dish: only fields that differ from the current effective
@@ -196,7 +226,7 @@ export function reviewCorrection(
   compare('description', orNull(form.description));
   compare('category', orNull(form.category));
   compare('price_amount', orNull(form.priceAmount));
-  compare('price_currency', orNull(form.priceCurrency)?.toUpperCase() ?? null);
+  compare('price_currency', pilotPriceCurrency(form.priceCurrency).toUpperCase());
   const ingredients =
     form.ingredients.status === 'unknown' ? null : [...new Set(form.ingredients.items)];
   const before = effective.ingredients ?? null;
@@ -210,6 +240,12 @@ export function reviewCorrection(
   )
     corrected.allergens = allergens;
   if (form.photoId !== (effective.photo_id ?? null)) corrected.photo_id = form.photoId;
+  if (
+    form.portionCalibration !== undefined &&
+    JSON.stringify(form.portionCalibration) !==
+      JSON.stringify(effective.portion_calibration ?? null)
+  )
+    corrected.portion_calibration = form.portionCalibration;
   return Object.keys(corrected).length === 0 ? null : corrected;
 }
 
@@ -223,7 +259,8 @@ export function approvalIssues(form: DishForm): ApprovalIssue[] {
   if (form.name.trim() === '') issues.push('name');
   if (form.category.trim() === '') issues.push('category');
   if (!/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/.test(form.priceAmount.trim())) issues.push('price');
-  if (!/^[A-Z]{3}$/.test(form.priceCurrency.trim().toUpperCase())) issues.push('currency');
+  if (!/^[A-Z]{3}$/.test(pilotPriceCurrency(form.priceCurrency).toUpperCase()))
+    issues.push('currency');
   return issues;
 }
 

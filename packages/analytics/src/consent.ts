@@ -51,6 +51,8 @@ export function mountAnalyticsConsent(
   const status = document.createElement('p');
   status.setAttribute('role', 'status');
   status.textContent = 'Optional analytics is off.';
+  let updateDiner: (() => void) | undefined;
+  let preferenceButton: HTMLButtonElement | undefined;
   const update = () => {
     const active = allowed();
     button.setAttribute('aria-pressed', String(active));
@@ -58,15 +60,60 @@ export function mountAnalyticsConsent(
     status.textContent = active
       ? 'Optional analytics is on for this page.'
       : 'Optional analytics is off. Browser privacy preferences are respected.';
+    updateDiner?.();
   };
   const stop = controller?.subscribe(update);
   update();
   button.addEventListener('click', () => {
-    setConsent(!allowed());
+    const enabling = !allowed();
+    setConsent(enabling);
     update();
+    if (controller && !allowed() && enabling) {
+      status.textContent = 'Your browser privacy preferences keep optional analytics off.';
+    }
     if (!controller && allowed()) void analytics!.captureShellView();
   });
   section.append(description, button, status);
+  if (controller && surface === 'diner') {
+    const title = document.createElement('strong');
+    title.textContent = 'Allow optional analytics?';
+    const details = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = 'What gets shared';
+    details.append(summary, description);
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.textContent = 'Not now';
+    const expand = document.createElement('button');
+    preferenceButton = expand;
+    expand.type = 'button';
+    expand.textContent = 'Analytics preferences';
+    expand.hidden = true;
+    const collapse = () => {
+      section.hidden = true;
+      expand.hidden = false;
+      expand.focus();
+    };
+    dismiss.addEventListener('click', collapse);
+    button.addEventListener('click', collapse);
+    expand.addEventListener('click', () => {
+      section.hidden = false;
+      expand.hidden = true;
+      button.focus();
+    });
+    const label = () => {
+      button.textContent = allowed() ? 'Turn off optional analytics' : 'Yes';
+      button.setAttribute(
+        'aria-label',
+        allowed() ? 'Turn off optional analytics' : 'Yes, allow optional analytics',
+      );
+      dismiss.textContent = allowed() ? 'Close' : 'Not now';
+    };
+    updateDiner = label;
+    label();
+    section.replaceChildren(title, details, button, dismiss, status);
+    parent.append(expand);
+  }
   parent.append(section);
   return {
     analytics,
@@ -74,6 +121,7 @@ export function mountAnalyticsConsent(
       stop?.();
       setConsent(false);
       section.remove();
+      preferenceButton?.remove();
     },
   };
 }

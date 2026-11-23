@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
-import { type PublicPortion, PublicPortionSchema } from '@peekaplate/contracts';
+import {
+  canonicalJson,
+  type PlateCalibration,
+  PlateCalibrationSchema,
+  type PublicPortion,
+  PublicPortionSchema,
+} from '@peekaplate/contracts';
 
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -16,6 +22,27 @@ export type PreparedApprovedPortion = {
   portion: PublicPortion;
   files: PreparedPortionFile[];
 };
+
+const reviewedOwnerPortions = new WeakMap<
+  PreparedApprovedPortion,
+  { photoId: string; sourceHash: string; portion: string }
+>();
+
+/** Only this validator's exact output can authorize an owner-photo portion in the producer. */
+export function matchesApprovedOwnerPortion(
+  prepared: PreparedApprovedPortion | undefined,
+  photoId: string,
+  sourceHash: string,
+  portion: PublicPortion,
+): boolean {
+  const reviewed = prepared && reviewedOwnerPortions.get(prepared);
+  return Boolean(
+    reviewed &&
+      reviewed.photoId === photoId &&
+      reviewed.sourceHash === sourceHash &&
+      reviewed.portion === canonicalJson(portion),
+  );
+}
 
 type ExportLayer = { name: string; sha256: string; size_bytes: number; base64: string };
 type ApprovedExport = {
@@ -49,6 +76,13 @@ export function prepareApprovedPortion(
     draftId: string;
     photoId: string;
     assetBaseUrl: string;
+    sourceHash?: string;
+    /** Independently approved facts, never measurements supplied by the cutout processor. */
+    portionCalibration?: PlateCalibration | null;
+    servingCount?: number | null;
+    /** Dimensions read from the exact hash-verified source bytes, after EXIF orientation. */
+    sourceDimensions?: { width: number; height: number };
+    layerUrl?: (hash: string) => string;
   },
 ): PreparedApprovedPortion {
   if (!input || typeof input !== 'object') throw new Error('Invalid approved portion export');
@@ -64,6 +98,9 @@ export function prepareApprovedPortion(
     throw new Error('Approved export identity or publication boundary mismatch');
   }
   const portion = PublicPortionSchema.parse(exportData.portion);
+  if (portion.physical_size) {
+    throw new Error('Private cutout metadata cannot authorize physical dimensions');
+  }
   if (portion.dish_id !== expected.draftId || portion.dish_revision_id !== expected.photoId) {
     throw new Error('Draft photo portion identity does not match the approved export');
   }
@@ -72,6 +109,7 @@ export function prepareApprovedPortion(
   if (
     approval.schema_version !== 1 ||
     approval.status !== 'approved' ||
+    (expected.sourceHash !== undefined && approval.source_sha256 !== expected.sourceHash) ||
     !/^[a-f0-9]{64}$/.test(approval.source_sha256) ||
     sha(portionBytes) !== approval.portion_sha256 ||
     !uuid.test(approval.approved_by) ||
@@ -81,6 +119,18 @@ export function prepareApprovedPortion(
   }
   if (exportData.layers.length !== 2 || portion.layers.length !== 2) {
     throw new Error('S09 export requires one foreground and one background');
+  }
+  const plate = expected.portionCalibration
+    ? PlateCalibrationSchema.parse(expected.portionCalibration)
+    : undefined;
+  if (
+    plate &&
+    (!expected.sourceHash ||
+      plate.source_sha256 !== expected.sourceHash ||
+      plate.source_width_px !== expected.sourceDimensions?.width ||
+      plate.source_height_px !== expected.sourceDimensions?.height)
+  ) {
+    throw new Error('Physical dimensions do not match the approved source photo');
   }
   const files: PreparedPortionFile[] = [];
   const rewrittenLayers = [];
@@ -102,7 +152,7 @@ export function prepareApprovedPortion(
       throw new Error('2.5D public layer bytes do not match approved hashes');
     }
     const relativePath = `portions/${expected.dishId}/${expected.dishRevisionId}/${layer.sha256}/${name}`;
-    const url = `${expected.assetBaseUrl}/${relativePath}`;
+    const url = expected.layerUrl?.(layer.sha256) ?? `${expected.assetBaseUrl}/${relativePath}`;
     files.push({
       relativePath,
       url,
@@ -116,9 +166,26 @@ export function prepareApprovedPortion(
     ...portion,
     dish_id: expected.dishId,
     dish_revision_id: expected.dishRevisionId,
+    ...(plate
+      ? {
+          physical_size: {
+            plate,
+            ...(expected.servingCount != null ? { serving_count: expected.servingCount } : {}),
+            foreground_sha256: rewrittenLayers.find((layer) => layer.depth > 0)?.sha256,
+            source: 'owner',
+            validation_status: 'pending',
+          },
+        }
+      : {}),
     layers: rewrittenLayers,
   });
-  return { portion: published, files };
+  const prepared = { portion: published, files };
+  reviewedOwnerPortions.set(prepared, {
+    photoId: expected.photoId,
+    sourceHash: approval.source_sha256,
+    portion: canonicalJson(published),
+  });
+  return prepared;
 }
 
 /** Admission cannot proceed until public immutable hosting returns the exact reviewed bytes. */

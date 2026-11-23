@@ -10,12 +10,12 @@ for (const port of [5173, 5174]) {
       await route.fulfill({ status: 200, body: '{}' });
     });
     await page.goto(`http://127.0.0.1:${port}/?email=synthetic-private@example.test`);
-    const button = page.getByRole('button', { name: 'Allow optional analytics' });
+    const button = page.getByRole('button', { name: /allow optional analytics/i });
     await expect(button).toBeVisible();
     expect(bodies).toHaveLength(0);
     await button.click();
     if (port === 5173) {
-      // The diner uses the shared gate and remains fixture-only until a live menu enables it.
+      await page.getByRole('button', { name: 'Analytics preferences' }).click();
       await expect(page.getByRole('button', { name: 'Turn off optional analytics' })).toBeVisible();
       await page.getByRole('button', { name: 'Turn off optional analytics' }).click();
       await page.reload();
@@ -62,7 +62,8 @@ for (const port of [5173, 5174]) {
       Object.defineProperty(navigator, 'globalPrivacyControl', { value: true }),
     );
     await page.goto(`http://127.0.0.1:${port}`);
-    await page.getByRole('button', { name: 'Allow optional analytics' }).click();
+    await page.getByRole('button', { name: /allow optional analytics/i }).click();
+    if (port === 5173) await page.getByRole('button', { name: 'Analytics preferences' }).click();
     await expect(page.getByRole('status')).toContainText('off');
     expect(captures).toBe(0);
   });

@@ -595,6 +595,7 @@ body:has(.owner-root) {
   align-items: stretch;
 }
 .owner-ai__composer--pickers > .owner-ai__input.owner-ai__input {
+  box-sizing: border-box;
   flex: none;
   width: 100%;
 }

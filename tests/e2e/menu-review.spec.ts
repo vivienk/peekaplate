@@ -25,11 +25,11 @@ test('the demo is labelled as synthetic and Complete verification waits for ever
   await page.getByRole('button', { name: '+ Add dish' }).click();
   await expect(page.getByLabel('Dish name')).toHaveValue('');
   await page.goto(demo);
-  await expect(page.getByText('7 dishes extracted')).toBeVisible();
+  await expect(page.getByText('7 dishes in your menu')).toBeVisible();
   // Three dishes need one fix each (price, category, serving size): the pill names that one field.
   await expect(page.getByText('Price Missing')).toHaveCount(1);
   await expect(page.getByText('Category Missing')).toHaveCount(1);
-  await expect(page.getByText('Serving Size Missing')).toHaveCount(1);
+  await expect(page.getByText('Serving size (people) Missing')).toHaveCount(1);
   await expect(page.getByText(/\d+ fields? missing/)).toHaveCount(0);
   await expect(complete).toHaveCount(0);
 

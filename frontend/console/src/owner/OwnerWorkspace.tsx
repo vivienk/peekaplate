@@ -1,4 +1,4 @@
-import type { RestaurantSetup } from '@peekaplate/contracts';
+import type { OwnerVenue, RestaurantProfile, RestaurantSetup } from '@peekaplate/contracts';
 import {
   OWNER_ANALYSIS_ACTIONS,
   OWNER_ANALYSIS_LIMITATION,
@@ -17,26 +17,58 @@ import {
   useState,
 } from 'react';
 import type { OwnerAuthRuntime, SignedInOwner } from '../auth/supabase-auth';
-import { OwnerAccountMenu } from '../onboarding/OnboardingLayout';
+import type { RestaurantDetails as Details } from '../onboarding/details';
+import { OnboardingLayout, OwnerAccountMenu } from '../onboarding/OnboardingLayout';
+import { RestaurantDetails } from '../onboarding/RestaurantDetails';
+import { focusScreenHeading } from '../onboarding/useHeadingFocus';
 import {
   createOwnerAnalysisClient,
   OwnerAnalysisAccessError,
+  OwnerAnalysisReferenceError,
 } from '../owner-dashboard/ai-preview/analysis-client';
-import { ReportData } from '../owner-dashboard/report-data';
-import { Button } from '../ui';
+import { Btn } from '../owner-dashboard/controls';
+import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
+import { ReportView, useOwnerReport } from '../owner-dashboard/report-data';
+import { createOwnerMenuClient, newCommandId, OwnerMenuApiError } from '../owner-menu/api';
+import { Button, Input } from '../ui';
 import { FirstDashboardAside, FirstDashboardTopbar } from './FirstDashboard';
 import { Icon } from './icons';
+import type { MenuSnapshot } from './menu-snapshot';
 import { OwnerMenuWorkspace } from './OwnerMenuWorkspace';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
-import { fetchOwnerWorkspace, type WorkspaceState } from './workspace-api';
+import { fetchOwnerActions, type OwnerActionsState } from './owner-actions-api';
+import { OWNER_PAGE_LABELS } from './routes';
+import { useOwnerPage } from './useOwnerPage';
+import {
+  createRestaurant,
+  fetchOwnerWorkspace,
+  readWorkspaceApiBase,
+  restaurantDetailsSaver,
+  type WorkspaceState,
+} from './workspace-api';
 import './owner.css';
+import '../owner-dashboard/owner-dashboard.css';
 import './workspace.css';
+
+export function ownerDashboardPages(
+  permission: string | undefined,
+  verified: boolean,
+  published: boolean | null,
+): ReadonlySet<OwnerPage> {
+  return new Set<OwnerPage>(
+    permission === 'owner' && (verified || published === true)
+      ? ['setup', 'overview', 'report', 'performance', 'menu', 'actions']
+      : ['setup', 'menu'],
+  );
+}
 
 export function OwnerWorkspace({
   auth,
   owner,
   apiBase,
+  production = false,
   aiEnabled = false,
+  dishAssistanceEnabled = false,
   onSessionExpired,
   onSignOut,
   signingOut,
@@ -44,8 +76,10 @@ export function OwnerWorkspace({
   auth: OwnerAuthRuntime;
   owner: SignedInOwner;
   apiBase: string | null;
+  production?: boolean;
   /** Shows the #164 AI panel beside the live report. Off unless the build turns it on. */
   aiEnabled?: boolean;
+  dishAssistanceEnabled?: boolean;
   onSessionExpired: () => void;
   onSignOut: () => void;
   signingOut: boolean;
@@ -53,10 +87,32 @@ export function OwnerWorkspace({
   const [state, setState] = useState<WorkspaceState>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState('');
-  const [page, setPage] = useState<OwnerPage>('setup');
   const [navigation, setNavigation] = useState(0);
+  const [firstProfile, setFirstProfile] = useState<{
+    venueId: string;
+    status: RestaurantProfile['status'];
+    navigation: number;
+  } | null>(null);
+  const [reportAttempt, setReportAttempt] = useState(0);
   const [detailsRequested, setDetailsRequested] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const canLeave = useCallback(
+    () =>
+      !dirty || window.confirm('Leave these unsaved changes? Your saved draft stays available.'),
+    [dirty],
+  );
+  const resetView = useCallback(() => {
+    setDetailsRequested(false);
+    setNavigation((value) => value + 1);
+  }, []);
+  const [page, setPage] = useOwnerPage(production, canLeave, resetView);
+  const [menuRead, setMenuRead] = useState<{ actor: string; value: MenuSnapshot | null } | null>(
+    null,
+  );
+  const updateMenu = useCallback(
+    (value: MenuSnapshot | null) => setMenuRead({ actor: owner.id, value }),
+    [owner.id],
+  );
   const [setupRead, setSetupRead] = useState<{ actor: string; value: RestaurantSetup } | null>(
     null,
   );
@@ -64,12 +120,14 @@ export function OwnerWorkspace({
     (value: RestaurantSetup | null) => setSetupRead(value ? { actor: owner.id, value } : null),
     [owner.id],
   );
-  const canLeave = () =>
-    !dirty || window.confirm('Leave these unsaved changes? Your saved draft stays available.');
   const pickerId = useId();
   // The report on screen, tagged with the restaurant it belongs to, so the AI panel never offers
   // one restaurant's dishes under another.
-  const [shown, setShown] = useState<{ scope: string; report: OwnerDishReport } | null>(null);
+  const [shown, setShown] = useState<{
+    scope: string;
+    report: OwnerDishReport;
+    reference?: string | undefined;
+  } | null>(null);
   const getAccessToken = useCallback(() => auth.accessTokenFor(owner.id), [auth, owner.id]);
 
   useEffect(() => {
@@ -91,10 +149,13 @@ export function OwnerWorkspace({
 
   const refresh = useCallback(() => {
     setDetailsRequested(false);
+    setFirstProfile(null);
     setState({ kind: 'loading' });
-    setPage('setup');
+    setMenuRead(null);
+    setSetupRead(null);
+    setPage('setup', 'replace');
     setAttempt((value) => value + 1);
-  }, []);
+  }, [setPage]);
   const accessFailure = useCallback(
     (kind: 'signed_out' | 'denied') => {
       if (kind === 'signed_out') onSessionExpired();
@@ -105,7 +166,7 @@ export function OwnerWorkspace({
   const venues = state.kind === 'ready' ? state.venues : [];
   const selected =
     venues.find((venue) => venue.venueId === selectedId) ??
-    (venues.length === 1 ? venues[0] : undefined);
+    (production || (!selectedId && venues.length === 1) ? venues[0] : undefined);
   const workspaceSetup =
     setupRead?.actor === owner.id && setupRead.value.venueId === selected?.venueId
       ? setupRead.value
@@ -116,16 +177,52 @@ export function OwnerWorkspace({
           menuAdded: null,
           published: null,
         };
-  const pages = useMemo(
-    () =>
-      new Set<OwnerPage>(
-        selected?.permission === 'owner' ? ['setup', 'performance', 'menu'] : ['setup', 'menu'],
-      ),
-    [selected?.permission],
+  const menu =
+    menuRead?.actor === owner.id && menuRead.value?.venueId === selected?.venueId
+      ? menuRead.value
+      : null;
+  const pages = ownerDashboardPages(
+    selected?.permission,
+    menu?.verified === true && menu.dishes.length > 0,
+    workspaceSetup.published,
   );
+  const activePage = pages.has(page) ? page : 'setup';
+  const checkingPage = selected?.permission === 'owner' && !menuRead && !pages.has(page);
+  const workspaceReady = state.kind === 'ready' && !checkingPage;
+  const readyPage = workspaceReady ? (selected ? activePage : 'setup') : null;
+  useEffect(() => {
+    if (production && workspaceReady)
+      setPage(selected && page === activePage ? page : 'setup', 'replace');
+  }, [activePage, page, production, selected, setPage, workspaceReady]);
+  useEffect(() => {
+    if (!production || !readyPage) return;
+    const previousTitle = document.title;
+    document.title = `PeekaPlate · ${OWNER_PAGE_LABELS[readyPage]}`;
+    const frame = window.requestAnimationFrame(() => {
+      const main = document.getElementById('owner-content');
+      if (!main) return;
+      main.closest('.owner-main')?.scrollTo(0, 0);
+      window.scrollTo(0, 0);
+      main.focus({ preventScroll: true });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.title = previousTitle;
+    };
+  }, [production, readyPage]);
+  useEffect(() => {
+    if (!production || selected || state.kind !== 'ready' || !dirty) return;
+    function onUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onUnload);
+    return () => window.removeEventListener('beforeunload', onUnload);
+  }, [dirty, production, selected, state.kind]);
   const scope = selected ? `${owner.id}:${selected.venueId}` : '';
   const showReport = useCallback(
-    (report: OwnerDishReport | null) => setShown(report ? { scope, report } : null),
+    (report: OwnerDishReport | null, reference?: string) =>
+      setShown(report ? { scope, report, reference } : null),
     [scope],
   );
   const signOut = (
@@ -139,6 +236,22 @@ export function OwnerWorkspace({
       Sign out
     </Button>
   );
+  const testRestaurant =
+    !production && apiBase && readWorkspaceApiBase(apiBase) ? (
+      <CreateTestRestaurant
+        key={`${owner.id}:${apiBase}`}
+        apiBase={apiBase}
+        getAccessToken={getAccessToken}
+        canLeave={canLeave}
+        onAccessFailure={accessFailure}
+        onCreated={(venueId) => {
+          refresh();
+          setSelectedId(venueId);
+          setDetailsRequested(true);
+          setNavigation((value) => value + 1);
+        }}
+      />
+    ) : null;
 
   if (!apiBase)
     return (
@@ -170,11 +283,33 @@ export function OwnerWorkspace({
         {signOut}
       </main>
     );
+  if (venues.length === 0 && production)
+    return (
+      <FirstRestaurant
+        apiBase={apiBase}
+        actorId={owner.id}
+        getAccessToken={getAccessToken}
+        onAccessFailure={accessFailure}
+        onDiscovered={(venues) => setState({ kind: 'ready', venues })}
+        onSaved={(venue, profile) => {
+          setFirstProfile({ venueId: venue.venueId, status: profile.status, navigation });
+          setSelectedId(venue.venueId);
+          setState({ kind: 'ready', venues: [venue] });
+        }}
+        onDirtyChange={setDirty}
+        accountActions={signOut}
+      />
+    );
   if (venues.length === 0)
     return (
       <main className="owner-workspace-state">
         <h1>No restaurant access yet</h1>
-        <p>Your account is ready. Contact PeekaPlate to connect your restaurant.</p>
+        <p>
+          {testRestaurant
+            ? 'Your account is ready. Create a test restaurant to start, or check access to an existing restaurant.'
+            : 'Your account is ready. Contact PeekaPlate to connect your restaurant.'}
+        </p>
+        {testRestaurant}
         <Button variant="outline" onClick={refresh}>
           Check access again
         </Button>
@@ -182,28 +317,32 @@ export function OwnerWorkspace({
       </main>
     );
 
-  const picker = (
-    <div className="owner-workspace-picker">
-      <label htmlFor={pickerId}>Restaurant</label>
-      <select
-        id={pickerId}
-        value={selected?.venueId ?? ''}
-        onChange={(event) => {
-          if (!canLeave()) return;
-          setSelectedId(event.target.value);
-          setDetailsRequested(false);
-          setPage('setup');
-        }}
-      >
-        {!selected && <option value="">Choose a restaurant</option>}
-        {venues.map((venue) => (
-          <option key={venue.venueId} value={venue.venueId}>
-            {venue.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
+  const picker =
+    production && venues.length === 1 ? null : (
+      <div className="owner-workspace-picker">
+        <label htmlFor={pickerId}>Restaurant</label>
+        <select
+          id={pickerId}
+          value={selected?.venueId ?? ''}
+          onChange={(event) => {
+            if (!canLeave()) return;
+            setSelectedId(event.target.value);
+            setMenuRead(null);
+            setSetupRead(null);
+            setDetailsRequested(false);
+            setPage('setup');
+          }}
+        >
+          {!selected && <option value="">Choose a restaurant</option>}
+          {venues.map((venue) => (
+            <option key={venue.venueId} value={venue.venueId}>
+              {venue.name}
+            </option>
+          ))}
+        </select>
+        {testRestaurant}
+      </div>
+    );
   if (!selected)
     return (
       <main className="owner-workspace-state">
@@ -213,7 +352,10 @@ export function OwnerWorkspace({
       </main>
     );
 
-  const reportShown = page === 'performance' && shown?.scope === scope ? shown.report : null;
+  const reportShown =
+    ['overview', 'report', 'performance'].includes(activePage) && shown?.scope === scope
+      ? shown.report
+      : null;
   const aside =
     aiEnabled && selected.permission === 'owner' && reportShown ? (
       <LiveAiPanel
@@ -223,6 +365,11 @@ export function OwnerWorkspace({
         restaurantName={selected.name}
         getAccessToken={getAccessToken}
         report={reportShown}
+        reportReference={shown?.scope === scope ? shown.reference : undefined}
+        onReloadReport={() => {
+          setShown(null);
+          setReportAttempt((value) => value + 1);
+        }}
         onAccessFailure={accessFailure}
       />
     ) : (
@@ -252,29 +399,30 @@ export function OwnerWorkspace({
         Refresh access
       </Button>
       {signOut}
-      <small className="owner-workspace-design-note">
-        (Account placement awaiting design review)
-      </small>
+      {!production && (
+        <small className="owner-workspace-design-note">
+          (Account placement awaiting design review)
+        </small>
+      )}
     </>
   );
+  const openPage = (next: OwnerPage) => {
+    if (!pages.has(next) || !canLeave()) return;
+    setPage(next);
+    resetView();
+  };
   const renderShell = (content: ReactNode) => (
     <div className="owner-root owner-workspace">
       <OwnerShell
         venueId={selected.venueId}
         restaurantName={workspaceSetup.restaurantName}
-        current={page}
+        current={activePage}
         available={pages}
-        lockedHint="Some screens are not connected in this workspace yet."
+        lockedHint="Verify every saved dish to open the dashboard. Publication remains a separate step."
         visible={
           new Set<OwnerPage>(['overview', 'report', 'performance', 'menu', 'actions', 'setup'])
         }
-        onNavigate={(next) => {
-          if (pages.has(next) && canLeave()) {
-            setDetailsRequested(false);
-            setPage(next);
-            setNavigation((value) => value + 1);
-          }
-        }}
+        onNavigate={openPage}
         aside={aside}
         topbar={
           <div className="owner-workspace-toolbar">
@@ -287,33 +435,393 @@ export function OwnerWorkspace({
       </OwnerShell>
     </div>
   );
-  return page === 'performance' && selected.permission === 'owner' ? (
-    renderShell(
-      <ReportData
-        key={`${owner.id}:${selected.venueId}`}
-        source={{ mode: 'live', apiBase, venueId: selected.venueId, getAccessToken }}
-        onAccessFailure={accessFailure}
-        onReport={showReport}
-      />,
-    )
+  const navigate = (next: Page) => {
+    const target: OwnerPage =
+      next === 'perf' || next === 'data' || next === 'dish'
+        ? 'performance'
+        : next === 'welcome'
+          ? 'setup'
+          : next;
+    openPage(target);
+  };
+  const showMenu = activePage === 'menu' || activePage === 'setup';
+  return (
+    <>
+      {(showMenu || production) && (
+        <OwnerMenuWorkspace
+          key={scope}
+          active={showMenu}
+          apiBase={apiBase}
+          actorId={owner.id}
+          venueId={selected.venueId}
+          restaurantName={selected.name}
+          canPublish={selected.permission === 'owner'}
+          dishAssistanceEnabled={dishAssistanceEnabled}
+          section={activePage === 'menu' ? 'menu' : 'overview'}
+          navigation={navigation}
+          detailsRequested={detailsRequested}
+          offerInitialDetails={
+            production && selected.permission === 'owner' && activePage === 'setup'
+          }
+          firstProfileStatus={
+            firstProfile?.venueId === selected.venueId && firstProfile.navigation === navigation
+              ? firstProfile.status
+              : undefined
+          }
+          getAccessToken={getAccessToken}
+          onAccessFailure={accessFailure}
+          onDirtyChange={setDirty}
+          onSetupChange={updateSetup}
+          onMenuChange={updateMenu}
+          renderShell={renderShell}
+          accountActions={accountActions}
+        />
+      )}
+      {activePage === 'actions' &&
+        renderShell(
+          <LiveActions
+            key={scope}
+            apiBase={apiBase}
+            venueId={selected.venueId}
+            restaurantName={workspaceSetup.restaurantName}
+            getAccessToken={getAccessToken}
+            onAccessFailure={accessFailure}
+          />,
+        )}
+      {(activePage === 'overview' || activePage === 'report' || activePage === 'performance') &&
+        renderShell(
+          <LiveDashboardReport
+            key={`${scope}:${reportAttempt}`}
+            page={activePage}
+            apiBase={apiBase}
+            venueId={selected.venueId}
+            restaurantName={workspaceSetup.restaurantName}
+            menu={menu?.dishes ?? []}
+            getAccessToken={getAccessToken}
+            onAccessFailure={accessFailure}
+            onReport={showReport}
+            go={navigate}
+          />,
+        )}
+    </>
+  );
+}
+
+function FirstRestaurant({
+  apiBase,
+  actorId,
+  getAccessToken,
+  onAccessFailure,
+  onDiscovered,
+  onSaved,
+  onDirtyChange,
+  accountActions,
+}: {
+  apiBase: string;
+  actorId: string;
+  getAccessToken: () => Promise<string | null>;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+  onDiscovered: (venues: OwnerVenue[]) => void;
+  onSaved: (venue: OwnerVenue, profile: RestaurantProfile) => void;
+  onDirtyChange: (dirty: boolean) => void;
+  accountActions: ReactNode;
+}) {
+  const pending = useRef<AbortController | null>(null);
+  const creation = useRef<{ name: string; commandId: string; venue?: OwnerVenue } | null>(null);
+  const [saveDetails] = useState(restaurantDetailsSaver);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    focusScreenHeading();
+    return () => pending.current?.abort();
+  }, []);
+
+  async function save(details: Details, photo: File | null) {
+    if (pending.current) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    pending.current = controller;
+    setBusy(true);
+    setFailed(false);
+    const attempt = (creation.current ??= { name: details.name, commandId: newCommandId() });
+    async function checkMembership() {
+      const result = await fetchOwnerWorkspace({ apiBase, actorId, getAccessToken, signal });
+      if (signal.aborted) return;
+      if (result.kind === 'ready' && result.venues.length) onDiscovered(result.venues);
+      else if (result.kind === 'signed_out') onAccessFailure('signed_out');
+      else setFailed(true);
+    }
+    try {
+      if (!attempt.venue) {
+        const result = await createRestaurant({ apiBase, getAccessToken, signal, ...attempt });
+        if (signal.aborted) return;
+        if (result.kind === 'conflict') return await checkMembership();
+        if (result.kind === 'signed_out' || result.kind === 'denied')
+          return onAccessFailure(result.kind);
+        if (result.kind !== 'created') return setFailed(true);
+        attempt.venue = result.venue;
+      }
+      const client = createOwnerMenuClient({ baseUrl: apiBase, getToken: getAccessToken, signal });
+      const profile = await saveDetails(client, attempt.venue.venueId, details, photo, null);
+      if (signal.aborted) return;
+      if (profile) onSaved(attempt.venue, profile);
+      else setFailed(true);
+    } catch (reason) {
+      if (signal.aborted) return;
+      if (reason instanceof OwnerMenuApiError) {
+        if (reason.status === 401 || reason.status === 403)
+          return onAccessFailure(reason.status === 401 ? 'signed_out' : 'denied');
+        if (reason.status === 409) return await checkMembership();
+      }
+      setFailed(true);
+    } finally {
+      pending.current = null;
+      if (!signal.aborted) setBusy(false);
+    }
+  }
+
+  return (
+    <OnboardingLayout accountActions={accountActions}>
+      <RestaurantDetails
+        mode="onboarding"
+        saving={busy}
+        saveFailed={failed}
+        onSave={(details, photo) => void save(details, photo)}
+        onDirtyChange={onDirtyChange}
+      />
+    </OnboardingLayout>
+  );
+}
+
+function CreateTestRestaurant({
+  apiBase,
+  getAccessToken,
+  canLeave,
+  onAccessFailure,
+  onCreated,
+}: {
+  apiBase: string;
+  getAccessToken: () => Promise<string | null>;
+  canLeave: () => boolean;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+  onCreated: (venueId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const id = useId();
+  const pending = useRef<AbortController | null>(null);
+  const command = useRef<{ commandId: string; name: string } | null>(null);
+  useEffect(() => () => pending.current?.abort(), []);
+  const create = async (event: FormEvent) => {
+    event.preventDefault();
+    if (pending.current || !canLeave()) return;
+    const trimmed = name.trim();
+    if (command.current?.name !== trimmed)
+      command.current = { commandId: crypto.randomUUID(), name: trimmed };
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true);
+    setError('');
+    const result = await createRestaurant({
+      apiBase,
+      ...command.current,
+      getAccessToken,
+      signal: controller.signal,
+    });
+    if (controller.signal.aborted) return;
+    pending.current = null;
+    setBusy(false);
+    if (result.kind === 'created') {
+      onCreated(result.venue.venueId);
+      return;
+    }
+    if (result.kind === 'signed_out' || result.kind === 'denied') {
+      onAccessFailure(result.kind);
+      return;
+    }
+    setError(
+      result.kind === 'quota'
+        ? 'Your test restaurant limit has been reached. Use an existing restaurant.'
+        : result.kind === 'conflict'
+          ? 'This request was already used with a different name. Enter a new name to start another request.'
+          : result.kind === 'invalid'
+            ? 'Enter a restaurant name of 1–160 characters without control characters, then try again.'
+            : 'We could not confirm creation. Retry with the same name to safely check the same request.',
+    );
+  };
+  return open ? (
+    <form onSubmit={(event) => void create(event)} aria-label="Create test restaurant">
+      <label htmlFor={id}>Test restaurant name (Staging testing)</label>
+      <Input
+        id={id}
+        value={name}
+        required
+        maxLength={160}
+        disabled={busy}
+        onChange={(event) => setName(event.target.value)}
+      />
+      {error && <p role="alert">{error}</p>}
+      <Button type="submit" disabled={busy || !name.trim()}>
+        {busy ? 'Creating test restaurant…' : 'Create test restaurant'}
+      </Button>
+    </form>
   ) : (
-    <OwnerMenuWorkspace
-      key={`${owner.id}:${selected.venueId}`}
-      apiBase={apiBase}
-      actorId={owner.id}
-      venueId={selected.venueId}
-      restaurantName={selected.name}
-      canPublish={selected.permission === 'owner'}
-      section={page === 'menu' ? 'menu' : 'overview'}
-      navigation={navigation}
-      detailsRequested={detailsRequested}
-      getAccessToken={getAccessToken}
-      onAccessFailure={accessFailure}
-      onDirtyChange={setDirty}
-      onSetupChange={updateSetup}
-      renderShell={renderShell}
-      accountActions={accountActions}
+    <Button variant="outline" onClick={() => setOpen(true)}>
+      Create test restaurant (Staging testing)
+    </Button>
+  );
+}
+
+const noop = () => {};
+function LiveDashboardReport({
+  page,
+  apiBase,
+  venueId,
+  restaurantName,
+  menu,
+  getAccessToken,
+  onAccessFailure,
+  onReport,
+  go,
+}: {
+  page: 'overview' | 'report' | 'performance';
+  apiBase: string;
+  venueId: string;
+  restaurantName: string;
+  menu: LiveMenuRow[];
+  getAccessToken: () => Promise<string | null>;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+  onReport: (report: OwnerDishReport | null, reference?: string) => void;
+  go: (page: Page) => void;
+}) {
+  const { state, retry, refreshing } = useOwnerReport({
+    mode: 'live',
+    apiBase,
+    venueId,
+    getAccessToken,
+  });
+  const report = state.kind === 'ready' ? state.report : null;
+  const reference = state.kind === 'ready' ? state.reference : undefined;
+  useEffect(() => {
+    onReport(report, reference);
+  }, [report, reference, onReport]);
+  useEffect(() => () => onReport(null), [onReport]);
+  useEffect(() => {
+    if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure(state.kind);
+  }, [state.kind, onAccessFailure]);
+  const reportRefresh =
+    state.kind === 'ready' ||
+    state.kind === 'unavailable' ||
+    state.kind === 'invalid' ||
+    (page === 'overview' && state.kind === 'error') ? (
+      <div className="row">
+        <Btn type="button" size="md" onClick={retry} disabled={refreshing}>
+          Refresh report
+        </Btn>
+        <span className="muted" aria-live="polite">
+          {refreshing ? 'Refreshing report…' : ''}
+        </span>
+      </div>
+    ) : null;
+  const reportContent = (
+    <ReportView
+      state={state}
+      savedMenu={menu}
+      onRetry={retry}
+      refreshing={refreshing}
+      refreshControl={page === 'performance' ? reportRefresh : undefined}
+      presentation={page === 'performance' ? 'performance' : 'data'}
     />
+  );
+  const live = {
+    restaurantName,
+    reportContent,
+    reportRefresh,
+    summary: report?.summary,
+    summaryFreshness: report?.report_metadata.freshness.is_stale,
+    summarySource: report?.source,
+    summaryBatch: report?.report_metadata.calculation_version === 'production.batch.v1',
+    period: report ? reportPeriod(report.report_metadata.date_window) : undefined,
+  };
+  return (
+    <div className="owner-dashboard-content">
+      {page === 'performance' ? (
+        reportContent
+      ) : page === 'report' ? (
+        <Report live={live} go={go} acts={{}} setAct={noop} />
+      ) : (
+        <Overview
+          live={{ ...live, menu }}
+          go={go}
+          acts={{}}
+          sim={{ scn: 'empty' }}
+          openDish={() => go('menu')}
+          openInsight={() => go('report')}
+        />
+      )}
+    </div>
+  );
+}
+
+function LiveActions({
+  apiBase,
+  venueId,
+  restaurantName,
+  getAccessToken,
+  onAccessFailure,
+}: {
+  apiBase: string;
+  venueId: string;
+  restaurantName: string;
+  getAccessToken: () => Promise<string | null>;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+}) {
+  const [state, setState] = useState<OwnerActionsState>({ kind: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    void attempt;
+    setState({ kind: 'loading' });
+    void fetchOwnerActions({ apiBase, venueId, getAccessToken, signal: controller.signal }).then(
+      (result) => {
+        if (controller.signal.aborted) return;
+        setState(result);
+        if (result.kind === 'signed_out' || result.kind === 'denied') onAccessFailure(result.kind);
+      },
+    );
+    return () => controller.abort();
+  }, [apiBase, venueId, getAccessToken, onAccessFailure, attempt]);
+  return (
+    <div className="owner-dashboard-content">
+      <Actions
+        acts={{}}
+        setAct={noop}
+        editDish={noop}
+        openInsight={noop}
+        sim={{ scn: 'empty' }}
+        live={{
+          restaurantName,
+          actionsStatus:
+            state.kind === 'ready' ? 'ready' : state.kind === 'loading' ? 'loading' : 'unavailable',
+          actions:
+            state.kind === 'ready'
+              ? state.actions.map((action) => ({
+                  id: action.actionId,
+                  title: action.category.replaceAll('_', ' '),
+                  text: action.note ?? 'No note recorded.',
+                  status: action.status,
+                }))
+              : [],
+        }}
+      />
+      {state.kind === 'unavailable' && (
+        <Button variant="outline" onClick={() => setAttempt((value) => value + 1)}>
+          Retry saved actions
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -321,13 +829,33 @@ export function OwnerWorkspace({
 // header with restaurant and report-period chips, intro text, messages, composer. Identity and
 // restaurant come only from the signed-in workspace: the token getter is bound to this owner and the
 // venue is the authorised selection. The analysis API (#164) takes a dish and a review focus rather
-// than free text, so the composer offers those two pickers in place of Figma's text box (design gap
-// flagged for Rania). Only `{ dishId, goal }` is sent; nothing is published or changed.
+// than free text, so typed questions can only select a focus for the displayed report.
 const FOCUS_OPTIONS: { value: OwnerAnalysisRequest['goal']; label: string }[] = [
   { value: 'menu', label: 'Menu presentation' },
   { value: 'engagement', label: 'Dish engagement' },
   { value: 'crm', label: 'Customer retention (CRM)' },
 ];
+
+export function matchReportQuestion(question: string): OwnerAnalysisRequest['goal'] | null {
+  const text = question
+    .trim()
+    .toLowerCase()
+    .replace(/[?.!]$/, '')
+    .trim();
+  switch (text) {
+    case 'dish engagement':
+    case 'how is engagement for this dish':
+      return 'engagement';
+    case 'menu presentation':
+    case 'dish saves':
+      return 'menu';
+    case 'customer retention':
+    case 'how can i improve customer retention':
+      return 'crm';
+    default:
+      return null;
+  }
+}
 const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -337,6 +865,9 @@ const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
 // Report windows are end-exclusive, so the last day shown is the millisecond before the end.
 function reportPeriod(window: { start_time: string; end_time: string }): string {
   const start = new Date(window.start_time);
+  if (Date.parse(window.end_time) - start.getTime() === 300_000) {
+    return `${window.start_time.slice(0, 10)} · ${window.start_time.slice(11, 16)}–${window.end_time.slice(11, 16)} UTC`;
+  }
   const end = new Date(Math.max(start.getTime(), new Date(window.end_time).getTime() - 1));
   return PERIOD_FORMAT.formatRange(start, end);
 }
@@ -381,6 +912,7 @@ export function samePeriod(
 type Reply =
   | { kind: 'loading'; scope: string }
   | { kind: 'error'; scope: string }
+  | { kind: 'reference_error'; scope: string }
   | { kind: 'result'; scope: string; result: OwnerAnalysisResult; dishName: string };
 
 function LiveAiPanel({
@@ -389,6 +921,8 @@ function LiveAiPanel({
   restaurantName,
   getAccessToken,
   report,
+  reportReference,
+  onReloadReport,
   onAccessFailure,
 }: {
   apiBase: string;
@@ -396,18 +930,24 @@ function LiveAiPanel({
   restaurantName: string;
   getAccessToken: () => Promise<string | null>;
   report: OwnerDishReport;
+  reportReference?: string | undefined;
+  onReloadReport: () => void;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
 }) {
   const ids = useId();
   const dishes = report.dishes;
+  const production = report.source === 'production';
   const [picked, setPicked] = useState('');
   const [goal, setGoal] = useState<OwnerAnalysisRequest['goal']>('menu');
+  const [question, setQuestion] = useState('');
+  const [questionError, setQuestionError] = useState<string | null>(null);
   const [reply, setReply] = useState<Reply | null>(null);
   const pending = useRef<AbortController | null>(null);
   const dishId = dishes.some((dish) => dish.dish_id === picked)
     ? picked
     : (dishes[0]?.dish_id ?? '');
-  const scope = `${venueId}:${dishId}:${goal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}`;
+  const requestGoal = question.trim() ? matchReportQuestion(question) : goal;
+  const scope = `${venueId}:${dishId}:${requestGoal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}:${reportReference ?? ''}`;
   const analyze = useMemo(
     () => createOwnerAnalysisClient({ baseUrl: apiBase, venueId, getAccessToken }),
     [apiBase, venueId, getAccessToken],
@@ -425,20 +965,43 @@ function LiveAiPanel({
 
   async function ask(event: FormEvent) {
     event.preventDefault();
-    if (!dishId || pending.current) return;
+    if (pending.current) return;
+    if (!dishId) {
+      if (production) setQuestionError('There are no dishes with report data in this period.');
+      return;
+    }
+    if (!reportReference) {
+      if (production) setReply({ kind: 'reference_error', scope });
+      return;
+    }
+    if (!requestGoal) {
+      setQuestionError(
+        'Use the focus menu or type “Dish engagement”, “Menu presentation”, “Dish saves”, or “Customer retention”. The review uses the displayed dish and report period.',
+      );
+      return;
+    }
+    setQuestionError(null);
     const controller = new AbortController();
     pending.current = controller;
     const dishName = dishes.find((dish) => dish.dish_id === dishId)?.name ?? '';
-    setReply({ kind: 'loading', scope });
+    const requestScope = scope;
+    setReply({ kind: 'loading', scope: requestScope });
     try {
-      const result = await analyze({ dishId, goal }, controller.signal);
-      if (!controller.signal.aborted) setReply({ kind: 'result', scope, result, dishName });
+      const result = await analyze(
+        { dishId, goal: requestGoal },
+        controller.signal,
+        reportReference,
+      );
+      if (!controller.signal.aborted)
+        setReply({ kind: 'result', scope: requestScope, result, dishName });
     } catch (error) {
       if (!controller.signal.aborted) {
         if (error instanceof OwnerAnalysisAccessError) {
           setReply(null);
           onAccessFailure(error.status === 401 ? 'signed_out' : 'denied');
-        } else setReply({ kind: 'error', scope });
+        } else if (error instanceof OwnerAnalysisReferenceError) {
+          setReply({ kind: 'reference_error', scope: requestScope });
+        } else setReply({ kind: 'error', scope: requestScope });
       }
     } finally {
       if (pending.current === controller) pending.current = null;
@@ -463,9 +1026,16 @@ function LiveAiPanel({
         </div>
       </div>
       <div className="owner-ai__body" data-ai-state={shown?.kind ?? 'empty'} aria-live="polite">
+        {!reportReference && (
+          <p className="owner-muted">
+            Analysis needs a current server report reference. Reload the report; analysis stays
+            unavailable if no reference is issued.
+          </p>
+        )}
         <p className="owner-muted">
-          Choose a dish for analysis from a separate authorized server-read snapshot. Its evidence
-          period may differ from the report displayed here.
+          {report.source === 'production'
+            ? 'Analysis uses the same authorized report window shown here.'
+            : 'Choose a dish for analysis from a separate authorized server-read snapshot. Its evidence period may differ from the report displayed here.'}
         </p>
         {dishes.length === 0 && (
           <>
@@ -491,6 +1061,14 @@ function LiveAiPanel({
           <p className="owner-ai__error" role="alert">
             The report could not be reviewed. Check your session or try again later.
           </p>
+        )}
+        {shown?.kind === 'reference_error' && (
+          <div role="alert">
+            <p>The report reference expired or changed. Reload the report, then ask again.</p>
+            <Button variant="outline" onClick={onReloadReport}>
+              Reload report
+            </Button>
+          </div>
         )}
         {shown?.kind === 'result' &&
           !samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
@@ -544,7 +1122,9 @@ function LiveAiPanel({
                 })}
               </p>
               <p className="owner-muted">
-                Synthetic analysis from a separate server-read snapshot.
+                {shown.result.source === 'production'
+                  ? 'Analysis from the authorized production report.'
+                  : 'Synthetic analysis from a separate server-read snapshot.'}
               </p>
               <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
               <p className="owner-muted">No menu changes or customer messages are sent.</p>
@@ -552,6 +1132,28 @@ function LiveAiPanel({
           )}
       </div>
       <form className="owner-ai__composer owner-ai__composer--pickers" onSubmit={ask}>
+        <label className="owner-visually-hidden" htmlFor={`${ids}-question`}>
+          Ask a report question
+        </label>
+        <input
+          id={`${ids}-question`}
+          className="owner-ai__input"
+          value={question}
+          onChange={(event) => {
+            setQuestion(event.target.value);
+            setQuestionError(null);
+            pending.current?.abort();
+            pending.current = null;
+            setReply(null);
+          }}
+          placeholder="Type a review focus, e.g. Dish engagement"
+          disabled={!production && dishes.length === 0}
+        />
+        {questionError && (
+          <p className="owner-ai__error" role="alert">
+            {questionError}
+          </p>
+        )}
         <label className="owner-visually-hidden" htmlFor={`${ids}-dish`}>
           Dish
         </label>
@@ -575,8 +1177,12 @@ function LiveAiPanel({
           <select
             id={`${ids}-focus`}
             className="owner-ai__input"
-            value={goal}
-            onChange={(event) => setGoal(event.target.value as OwnerAnalysisRequest['goal'])}
+            value={requestGoal ?? goal}
+            onChange={(event) => {
+              setGoal(event.target.value as OwnerAnalysisRequest['goal']);
+              setQuestion('');
+              setQuestionError(null);
+            }}
           >
             {FOCUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -587,7 +1193,7 @@ function LiveAiPanel({
           <button
             type="submit"
             className="owner-ai__send"
-            disabled={busy || dishes.length === 0}
+            disabled={busy || (!production && (dishes.length === 0 || !reportReference))}
             aria-label="Review report"
           >
             <Icon name="send" size={18} />

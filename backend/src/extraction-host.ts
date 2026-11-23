@@ -6,6 +6,8 @@ import { type ExtractionSource, readExtractionCapability } from './extraction-ca
 type Stub = { fetch(request: Request): Promise<Response> };
 export type ExtractionHostEnv = {
   APP_ENV: string;
+  EXTRACTION_PRODUCTION_ENABLED?: string;
+  EXTRACTION_PRODUCTION_PORTION_ONLY?: string;
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
   EXTRACTION_SOURCE_ORIGIN: string;
@@ -45,6 +47,10 @@ const budgetKeyPattern = /^[A-Za-z0-9:_-]{1,128}$/;
 const providerNamePattern = /^[A-Za-z0-9._-]{1,64}$/;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function productionPortionOnly(env: ExtractionHostEnv) {
+  return env.APP_ENV === 'production' && env.EXTRACTION_PRODUCTION_PORTION_ONLY === 'true';
+}
+
 export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
   envVars: Record<string, string>;
   private readiness: Promise<void> | undefined;
@@ -55,8 +61,13 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
     this.envVars = {
       EXTRACTION_SERVICE_SECRET: env.EXTRACTION_SERVICE_SECRET ?? '',
       EXTRACTION_SOURCE_ORIGIN: env.EXTRACTION_SOURCE_ORIGIN,
+      EXTRACTION_ENVIRONMENT: env.APP_ENV,
+      PORTION_REVIEW_ROOT: '/tmp/peekaplate-portions',
+      U2NET_HOME: '/app/models',
       ...Object.fromEntries(
-        pipelineVariables.flatMap((key) => (env[key] ? [[key, env[key]]] : [])),
+        productionPortionOnly(env)
+          ? []
+          : pipelineVariables.flatMap((key) => (env[key] ? [[key, env[key]]] : [])),
       ),
     };
     if (ctx.container?.running) {
@@ -74,7 +85,7 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
         image,
         instance: 'standard-1',
         env: this.envVars,
-        enableInternet: true,
+        enableInternet: !productionPortionOnly(this.env),
       });
     }
     await container.setInactivityTimeout(60_000);
@@ -260,6 +271,7 @@ export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
 
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const sourcePath = new RegExp(`^/sources/(${uuid})/(${uuid})$`);
+const portionPath = new RegExp(`^/v1/portion-uploads/(${uuid})/(${uuid})$`);
 const json = (error: string, status: number) =>
   Response.json(
     { error },
@@ -270,8 +282,47 @@ const json = (error: string, status: number) =>
   );
 
 const maxBundleBytes = 32_000_000;
+const maxPortionSourceBytes = 12_000_000;
+const maxPortionResponseBytes = 300_000;
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+async function readPortionBytes(
+  body: ReadableStream<Uint8Array> | null,
+  limit: number,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  if (!body) return new Uint8Array();
+  const reader = body.getReader();
+  const cancel = () => void reader.cancel().catch(() => {});
+  signal.addEventListener('abort', cancel, { once: true });
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      signal.throwIfAborted();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
 
 async function safeErrorResponse(response: Response): Promise<Response> {
   const status = response.status >= 400 && response.status < 600 ? response.status : 502;
@@ -423,17 +474,20 @@ async function retainArtifacts(
 
 export default {
   async fetch(request: Request, env: ExtractionHostEnv): Promise<Response> {
+    const environment = env.APP_ENV;
     const secret = env.EXTRACTION_SERVICE_SECRET;
     const signingSecret = env.EXTRACTION_SOURCE_SIGNING_SECRET;
+    const portionOnly = productionPortionOnly(env);
     if (
-      env.APP_ENV !== 'staging' ||
+      (environment !== 'staging' &&
+        !(environment === 'production' && env.EXTRACTION_PRODUCTION_ENABLED === 'true')) ||
       !secret ||
       secret.length < 48 ||
-      !signingSecret ||
-      signingSecret.length < 48 ||
-      signingSecret === secret
+      (!portionOnly && (!signingSecret || signingSecret.length < 48 || signingSecret === secret))
     )
       return json('not_configured', 503);
+    const containerName =
+      environment === 'production' ? 'production-extractor' : 'staging-extractor';
     const supplied = new TextEncoder().encode(request.headers.get('authorization') ?? '');
     const expected = new TextEncoder().encode(`Bearer ${secret}`);
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
@@ -442,11 +496,44 @@ export default {
     const url = new URL(request.url);
     if (url.search) return json('invalid_request', 400);
     try {
+      if (portionPath.test(url.pathname) && request.method === 'POST') {
+        const signal = AbortSignal.timeout(220_000);
+        if (
+          !/^application\/octet-stream(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')
+        )
+          return json('unsupported_media_type', 415);
+        if (Number(request.headers.get('content-length')) > maxPortionSourceBytes)
+          return json('request_too_large', 413);
+        const photo = await readPortionBytes(request.body, maxPortionSourceBytes, signal);
+        if (!photo) return json('request_too_large', 413);
+        if (!photo.byteLength) return json('empty_photo', 400);
+        const headers = new Headers(request.headers);
+        headers.delete('Content-Length');
+        const response = await env.EXTRACTOR.getByName(containerName).fetch(
+          new Request(url, { method: 'POST', headers, body: photo, signal, redirect: 'manual' }),
+        );
+        const bytes = await readPortionBytes(response.body, maxPortionResponseBytes, signal);
+        if (!bytes || !response.headers.get('content-type')?.startsWith('application/json'))
+          return json('portion_unavailable', 502);
+        const bounded = new Response(bytes, { status: response.status, headers: response.headers });
+        if (!response.ok) return await safeErrorResponse(bounded);
+        return new Response(bytes, {
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+        });
+      }
+      if (portionOnly) {
+        if (url.pathname === '/health' && request.method === 'GET')
+          return await env.EXTRACTOR.getByName(containerName).fetch(request);
+        return json('not_found', 404);
+      }
+      if (!signingSecret) return json('not_configured', 503);
       const source = sourcePath.exec(url.pathname);
       if (source && request.method === 'GET') {
         const scope = await readExtractionCapability(
           request.headers.get('x-source-capability') ?? '',
           signingSecret,
+          undefined,
+          environment,
         );
         if (
           !scope ||
@@ -497,6 +584,8 @@ export default {
         const scope = await readExtractionCapability(
           request.headers.get('x-source-capability') ?? '',
           signingSecret,
+          undefined,
+          environment,
         );
         if (
           !scope ||
@@ -506,7 +595,7 @@ export default {
         )
           return json('forbidden', 403);
         const body = await request.text();
-        return await env.EXTRACTOR.getByName('staging-extractor').fetch(
+        return await env.EXTRACTOR.getByName(containerName).fetch(
           new Request('http://extractor/_budget/reserve', {
             method: 'POST',
             headers: {
@@ -526,6 +615,8 @@ export default {
           const scope = await readExtractionCapability(
             request.headers.get('x-source-capability') ?? '',
             signingSecret,
+            undefined,
+            environment,
           );
           if (
             !scope ||
@@ -540,10 +631,10 @@ export default {
           const forwarded = new Request(request);
           forwarded.headers.set('X-Source-Hash', scope.sourceHash);
           forwarded.headers.set('X-Extraction-Artifact-Bundle', '1');
-          const response = await env.EXTRACTOR.getByName('staging-extractor').fetch(forwarded);
+          const response = await env.EXTRACTOR.getByName(containerName).fetch(forwarded);
           return await retainArtifacts(response, env, scope);
         }
-        return await env.EXTRACTOR.getByName('staging-extractor').fetch(request);
+        return await env.EXTRACTOR.getByName(containerName).fetch(request);
       }
       return json('not_found', 404);
     } catch {

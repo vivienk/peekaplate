@@ -1,5 +1,5 @@
 import type { Client } from 'pg';
-import { CommandError } from './dish-command';
+import { CommandError } from './command-error';
 
 export async function authorizeStaffVenue(
   client: Client,

@@ -61,7 +61,7 @@ describe('dishStatus', () => {
   it('names the field, in yellow, when only the serving size is missing', () => {
     expect(dishStatus(dish({ servingSize: null }))).toEqual({
       ready: false,
-      label: 'Serving Size Missing',
+      label: 'Serving size (people) Missing',
       tone: 'warning',
     });
   });
@@ -97,7 +97,7 @@ describe('dishStatus', () => {
     expect(dishStatus(dish({ reviewed: false }))).toEqual({
       ready: false,
       label: 'Pending Review',
-      tone: 'information',
+      tone: 'warning',
     });
     expect(dishStatus(dish({ reviewed: true })).label).toBe('Ready');
     // Missing details come first.

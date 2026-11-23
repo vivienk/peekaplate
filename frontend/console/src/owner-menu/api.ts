@@ -11,6 +11,9 @@ import {
   type ApproveMenuRevision,
   ApproveMenuRevisionSchema,
   CreateMenuUploadGroupSchema,
+  type DishAssistanceRequest,
+  DishAssistanceRequestSchema,
+  DishAssistanceResultSchema,
   DishRevisionSchema,
   type ExtractionReviewSessionResponse,
   ExtractionReviewSessionResponseSchema,
@@ -38,7 +41,7 @@ import {
   type VerifyDishDraft,
   VerifyDishDraftSchema,
 } from '@peekaplate/contracts';
-import { readWorkspaceApiBase } from '../owner/workspace-api';
+import { PRODUCTION_OWNER_API_ORIGIN, readWorkspaceApiBase } from '../owner/api-origin';
 
 export type SourceType = 'pdf' | 'photo';
 
@@ -320,6 +323,33 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   });
 
   return {
+    async assistDish(venueId: string, draftId: string, input: DishAssistanceRequest) {
+      const payload = DishAssistanceRequestSchema.parse(input);
+      return request(
+        venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/ai/assist`),
+        json('POST', payload),
+        (body) => {
+          const value = DishAssistanceResultSchema.parse(body);
+          if (
+            value.venueId !== venueId ||
+            value.draftId !== draftId ||
+            value.requestId !== payload.requestId ||
+            value.expectedVersion !== payload.expectedVersion ||
+            value.operation !== payload.operation
+          )
+            throw new Error('assistance scope');
+          if (
+            value.operation === 'description' &&
+            payload.operation === 'description' &&
+            value.evidence?.source === 'owner_input' &&
+            payload.facts.description.slice(value.evidence.start, value.evidence.end) !==
+              value.description
+          )
+            throw new Error('assistance evidence');
+          return value;
+        },
+      );
+    },
     async setDraftRemoval(venueId: string, draftId: string, input: SetDraftRemoval) {
       return request(
         venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/removal`),
@@ -402,11 +432,16 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
     // Part A: turn the owner's verified dishes into a prepared menu for S13 (never publishes).
     async prepareMenu(venueId: string) {
       return request(venuePath(venueId, '/prepared-menus/prepare'), { method: 'POST' }, (body) => {
+        const menuId = field(body, 'menuId');
         const menuRevisionId = field(body, 'menuRevisionId');
         const completeDishes = field(body, 'completeDishes');
-        if (typeof menuRevisionId !== 'string' || typeof completeDishes !== 'number')
+        if (
+          typeof menuId !== 'string' ||
+          typeof menuRevisionId !== 'string' ||
+          typeof completeDishes !== 'number'
+        )
           throw new Error('prepared menu');
-        return { menuRevisionId, completeDishes };
+        return { menuId, menuRevisionId, completeDishes };
       });
     },
     async previewPreparedMenu(venueId: string, menuId: string, revisionId: string) {
@@ -479,8 +514,12 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           const path = field(body, 'path');
           if (typeof value !== 'string' || typeof path !== 'string') throw new Error('link');
           const url = new URL(value);
+          const dinerOrigin =
+            base === PRODUCTION_OWNER_API_ORIGIN
+              ? 'https://diner.peekaplate.app'
+              : 'https://routing-staging.peekaplate-diner-staging.pages.dev';
           if (
-            url.origin !== 'https://routing-staging.peekaplate-diner-staging.pages.dev' ||
+            url.origin !== dinerOrigin ||
             url.pathname !== path ||
             !/^\/diner\/[a-z0-9][a-z0-9_-]{0,63}$/.test(path) ||
             url.search ||

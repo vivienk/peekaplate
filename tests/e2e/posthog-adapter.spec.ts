@@ -104,7 +104,7 @@ test('the actual diner banner dispatches one live event to the real SDK and cano
     );
   });
   expect(requests).toHaveLength(0);
-  await page.getByRole('button', { name: 'Allow optional analytics', exact: true }).click();
+  await page.getByRole('button', { name: 'Yes, allow optional analytics', exact: true }).click();
   const emit = () =>
     page.evaluate(async () => {
       const { track } = await import(/* @vite-ignore */ '/src/tracking/index.ts');
@@ -136,6 +136,7 @@ test('the actual diner banner dispatches one live event to the real SDK and cano
   });
   expect(JSON.stringify(sent)).not.toContain(observation.session_id);
   expect(JSON.stringify(sent)).not.toContain(observation.producer_id);
+  await page.getByRole('button', { name: 'Analytics preferences' }).click();
   await page.getByRole('button', { name: 'Turn off optional analytics' }).click();
   await emit();
   await page.clock.runFor(5000);

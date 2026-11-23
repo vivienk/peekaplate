@@ -36,10 +36,12 @@ export async function insertObservationFacts(client: Client, record: CanonicalOb
     ],
   );
   if (matching.rowCount !== 1) throw new Error('Archive does not match the accepted index');
+  const provenance = envelope.sourceEnvironment;
   const inserted = await client.query(
     `INSERT INTO app_private.observation_event
-     (tenant_id,event_id,event_type,session_id,producer_id,local_sequence,publication_revision_id,traffic_class)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (tenant_id,event_id) DO NOTHING RETURNING 1`,
+     (tenant_id,event_id,event_type,session_id,producer_id,local_sequence,publication_revision_id,traffic_class${provenance ? ',source_environment' : ''})
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8${provenance ? ',$9' : ''})
+     ON CONFLICT (tenant_id,event_id) DO NOTHING RETURNING 1`,
     [
       record.tenantId,
       event.event_id,
@@ -49,6 +51,7 @@ export async function insertObservationFacts(client: Client, record: CanonicalOb
       event.local_sequence,
       event.publication_revision_id,
       envelope.traffic_class,
+      ...(provenance ? [provenance] : []),
     ],
   );
   if (inserted.rowCount === 0) return;
@@ -77,6 +80,10 @@ export async function insertObservationFacts(client: Client, record: CanonicalOb
       break;
     case 'dish_compared':
       table = 'comparison';
+      fields = event.payload;
+      break;
+    case 'dish_portion_opened':
+      table = 'portion_opening';
       fields = event.payload;
       break;
     case 'dish_saved': {

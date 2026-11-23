@@ -24,6 +24,44 @@
 body {
   margin: 0;
 }
+#consent {
+  max-width: 30rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+#consent section {
+  position: fixed;
+  z-index: 5;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  right: 1rem;
+  width: min(18rem, calc(100vw - 2rem));
+  box-sizing: border-box;
+  max-height: 55vh;
+  overflow: auto;
+  padding: 1rem;
+  border-radius: 1rem;
+  color: #fff;
+  background: #292c35;
+  box-shadow: 0 4px 20px #0005;
+}
+#consent details,
+#consent [role="status"] {
+  margin-block: 0.5rem;
+  font-size: 0.875rem;
+}
+#consent button {
+  border-radius: 2rem;
+  padding: 0.55rem 0.9rem;
+  margin-inline-end: 0.5rem;
+}
+#consent section button:first-of-type {
+  color: #201a14;
+  background: #ffad6a;
+}
+body:not(:has(#app .pp-menu)) > #consent,
+body:has(.pp-detail, .pp-picker, .pp-result) > #consent {
+  display: none;
+}
 main {
   max-width: 48rem;
   margin: 12vh auto;
@@ -902,24 +940,10 @@ main:has(> .pp-compare) {
   color: #fafafa;
 }
 
-/* Icons (decorative). */
-.pp-logo__image {
-  display: block;
-  height: 32px;
-  width: auto;
-}
-
-.pp-search__icon {
-  display: block;
-  width: 24px;
-  height: 24px;
-}
-
 .pp-chip__icon {
-  display: block;
-  flex: none;
   width: 16px;
   height: 16px;
+  flex: none;
 }
 
 .pp-allergy-note {
@@ -1196,6 +1220,10 @@ main:has(> .pp-compare) {
   background: var(--pp-role-surface-container);
   /* Inside stroke, as in Figma, so the card is 72px tall (48px photo + 2 × 12px). */
   box-shadow: inset 0 0 0 1px var(--pp-role-outline);
+}
+
+.pp-picker__kept + .pp-picker__kept {
+  margin-top: 8px;
 }
 
 .pp-picker__kept-image {
@@ -1556,6 +1584,26 @@ main:has(> .pp-compare) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
   column-gap: 12px;
+}
+
+.pp-compare[data-dish-count="3"] .pp-compare__pair {
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr);
+  column-gap: 4px;
+}
+
+.pp-compare[data-dish-count="3"] .pp-compare__view {
+  padding: 4px 6px;
+  justify-content: center;
+}
+
+.pp-compare[data-dish-count="3"] .pp-compare__view span {
+  display: none;
+}
+
+.pp-compare[data-dish-count="3"] .pp-compare__replace {
+  max-width: 100%;
+  padding-inline: 4px;
+  overflow-wrap: anywhere;
 }
 
 .pp-compare__divider {

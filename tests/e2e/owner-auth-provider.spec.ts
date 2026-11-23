@@ -1,6 +1,20 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page, type Route, test } from '@playwright/test';
+import { OWNER_PAGE_PATHS } from '../../frontend/console/src/owner/routes';
+import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
 
 const origin = 'http://127.0.0.1:5174';
+const productionOrigin = 'https://peekaplate.app';
+async function serveConsole(route: Route) {
+  const { pathname, search } = new URL(route.request().url());
+  const response = await route.fetch({ url: `${origin}${pathname}${search}` });
+  await route.fulfill({ response });
+}
+
+test.afterEach(async ({ page }, { status }) => {
+  // A failed assertion can leave a deliberately paused fixture request waiting for the test.
+  await page.unrouteAll({ behavior: status === 'passed' ? 'wait' : 'ignoreErrors' });
+});
+
 const email = 'owner@example.test';
 const user = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -23,6 +37,7 @@ const session = {
 async function provider(
   page: Page,
   overrides: Record<string, { status?: number; body: unknown }> = {},
+  appOrigin = origin,
 ) {
   const calls: Array<{ url: string; body: Record<string, unknown> | null }> = [];
   await page.route('https://auth-fixture.supabase.co/auth/v1/**', async (route) => {
@@ -30,16 +45,15 @@ async function provider(
     if (request.method() === 'OPTIONS') {
       await route.fulfill({
         status: 204,
-        headers: { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*' },
+        headers: { 'Access-Control-Allow-Origin': appOrigin, 'Access-Control-Allow-Headers': '*' },
       });
       return;
     }
     const path = new URL(request.url()).pathname.split('/').at(-1)!;
-    calls.push({
-      url: request.url(),
-      body: request.postDataJSON() as Record<string, unknown> | null,
-    });
-    const answer = overrides[`${path}:${request.method()}`] ??
+    const body = request.postDataJSON() as Record<string, unknown> | null;
+    calls.push({ url: request.url(), body });
+    const answer = overrides[`${path}:${body?.auth_code}`] ??
+      overrides[`${path}:${request.method()}`] ??
       overrides[path] ?? {
         body:
           path === 'token'
@@ -54,7 +68,7 @@ async function provider(
       status: answer.status ?? 200,
       json: answer.body,
       headers: {
-        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Origin': appOrigin,
         'X-Supabase-Api-Version': '2024-01-01',
         'Access-Control-Expose-Headers': 'X-Supabase-Api-Version',
       },
@@ -63,15 +77,19 @@ async function provider(
   return calls;
 }
 
-async function signInScreen(page: Page) {
-  await page.goto(`${origin}/owner-auth.html`);
+async function signInScreen(page: Page, appOrigin = origin) {
+  await page.goto(`${appOrigin}/owner-auth.html`);
+  await enterEmail(page);
+}
+
+async function enterEmail(page: Page) {
   await page.getByLabel('Email address').fill(email);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 }
 
-async function signup(page: Page) {
-  await signInScreen(page);
+async function signup(page: Page, appOrigin = origin) {
+  await signInScreen(page, appOrigin);
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await page.getByLabel('Full name').fill('Synthetic Owner');
   await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
@@ -79,6 +97,458 @@ async function signup(page: Page) {
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
 }
+
+test('signed-out owners return to the sign-in path from each production workspace URL', async ({
+  page,
+}) => {
+  await page.route(`${productionOrigin}/**`, serveConsole);
+  const calls = await provider(page, {}, productionOrigin);
+  let workspaceRequests = 0;
+  await page.route('https://api.peekaplate.app/**', async (route) => {
+    workspaceRequests++;
+    await route.abort();
+  });
+  for (const path of Object.values(OWNER_PAGE_PATHS)) {
+    await page.goto(`${productionOrigin}${path}`);
+    await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
+    await expect(page.getByLabel('Email address')).toBeVisible();
+  }
+  expect(calls).toEqual([]);
+  expect(workspaceRequests).toBe(0);
+});
+
+test('production deep links resume after sign-in and keep orientation through browser history', async ({
+  page,
+}) => {
+  await page.route(`${productionOrigin}/**`, serveConsole);
+  await provider(page, {}, productionOrigin);
+  const venue = { venueId: user.id, name: 'Synthetic Corner Cafe', permission: 'owner' };
+  let published = true;
+  let setupReads = 0;
+  let reportReads = 0;
+  let workspaceReads = 0;
+  let emptyReport = false;
+  let analysisRequests = 0;
+  await page.route('https://api.peekaplate.app/**', async (route) => {
+    const { pathname, searchParams } = new URL(route.request().url());
+    const headers = {
+      'Access-Control-Allow-Origin': productionOrigin,
+      'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Owner-Report-Ref',
+      'Access-Control-Expose-Headers': 'X-Owner-Report-Ref',
+    };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    expect(route.request().headers().authorization).toBe(`Bearer ${session.access_token}`);
+    let json: unknown;
+    if (pathname === '/staff/venues') {
+      workspaceReads++;
+      json = { actorId: user.id, venues: [venue] };
+    } else if (pathname.endsWith('/setup')) {
+      setupReads++;
+      json = {
+        venueId: venue.venueId,
+        restaurantName: venue.name,
+        detailsStatus: 'verified',
+        menuAdded: true,
+        menuVerified: true,
+        published,
+      };
+    } else if (pathname.endsWith('/profile')) json = { profile: null };
+    else if (pathname.endsWith('/jobs')) json = { jobs: [] };
+    else if (pathname.endsWith('/drafts')) json = { drafts: [] };
+    else if (pathname.endsWith('/owner-insight-actions')) {
+      json = { schemaVersion: 1, actions: [] };
+    } else if (pathname.endsWith('/ai/analysis')) {
+      analysisRequests++;
+      expect(route.request().headers()['x-owner-report-ref']).toBe('fixture-report-reference');
+      const { dishId, goal } = route.request().postDataJSON();
+      expect(goal).toBe('engagement');
+      const period = UNEEZA_REPORT.report_metadata.date_window;
+      json = {
+        schemaVersion: 'owner-analysis.v1',
+        venueId: venue.venueId,
+        dishId,
+        goal,
+        source: 'production',
+        reportSnapshot: 'a'.repeat(64),
+        timeWindow: { start: period.start_time, end: period.end_time },
+        status: 'abstained',
+        metric: null,
+        value: null,
+        reason: 'unusable_evidence',
+        approvalRequired: true,
+        allowedEffects: [],
+      };
+    } else if (pathname.endsWith('/analytics/dishes')) {
+      expect(searchParams.get('source')).toBe('production');
+      expect(searchParams.get('displayActions')).toBe('true');
+      reportReads++;
+      json = {
+        ...UNEEZA_REPORT,
+        source: 'production',
+        venue_id: venue.venueId,
+        dishes: (emptyReport ? [] : UNEEZA_REPORT.dishes).map((dish, index) =>
+          index === 0
+            ? {
+                ...dish,
+                name: 'Fixture lentil soup',
+                display_actions: {
+                  portion_previews_shown: { value: 12, status: 'NORMAL' },
+                  comparisons_started: { value: 10, status: 'NORMAL' },
+                },
+              }
+            : dish,
+        ),
+        report_metadata: {
+          ...UNEEZA_REPORT.report_metadata,
+          calculation_version: 'production.batch.v1',
+        },
+      };
+      return route.fulfill({
+        status: 200,
+        headers: { ...headers, 'X-Owner-Report-Ref': 'fixture-report-reference' },
+        json,
+      });
+    } else return route.fulfill({ status: 404, headers, json: { error: 'unexpected_path' } });
+    await route.fulfill({ status: 200, headers, json });
+  });
+  await page.goto(`${productionOrigin}/dish-performance?next=https://example.invalid`);
+  await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
+  expect(workspaceReads).toBe(0);
+  await enterEmail(page);
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(`${productionOrigin}/dish-performance`);
+  await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
+  const question = page.getByRole('textbox', { name: 'Ask a report question' });
+  const sendQuestion = page.getByRole('button', { name: 'Review report' });
+  await question.fill('Dish engagement');
+  await sendQuestion.click();
+  await expect(
+    page.getByText('There is not enough verified evidence to suggest a next step.'),
+  ).toBeVisible();
+  expect(analysisRequests).toBe(1);
+  await page.getByRole('button', { name: '2.5D previews', exact: true }).click();
+  await page.getByRole('button', { name: 'View as table', exact: true }).click();
+  await expect(
+    page.getByRole('row', { name: 'Fixture lentil soup 12', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Comparisons started', exact: true }).click();
+  await expect(
+    page.getByRole('row', { name: 'Fixture lentil soup 10', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Show chart', exact: true }).click();
+  const nav = page.getByRole('navigation', { name: 'Workspace' });
+  const visit = async (label: string, path: string, heading: string) => {
+    await nav.getByRole('button', { name: label, exact: true }).click();
+    await expect(page).toHaveURL(`${productionOrigin}${path}`);
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+  };
+  const mainPane = page.locator('.owner-main');
+  await mainPane.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect.poll(() => mainPane.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await visit('Overview', '/overview', 'How your menu did this period');
+  await expect(page.getByRole('main')).toBeFocused();
+  await expect(page).toHaveTitle('PeekaPlate · Overview');
+  await expect.poll(() => mainPane.evaluate((element) => element.scrollTop)).toBe(0);
+  await visit('AI Insight Report', '/ai-insight-report', 'Menu activity report');
+  await visit('Dish performance', '/dish-performance', 'What diners did with each dish');
+  await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
+  expect(reportReads).toBe(1);
+  await visit('Actions', '/actions', 'What you decided to do');
+  await visit('Menu', '/menu', 'Your dishes');
+  expect(setupReads).toBe(1);
+  expect(workspaceReads).toBe(1);
+
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  const dishName = page.getByRole('textbox', { name: 'Dish name' });
+  await dishName.fill('Unsaved route test');
+  const cancel = page.waitForEvent('dialog').then((dialog) => dialog.dismiss());
+  await page.evaluate(() => window.history.back());
+  await cancel;
+  await expect(page).toHaveURL(`${productionOrigin}/menu`);
+  await expect(dishName).toHaveValue('Unsaved route test');
+  const discard = page.waitForEvent('dialog').then((dialog) => dialog.accept());
+  await page.evaluate(() => window.history.back());
+  await discard;
+  await expect(page).toHaveURL(`${productionOrigin}/actions`);
+  await expect(page.getByRole('heading', { name: 'What you decided to do' })).toBeVisible();
+  await page.goForward();
+  await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
+  await page.goto(`${productionOrigin}/dish-performance`);
+  await expect(page.getByRole('table')).toBeVisible();
+  await page.reload();
+  await expect(page).toHaveURL(`${productionOrigin}/dish-performance`);
+  await expect(page.getByRole('table')).toBeVisible();
+
+  published = false;
+  await page.reload();
+  await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
+  await expect(nav.getByRole('button', { name: 'Dish performance' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  expect(reportReads).toBe(3);
+
+  await page.getByLabel('Owner account').click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
+  await expect(page).toHaveTitle('PeekaPlate · Owner sign in');
+  published = true;
+  await enterEmail(page);
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
+  expect(reportReads).toBe(3);
+  emptyReport = true;
+  await visit('Overview', '/overview', 'How your menu did this period');
+  await question.fill('Dish engagement');
+  await sendQuestion.click();
+  await expect(
+    page.getByText('There are no dishes with report data in this period.'),
+  ).toBeVisible();
+  expect(analysisRequests).toBe(1);
+});
+
+test('production confirms to sign-in, opens S05, resumes saves and retains the authorized workspace', async ({
+  page,
+}) => {
+  await page.route(`${productionOrigin}/**`, serveConsole);
+  const calls = await provider(
+    page,
+    {
+      'token:synthetic-rejected': { status: 400, body: { code: 'flow_state_not_found' } },
+    },
+    productionOrigin,
+  );
+  const venue = {
+    venueId: '30224700-944a-48af-8c6d-d1d7578b229a',
+    name: 'Riverview Cafe',
+    permission: 'owner',
+  };
+  const otherVenue = {
+    ...venue,
+    venueId: '0e200b46-e52c-43b2-8522-71ff3bb523f0',
+    name: 'Willow Cafe',
+  };
+  const details = {
+    name: venue.name,
+    city: 'Phoenix',
+    street: '100 Main Street',
+    line2: '',
+    phone: '(555) 123-4567',
+    email: '',
+    photoId: null,
+  };
+  const venues: (typeof venue)[] = [];
+  const creationRequests: unknown[] = [];
+  const profileRequests: unknown[] = [];
+  const profiles = new Map<string, { version: number; fields: typeof details; status: string }>();
+  await page.route('https://api.peekaplate.app/**', async (route) => {
+    const request = route.request();
+    const headers = {
+      'Access-Control-Allow-Origin': productionOrigin,
+      'Access-Control-Allow-Headers': 'Authorization,Content-Type',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    const pathname = new URL(request.url()).pathname;
+    let json: unknown;
+    let status = 200;
+    if (pathname === '/staff/venues') {
+      if (request.method() === 'POST') {
+        creationRequests.push(request.postDataJSON());
+        if (!venues.length) venues.push(venue);
+        status = creationRequests.length === 1 ? 503 : 200;
+        json = { venue };
+      } else json = { actorId: user.id, venues };
+    } else {
+      const venueId = pathname.split('/')[2]!;
+      const selected = venues.find((item) => item.venueId === venueId);
+      if (!selected) return route.fulfill({ status: 403, headers, json: { error: 'forbidden' } });
+      if (pathname.endsWith('/profile')) {
+        if (request.method() === 'PUT') {
+          const input = request.postDataJSON();
+          profileRequests.push(input);
+          profiles.set(venueId, { version: 1, status: 'verified', fields: input.fields });
+          status = profileRequests.length === 1 ? 503 : 200;
+        }
+        json = { profile: profiles.get(venueId) ?? null };
+      } else if (pathname.endsWith('/setup')) {
+        json = {
+          venueId,
+          restaurantName: selected.name,
+          detailsStatus: profiles.get(venueId)?.status ?? 'missing',
+          menuAdded: false,
+          menuVerified: false,
+          published: false,
+        };
+      } else if (pathname.endsWith('/jobs')) json = { jobs: [] };
+      else if (pathname.endsWith('/drafts')) json = { drafts: [] };
+    }
+    await route.fulfill({ status, json, headers });
+  });
+
+  await signup(page, productionOrigin);
+  await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-rejected`);
+  await expect(
+    page.getByRole('heading', { name: 'This confirmation link cannot be used' }),
+  ).toBeVisible();
+  const verification = Promise.withResolvers<void>();
+  await page.route('https://auth-fixture.supabase.co/auth/v1/user', async (route) => {
+    await verification.promise;
+    await route.fallback();
+  });
+  await page.goto(`${productionOrigin}/auth-confirm?code=synthetic-production-code`);
+  await expect(page).toHaveURL(`${productionOrigin}/auth-confirm`);
+  await expect(page.getByRole('status')).toHaveText('Confirming your email…');
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toHaveCount(0);
+  verification.resolve();
+  await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
+  expect(await page.evaluate(() => localStorage.getItem('sb-auth-fixture-auth-token'))).toBeNull();
+  expect(creationRequests).toHaveLength(0);
+  await page.goto(`${productionOrigin}/dish-performance`);
+  await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
+  await page.getByLabel('Email address').fill(email);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Restaurant Details' })).toBeFocused();
+  await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
+  await expect(page.getByText('Create test restaurant')).toHaveCount(0);
+  expect(creationRequests).toHaveLength(0);
+  const name = page.getByLabel('Restaurant name');
+  await name.fill(details.name);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const channel = new BroadcastChannel('sb-auth-fixture-auth-token');
+        channel.onmessage = ({ data }) => {
+          if (data.event === 'SIGNED_IN') {
+            channel.close();
+            resolve();
+          }
+        };
+        window.dispatchEvent(new Event('visibilitychange'));
+      }),
+  );
+  await expect(name).toHaveValue(details.name);
+  await page.getByLabel('City').fill(details.city);
+  await page.getByLabel('Street address').fill(details.street);
+  await page.getByLabel('Phone number').fill(details.phone);
+  const save = page.getByRole('button', { name: 'Save', exact: true });
+  await name.fill('x'.repeat(161));
+  await expect(page.getByText('Use 160 characters or fewer')).toBeVisible();
+  await expect(save).toBeDisabled();
+  expect(creationRequests).toHaveLength(0);
+  await name.fill(details.name);
+  await page.evaluate(async () => {
+    const key = 'sb-auth-fixture-auth-token';
+    const saved = localStorage.getItem(key);
+    if (!saved) throw new Error('Fixture session was not persisted');
+    const prior = JSON.parse(saved);
+    const next = { ...prior, access_token: prior.access_token.replace(/[^.]+$/, 'cm90YXRlZA') };
+    localStorage.setItem(key, JSON.stringify(next));
+    const channel = new BroadcastChannel(key);
+    channel.postMessage({ event: 'TOKEN_REFRESHED', session: next });
+    channel.close();
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  });
+  await expect(name).toHaveValue(details.name);
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(page.getByText('We couldn’t save your restaurant details')).toBeVisible();
+  await save.click();
+  await expect(page.getByText('We couldn’t save your restaurant details')).toBeVisible();
+  await save.click();
+  await expect(page.getByRole('heading', { name: 'Choose how to add your menu' })).toBeFocused();
+  await expect(
+    page.getByText('Restaurant details saved. Verified. This does not publish your menu.'),
+  ).toBeVisible();
+  expect(creationRequests).toEqual([
+    { name: venue.name, commandId: expect.any(String) },
+    creationRequests[0],
+  ]);
+  expect(profileRequests).toEqual([
+    { expectedVersion: 0, fields: details, commandId: expect.any(String) },
+    profileRequests[0],
+  ]);
+  const exchanges = calls.filter((call) => call.body?.auth_code === 'synthetic-production-code');
+  expect(exchanges).toHaveLength(1);
+  expect(exchanges[0]?.body?.code_verifier).toEqual(expect.stringMatching(/\S+/));
+  expect(calls.filter((call) => new URL(call.url).pathname.endsWith('/logout'))).toHaveLength(1);
+
+  venues.push(otherVenue);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose a restaurant' })).toHaveCount(0);
+  await page.getByLabel('Owner account').click();
+  const picker = page.getByRole('combobox', { name: 'Restaurant', exact: true });
+  await expect(picker).toHaveValue(venue.venueId);
+  await picker.selectOption(otherVenue.venueId);
+  await expect(page.getByRole('heading', { name: 'Restaurant Details' })).toBeVisible();
+  await expect(page.getByLabel('Restaurant name')).toHaveValue(otherVenue.name);
+  await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-production-code`);
+  await expect(
+    page.getByRole('heading', { name: 'This confirmation link cannot be used' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to sign in' }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
+  expect(creationRequests).toHaveLength(2);
+});
+
+for (const transition of ['popstate', 'back-forward cache'] as const) {
+  test(`interrupting production confirmation with ${transition} still requires sign-in`, async ({
+    page,
+  }) => {
+    await page.route(`${productionOrigin}/**`, serveConsole);
+    await provider(page, {}, productionOrigin);
+    await signup(page, productionOrigin);
+    const response = Promise.withResolvers<void>();
+    const verification = page.waitForRequest('https://auth-fixture.supabase.co/auth/v1/user');
+    await page.route('https://auth-fixture.supabase.co/auth/v1/user', async (route) => {
+      await response.promise;
+      await route.fallback();
+    });
+    await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-interrupted`);
+    await verification;
+    await page.evaluate((event) => {
+      if (event === 'popstate') window.dispatchEvent(new PopStateEvent('popstate'));
+      else {
+        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+      }
+    }, transition);
+    response.resolve();
+    await expect(
+      page.getByRole('heading', { name: 'This confirmation link cannot be used' }),
+    ).toBeVisible();
+    const saved = await page.evaluate(() => localStorage.getItem('sb-auth-fixture-auth-token'));
+    expect(saved).toBeNull();
+    await page.goto(`${productionOrigin}/owner-auth.html`);
+    await expect(page.getByLabel('Email address')).toBeVisible();
+  });
+}
+
+test('production confirmation discards a recovery-purpose exchange', async ({ page }) => {
+  await page.route(`${productionOrigin}/**`, serveConsole);
+  const calls = await provider(page, {}, productionOrigin);
+  await recoveryEmail(page, productionOrigin);
+  await page.goto(`${productionOrigin}/auth-confirm.html?code=synthetic-recovery-on-confirmation`);
+  await expect(
+    page.getByRole('heading', { name: 'This confirmation link cannot be used' }),
+  ).toBeVisible();
+  expect(
+    calls.filter((call) => call.body?.auth_code === 'synthetic-recovery-on-confirmation'),
+  ).toHaveLength(1);
+  await page.getByRole('link', { name: 'Back to sign in' }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
+  await expect(page.getByLabel('Email address')).toBeVisible();
+});
 
 test('Pages clean confirmation callback keeps PKCE and strips the code', async ({ page }) => {
   const calls = await provider(page);
@@ -172,8 +642,8 @@ test('invalid, injected, implicit and expired links never confirm', async ({ pag
   ).toBeVisible();
 });
 
-async function recoveryEmail(page: Page) {
-  await signInScreen(page);
+async function recoveryEmail(page: Page, appOrigin = origin) {
+  await signInScreen(page, appOrigin);
   await page.getByRole('button', { name: 'Forgot password?', exact: true }).click();
   await page.getByRole('button', { name: 'Send reset link', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();

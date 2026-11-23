@@ -1,5 +1,6 @@
 // S09 presentation extracted from #172, with the same authored markup and tokens.
 // Demo fixtures/providers are supplied by menu.tsx; the signed-in adapter supplies persisted data.
+import { parseServingCountInput } from '@peekaplate/contracts/portion';
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -33,6 +34,7 @@ export function DishFormView({
   suggestIngredients,
   suggestAllergens,
   draftDescription,
+  descriptionActionLabel = 'Draft with AI',
   currency = 'USD',
   allowZeroPrice = false,
   busy = false,
@@ -40,7 +42,7 @@ export function DishFormView({
   sourceNote,
   evidence,
   photo,
-  servingCountControl,
+  portionCalibrationControl,
   portionReview,
   onApprovePortion,
   onGeneratePortion,
@@ -58,6 +60,7 @@ export function DishFormView({
   suggestIngredients?: (name: string) => Promise<string[]>;
   suggestAllergens?: (name: string, ingredients: string[]) => Promise<string[]>;
   draftDescription?: (name: string, ingredients: string[]) => Promise<string>;
+  descriptionActionLabel?: string;
   currency?: string;
   allowZeroPrice?: boolean;
   busy?: boolean;
@@ -65,7 +68,7 @@ export function DishFormView({
   sourceNote?: ReactNode;
   evidence?: ReactNode;
   photo?: ReactNode;
-  servingCountControl?: ReactNode;
+  portionCalibrationControl?: ReactNode;
   /** Private owner-only preview, never public publication evidence. */
   portionReview?: {
     status: 'processing' | 'needs_review' | 'failed';
@@ -109,7 +112,8 @@ export function DishFormView({
       !(allowZeroPrice ? Number(d.price) >= 0 : Number(d.price) > 0)
     )
       er['f-price'] = 'Enter a valid price';
-    if (!d.size.trim()) er['f-size'] = 'Enter a serving size';
+    if (parseServingCountInput(d.size) === undefined)
+      er['f-size'] = 'Enter a whole number of people from 1 to 100';
     if (d.ing.length < 1) er['f-ing'] = 'Add at least one ingredient';
     // A photo is required (Jeffin, 14 Nov): an uploaded one or the dish's existing photo.
     if (!imageFor(d)) er['f-photo'] = 'Add a photo of the dish';
@@ -259,22 +263,24 @@ export function DishFormView({
               <section className="card s09-sidecard s09-sidecard--25d" aria-labelledby="s09-25d">
                 <h2 id="s09-25d">2.5D preview</h2>
                 {onGeneratePortion && !portionReview?.approved && (
-                  <button type="button" disabled={busy || !dr.upload} onClick={onGeneratePortion}>
+                  <Btn
+                    kind="outlined"
+                    size="md"
+                    type="button"
+                    disabled={busy || !dr.upload}
+                    onClick={onGeneratePortion}
+                  >
                     Save photo and generate 2.5D
-                  </button>
+                  </Btn>
                 )}
                 {portionReview?.status === 'needs_review' && portionReview.previewUrl ? (
                   <>
-                    <img
-                      src={portionReview.previewUrl}
-                      alt={`Review-only 2.5D preview of ${dr.name || 'this dish'}`}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        height: 'auto',
-                        objectFit: 'contain',
-                      }}
-                    />
+                    <div className="s09-photo has">
+                      <img
+                        src={portionReview.previewUrl}
+                        alt={`Review-only 2.5D preview of ${dr.name || 'this dish'}`}
+                      />
+                    </div>
                     <span className={`s09-chip${portionReview.approved ? ' good' : ''}`}>
                       {portionReview.approved ? 'Approved for publication review' : 'Needs review'}
                     </span>
@@ -283,17 +289,46 @@ export function DishFormView({
                       approved portion assets.
                     </p>
                     {!portionReview.approved && onApprovePortion && (
-                      <button type="button" onClick={onApprovePortion} disabled={busy}>
+                      <Btn
+                        kind="outlined"
+                        size="md"
+                        type="button"
+                        onClick={onApprovePortion}
+                        disabled={busy}
+                      >
                         Approve 2.5D preview
-                      </button>
+                      </Btn>
                     )}
                   </>
                 ) : (
                   <>
                     <span className="s09-chip">
-                      {portionReview?.status === 'processing' ? 'Processing' : 'Not available'}
+                      {portionReview?.status === 'processing'
+                        ? 'Processing'
+                        : portionReview?.status === 'failed'
+                          ? 'Failed'
+                          : 'Not available'}
                     </span>
-                    <p role="status">
+                    {/* The S07 upload bar (onboarding.css): generation reports no percentage, so it
+                        runs while processing and turns red, full width, when it fails. */}
+                    {(portionReview?.status === 'processing' ||
+                      portionReview?.status === 'failed') && (
+                      <div
+                        className={`pp-onboard-progress s09-25d-progress ${
+                          portionReview.status === 'failed'
+                            ? 's09-25d-progress--failed'
+                            : 'pp-onboard-progress--running'
+                        }`}
+                        role="progressbar"
+                        aria-label="2.5D preview processing"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={portionReview.status === 'failed' ? 100 : undefined}
+                      >
+                        <span className="pp-onboard-progress__fill" />
+                      </div>
+                    )}
+                    <p role={portionReview?.status === 'failed' ? 'alert' : 'status'}>
                       {portionReview?.message ??
                         (portionReview?.status === 'processing'
                           ? 'Preparing the 2.5D preview from the dish photo.'
@@ -345,14 +380,20 @@ export function DishFormView({
             />
             <TextField
               id="f-size"
-              label="Serving Size"
+              label="Serving size (people)"
+              hint="How many people this dish serves: 1 for one person, 2 for two."
+              placeholder="1 or 2"
+              type="number"
+              min={1}
+              max={100}
+              step={1}
               required
               value={dr.size}
               {...errOf('f-size')}
               onChange={(e) => set({ size: e.target.value })}
             />
           </div>
-          {servingCountControl}
+          {portionCalibrationControl}
           <div className="s09-desc">
             <div className="pp-field">
               <label className="pp-field__label" htmlFor="f-desc">
@@ -390,7 +431,7 @@ export function DishFormView({
                     );
                 }}
               >
-                Draft with AI
+                {descriptionActionLabel}
               </Btn>
               <span className="s09-hint">
                 {draftDescription
@@ -455,6 +496,12 @@ export function DishFormView({
                     .then((items) => {
                       if (!stillCurrent()) return;
                       const s = items.filter((x) => !dr.ing.includes(x));
+                      if (!s.length) {
+                        setSuggestionError(
+                          'No additional ingredients were suggested. Your dish has not changed.',
+                        );
+                        return;
+                      }
                       setAi({ ing: [...dr.ing, ...s], aiIng: [...dr.aiIng, ...s] });
                     })
                     .catch(
@@ -505,6 +552,15 @@ export function DishFormView({
                     .then((items) => {
                       if (!stillCurrent()) return;
                       const s = items.filter((x) => !dr.alg.includes(x));
+                      if (!s.length) {
+                        // An empty AI answer is not an allergen-free claim.
+                        setSuggestionError(
+                          items.length
+                            ? 'No additional allergens were suggested. Your dish has not changed.'
+                            : 'No allergens were suggested. This does not mean the dish is allergen-free. Your dish has not changed.',
+                        );
+                        return;
+                      }
                       setAi({ alg: [...dr.alg, ...s], aiAlg: [...dr.aiAlg, ...s] });
                     })
                     .catch(
@@ -524,16 +580,26 @@ export function DishFormView({
             )}
           </div>
           <div className="pp-field">
-            <label className="s09-check" htmlFor="f-ai">
+            <label
+              className={`s09-check${requireReviewBox || dr.aiUsed ? ' s09-req' : ''}`}
+              htmlFor="f-ai"
+            >
               <input
                 id="f-ai"
                 type="checkbox"
                 checked={dr.aiReviewed}
+                aria-required={requireReviewBox || dr.aiUsed}
                 aria-invalid={err('f-ai') ? true : undefined}
                 aria-describedby={err('f-ai') ? 'f-ai-error' : undefined}
                 onChange={(e) => set({ aiReviewed: e.target.checked })}
               />
-              <span>I reviewed the AI-drafted text and ingredients. They are accurate.</span>
+              <span>
+                {/* Rania's wording; it names allergens only when AI suggested some, because
+                    ticking it confirms them. */}
+                {dr.aiAlg.length
+                  ? 'I reviewed the AI-drafted text, ingredients and allergens. They are accurate.'
+                  : 'I reviewed the AI-drafted text and ingredients. They are accurate.'}
+              </span>
             </label>
             {fieldErr('f-ai')}
           </div>

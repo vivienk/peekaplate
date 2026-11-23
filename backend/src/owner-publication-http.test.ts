@@ -29,6 +29,30 @@ describe('prepared menu HTTP boundary', () => {
     expect(fetchPreparedMenu).not.toHaveBeenCalled();
   });
 
+  it('keeps prepared menus and preparation actor-scoped when production is enabled', async () => {
+    const listPreparedMenus = vi.fn(async () => []);
+    const prepareOwnerMenu = vi
+      .fn()
+      .mockRejectedValue(new PublicationCommandError('forbidden', 403));
+    const app = createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      listPreparedMenus,
+      fetchPreparedMenu: vi.fn(),
+      prepareOwnerMenu,
+    });
+    const production = { APP_ENV: 'production', OWNER_WORKFLOW_ENABLED: 'true' };
+    const origin = 'https://peekaplate.app';
+    const req = { headers: { ...headers, Origin: origin } };
+    const response = await app.request(path, req, production);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+    expect(listPreparedMenus).toHaveBeenCalledWith(actorId, venueId, production);
+    const denied = await app.request(`${path}/prepare`, { ...req, method: 'POST' }, production);
+    expect(denied.status).toBe(403);
+    expect(prepareOwnerMenu).toHaveBeenCalledWith(actorId, venueId, 'http://localhost', production);
+  });
+
   it('uses the verified actor and exact console origin with private no-store reads', async () => {
     const listPreparedMenus = vi.fn(async () => []);
     const app = createApp({

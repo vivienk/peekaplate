@@ -14,10 +14,11 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-// Icons are decoration only: the text label always stays, and the image is hidden from screen readers.
-function iconMarkup(src: string | null, className: string, size: number): string {
-  if (!src) return '';
-  return `<img class="${className}" src="${escapeHtml(src)}" alt="" aria-hidden="true" width="${size}" height="${size}" />`;
+// Original PR145 decoration; labels remain the source of accessible information.
+function iconMarkup(src: string | null): string {
+  return src
+    ? `<img class="pp-chip__icon" src="${escapeHtml(src)}" alt="" aria-hidden="true" width="16" height="16" />`
+    : '';
 }
 
 export function allergenChips(dish: CompleteDish): string {
@@ -26,7 +27,7 @@ export function allergenChips(dish: CompleteDish): string {
     .map(
       (value) => `
         <span class="pp-chip" aria-label="Contains ${escapeHtml(value)}">
-          ${iconMarkup(allergenIcon(value), 'pp-chip__icon', 16)}
+          ${iconMarkup(allergenIcon(value))}
           <span class="pp-chip__text">${escapeHtml(value)}</span>
         </span>
       `,
@@ -40,7 +41,7 @@ export function dietaryChips(dish: CompleteDish): string {
     .map(
       (value) => `
         <span class="pp-chip" aria-label="Dietary info: ${escapeHtml(value)}">
-          ${iconMarkup(dietaryIcon(value), 'pp-chip__icon', 16)}
+          ${iconMarkup(dietaryIcon(value))}
           <span class="pp-chip__text">${escapeHtml(value)}</span>
         </span>
       `,
@@ -72,6 +73,7 @@ export function renderDishDetail(
   // Detail opened from a Compare result (DIN-02.4): Back returns to that result, and the Compare
   // button is hidden because the diner is already comparing.
   fromCompare = false,
+  onPortionShown?: () => void,
 ): () => void {
   const image = dish.images?.detail ?? dish.images?.card;
   const imageMarkup = image
@@ -187,5 +189,5 @@ export function renderDishDetail(
       handleFailure();
     }
   }
-  return bindPortionPreview(container, dish);
+  return bindPortionPreview(container, dish, onPortionShown);
 }

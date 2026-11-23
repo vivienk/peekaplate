@@ -16,6 +16,9 @@ const checks = new Set([
   'docs:check',
   'test:db',
   'test:e2e',
+  'test:e2e:core',
+  'test:e2e:workspace',
+  'test:e2e:flows',
   'pr:check',
 ]);
 

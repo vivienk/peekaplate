@@ -1,4 +1,7 @@
+import { createHash } from 'node:crypto';
+import { type PlateCalibration, PublicPortionSchema } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { prepareApprovedPortion } from './bundle-producer/approved-portions';
 import {
   type ApprovedDishSource,
   BundleProducerError,
@@ -69,6 +72,123 @@ async function request(dishes: { dish_id: string; portion?: unknown }[]) {
 }
 
 describe('existing producer with owner-approved photos and the text-only fallback (Part A)', () => {
+  it('publishes serving size as people while keeping approved plate dimensions independent', async () => {
+    const plate: PlateCalibration = {
+      shape: 'round',
+      width_mm: 280,
+      depth_mm: 280,
+      source_sha256: hash,
+      source_width_px: 800,
+      source_height_px: 800,
+      boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+      confirmed: true,
+    };
+    const draftId = '66666666-6666-4666-8666-666666666666';
+    const layers = [
+      { name: 'background.svg', depth: 0, bytes: Buffer.from('<svg/>') },
+      { name: 'dish.webp', depth: 1, bytes: Buffer.from('synthetic reviewed foreground') },
+    ];
+    const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+    const privatePortion = PublicPortionSchema.parse({
+      schema_version: 1,
+      dish_id: draftId,
+      dish_revision_id: photoId,
+      width: 64,
+      height: 64,
+      layers: layers.map((layer) => ({
+        url: `https://portion-ingestion.invalid/${layer.name}`,
+        depth: layer.depth,
+        sha256: digest(layer.bytes),
+        size_bytes: layer.bytes.length,
+      })),
+    });
+    const prepared = prepareApprovedPortion(
+      {
+        venueId: venue,
+        dishId: soupId,
+        dishRevisionId: soupRevision,
+        publicationEligible: false,
+        portion: privatePortion,
+        layers: layers.map((layer) => ({
+          name: layer.name,
+          sha256: digest(layer.bytes),
+          size_bytes: layer.bytes.length,
+          base64: layer.bytes.toString('base64'),
+        })),
+        approval: {
+          schema_version: 1,
+          status: 'approved',
+          source_sha256: hash,
+          portion_sha256: digest(Buffer.from(JSON.stringify(privatePortion))),
+          approved_by: draftId,
+          approved_at: '2026-11-17T19:00:00.000Z',
+        },
+      },
+      {
+        venueId: venue,
+        dishId: soupId,
+        dishRevisionId: soupRevision,
+        draftId,
+        photoId,
+        sourceHash: hash,
+        assetBaseUrl: 'https://assets.example.test',
+        sourceDimensions: { width: 800, height: 800 },
+        portionCalibration: plate,
+        servingCount: 2,
+      },
+    );
+    const input = await request([{ dish_id: soupId, portion: prepared.portion }]);
+    const run = (approved: ApprovedDishSource) =>
+      produceMenuBundle(input, new Map([[soupId, approved]]), new Map(), {
+        ownerPhotos: new Map([[soupId, photo({ width: 800, height: 800 })]]),
+        ownerPortions: new Map([[soupId, prepared]]),
+        missingPhoto: 'text_only',
+      });
+    const approved = source({ servingCount: 2, portionCalibration: plate });
+    const bundle = (await run(approved)).bundle;
+    expect(bundle.categories[0]!.dishes[0]).toMatchObject({
+      serving_count: 2,
+      portion: { physical_size: { plate, serving_count: 2 } },
+    });
+    for (const changed of [
+      { portionCalibration: null },
+      { portionCalibration: { ...plate, width_mm: 240, depth_mm: 240 } },
+      { servingCount: 3 },
+      { servingCount: null },
+    ])
+      await expect(run({ ...approved, ...changed })).rejects.toMatchObject({
+        code: 'asset_revision_mismatch',
+      });
+  });
+
+  it('rejects a caller-supplied portion association that never passed private approval validation', async () => {
+    const input = await request([
+      {
+        dish_id: soupId,
+        portion: {
+          schema_version: 1,
+          dish_id: soupId,
+          dish_revision_id: soupRevision,
+          width: 128,
+          height: 128,
+          layers: [0, 1].map((depth) => ({
+            url: `https://assets.example.test/${depth}`,
+            sha256: hash,
+            size_bytes: 10,
+            depth,
+          })),
+        },
+      },
+    ]);
+    const portion = input.categories[0]!.dishes[0]!.portion!;
+    await expect(
+      produceMenuBundle(input, new Map([[soupId, source()]]), new Map(), {
+        ownerPhotos: new Map([[soupId, photo()]]),
+        missingPhoto: 'text_only',
+        ownerPortions: new Map([[soupId, { portion, files: [] }]]),
+      }),
+    ).rejects.toMatchObject({ code: 'asset_revision_mismatch' });
+  });
   it('uses the photo approved on the revision, and text-only for a dish without one', async () => {
     const produced = await produceMenuBundle(
       await request([{ dish_id: soupId }, { dish_id: saladId }]),

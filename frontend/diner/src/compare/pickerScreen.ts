@@ -9,7 +9,7 @@ import { navButtonMarkup } from '../menu/navButton';
 import { formatPrice } from '../menu/price';
 import { SEARCH_STAFF_LINE, searchEmptyMarkup } from '../menu/searchView';
 import type { CompleteDish, Menu } from '../menu/types';
-import { type PickerExclusions, pickerOptions, selectOption } from './picker';
+import { isSelectable, type PickerExclusions, pickerOptions, selectOption } from './picker';
 
 export type PickerViewState = {
   options: CompleteDish[];
@@ -53,13 +53,12 @@ export function pickerViewState(
 export type ComparePickerOptions = {
   menu: Menu;
   // The dish Compare started from, shown as "Keeping".
-  keptDish: CompleteDish;
+  keptDishes: readonly CompleteDish[];
   // Dishes that cannot be picked: the kept dish, or both shown dishes when replacing (DIN-02.4).
   exclude?: PickerExclusions;
   onClose(): void;
-  // Called with the selected dish. Until the Compare result screen (DIN-02.4) passes it, the
-  // Compare button stays disabled and says so.
-  onConfirm?: (pickedDishId: string) => void;
+  onConfirm?: (pickedDishIds: readonly string[]) => void;
+  selectionLimit: 1 | 2;
   // "Compare" when starting a comparison, "Replace Dish" when replacing one side (DIN-02.4).
   confirmLabel?: string;
   // Screen title: "Compare Dish", or "Replace Dish" after Replace (Rania, Nov 15; Azoz review #14).
@@ -115,11 +114,11 @@ function optionMarkup(dish: CompleteDish, selected: boolean): string {
 }
 
 export function renderComparePicker(container: HTMLElement, options: ComparePickerOptions): void {
-  const { menu, keptDish, onClose, onConfirm } = options;
+  const { menu, keptDishes, onClose, onConfirm, selectionLimit } = options;
   const confirmLabel = options.confirmLabel ?? 'Compare';
-  const exclude = options.exclude ?? [keptDish.dishId];
+  const exclude = options.exclude ?? keptDishes.map((dish) => dish.dishId);
   let query = '';
-  let selectedId: string | null = null;
+  let selectedIds: string[] = [];
   const initial = pickerViewState(menu, exclude, query);
 
   container.innerHTML = `
@@ -132,19 +131,25 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
 
       <section class="pp-picker__keeping" aria-labelledby="pp-picker-keeping-label">
         <p class="pp-picker__label" id="pp-picker-keeping-label">Keeping</p>
-        <div class="pp-picker__kept">
-          ${thumbMarkup(keptDish, 'pp-picker__kept-image')}
-          <p class="pp-picker__kept-name">${escapeHtml(keptDish.name)}</p>
-        </div>
+        ${keptDishes
+          .map(
+            (dish) => `
+          <div class="pp-picker__kept">
+            ${thumbMarkup(dish, 'pp-picker__kept-image')}
+            <p class="pp-picker__kept-name">${escapeHtml(dish.name)}</p>
+          </div>
+        `,
+          )
+          .join('')}
       </section>
 
       <section class="pp-picker__choose-section" aria-labelledby="pp-picker-choose-label">
-        <p class="pp-picker__label" id="pp-picker-choose-label">Choose a dish to compare</p>
+        <p class="pp-picker__label" id="pp-picker-choose-label">${selectionLimit === 1 ? 'Choose a dish to compare' : 'Choose up to two dishes to compare'}</p>
         ${
           initial.noOptions
             ? `<p class="pp-picker__none">There are no other dishes to compare on this menu yet.</p>`
             : `
-              <p class="pp-picker__hint">Select another dish from the menu to compare side by side.</p>
+              <p class="pp-picker__hint">${selectionLimit === 1 ? 'Select another dish from the menu to compare side by side.' : 'Select one or two dishes to compare side by side.'}</p>
               <form class="pp-search-bar pp-picker__search" role="search" aria-label="Search dishes to compare">
                 <span class="pp-picker__search-icon" aria-hidden="true"></span>
                 <label class="pp-sr-only" for="pp-picker-search-input">Search dishes or ingredients</label>
@@ -152,6 +157,7 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
               </form>
               <p class="pp-search-staff" hidden>${SEARCH_STAFF_LINE}</p>
               <p class="pp-sr-only" id="pp-picker-status" role="status" aria-live="polite"></p>
+              <p class="pp-picker__hint" id="pp-picker-limit" role="status" hidden>Two dishes selected. Deselect one to change your choices.</p>
               <div class="pp-picker__list" role="group" aria-labelledby="pp-picker-choose-label"></div>
               ${searchEmptyMarkup()}
             `
@@ -171,7 +177,7 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
     ?.addEventListener('click', onClose);
   const confirm = container.querySelector<HTMLButtonElement>('.pp-picker__confirm');
   confirm?.addEventListener('click', () => {
-    if (selectedId && onConfirm) onConfirm(selectedId);
+    if (selectedIds.length && onConfirm) onConfirm(selectedIds);
   });
   container.querySelector<HTMLElement>('.pp-picker')?.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
@@ -186,39 +192,47 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
   const list = container.querySelector<HTMLElement>('.pp-picker__list');
   const staff = container.querySelector<HTMLElement>('.pp-search-staff');
   const status = container.querySelector<HTMLElement>('#pp-picker-status');
+  const limit = container.querySelector<HTMLElement>('#pp-picker-limit');
   const empty = container.querySelector<HTMLElement>('.pp-search-empty');
   const clear = container.querySelector<HTMLButtonElement>('.pp-search-empty__clear');
   if (!form || !input || !list || !staff || !status || !empty || !clear) return;
 
   const updateConfirm = () => {
-    if (confirm) confirm.disabled = selectedId === null || !onConfirm;
+    if (confirm) confirm.disabled = selectedIds.length === 0 || !onConfirm;
+    const full = selectionLimit === 2 && selectedIds.length === selectionLimit;
+    if (limit) limit.hidden = !full;
+    for (const card of list.querySelectorAll<HTMLElement>('.pp-picker__option')) {
+      const selected =
+        card.dataset.dishId !== undefined && selectedIds.includes(card.dataset.dishId);
+      const button = card.querySelector<HTMLButtonElement>('.pp-picker__choose');
+      card.classList.toggle('pp-picker__option--selected', selected);
+      button?.setAttribute('aria-pressed', String(selected));
+      button?.setAttribute('aria-disabled', String(full && !selected));
+    }
   };
 
   const renderOptions = () => {
     const state = pickerViewState(menu, exclude, query);
-    // A selected dish that the search hides is unselected, so Compare never confirms a dish the
-    // diner can no longer see (Azoz review #7).
-    if (selectedId && !state.options.some((dish) => dish.dishId === selectedId)) {
-      selectedId = null;
-      updateConfirm();
-    }
+    // Clear choices hidden by search, so Compare only confirms visible dishes.
+    selectedIds = selectedIds.filter((id) => state.options.some((dish) => dish.dishId === id));
     list.innerHTML = state.options
-      .map((dish) => optionMarkup(dish, dish.dishId === selectedId))
+      .map((dish) => optionMarkup(dish, selectedIds.includes(dish.dishId)))
       .join('');
     list.hidden = state.options.length === 0;
     empty.hidden = !state.noResults;
     staff.hidden = !state.allergyNotice;
     status.textContent = state.announcement;
+    updateConfirm();
   };
 
   const select = (dishId: string) => {
-    selectedId = selectOption(menu, exclude, selectedId, dishId);
-    for (const card of Array.from(list.querySelectorAll<HTMLElement>('.pp-picker__option'))) {
-      const selected = card.dataset.dishId === selectedId;
-      card.classList.toggle('pp-picker__option--selected', selected);
-      card
-        .querySelector<HTMLButtonElement>('.pp-picker__choose')
-        ?.setAttribute('aria-pressed', String(selected));
+    if (selectionLimit === 1) {
+      const selectedId = selectOption(menu, exclude, selectedIds[0] ?? null, dishId);
+      selectedIds = selectedId ? [selectedId] : [];
+    } else if (selectedIds.includes(dishId)) {
+      selectedIds = selectedIds.filter((id) => id !== dishId);
+    } else if (selectedIds.length < selectionLimit && isSelectable(menu, exclude, dishId)) {
+      selectedIds = [...selectedIds, dishId];
     }
     updateConfirm();
   };
@@ -261,5 +275,4 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
   });
 
   renderOptions();
-  updateConfirm();
 }

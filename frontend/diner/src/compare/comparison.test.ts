@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { completeDishes } from '../menu/adapter';
 import { createFixtureMenuSource, DISH, FIXTURE_PUBLICATION_REVISION_ID } from '../menu/fixtures';
 import type { Menu } from '../menu/types';
-import { dishComparedPayload, replaceExclusions, replaceSide, startComparison } from './comparison';
+import {
+  dishComparedPayloads,
+  replaceExclusions,
+  replaceSide,
+  startComparison,
+} from './comparison';
 import { pickerOptions } from './picker';
 
 async function loadMenu(scenario: Parameters<typeof createFixtureMenuSource>[0]): Promise<Menu> {
@@ -31,7 +36,7 @@ describe('startComparison', () => {
   it('starts a comparison with the kept dish first and a new comparison id', async () => {
     const menu = await loadMenu('demo');
     const newId = idSequence();
-    expect(startComparison(menu, DISH.avocadoToast, DISH.harvestPowerBowl, newId)).toEqual({
+    expect(startComparison(menu, DISH.avocadoToast, [DISH.harvestPowerBowl], newId)).toEqual({
       comparisonId: 'comparison-1',
       firstDishId: DISH.avocadoToast,
       otherDishId: DISH.harvestPowerBowl,
@@ -42,17 +47,40 @@ describe('startComparison', () => {
   it('blocks the same dish twice and incomplete dishes, without making an id', async () => {
     const menu = await loadMenu('edge-cases');
     const newId = idSequence();
-    expect(startComparison(menu, DISH.avocadoToast, DISH.avocadoToast, newId)).toBeNull();
-    expect(startComparison(menu, DISH.avocadoToast, DISH.incomplete, newId)).toBeNull();
-    expect(startComparison(menu, DISH.noIngredients, DISH.avocadoToast, newId)).toBeNull();
+    expect(startComparison(menu, DISH.avocadoToast, [DISH.avocadoToast], newId)).toBeNull();
+    expect(startComparison(menu, DISH.avocadoToast, [DISH.incomplete], newId)).toBeNull();
+    expect(startComparison(menu, DISH.noIngredients, [DISH.avocadoToast], newId)).toBeNull();
     expect(newId).not.toHaveBeenCalled();
+  });
+
+  it('accepts two different candidates and rejects duplicates or a third pick', async () => {
+    const menu = await loadMenu('demo');
+    const newId = idSequence();
+    const candidates = [DISH.harvestPowerBowl, DISH.salmonPokeBowl];
+    expect(startComparison(menu, DISH.avocadoToast, candidates, newId)).toMatchObject({
+      firstDishId: DISH.avocadoToast,
+      otherDishId: DISH.harvestPowerBowl,
+      thirdDishId: DISH.salmonPokeBowl,
+    });
+    expect(
+      startComparison(menu, DISH.avocadoToast, [...candidates, DISH.eggsBenedict], newId),
+    ).toBeNull();
+    expect(
+      startComparison(
+        menu,
+        DISH.avocadoToast,
+        [DISH.harvestPowerBowl, DISH.harvestPowerBowl],
+        newId,
+      ),
+    ).toBeNull();
+    expect(newId).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('replaceSide', () => {
   it('replaces either side and keeps the comparison id, then replaces again', async () => {
     const menu = await loadMenu('demo');
-    const start = startComparison(menu, DISH.avocadoToast, DISH.harvestPowerBowl, idSequence());
+    const start = startComparison(menu, DISH.avocadoToast, [DISH.harvestPowerBowl], idSequence());
     if (!start) throw new Error('expected a comparison');
     const once = replaceSide(menu, start, 'other', DISH.salmonPokeBowl);
     expect(once).toEqual({ ...start, otherDishId: DISH.salmonPokeBowl });
@@ -66,7 +94,7 @@ describe('replaceSide', () => {
 
   it('ignores a replacement that is already shown or incomplete', async () => {
     const menu = await loadMenu('edge-cases');
-    const start = startComparison(menu, DISH.avocadoToast, DISH.harvestPowerBowl, idSequence());
+    const start = startComparison(menu, DISH.avocadoToast, [DISH.harvestPowerBowl], idSequence());
     if (!start) throw new Error('expected a comparison');
     for (const dishId of [DISH.avocadoToast, DISH.harvestPowerBowl, DISH.incomplete]) {
       expect(replaceSide(menu, start, 'other', dishId)).toBe(start);
@@ -75,7 +103,7 @@ describe('replaceSide', () => {
 
   it('gives the picker both shown dishes to exclude', async () => {
     const menu = await loadMenu('demo');
-    const start = startComparison(menu, DISH.avocadoToast, DISH.harvestPowerBowl, idSequence());
+    const start = startComparison(menu, DISH.avocadoToast, [DISH.harvestPowerBowl], idSequence());
     if (!start) throw new Error('expected a comparison');
     expect(pickerOptions(menu, replaceExclusions(start)).dishIds).toEqual([
       DISH.eggsBenedict,
@@ -85,23 +113,25 @@ describe('replaceSide', () => {
   });
 });
 
-describe('dishComparedPayload', () => {
+describe('dishComparedPayloads', () => {
   it('builds start then replace payloads with the same comparison id', async () => {
     const menu = await loadMenu('demo');
-    const start = startComparison(menu, DISH.avocadoToast, DISH.harvestPowerBowl, idSequence());
+    const start = startComparison(menu, DISH.avocadoToast, [DISH.harvestPowerBowl], idSequence());
     if (!start) throw new Error('expected a comparison');
-    expect(dishComparedPayload(menu, start, 'start', false)).toEqual({
-      publication_revision_id: FIXTURE_PUBLICATION_REVISION_ID,
-      comparison_id: 'comparison-1',
-      compare_action: 'start',
-      dish_id: DISH.avocadoToast,
-      dish_revision_id: revisionOf(menu, DISH.avocadoToast),
-      other_dish_id: DISH.harvestPowerBowl,
-      other_dish_revision_id: revisionOf(menu, DISH.harvestPowerBowl),
-      save_available: false,
-    });
+    expect(dishComparedPayloads(menu, start, 'start', false)).toEqual([
+      {
+        publication_revision_id: FIXTURE_PUBLICATION_REVISION_ID,
+        comparison_id: 'comparison-1',
+        compare_action: 'start',
+        dish_id: DISH.avocadoToast,
+        dish_revision_id: revisionOf(menu, DISH.avocadoToast),
+        other_dish_id: DISH.harvestPowerBowl,
+        other_dish_revision_id: revisionOf(menu, DISH.harvestPowerBowl),
+        save_available: false,
+      },
+    ]);
     const replaced = replaceSide(menu, start, 'other', DISH.salmonPokeBowl);
-    expect(dishComparedPayload(menu, replaced, 'replace', true)).toMatchObject({
+    expect(dishComparedPayloads(menu, replaced, 'replace', true, 'other')[0]).toMatchObject({
       publication_revision_id: FIXTURE_PUBLICATION_REVISION_ID,
       comparison_id: 'comparison-1',
       compare_action: 'replace',
@@ -116,9 +146,14 @@ describe('dishComparedPayload', () => {
     const first = await source.load();
     const second = await source.load();
     if (first.status !== 'ready' || second.status !== 'ready') throw new Error('expected menus');
-    const start = startComparison(first.menu, DISH.avocadoToast, DISH.salmonPokeBowl, idSequence());
+    const start = startComparison(
+      first.menu,
+      DISH.avocadoToast,
+      [DISH.salmonPokeBowl],
+      idSequence(),
+    );
     if (!start) throw new Error('expected a comparison');
-    expect(dishComparedPayload(second.menu, start, 'start', false)).toBeNull();
+    expect(dishComparedPayloads(second.menu, start, 'start', false)).toEqual([]);
   });
 
   it('makes no network call and logs nothing', async () => {
@@ -127,13 +162,14 @@ describe('dishComparedPayload', () => {
     const logSpies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((level) =>
       vi.spyOn(console, level),
     );
-    const start = startComparison(menu, DISH.avocadoToast, DISH.harvestPowerBowl, idSequence());
+    const start = startComparison(menu, DISH.avocadoToast, [DISH.harvestPowerBowl], idSequence());
     if (start)
-      dishComparedPayload(
+      dishComparedPayloads(
         menu,
         replaceSide(menu, start, 'other', DISH.salmonPokeBowl),
         'replace',
         false,
+        'other',
       );
     expect(fetchSpy).not.toHaveBeenCalled();
     for (const spy of logSpies) expect(spy).not.toHaveBeenCalled();

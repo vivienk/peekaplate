@@ -41,6 +41,30 @@ it('does not send a request without a signed-in session', async () => {
   await expect(analyze({ dishId, goal: 'menu' }, new AbortController().signal)).rejects.toThrow();
   expect(fetchImpl).not.toHaveBeenCalled();
 });
+it('accepts only production evidence from the production API', async () => {
+  const valid = { ...result, source: 'production' };
+  const request = { dishId, goal: 'menu' } as const;
+  const analyze = createOwnerAnalysisClient({
+    baseUrl: 'https://api.peekaplate.app',
+    venueId,
+    getAccessToken: async () => 'owner-session',
+    fetchImpl: vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(valid))
+      .mockResolvedValueOnce(Response.json(result)),
+  });
+  await expect(analyze(request, new AbortController().signal)).resolves.toEqual(valid);
+  await expect(analyze(request, new AbortController().signal)).rejects.toThrow(
+    'Analysis unavailable',
+  );
+});
+it('forwards the displayed report reference in a header without changing dish/goal', async () => {
+  const { analyze, fetchImpl } = setup();
+  await analyze({ dishId, goal: 'menu' }, new AbortController().signal, 'signed.report.reference');
+  const [, init] = (fetchImpl.mock.calls as unknown as [string, RequestInit][])[0]!;
+  expect(new Headers(init.headers).get('X-Owner-Report-Ref')).toBe('signed.report.reference');
+  expect(JSON.parse(init.body as string)).toEqual({ dishId, goal: 'menu' });
+});
 it('rejects unsupported API destinations before reading a staff credential', async () => {
   const getAccessToken = vi.fn(async () => 'private-session');
   const fetchImpl = vi.fn(async () => Response.json(result));
@@ -65,6 +89,32 @@ it.each([401, 403])('preserves access denial %i for the workspace', async (statu
   await expect(
     analyze({ dishId, goal: 'menu' }, new AbortController().signal),
   ).rejects.toMatchObject({ status });
+});
+it('identifies an expired or mismatched report reference for explicit report reload', async () => {
+  const fetchImpl = vi.fn(async () =>
+    Response.json({ error: 'report_reference_unavailable' }, { status: 409 }),
+  );
+  const analyze = createOwnerAnalysisClient({
+    baseUrl: 'https://peekaplate-api-staging.vxkong.workers.dev',
+    venueId,
+    getAccessToken: async () => 'session',
+    fetchImpl,
+  });
+  await expect(
+    analyze({ dishId, goal: 'menu' }, new AbortController().signal, 'expired.reference'),
+  ).rejects.toMatchObject({ name: 'OwnerAnalysisReferenceError' });
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+});
+it('does not classify an unrelated conflict as an expired reference', async () => {
+  const analyze = createOwnerAnalysisClient({
+    baseUrl: 'https://peekaplate-api-staging.vxkong.workers.dev',
+    venueId,
+    getAccessToken: async () => 'session',
+    fetchImpl: async () => Response.json({ error: 'other_conflict' }, { status: 409 }),
+  });
+  await expect(
+    analyze({ dishId, goal: 'menu' }, new AbortController().signal),
+  ).rejects.toMatchObject({ name: 'Error', message: 'Analysis unavailable' });
 });
 it('does not dispatch after cancellation during session lookup', async () => {
   const controller = new AbortController();

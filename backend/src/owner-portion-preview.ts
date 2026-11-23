@@ -43,7 +43,7 @@ export type PrivatePreview = {
 };
 
 export async function readPrivatePortion(
-  bucket: Bucket,
+  bucket: Pick<Bucket, 'get'>,
   key: string,
 ): Promise<PrivatePreview | null> {
   if (!bucket.get) throw new Error('storage_unavailable');
@@ -101,41 +101,63 @@ export async function processPrivateDishPhoto(input: {
   const { env, bucket, venueId, draftId, photoId, sourceKey, sourceHash, sourceSize } = input;
   const key = previewKey(venueId, draftId, photoId, sourceHash);
   const existing = await readPrivatePortion(bucket, key);
-  if (existing) return existing;
-  if (!env.PORTION_SERVICE_URL || !env.PORTION_SERVICE_SECRET || !bucket.get) {
+  if (existing?.status === 'needs_review') return existing;
+  const dedicated =
+    env.PORTION_SERVICE_URL !== undefined || env.PORTION_SERVICE_SECRET !== undefined;
+  const serviceUrl = dedicated ? env.PORTION_SERVICE_URL : env.EXTRACTION_SERVICE_URL;
+  const serviceSecret = dedicated ? env.PORTION_SERVICE_SECRET : env.EXTRACTION_SERVICE_SECRET;
+  if (!serviceUrl || !serviceSecret || !bucket.get) {
     throw new Error('portion_service_unavailable');
   }
-  const endpoint = new URL(env.PORTION_SERVICE_URL);
+  const endpoint = new URL(serviceUrl);
   if (
     endpoint.protocol !== 'https:' ||
     endpoint.username ||
     endpoint.password ||
     endpoint.search ||
     endpoint.hash ||
-    endpoint.pathname !== '/'
+    (dedicated && endpoint.pathname !== '/')
   ) {
     throw new Error('invalid_portion_service_url');
   }
   const photo = await objectBytes(await bucket.get(sourceKey), sourceSize, sourceHash);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
-  let response: Response;
+  // Existing container startup (30s), bounded local segmentation (180s), and response delivery.
+  const timeout = setTimeout(() => controller.abort(), 220_000);
+  let raw: unknown;
   try {
-    response = await fetch(new URL(`/v1/portion-uploads/${draftId}/${photoId}`, endpoint), {
+    const response = await fetch(new URL(`/v1/portion-uploads/${draftId}/${photoId}`, endpoint), {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${env.PORTION_SERVICE_SECRET}`,
+        Authorization: `Bearer ${serviceSecret}`,
         'Content-Type': 'application/octet-stream',
       },
       body: photo,
-      redirect: 'error',
+      redirect: 'manual',
       signal: controller.signal,
     });
+    if (!response.ok || !response.body) {
+      await response.body?.cancel();
+      throw new Error('portion_processing_unavailable');
+    }
+    const reader = response.body.getReader();
+    let size = 0;
+    const chunks: Uint8Array[] = [];
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 300_000) throw new Error('processor_response_too_large');
+        chunks.push(value);
+      }
+      raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
   } finally {
     clearTimeout(timeout);
   }
-  if (!response.ok) throw new Error('portion_processing_unavailable');
-  const raw: unknown = await response.json();
   if (!raw || typeof raw !== 'object') throw new Error('invalid_processor_response');
   const result = raw as {
     status?: unknown;
@@ -206,7 +228,7 @@ const portionHash = (portion: PublicPortion) =>
   hash(new TextEncoder().encode(JSON.stringify(portion)));
 
 export async function readPrivatePortionApproval(
-  bucket: Bucket,
+  bucket: Pick<Bucket, 'get'>,
   key: string,
   record: PrivatePreview,
 ): Promise<PrivatePortionApproval | null> {
@@ -268,7 +290,7 @@ export async function approvePrivatePortion(
  * upload exact bytes to immutable public hosting and run the existing admission gate.
  */
 export async function exportApprovedPrivatePortion(
-  bucket: Bucket,
+  bucket: Pick<Bucket, 'get'>,
   key: string,
 ): Promise<{
   portion: PublicPortion;

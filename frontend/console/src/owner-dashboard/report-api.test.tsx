@@ -22,6 +22,26 @@ function request(fetch: ReturnType<typeof vi.fn>, overrides = {}) {
 }
 
 describe('fetchOwnerReport (S3-RES-03)', () => {
+  it('keeps the server-issued reference with its validated report only', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json(UNEEZA_REPORT, {
+        headers: { 'X-Owner-Report-Ref': 'signed.report.reference' },
+      }),
+    );
+    expect(await request(fetch)).toMatchObject({
+      kind: 'ready',
+      reference: 'signed.report.reference',
+    });
+    const wrong = vi.fn(async () =>
+      Response.json(
+        { ...UNEEZA_REPORT, venue_id: '00000000-0000-4000-8000-000000000123' },
+        {
+          headers: { 'X-Owner-Report-Ref': 'signed.report.reference' },
+        },
+      ),
+    );
+    expect(await request(wrong)).toEqual({ kind: 'invalid' });
+  });
   it('asks for the synthetic report with the owner token and no cache', async () => {
     const fetch = respond(200, UNEEZA_REPORT);
     const state = await request(fetch);
@@ -41,6 +61,19 @@ describe('fetchOwnerReport (S3-RES-03)', () => {
     const state = await request(respond(200, UNEEZA_REPORT));
     if (state.kind !== 'ready') throw new Error(state.kind);
     expect(state.report).toEqual(UNEEZA_REPORT);
+  });
+
+  it('limits the production console to live data for the signed-in restaurant', async () => {
+    const apiBase = 'https://api.peekaplate.app/';
+    const report = { ...UNEEZA_REPORT, source: 'production' };
+    const fetch = respond(200, report);
+    expect(await request(fetch, { apiBase })).toMatchObject({ kind: 'ready', report });
+    expect(fetch).toHaveBeenCalledWith(
+      `https://api.peekaplate.app/api/v1/venues/${VENUE}/analytics/dishes?source=production&displayActions=true`,
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+    expect(await request(respond(200, UNEEZA_REPORT), { apiBase })).toEqual({ kind: 'invalid' });
+    expect(await request(respond(200, report))).toEqual({ kind: 'invalid' });
   });
 
   it('does not call the API without a sign-in or with a malformed restaurant id', async () => {

@@ -20,12 +20,18 @@ describe('S13 diner preview address', () => {
     );
   });
 
+  it('pairs the production owner with the production diner only over HTTPS', () => {
+    expect(dinerPreviewUrl({ protocol: 'https:', hostname: 'peekaplate.app' })).toBe(
+      'https://diner.peekaplate.app/diner/',
+    );
+  });
+
   it('shows no diner anywhere else rather than guessing', () => {
     for (const location of [
       { protocol: 'https:', hostname: 'example.com' },
       { protocol: 'http:', hostname: 'pr-1.peekaplate-console-preview.pages.dev' },
       { protocol: 'https:', hostname: 'pr-1.peekaplate-console-preview.pages.dev.evil.test' },
-      { protocol: 'https:', hostname: 'peekaplate.app' },
+      { protocol: 'http:', hostname: 'peekaplate.app' },
     ]) {
       expect(dinerPreviewUrl(location)).toBeNull();
     }

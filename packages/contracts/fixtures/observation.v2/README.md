@@ -2,7 +2,7 @@
 
 Local verification covers the fixture, contract, menu-token and HTTP boundary tests. Record current commands, counts and runtimes in the PR verification section. These fixtures do not establish hosted integration acceptance.
 
-Synthetic inputs for TRK-01. Load fixtures.json: valid_events covers nine P0 types; invalid_events contains negative cases; delivery_cases contains ordered HTTP request bodies and expected ingestion receipt statuses. Send only request bodies, not fixture metadata.
+Synthetic inputs for TRK-01. Load fixtures.json. The valid_events list covers all observation.v2 types, including successful display of an interactive portion preview. The invalid_events list contains negative cases. The delivery_cases list contains ordered HTTP request bodies and expected ingestion receipt statuses. Send only request bodies.
 
 Freeze the clock at 2026-10-24T16:00:00.000Z. Mock test-only authorization for publication 40000000-0000-4000-8000-000000000001, permitted rate limits and successful Queue enqueue. Never send these fixed-time fixtures to production.
 

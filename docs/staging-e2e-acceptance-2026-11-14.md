@@ -1,6 +1,10 @@
 # FE-06.4 staging acceptance: verifier and run handoff
 
-## Current operator handoff — November 14, 2026
+## Historical operator handoff — November 14, 2026
+
+For the extraction-only main promotion after the `ba70ce9` API/Pages release,
+follow [the current release runbook](extraction-budget-release.md). The version,
+Queue and access observations below are historical; refresh them before a run.
 
 [PR #185](https://github.com/vivienk/peekaplate/pull/185) promoted #161's verification slice.
 Staging API runs main `20e52a3`, Worker `0c60d064-c804-44a0-b4f3-3aaf44e64848`.

@@ -39,25 +39,93 @@ only to originals.
 The current 2.5D preview shows the **actual generated cutout**, not a synthetic
 2.5D fixture or 3D model. Diner camera/AR placement remains in PR #162.
 
+S09 keeps the original #172/#213 form and its existing right-hand 2.5D card.
+The generated image uses the same bounded 120px photo presentation as the
+authored photo card; it must not expand at its intrinsic height. Generation,
+private review status and explicit approval stay inside this card. No separate
+editor, preview page, design token or approval path is introduced.
+
+## Serving size counts people; plate measurements set AR scale
+
+S09 has one **Serving size (people)** field: `1` means one person and `2` means
+two people. It edits the canonical `servingCount` (`serving_count` on extracted
+corrections), with integers from 1–100. There is no second People served input.
+Fractions, ranges and units are not people counts. Existing explicit counts take
+precedence over legacy `servingSize` text; an explicit unknown count stays unknown.
+Unrelated edits preserve old descriptive text without treating `1 bowl` or
+`28 cm` as a count. A plain integer legacy value can populate the control only
+when no canonical count or plate calibration is present.
+Withdrawing or invalidating an older calibration preserves an unknown people
+count until the owner supplies one; removing the measurement must not turn an
+old numeric centimetre value into people.
+Review and explicit dish approval use the same resolution rule, including when
+an older draft goes directly from S10 to publication without reopening S09.
+
+The separate optional **Plate size (cm)** input supplies dimensions for measured
+table AR: `28` or `28 cm` means a round 28 cm diameter; `30 x 20` or
+`30 × 20 cm` means a rectangular 30 by 20 cm footprint. Each dimension is
+3–100 cm, with at most one decimal place. A two-person serving on a 28 cm plate
+keeps that 28 cm footprint; the count never multiplies the dimensions.
+
+After saving the original photo, the owner marks the outer plate boundary on
+that photo and confirms the measurement. The boundary excludes margins,
+utensils and garnish. The control uses the separate Plate size input and restores
+saved dimensions from its confirmed calibration. Changing the people count,
+plate dimensions, boundary or selected photo clears the local confirmation.
+A replacement photo must finish saving before it can be calibrated. Failed
+photo loading or an invalid boundary cannot create measurement evidence.
+
+Manual drafts persist `portionCalibration`; extracted corrections persist
+`portion_calibration`. Both use the shared `PlateCalibrationSchema` and retain
+the original-photo hash and oriented pixel dimensions. Saving and verifying
+these facts follows the existing versioned draft and dish-review transactions.
+No database migration or new processing call is required for a size-only edit.
+
+S13 attaches physical size only from the approved dish revision. It verifies the
+exact selected photo hash, checks JPEG/PNG dimensions including EXIF orientation,
+and binds the calibration to the approved foreground hash. Unsupported or
+ambiguous orientation evidence cannot authorize physical placement. The private
+cutout and its artwork approval remain unchanged; processor-supplied physical
+metadata cannot substitute for the independently approved measurement.
+
+Published asset reads use the measurement in the immutable published snapshot,
+not the current editable draft. Re-editing the serving size therefore cannot
+remove an earlier publication's layers. After re-verification and explicit
+publication, the new revision carries its new measurement.
+
+The diner displays `Serves 2 people` and separate `Plate size` dimensions in View
+Portion and the camera portal.
+On a device supporting tracked table AR, matching measurements set the plate
+footprint in metres and disable arbitrary visual resizing in measured mode.
+Both an absent people count and an absent calibration count are allowed;
+present counts must agree. Ordinary camera placement and the upright 2.5D
+appearance remain approximate. A physical-device check is still required before
+claiming real-world scale acceptance.
+
 ## Private service configuration
 
-The Worker requires server-side `PORTION_SERVICE_URL` (bare HTTPS origin)
-and `PORTION_SERVICE_SECRET` (the extraction host's service bearer token).
-The extraction host must be deployed with an absolute, writable
-`PORTION_REVIEW_ROOT` to mount the private portion endpoint. Each request uses a
-temporary directory under that root. Its host already uses
-`EXTRACTION_SERVICE_SECRET`; configure the Worker portion token to match the
-host's secret. Do not expose these values via `VITE_*`, HTML, assets, docs or logs.
+The Worker reuses the existing server-side `EXTRACTION_SERVICE_URL` and
+`EXTRACTION_SERVICE_SECRET` when neither dedicated portion setting exists.
+An explicit `PORTION_SERVICE_URL` (bare HTTPS origin) and
+`PORTION_SERVICE_SECRET` pair may override that destination; a partial pair
+fails closed. Do not expose these values via `VITE_*`, HTML, assets, docs or logs.
 
 The service is **disabled until configured and deployed**. The owner UI retains
 the photo fallback and reports service unavailability. No provider credits,
 Tripo or billable 3D calls are involved.
 
-The checked-in staging extraction Worker does not forward the portion upload
-route or pass the scratch root to the Python container. Its image installs the
-`service` extra, while automatic segmentation of an opaque photo requires the
-`cutout` extra and the U2NET model. Verify a real opaque-photo request against a
-configured host before counting staging generation as accepted.
+The existing extraction Worker forwards only the authenticated portion-upload
+route to its existing container. It passes a private scratch root; the image
+installs the locked `service` and `cutout` extras and includes the
+checksum-verified U2NETP model, readable by its non-root runtime. Each request
+removes its temporary directory. Input is bounded to 12 MB, the response to
+300 KB, and the complete request/body deadline to 220 seconds. The existing
+two-attempt paid extraction budget is unchanged; cutout generation is CPU-only.
+
+A failed generation can be retried with the same saved photo. Only successful
+review manifests are reused; ordinary field edits do not start another request.
+Verify a real opaque-photo request on the deployed host before claiming hosted
+generation acceptance.
 
 ## Approved publication handoff
 
@@ -69,7 +137,19 @@ exported photo must match the current revision's approved photo. A text-only
 revision can reuse the artwork if it retains that photo. Replacing or clearing
 the approved photo makes the old artwork ineligible for export.
 
-The existing privileged producer now accepts optional arguments:
+S13 preparation reuses `exportApprovedPrivatePortion`, the approved-portion
+validator and the existing bundle producer. It binds each approved visual to
+the verified source photo and canonical dish revision. Missing approval leaves
+the ordinary photo fallback; malformed approved artifacts block preparation.
+No second producer or public upload store is introduced.
+
+The existing prepared-menu asset route serves the hash-verified layers only
+when the exact content/asset snapshot is published. Editing a draft or preparing
+a later revision does not remove the previous publication's assets. Withdrawal,
+revoked visual approval, corrupt bytes or a mismatched tenant fail closed.
+New preparation still requires the current verified draft/photo/revision.
+
+The existing operator CLI remains available for its separate explicit handoff:
 
 ```bash
 PEEKAPLATE_OWNER_TOKEN='<private staff token>' pnpm produce:bundle \
@@ -90,7 +170,7 @@ and revision UUIDs**. It writes immutable files under
 `--out/assets/portions/<dish>/<revision>/<hash>/background.svg` and
 `dish.webp`, plus the resulting bundle and handoff JSON.
 
-**Operator hosting is still a required step:** upload the generated asset files
+**For the operator CLI path**, upload the generated asset files
 at the exact `asset_base_url/portions/...` HTTPS paths, with suitable MIME/CORS
 headers, before running the same command with `--admit`. When the portion
 mapping is used, admission checks every hosted public portion layer's exact
@@ -111,15 +191,29 @@ Required before claiming full staging readiness:
 - An actual uploaded dish photo produces both private 2.5D layers; Screen 9
   previews the correct image, and the result survives refresh.
 - The owner approves the visual; S10 independently verifies dish/photo facts.
-- A trusted operator prepares/hosts/adopts the approved portion and publishes
-  the admitted menu; the diner loads exactly the same approved layer bytes.
+- S13 prepares the approved portion, previews and publishes the admitted menu;
+  the diner loads exactly the same approved layer bytes through the existing
+  published asset route. The operator CLI has its own explicit hosting step.
 - Missing assets fall back to the original photo. Revision changes and
   cross-dish or cross-venue requests cannot reuse another image.
+- Confirm round and rectangular Plate size inputs against the saved original,
+  reopen the draft, verify and publish it, and inspect the same dimensions in
+  the diner. Check both a supplied and an unknown people count.
+- Size/photo changes clear confirmation; forged hashes, dimensions or boundaries
+  cannot become physical metadata. An existing published menu must keep its
+  approved assets while the next size is edited.
 - Test failing segmentation, corrupted hashes, revoked sessions, unavailable
   service, stale menu snapshots, browser Back and camera placement on a phone.
 - CI quality, unit, database and browser checks must pass before merging.
 
-**Not yet claimed:** hosted processing-service rollout, an automatically
-background-scheduled generation queue, entirely automated private-to-public
-promotion, an actual authenticated staging round trip, physical-device AR
-calibration or production release sign-off.
+Local evidence includes a real non-root Linux container request with networking
+disabled: one opaque synthetic JPEG produced two validated layers in 41 seconds,
+with no provider call and no scratch files remaining. Database regressions cover
+preparation, corruption, revocation and preservation of the previous publication
+while a draft is edited. This is local evidence, not hosted acceptance.
+
+**Not yet claimed:** the new hosted processing-service rollout and authenticated
+round trip, automatic background generation, physical-device AR calibration or
+production release sign-off. This owner path publishes approximate 2.5D and may
+carry approved photo-bound dimensions for tracked placement; serving count alone
+never authorizes actual-size placement.

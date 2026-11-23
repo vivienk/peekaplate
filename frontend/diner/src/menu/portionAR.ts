@@ -8,8 +8,7 @@ export function portionWorldWidth(size?: PublicPortion['physical_size']) {
   return size ? size.plate.width_mm / 1000 / size.plate.boundary.width : 0.3;
 }
 
-// Loaded after a validated portion is ready. Opening table preview is an explicit action;
-// fixture-only generated models remain gated by the caller.
+// Loaded on deliberate camera entry; local review fixtures also offer the portal automatically.
 export function bindPortionAR(
   controls: HTMLElement,
   source: () => HTMLImageElement | null,
@@ -19,12 +18,13 @@ export function bindPortionAR(
   physicalSize?: PublicPortion['physical_size'],
   originalSource?: () => HTMLImageElement | null,
   publishedServing?: { count: number | undefined },
+  entry?: HTMLButtonElement,
 ) {
   // Legacy/unbound calibration may still support local review, never measured live placement.
   const measuredSize = publishedServing
     ? sizeForServing(physicalSize ? { physical_size: physicalSize } : {}, publishedServing.count)
     : physicalSize;
-  const open = document.createElement('button');
+  const open = entry ?? document.createElement('button');
   open.type = 'button';
   open.textContent = 'View on your table';
   controls.append(open);
@@ -275,11 +275,13 @@ export function bindPortionAR(
         ? 'Shared sample, not this dish · '
         : publishedServing?.count
           ? `Serves ${publishedServing.count} ${publishedServing.count === 1 ? 'person' : 'people'} · `
-          : 'Review preview · ';
+          : publishedServing
+            ? ''
+            : 'Review preview · ';
       scaleStatus.textContent =
         prefix +
         (plate
-          ? `Owner plate: ${plate.width_mm / 10} × ${plate.depth_mm / 10} cm · ${tracked ? '1:1 measured plate footprint; dish appearance approximate, device validation pending' : 'camera scale is approximate'}`
+          ? `Plate size: ${plate.width_mm / 10} × ${plate.depth_mm / 10} cm · ${tracked ? '1:1 measured plate footprint; dish appearance approximate, device validation pending' : 'camera scale is approximate'}`
           : 'Approximate preview · matching serving/plate measurements not supplied');
     };
     const changed = () => {

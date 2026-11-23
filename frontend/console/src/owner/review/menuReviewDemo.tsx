@@ -83,7 +83,7 @@ const toReviewDish = (item: MenuItem): ReviewDish =>
 // one without a serving size ("ready" fills all three in).
 function sampleItems(kind: 'fixes' | 'ready'): MenuItem[] {
   return initialMenu().map((item) => {
-    const dish: MenuItem = { ...item, alg: ALLERGENS[item.id ?? ''] ?? [], size: '1 serving' };
+    const dish: MenuItem = { ...item, alg: ALLERGENS[item.id ?? ''] ?? [], size: '1' };
     if (kind === 'ready') return dish;
     if (item.id === 'berrypancakes') return { ...dish, price: '' };
     if (item.id === 'frenchtoast') return { ...dish, cat: '' };
@@ -278,6 +278,7 @@ function Demo() {
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Menu review demo root element is missing');
+document.body.classList.add('owner-dashboard-demo');
 createRoot(root).render(
   <StrictMode>
     <Demo />

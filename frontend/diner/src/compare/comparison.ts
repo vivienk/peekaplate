@@ -1,17 +1,16 @@
-// Compare result and Replace (S3-DIN-02.4): the two dishes shown side by side and the
-// dish_compared payload for each valid comparison actually displayed. The screen sends the payload
-// through track(); picker open, cancel and failed comparisons produce nothing.
 import { completeDishes } from '../menu/adapter';
 import type { CompleteDish, Menu } from '../menu/types';
 import { isSelectable, type PickerExclusions } from './picker';
 
-export type CompareSide = 'first' | 'other';
+export type CompareSide = 'first' | 'other' | 'third';
+export const MAX_COMPARE_CHOICES = 2;
 
 export type Comparison = {
   comparisonId: string;
   // The dish Compare started from ("Keeping") is first; the picked dish is other.
   firstDishId: string;
   otherDishId: string;
+  thirdDishId?: string;
 };
 
 export type CompareAction = 'start' | 'replace';
@@ -36,22 +35,52 @@ function findComplete(menu: Menu, dishId: string): CompleteDish | undefined {
   return completeDishes(menu).find((d) => d.dishId === dishId);
 }
 
-// Starts a comparison when both dishes are complete and different; otherwise null.
+// The kept dish and each pick must be distinct, complete dishes from the displayed menu.
 export function startComparison(
   menu: Menu,
   keptDishId: string,
-  pickedDishId: string,
+  pickedDishIds: readonly string[],
   newId: NewComparisonId,
 ): Comparison | null {
-  if (!findComplete(menu, keptDishId) || !isSelectable(menu, [keptDishId], pickedDishId)) {
+  const [otherDishId, thirdDishId] = pickedDishIds;
+  const ids = [keptDishId, ...pickedDishIds];
+  if (
+    !otherDishId ||
+    pickedDishIds.length > MAX_COMPARE_CHOICES ||
+    new Set(ids).size !== ids.length ||
+    ids.some((id) => !findComplete(menu, id))
+  ) {
     return null;
   }
-  return { comparisonId: newId(), firstDishId: keptDishId, otherDishId: pickedDishId };
+  return {
+    comparisonId: newId(),
+    firstDishId: keptDishId,
+    otherDishId,
+    ...(thirdDishId ? { thirdDishId } : {}),
+  };
 }
 
-// The picker excludes both shown dishes when replacing one side.
-export function replaceExclusions(comparison: Comparison): PickerExclusions {
-  return [comparison.firstDishId, comparison.otherDishId];
+const sides: readonly CompareSide[] = ['first', 'other', 'third'];
+
+export function comparisonDishes(menu: Menu, comparison: Comparison) {
+  const shown: { side: CompareSide; dish: CompleteDish }[] = [];
+  for (const side of sides) {
+    const id = comparison[`${side}DishId`];
+    if (side === 'third' && id === undefined) continue;
+    const dish = id === undefined ? undefined : findComplete(menu, id);
+    if (!dish || shown.some((entry) => entry.dish.dishId === id)) return [];
+    shown.push({ side, dish });
+  }
+  return shown;
+}
+
+// The picker excludes every shown dish when replacing a side.
+export function replaceExclusions({
+  firstDishId,
+  otherDishId,
+  thirdDishId,
+}: Comparison): PickerExclusions {
+  return thirdDishId ? [firstDishId, otherDishId, thirdDishId] : [firstDishId, otherDishId];
 }
 
 // Replacing changes the pair without starting a new comparison, so the ID is kept (TRK-01 plan;
@@ -62,31 +91,33 @@ export function replaceSide(
   side: CompareSide,
   replacementDishId: string,
 ): Comparison {
-  if (!isSelectable(menu, replaceExclusions(comparison), replacementDishId)) return comparison;
-  return side === 'first'
-    ? { ...comparison, firstDishId: replacementDishId }
-    : { ...comparison, otherDishId: replacementDishId };
+  const slot = `${side}DishId` as const;
+  if (!comparison[slot] || !isSelectable(menu, replaceExclusions(comparison), replacementDishId))
+    return comparison;
+  return { ...comparison, [slot]: replacementDishId };
 }
 
-// The dish_compared payload for a comparison that is displayed, or null if either dish is no
-// longer complete on the menu (a failed comparison is not a comparison).
-export function dishComparedPayload(
+// The existing observation contract records pairs. A result emits its new anchor/candidate
+// pairs under one comparison ID. Counts of completed starts use distinct IDs, not row count.
+export function dishComparedPayloads(
   menu: Menu,
   comparison: Comparison,
   action: CompareAction,
   saveAvailable: boolean,
-): DishComparedPayload | null {
-  const first = findComplete(menu, comparison.firstDishId);
-  const other = findComplete(menu, comparison.otherDishId);
-  if (!first || !other || first.dishId === other.dishId) return null;
-  return {
-    publication_revision_id: menu.publicationRevisionId,
-    comparison_id: comparison.comparisonId,
-    compare_action: action,
-    dish_id: first.dishId,
-    dish_revision_id: first.dishRevisionId,
-    other_dish_id: other.dishId,
-    other_dish_revision_id: other.dishRevisionId,
-    save_available: saveAvailable,
-  };
+  replacedSide?: CompareSide,
+): DishComparedPayload[] {
+  const [anchor, ...candidates] = comparisonDishes(menu, comparison);
+  if (!anchor) return [];
+  return candidates
+    .filter(({ side }) => action === 'start' || replacedSide === 'first' || replacedSide === side)
+    .map(({ dish: other }) => ({
+      publication_revision_id: menu.publicationRevisionId,
+      comparison_id: comparison.comparisonId,
+      compare_action: action,
+      dish_id: anchor.dish.dishId,
+      dish_revision_id: anchor.dish.dishRevisionId,
+      other_dish_id: other.dishId,
+      other_dish_revision_id: other.dishRevisionId,
+      save_available: saveAvailable,
+    }));
 }

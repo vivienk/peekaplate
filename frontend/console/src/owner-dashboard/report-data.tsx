@@ -3,7 +3,8 @@
 // report API (#107). Without the API settings (static previews) it shows a saved copy of a report
 // from Uneeza's synthetic P0 v2 data, labelled as such.
 import { type OwnerDishReport, OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
+import { type LiveMenuRow, LivePerf } from './pages';
 import { fetchOwnerReport, type ReportState } from './report-api';
 import { Note } from './ui';
 import { UNEEZA_REPORT } from './uneeza-report';
@@ -97,50 +98,63 @@ export function reportSourceFromEnv(
 // Loads the report for one restaurant. Changing restaurant clears the old report at once, and an
 // answer for a previous restaurant or attempt is dropped, so one restaurant's numbers never show
 // under another.
-function useOwnerReport(source: ReportSource): { state: ReportState; retry: () => void } {
-  const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState<ReportState>(
-    source.mode === 'saved' ? { kind: 'ready', report: SAVED_REPORT } : { kind: 'loading' },
-  );
+export function useOwnerReport(source: ReportSource): {
+  state: ReportState;
+  refreshing: boolean;
+  retry: () => void;
+} {
   const live = source.mode === 'live' ? source : null;
   const apiBase = live?.apiBase;
   const venueId = live?.venueId;
   const getAccessToken = live?.getAccessToken;
-  const [identity, setIdentity] = useState({ apiBase, venueId, getAccessToken });
+  const [load, setLoad] = useState(() => ({
+    request: { apiBase, venueId, getAccessToken },
+    state: { kind: 'loading' } as ReportState,
+    refreshing: false,
+  }));
+  const { request, state, refreshing } = load;
   if (
-    identity.apiBase !== apiBase ||
-    identity.venueId !== venueId ||
-    identity.getAccessToken !== getAccessToken
+    request.apiBase !== apiBase ||
+    request.venueId !== venueId ||
+    request.getAccessToken !== getAccessToken
   ) {
     // Reset during render so the previous source's values cannot reach the next commit.
-    setIdentity({ apiBase, venueId, getAccessToken });
-    setState({ kind: 'loading' });
+    setLoad({
+      request: { apiBase, venueId, getAccessToken },
+      state: { kind: 'loading' },
+      refreshing: false,
+    });
   }
   useEffect(() => {
+    const { apiBase, venueId, getAccessToken } = request;
     if (!apiBase || !venueId || !getAccessToken) return;
-    // attempt is read so Retry runs this again.
-    void attempt;
     const controller = new AbortController();
-    setState({ kind: 'loading' });
+    const { signal } = controller;
     void (async () => {
       let next: ReportState;
       try {
-        next = await fetchOwnerReport({
-          apiBase,
-          venueId,
-          accessToken: await getAccessToken(),
-          signal: controller.signal,
-        });
+        const accessToken = await getAccessToken();
+        if (signal.aborted) return;
+        next = await fetchOwnerReport({ apiBase, venueId, accessToken, signal });
       } catch {
         next = { kind: 'error' };
       }
-      if (!controller.signal.aborted) setState(next);
+      if (signal.aborted) return;
+      setLoad((current) =>
+        current.request === request ? { request, state: next, refreshing: false } : current,
+      );
     })();
     return () => controller.abort();
-  }, [apiBase, venueId, getAccessToken, attempt]);
+  }, [request]);
   return {
     state: source.mode === 'saved' ? { kind: 'ready', report: SAVED_REPORT } : state,
-    retry: () => setAttempt((n) => n + 1),
+    refreshing,
+    retry: () =>
+      setLoad((current) => {
+        if (current.request !== request || current.refreshing || current.state.kind === 'loading')
+          return current;
+        return { ...current, request: { ...request }, refreshing: true };
+      }),
   };
 }
 
@@ -157,17 +171,41 @@ export function ReportView({
   state,
   saved = false,
   onRetry,
+  refreshing = false,
+  refreshControl,
+  presentation = 'data',
+  savedMenu = [],
 }: {
   state: ReportState;
+  savedMenu?: readonly Pick<LiveMenuRow, 'id' | 'name'>[];
   saved?: boolean;
   onRetry?: () => void;
+  refreshing?: boolean;
+  refreshControl?: ReactNode;
+  presentation?: 'data' | 'performance';
 }) {
-  if (state.kind === 'ready') return <ReportTable report={state.report} saved={saved} />;
+  if (state.kind === 'ready')
+    return (
+      <ReportTable
+        report={state.report}
+        saved={saved}
+        presentation={presentation}
+        refreshControl={refreshControl}
+        savedMenu={savedMenu}
+      />
+    );
   return (
     <div className="stack">
       <div className="pagehead">
-        <span className="eyebrow">Report data</span>
-        <h1>Dish report from the report API</h1>
+        <span className="eyebrow">
+          {presentation === 'performance' ? 'Dish performance' : 'Report data'}
+        </span>
+        <h1>
+          {presentation === 'performance'
+            ? 'What diners did with each dish'
+            : 'Dish report from the report API'}
+        </h1>
+        {refreshControl}
       </div>
       {state.kind === 'loading' ? (
         <div className="card" role="status">
@@ -177,8 +215,8 @@ export function ReportView({
         <div className="card" role={state.kind === 'error' ? 'alert' : 'status'}>
           <p>{STATE_TEXT[state.kind]}</p>
           {state.kind === 'error' && onRetry && (
-            <button type="button" className="btn primary" onClick={onRetry}>
-              Try again
+            <button type="button" className="btn primary" onClick={onRetry} disabled={refreshing}>
+              {refreshing ? 'Retrying…' : 'Try again'}
             </button>
           )}
         </div>
@@ -194,26 +232,79 @@ export function ReportData({
   }),
   onAccessFailure,
   onReport,
+  presentation = 'data',
 }: {
   source?: ReportSource;
   onAccessFailure?: (kind: 'signed_out' | 'denied') => void;
   /** The report on screen, or null while none is (loading, failed or denied). */
-  onReport?: (report: OwnerDishReport | null) => void;
+  onReport?: (report: OwnerDishReport | null, reference?: string) => void;
+  presentation?: 'data' | 'performance';
 }) {
-  const { state, retry } = useOwnerReport(source);
+  const { state, retry, refreshing } = useOwnerReport(source);
   useEffect(() => {
     if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure?.(state.kind);
   }, [state.kind, onAccessFailure]);
   const report = state.kind === 'ready' ? state.report : null;
+  const reference = state.kind === 'ready' ? state.reference : undefined;
   useEffect(() => {
-    onReport?.(report);
-  }, [report, onReport]);
+    onReport?.(report, reference);
+  }, [report, reference, onReport]);
   useEffect(() => () => onReport?.(null), [onReport]);
-  return <ReportView state={state} saved={source.mode === 'saved'} onRetry={retry} />;
+  return (
+    <ReportView
+      state={state}
+      saved={source.mode === 'saved'}
+      onRetry={retry}
+      refreshing={refreshing}
+      presentation={presentation}
+    />
+  );
 }
 
-function ReportTable({ report: r, saved }: { report: OwnerDishReport; saved: boolean }) {
+function ReportTable({
+  report: r,
+  saved,
+  presentation,
+  refreshControl,
+  savedMenu,
+}: {
+  report: OwnerDishReport;
+  savedMenu: readonly Pick<LiveMenuRow, 'id' | 'name'>[];
+  saved: boolean;
+  presentation: 'data' | 'performance';
+  refreshControl?: ReactNode;
+}) {
   const m = r.report_metadata;
+  if (presentation === 'performance')
+    return (
+      <LivePerf
+        report={r}
+        savedMenu={savedMenu}
+        headerAction={refreshControl}
+        period={`${fmt(m.date_window.start_time)} – ${fmt(m.date_window.end_time)} (end exclusive)`}
+        summary={`${m.coverage.measurable_dishes_count} measurable · report ${m.report_status.toLowerCase()} · ${freshnessLabel(m.freshness.is_stale)}`}
+        notice={
+          saved ? (
+            <Note kind="warn">Saved copy of a report: synthetic test data. Not real diners.</Note>
+          ) : r.source === 'synthetic' ? (
+            <Note kind="warn">Synthetic test data from the report API. Not real diners.</Note>
+          ) : m.calculation_version === 'production.batch.v1' ? (
+            <Note>
+              Each completed five-minute batch needs at least ten eligible visits per dish. Overview
+              shows restaurant totals.
+            </Note>
+          ) : (
+            <Note>Today uses matched PostHog events. Earlier UTC days use Supabase.</Note>
+          )
+        }
+        columns={COLUMNS}
+        display={(cell, kind) =>
+          cell.status === 'NORMAL' || cell.status === 'VALID_ZERO'
+            ? show(cell, kind)
+            : STATUS_TEXT[cell.status]
+        }
+      />
+    );
   return (
     <div className="stack">
       <div className="pagehead">
@@ -221,6 +312,7 @@ function ReportTable({ report: r, saved }: { report: OwnerDishReport; saved: boo
           Report data · {fmt(m.date_window.start_time)} – {fmt(m.date_window.end_time)}
         </span>
         <h1>Dish report from the report API</h1>
+        {refreshControl}
       </div>
       {saved ? (
         <Note kind="warn">

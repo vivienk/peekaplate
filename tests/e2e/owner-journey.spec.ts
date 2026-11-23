@@ -50,7 +50,7 @@ for (const width of [1440, 390]) {
       .click();
     await expect(page.getByRole('heading', { name: 'Edit dish', exact: true })).toBeVisible();
     await shot('s09-edit-dish');
-    await page.getByRole('textbox', { name: /Serving Size/ }).fill('1 plate');
+    await page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true }).fill('1');
     await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
     await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
