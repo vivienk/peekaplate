@@ -348,9 +348,11 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
         from peekaplate_processing.vision_extraction import single_price_amount
         from decimal import Decimal
         for text,amount,expected in [("25.99","25.99",Decimal("25.99")),("$12","12",Decimal("12")),
+                                     ("0.00","0.00",Decimal("0.00")),
+                                     (None,"19.95",None),("","19.95",None),("   ","19.95",None),
                                      ("1,200","1,200",None),("12,50 €","12,50",None),("12/15","12/15",None),
                                      ("10.00 / 12.00","10.00",None),("MP","MP",None),("9","8",None)]:
-            with self.subTest(text):
+            with self.subTest(text=text,amount=amount):
                 self.assertEqual(single_price_amount(text,amount),expected)
 
     def test_split_price_options_merge_but_distinct_items_stay(self):
@@ -681,6 +683,117 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
         self.assertEqual(attempts["attempts"][0]["failure_class"],"timeout")
         self.assertEqual(attempts["attempts"][0]["page_number"],1)
         self.assertIsNone(attempts["attempts"][0]["response"])
+
+    def test_later_vision_stop_keeps_reviewable_pages_and_never_replays_them(self):
+        from peekaplate_processing.provider_budget import ProviderBudgetError
+        from peekaplate_processing.review_candidates import prepare_review_candidates
+        from peekaplate_processing.schemas import MenuExtractionResult
+        import pymupdf
+
+        for failure in ("budget", "timeout", "provider", "parse"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                source = root / "menu.pdf"
+                with pymupdf.open() as pdf:
+                    for _ in range(3):
+                        pdf.new_page()
+                    pdf.save(source)
+
+                reservations = []
+                requests = []
+
+                class Gate:
+                    async def areserve(self, provider):
+                        reservations.append(provider)
+                        if failure == "budget" and len(reservations) == 2:
+                            raise ProviderBudgetError("synthetic budget exhausted")
+
+                class Vision:
+                    model_name = "synthetic"
+
+                    def bind(self, **kwargs):
+                        return self
+
+                    async def ainvoke(self, messages):
+                        requests.append(messages[-1][1][0]["text"])
+                        if len(requests) != 1:
+                            if failure == "timeout":
+                                raise TimeoutError("private timeout")
+                            if failure == "provider":
+                                raise RuntimeError("private provider failure")
+                            return SimpleNamespace(content="not JSON")
+                        return SimpleNamespace(content=json.dumps({"dishes": [{
+                            "name": "Soup", "description": "Tomato and basil",
+                            "ingredients": ["Tomato", "basil"], "price_text": "$8 / $12",
+                            "price_amount": "8", "box": [100, 100, 200, 300],
+                        }]}))
+
+                with patch("peekaplate_processing.run_pipeline.extract_source",
+                           side_effect=AssertionError("must not fall back")):
+                    run_pipeline(source, root / "run", llm=Vision(), provider="synthetic",
+                                 input_mode="vision_v4", budget_gate=Gate(), llm_cache_dir=None)
+                saved = MenuExtractionResult.model_validate_json(
+                    (root / "run" / "extraction.json").read_bytes())
+                exported = prepare_review_candidates(saved)
+                self.assertEqual((exported.schema_version, exported.pipeline_version), (2, "3"))
+                self.assertEqual(exported.status, "incomplete")
+                self.assertEqual([(s.page_number, s.status) for s in exported.segments], [
+                    (1, "ready"), (2, "skipped" if failure == "budget" else "failed"),
+                    (3, "skipped"),
+                ])
+                for segment in exported.segments:
+                    if segment.status == "skipped":
+                        self.assertIsNone(segment.error)
+                        self.assertTrue(segment.warnings)
+                (candidate,) = exported.candidates
+                self.assertEqual(candidate.original.name, "Soup")
+                self.assertEqual(candidate.original.ingredients, ["Tomato", "basil"])
+                self.assertEqual(candidate.original.price_text, "$8 / $12")
+                self.assertIsNone(candidate.original.price_amount)
+                self.assertEqual(candidate.original.status, "needs_review")
+                self.assertEqual(len(reservations), 2)
+                self.assertEqual(len(requests), 1 if failure == "budget" else 2)
+
+    def test_empty_completed_vision_page_is_not_replayed_after_rate_limit(self):
+        import httpx
+        import openai
+        import pymupdf
+
+        requests = []
+
+        class Vision:
+            model_name = "synthetic"
+
+            def bind(self, **kwargs):
+                return self
+
+            async def ainvoke(self, messages):
+                page = messages[-1][1][0]["text"]
+                requests.append(page)
+                if "Page 1." in page:
+                    return SimpleNamespace(content='{"dishes":[]}')
+                if requests.count(page) == 1:
+                    response = httpx.Response(429, request=httpx.Request("POST", "https://example.invalid"))
+                    raise openai.RateLimitError("synthetic rate limit", response=response, body=None)
+                return SimpleNamespace(content='{"dishes":[{"name":"Soup","box":[100,100,200,300]}]}')
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / "menu.pdf"
+            with pymupdf.open() as pdf:
+                pdf.new_page()
+                pdf.new_page()
+                pdf.save(source)
+            with patch("peekaplate_processing.run_pipeline.time.sleep"):
+                report = run_pipeline(source, root / "run", llm=Vision(), provider="synthetic",
+                                      input_mode="vision_v4", llm_cache_dir=None)
+        self.assertEqual(requests, [
+            "Extract all menu items from Page 1.",
+            "Extract all menu items from Page 2.",
+            "Extract all menu items from Page 2.",
+        ])
+        self.assertEqual(report.status, "complete")
+        self.assertEqual([draft.name for draft in report.drafts], ["Soup"])
 
 
 if __name__ == "__main__": unittest.main()
