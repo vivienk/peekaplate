@@ -40,16 +40,14 @@ A human must inspect the menu and correct the remaining draft values.
 
 ### Allergen review warning
 
-The bundle producer emits `allergens_unreviewed` when the effective allergen
-declaration is unavailable (`allergens: null`). This is an advisory warning;
-it does not change dish completeness or approve a dish.
+The producer emits `allergens_unreviewed` when the effective allergen
+declaration is unavailable (`null`). `null` means unavailable or unreviewed;
+`[]` means reviewed with no listed allergens, not a guarantee of allergen-free
+status. This advisory warning does not change dish completeness or approve a dish.
 
-`allergens: null` means the declaration is unavailable or unreviewed.
-`allergens: []` means the declaration was reviewed and contains no listed
-allergens; it is not a guarantee that the dish is allergen-free.
-
-Owner verification, dish acceptance and menu publication remain separate
-owner-controlled steps. See the [owner publish handoff](owner-publish-handoff.md).
+Restaurant verification, dish verification, menu approval and publication are
+separate steps. See [owner publication handoff](owner-publish-handoff.md) and
+[owner verification boundaries](owner-flow-corrections.md).
 
 ## Versioned contract
 
@@ -143,7 +141,7 @@ marks this honestly rather than presenting it as OCR evidence:
   report `errors`, so the status is `incomplete`, never silently `complete`.
 - `segments[].metadata.vision_boxes` maps candidate ID to
   `[{page_number, type: "title" | "price", text, box}]`, `box` being integer
-  `left`, `top`, `width`, `height` in pixels of the segment's `width` × `height`
+  `left`, `top`, `width`, `height` in pixels of the segment's `width` ÃƒÆ’Ã¢â‚¬â€ `height`
   prepared page image. Empty or inverted model boxes are omitted with a warning.
   These are model proposals, not OCR-joined `candidate_box_evidence`: on clean
   single-column menus they align well, on dense multi-column photos they were
