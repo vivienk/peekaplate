@@ -14,7 +14,6 @@ function AnswerView({ a }: { a: Answer }) {
     <div className="ans">
       <div className="head">
         <span className="av">AI</span>PeekaPlate AI <Lab k="st">Illustrative answer</Lab>{' '}
-        <span className="lab good">Evidence check passed</span>
       </div>
       <p className="short">{a.short}</p>
       {a.secs.map((s) => (

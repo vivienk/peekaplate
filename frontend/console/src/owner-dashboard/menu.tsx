@@ -54,7 +54,6 @@ export function MenuList({
       </div>
       <MenuTable>
         {menu.map((m) => {
-          const d = m.id ? DISH.find((x) => x.id === m.id) : undefined;
           return (
             <div key={m.id || m.name} className="mrow">
               <span className="thumb">
@@ -63,7 +62,7 @@ export function MenuList({
               <span className="dn">
                 {m.name}
                 <small>
-                  {m.ing.length} ingredients{d && d.ord === null ? ' · no order record' : ''}
+                  {m.ing.length} ingredients
                 </small>
                 {INSIGHTS.filter(
                   (i) => i.dish === m.id && acts[i.id] && acts[i.id]?.status === 'planned',
