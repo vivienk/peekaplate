@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Expand the 2-session story into 300 deterministic sessions (150 pairs) with --dry-run and --replay support."""
+"""Expand the 2-session story into 300 deterministic sessions (150 pairs) with --dry-run and --replay validation."""
 
 from __future__ import annotations
 
@@ -30,39 +30,48 @@ def build_expanded_lines(base_lines: list[str], pair_count: int = PAIR_COUNT) ->
     return expanded
 
 
-def summarize_deterministically(lines: list[str]) -> dict[str, Any]:
+def summarize_and_verify(lines: list[str], manifest: dict[str, Any]) -> dict[str, Any]:
     unique_events: dict[str, dict[str, Any]] = {}
     for line in lines:
         rec = json.loads(line)
         unique_events.setdefault(rec["event_id"], rec)
     sessions = {rec["session_id"] for rec in unique_events.values()}
     digest = hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
-    manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
-    return {
-        "pack_id": manifest["pack_id"],
+
+    actual_counts = {
         "pair_count": PAIR_COUNT,
         "delivered_lines": len(lines),
         "unique_events": len(unique_events),
         "distinct_sessions": len(sessions),
+    }
+
+    expected_counts = manifest.get("expected_counts")
+    if expected_counts and actual_counts != expected_counts:
+        raise SystemExit(f"Manifest count mismatch: expected {expected_counts}, got {actual_counts}")
+
+    trusted_sha256 = manifest.get("trusted_sha256")
+    if trusted_sha256 and digest != trusted_sha256:
+        raise SystemExit(f"Trusted SHA-256 mismatch: expected {trusted_sha256}, got {digest}")
+
+    return {
+        "pack_id": manifest["pack_id"],
+        **actual_counts,
         "verified_orders_status": manifest["unavailable_metrics"]["verified_orders"]["status"],
-        "supported_metric_names": [m["name"] for m in manifest["supported_metrics"]],
+        "classified_field_count": len(manifest.get("dashboard_field_classification", [])),
         "sha256": digest,
     }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Deterministic synthetic dataset generator (S7-DATA-15)")
-    parser.add_argument("--dry-run", action="store_true", help="Compute manifest summary without writing full_dataset.jsonl")
-    parser.add_argument("--replay", action="store_true", help="Regenerate and verify byte-identical replay determinism")
+    parser.add_argument("--dry-run", action="store_true", help="Compute and verify summary without writing files")
+    parser.add_argument("--replay", action="store_true", help="Replay generation and validate against trusted SHA-256 and manifest counts")
     args = parser.parse_args()
 
-    base_lines = [
-        line.strip()
-        for line in BASE_FILE.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+    base_lines = [line.strip() for line in BASE_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
     expanded = build_expanded_lines(base_lines, PAIR_COUNT)
-    summary = summarize_deterministically(expanded)
+    summary = summarize_and_verify(expanded, manifest)
 
     if args.dry_run:
         print(json.dumps({"mode": "dry-run", **summary}, indent=2))

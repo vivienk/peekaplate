@@ -33,7 +33,7 @@ describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determini
       distinct_sessions: 300,
     });
     expect(manifest.trusted_sha256).toMatch(/^[a-f0-9]{64}$/);
-    const categories = new Set(manifest.dashboard_field_classification.map((f) => f.category));
+    const categories = new Set(manifest.dashboard_field_classification.map((f: { category: string }) => f.category));
     expect(categories).toEqual(new Set(['supported', 'derived', 'unavailable', 'excluded']));
     expect(manifest.unavailable_metrics.verified_orders.status).toBe('UNAVAILABLE');
   });

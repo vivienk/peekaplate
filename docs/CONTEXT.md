@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "ceb7c345ec7da668212ede7f3cc6be94a6ff42292dc8c2a2f62355830ad090a2"
+      "sourceFingerprint": "6fa2ee4bfd5fed67210eb24ff43c50c0b537196ca5be1da0f67a9b1736a20965"
     },
     {
       "id": "backend",

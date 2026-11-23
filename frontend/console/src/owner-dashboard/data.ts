@@ -316,10 +316,7 @@ export const INSIGHTS: InsightItem[] = [
     evidence: [
       `${p.open} opens · ${p.again} opened again · in ${p.cmp} comparisons`,
       '22 comparisons were with the Harvest Power Bowl',
-      `Order records exist for ${T.withRec} of ${DISH.length} dishes and are entered by hand`,
-    ],
-    uncertain: [
-      'A dish that was viewed but not ordered is not assumed to be rejected.',
+      `Verified order outcomes are unavailable in the synthetic P0 scope'A dish that was viewed but not ordered is not assumed to be rejected.',
       `Orders may be unrecorded, so ${p.ord} may be too low.`,
     ],
     matters:
@@ -436,6 +433,7 @@ export const ANSWERS: Record<string, () => Answer> = {
     };
   },
   orders: () => ({
+    title: 'Verified orders are unavailable in P0',
     short: 'Verified orders are unavailable in the synthetic P0 scope because no verified POS or checkout order source is connected.',
     evidence: [
       { k: 'unk', items: ['Verified orders status: Unavailable (no verified order source in P0).'] },
