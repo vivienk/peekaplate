@@ -406,29 +406,31 @@ All 20 cases remain NOT RUN against the application AI. Passing local fixture te
 
 ---
 
+---
+
 ## Explicit Data Scope & Reproduction Commands (S7-DATA-15)
 
-### Supported vs. Unavailable Metrics
-- **Supported Descriptive Metrics (`manifest.json -> supported_metrics`):**
-  - `active_sessions` (`sessions`) — source: `app_private.owner_observation_v1`
-  - `open_rate` (`ratio_0_1`) — source: `app_private.owner_observation_v1`
-  - `engagement_rate` (`ratio_0_1`) — source: `app_private.owner_observation_v1`
-  - `save_rate` (`ratio_0_1`) — source: `app_private.owner_observation_v1`
-  - `avg_interaction_time_seconds` (`seconds`) — source: `app_private.owner_opening_activity_v1`
-  - `timing_coverage` (`ratio_0_1`) — source: `app_private.owner_opening_activity_v1`
-  - All metrics enforce `EMPTY` at `0` sessions, `SUPPRESSED` (`null`) below `10` distinct sessions, and `NOT_MEASURABLE` (`null`) when denominators are zero.
-- **Explicitly Unavailable Metrics (`manifest.json -> unavailable_metrics`):**
-  - `verified_orders`: **`UNAVAILABLE`** — no verified POS or checkout order source exists in P0; synthetic datasets and console views never fabricate order counts.
+### Complete Dashboard Field Classification (`manifest.json -> dashboard_field_classification`)
+Every displayed field on the owner dashboard is classified in `manifest.json` with its **category** (`supported`, `derived`, `unavailable`, or `excluded`), **unit**, **source**, and **unavailability conditions**:
+- **Supported (6 metrics):** `active_sessions`, `open_rate`, `engagement_rate`, `save_rate`, `avg_interaction_time_seconds`, `timing_coverage`.
+- **Derived (6 metrics):** `revisit_rate`, `portion_previews_shown`, `photo_fallback_opens`, `comparison_rate`, `most_compared_pairs`, `weekly_trend_delta`.
+- **Unavailable (3 fields):** `verified_orders`, `dish_order_record_coverage`, `weekly_verified_orders` — always `UNAVAILABLE` in P0; synthetic datasets and console views never fabricate order counts.
+- **Excluded (5 fields):** `checkout_revenue`, `pos_ticket_value`, `unconsented_diner_events`, `test_traffic_events`, `realtime_ingestion_staleness`.
 
 ### Step-by-Step Reproduction (Dry-Run & Deterministic Replay)
-```bash
-# 1. Dry-run (computes deterministic SHA-256 summary without writing files)
-python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --dry-run
 
-# 2. Generate & validate full dataset
+#### Linux / macOS (`python3`)
+```bash
+python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --dry-run
 python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py
 python3 test-data/owner-synthetic-p0-v2/validate_full_dataset.py
-
-# 3. Deterministic replay (verifies byte-identical output and identical manifest summary)
 python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --replay
+```
+
+#### Windows PowerShell / Git Bash (`py -3` or `python`)
+```powershell
+py -3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --dry-run
+py -3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py
+py -3 test-data/owner-synthetic-p0-v2/validate_full_dataset.py
+py -3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --replay
 ```

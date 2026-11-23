@@ -212,5 +212,230 @@
       "status": "UNAVAILABLE",
       "reason": "No verified POS or checkout order source exists in P0; synthetic datasets and dashboard views must never fabricate order counts or revenue."
     }
-  }
+  },
+  "expected_counts": {
+    "pair_count": 150,
+    "delivered_lines": 3300,
+    "unique_events": 3150,
+    "distinct_sessions": 300
+  },
+  "trusted_sha256": "7843e1be16a5f89ead79a52830a760eca0af96b1def73f6ec438505edb8c789b",
+  "dashboard_field_classification": [
+    {
+      "name": "active_sessions",
+      "dashboard_label": "Menu sessions",
+      "category": "supported",
+      "unit": "sessions",
+      "source": "app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "open_rate",
+      "dashboard_label": "Dish opens / Open rate",
+      "category": "supported",
+      "unit": "ratio_0_1",
+      "source": "app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "engagement_rate",
+      "dashboard_label": "Engagement rate",
+      "category": "supported",
+      "unit": "ratio_0_1",
+      "source": "app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "save_rate",
+      "dashboard_label": "Save rate",
+      "category": "supported",
+      "unit": "ratio_0_1",
+      "source": "app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "avg_interaction_time_seconds",
+      "dashboard_label": "Avg time interacting",
+      "category": "supported",
+      "unit": "seconds",
+      "source": "app_private.owner_opening_activity_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10 or open_eligible_sessions < 10",
+        "NOT_MEASURABLE when total_openings == 0"
+      ]
+    },
+    {
+      "name": "timing_coverage",
+      "dashboard_label": "Timing coverage",
+      "category": "supported",
+      "unit": "ratio_0_1",
+      "source": "app_private.owner_opening_activity_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10 or open_eligible_sessions < 10",
+        "NOT_MEASURABLE when total_openings == 0"
+      ]
+    },
+    {
+      "name": "revisit_rate",
+      "dashboard_label": "Opened again",
+      "category": "derived",
+      "unit": "ratio_0_1",
+      "source": "derived from dish_revisited / dish_detail_opened in app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10",
+        "NOT_MEASURABLE when dish_opens == 0"
+      ]
+    },
+    {
+      "name": "portion_previews_shown",
+      "dashboard_label": "2.5D previews shown",
+      "category": "derived",
+      "unit": "opens",
+      "source": "derived from preview_mode == '2_5d_preview' in app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "photo_fallback_opens",
+      "dashboard_label": "Photo fallback opens",
+      "category": "derived",
+      "unit": "opens",
+      "source": "derived from preview_failed / fallback_shown in app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "comparison_rate",
+      "dashboard_label": "Dishes in comparisons",
+      "category": "derived",
+      "unit": "ratio_0_1",
+      "source": "derived from ordered dish_detail_opened -> dish_compared attribution",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10",
+        "NOT_MEASURABLE when dish_opens == 0"
+      ]
+    },
+    {
+      "name": "most_compared_pairs",
+      "dashboard_label": "Most compared pairs",
+      "category": "derived",
+      "unit": "sessions",
+      "source": "derived from co-compared dish pairs in app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "weekly_trend_delta",
+      "dashboard_label": "Dish opens by day / week delta",
+      "category": "derived",
+      "unit": "percent_change",
+      "source": "derived from current vs baseline window comparison",
+      "unavailable_conditions": [
+        "SUPPRESSED when either window has < 10 sessions",
+        "NOT_MEASURABLE when baseline == 0"
+      ]
+    },
+    {
+      "name": "verified_orders",
+      "dashboard_label": "Verified orders on record",
+      "category": "unavailable",
+      "unit": "orders",
+      "source": "none (no verified POS or checkout order source in P0)",
+      "unavailable_conditions": [
+        "Always UNAVAILABLE in P0; synthetic datasets never fabricate order counts"
+      ]
+    },
+    {
+      "name": "dish_order_record_coverage",
+      "dashboard_label": "Dishes with order record",
+      "category": "unavailable",
+      "unit": "dishes",
+      "source": "none (manual order records removed in S7-DATA-15)",
+      "unavailable_conditions": [
+        "Always UNAVAILABLE in P0"
+      ]
+    },
+    {
+      "name": "weekly_verified_orders",
+      "dashboard_label": "Verified orders on record per week",
+      "category": "unavailable",
+      "unit": "orders",
+      "source": "none (no verified POS or checkout order source in P0)",
+      "unavailable_conditions": [
+        "Always UNAVAILABLE in P0"
+      ]
+    },
+    {
+      "name": "checkout_revenue",
+      "dashboard_label": "Revenue / GMV",
+      "category": "excluded",
+      "unit": "currency",
+      "source": "out_of_scope",
+      "unavailable_conditions": [
+        "Excluded from P0 owner analytics contract"
+      ]
+    },
+    {
+      "name": "pos_ticket_value",
+      "dashboard_label": "Average order value",
+      "category": "excluded",
+      "unit": "currency",
+      "source": "out_of_scope",
+      "unavailable_conditions": [
+        "Excluded from P0 owner analytics contract"
+      ]
+    },
+    {
+      "name": "unconsented_diner_events",
+      "dashboard_label": "Unconsented telemetry",
+      "category": "excluded",
+      "unit": "events",
+      "source": "filtered at ingestion boundary",
+      "unavailable_conditions": [
+        "Excluded by consent gate; never persisted or reported"
+      ]
+    },
+    {
+      "name": "test_traffic_events",
+      "dashboard_label": "QA / test traffic",
+      "category": "excluded",
+      "unit": "events",
+      "source": "traffic_class == 'test'",
+      "unavailable_conditions": [
+        "Excluded from live restaurant owner reports"
+      ]
+    },
+    {
+      "name": "realtime_ingestion_staleness",
+      "dashboard_label": "Freshness status",
+      "category": "excluded",
+      "unit": "boolean_or_null",
+      "source": "report_metadata.freshness.is_stale",
+      "unavailable_conditions": [
+        "Pinned to null (Freshness not known) until post-MVP completeness watermark"
+      ]
+    }
+  ]
 }
