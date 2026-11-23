@@ -26,7 +26,7 @@ export const DAILY_PREV = [80, 75, 87, 90, 109, 126, 87];
 export const WEEKS = ['Sep 14', 'Sep 21', 'Sep 28', 'Oct 5'];
 export const WK_PREVIEWS = [96, 111, 124, 143];
 export const WK_TIME = [57, 59, 61, 63];
-export const WK_ORDERS: (number | null)[] = [null, null, null, null];
+export const WK_ORDERS = [47, 50, 52, 58];
 
 // open = dish opens, again = opened again, cmp = in a comparison, p25 = 2.5D previews shown,
 // fb = tapped 2.5D and saw the photo, time = avg seconds interacting per open,
@@ -316,7 +316,10 @@ export const INSIGHTS: InsightItem[] = [
     evidence: [
       `${p.open} opens · ${p.again} opened again · in ${p.cmp} comparisons`,
       '22 comparisons were with the Harvest Power Bowl',
-      `Verified order outcomes are unavailable in the synthetic P0 scope'A dish that was viewed but not ordered is not assumed to be rejected.',
+      `Order records exist for ${T.withRec} of ${DISH.length} dishes and are entered by hand`,
+    ],
+    uncertain: [
+      'A dish that was viewed but not ordered is not assumed to be rejected.',
       `Orders may be unrecorded, so ${p.ord} may be too low.`,
     ],
     matters:
@@ -333,7 +336,7 @@ export const INSIGHTS: InsightItem[] = [
     rank: 'Also worth considering',
     dish: 'greek',
     title: 'Three dishes have high opens; verified order outcomes are unavailable in P0',
-    happened: `Berry Pancake Stack, Brioche French Toast and Garden Avocado Salad had ${byId('pancakes').open + byId('french').open + byId('salad').open} combined opens this week, while verified orders remain unavailable in P0.`,
+    happened: `Berry Pancake Stack, Brioche French Toast and Garden Avocado Salad have no verified order record this week. Together they had ${byId('berrypancakes').open + byId('frenchtoast').open + g.open} opens.`,
     evidence: [
       `Berry Pancake Stack ${byId('berrypancakes').open} opens · Brioche French Toast ${byId('frenchtoast').open} · Garden Avocado Salad ${g.open}`,
       `Garden Avocado Salad: ${g.p25} 2.5D previews in ${g.open} opens (${Math.round((100 * g.p25) / g.open)}%)`,
@@ -433,14 +436,143 @@ export const ANSWERS: Record<string, () => Answer> = {
     };
   },
   orders: () => ({
-    title: 'Verified orders are unavailable in P0',
-    short: 'Verified orders are unavailable in the synthetic P0 scope because no verified POS or checkout order source is connected.',
-    evidence: [
-      { k: 'unk', items: ['Verified orders status: Unavailable (no verified order source in P0).'] },
-      { k: 'obs', items: ['Supported descriptive metrics remain active: menu sessions, dish opens, interaction time, timing coverage, save rate, and engagement rate.'] },
+    short: `The Salmon Poke Bowl is opened often (${p.open} opens, second most) and has ${p.ord} verified orders on record, the lowest of the dishes that have a record.`,
+    secs: [
+      {
+        k: 'obs',
+        items: [
+          `${p.open} opens · ${p.again} opened again · in ${p.cmp} comparisons`,
+          '22 of those comparisons were with the Harvest Power Bowl',
+        ],
+      },
+      { k: 'ver', items: DISH.filter((d) => d.ord !== null).map((d) => `${d.name}: ${d.ord}`) },
+      {
+        k: 'unk',
+        items: [
+          'Berry Pancake Stack, Brioche French Toast and Garden Avocado Salad have no order record. Their outcome is Unknown, not zero.',
+          `Order records are entered by hand and may be incomplete, so ${p.ord} may undercount.`,
+        ],
+      },
+      {
+        k: 'rsn',
+        items: [
+          'Diners may be choosing between the two bowls (inferred from comparisons, not verified).',
+          'Some Poke Bowl orders may be unrecorded (possible).',
+        ],
+      },
     ],
-    caveat: 'Synthetic P0 datasets never fabricate order counts or revenue; only descriptive observation metrics are reported.',
-    follow: ['top', 'interact', 'week'],
+    ev: [
+      `Orders: manual records for ${T.withRec} of ${DISH.length} dishes.`,
+      'I do not describe a viewed dish as rejected or lost.',
+      EVT,
+    ],
+    follow: ['premise', 'improve'],
+  }),
+  interact: () => ({
+    short: `Across ${SESSIONS.now} menu sessions, diners opened ${T.open} dishes, about ${(T.open / SESSIONS.now).toFixed(1)} per session.`,
+    secs: [
+      {
+        k: 'obs',
+        items: [
+          `${T.again} dish openings (${pc(T.again, T.open)}%) were a diner opening a dish again`,
+          `${T.comparisons} comparisons started`,
+          `${T.p25} 2.5D previews shown, plus ${T.fb} taps that showed the photo instead`,
+          `Average interaction time: ${T.time} s per dish opening (sample measure)`,
+        ],
+      },
+      {
+        k: 'unk',
+        items: ['How interaction time is captured is not final, so treat it as a rough guide.'],
+      },
+      {
+        k: 'rsn',
+        items: ['Diners who open a dish again may be deciding between options (inferred).'],
+      },
+    ],
+    ev: [EVT],
+    follow: ['p25', 'compare'],
+  }),
+  improve: () => ({
+    short: 'Two options look worth considering this week. They are suggestions, not predictions.',
+    secs: [
+      {
+        k: 'obs',
+        items: [
+          `${p.fb} taps on “View in 2.5D” for the Salmon Poke Bowl showed the photo only`,
+          '3 dishes have no order record',
+        ],
+      },
+      { k: 'unk', items: ['Verified order outcomes are unavailable in the synthetic P0 scope.'] },
+      {
+        k: 'rsn',
+        items: [
+          'Add a 2.5D preview for the Salmon Poke Bowl first (most taps).',
+          'Focus on 2.5D preview coverage; verified orders are unavailable in P0.',
+        ],
+      },
+    ],
+    ev: ['Both come from the report. Nothing is sent to diners.', EVT],
+    follow: ['p25', 'week'],
+  }),
+  week: () => ({
+    short: `Menu activity rose this week: ${T.open} dish opens vs ${PREV.open} last week (${pctChg(T.open, PREV.open) > 0 ? '+' : ''}${pctChg(T.open, PREV.open)}%).`,
+    secs: [
+      {
+        k: 'obs',
+        items: [
+          `Menu sessions ${SESSIONS.now} vs ${SESSIONS.prev}`,
+          `2.5D previews shown ${T.p25} vs ${PREV.p25}`,
+          `Average interaction ${T.time} s vs ${PREV.time} s`,
+          `Biggest rise in opens: ${biggestRise.name} (+${biggestRise.open - (biggestRise.weekly[2] ?? 0)})`,
+        ],
+      },
+      {
+        k: 'ver',
+        items: [
+          `Verified orders remain unavailable in the synthetic P0 scope (no verified order source)`,
+        ],
+      },
+      { k: 'unk', items: [`Only descriptive observation metrics are reported in P0.`] },
+    ],
+    ev: [
+      `Weeks compared: ${REST.period} and ${REST.prev}. A change in numbers is an association, not a cause.`,
+      EVT,
+    ],
+    follow: ['top', 'improve'],
+  }),
+  p25: () => ({
+    short:
+      'Diners tap “View in 2.5D” on dishes without a preview about half as often as on dishes with one, and then see the photo.',
+    secs: [
+      {
+        k: 'obs',
+        items: [
+          `Dishes with a preview: ${T.p25} previews in ${T.openWith} opens (${T.tapRateWith}%)`,
+          `Dishes without: ${T.fb} taps in ${T.openWithout} opens (${T.tapRateWithout}%) that showed the photo`,
+        ],
+      },
+      {
+        k: 'unk',
+        items: ['We do not know whether the photo fallback changed any diner’s decision.'],
+      },
+      { k: 'rsn', items: ['Diners may want to see ingredients (inferred, not verified).'] },
+    ],
+    ev: ['Events: fallback_shown, preview_failed.'],
+    follow: ['improve', 'compare'],
+  }),
+  compare: () => ({
+    short: `${T.comparisons} comparisons started. Most were between similar dishes.`,
+    secs: [
+      {
+        k: 'obs',
+        items: PAIRS.map((pr) => `${byId(pr[0]).name} × ${byId(pr[1]).name}: ${pr[2]}`).concat([
+          `Other pairs: ${T.comparisons - PAIRS.reduce((s, pr) => s + pr[2], 0)}`,
+        ]),
+      },
+      { k: 'rsn', items: ['Diners may be choosing between similar options (inferred).'] },
+    ],
+    ev: ['Events: compare_started, compare_dish_replaced.'],
+    follow: ['orders', 'top'],
   }),
   premise: () => ({
     short:
@@ -468,7 +600,9 @@ export const ANSWERS: Record<string, () => Answer> = {
     secs: [
       {
         k: 'unk',
-        items: ['Try a question about opens, comparisons, 2.5D previews, or the weekly change.'],
+        items: [
+          items: ['Try a question about opens, comparisons, 2.5D previews, or the weekly change.'],
+        ],
       },
     ],
     ev: [EVT],
@@ -513,7 +647,9 @@ for (const d of DISH) {
             : `${d.fb} taps on “View in 2.5D” showed the photo (no preview yet)`,
         ],
       },
-      { k: 'unk', items: ['Verified orders: Unavailable in synthetic P0 scope (no verified order source).'] },
+      d.ord !== null
+        ? { k: 'ver', items: [`${d.ord} verified orders on record`] }
+        : { k: 'unk', items: ['No order record. Outcome is Unknown, not zero.'] },
       { k: 'rsn', items: ['The data does not point to a clear reason, so I won’t offer one.'] },
     ],
     ev: [EVT],
