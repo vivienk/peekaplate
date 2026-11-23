@@ -148,5 +148,69 @@
     "status": "PROVISIONAL_PENDING_METRIC_OWNER_APPROVAL",
     "inactivity_rule": "A gap of 30 minutes or more ends the current visit. Inactivity does not establish order or checkout completion.",
     "save_only": "Save alone does not establish engagement."
+  },
+  "supported_metrics": [
+    {
+      "name": "active_sessions",
+      "unit": "sessions",
+      "source": "app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "open_rate",
+      "unit": "ratio_0_1",
+      "source": "app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "engagement_rate",
+      "unit": "ratio_0_1",
+      "source": "app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "save_rate",
+      "unit": "ratio_0_1",
+      "source": "app_private.owner_observation_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10"
+      ]
+    },
+    {
+      "name": "avg_interaction_time_seconds",
+      "unit": "seconds",
+      "source": "app_private.owner_opening_activity_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10 or open_eligible_sessions < 10",
+        "NOT_MEASURABLE when total_openings == 0"
+      ]
+    },
+    {
+      "name": "timing_coverage",
+      "unit": "ratio_0_1",
+      "source": "app_private.owner_opening_activity_v1",
+      "unavailable_conditions": [
+        "EMPTY when distinct_sessions == 0",
+        "SUPPRESSED when distinct_sessions < 10 or open_eligible_sessions < 10",
+        "NOT_MEASURABLE when total_openings == 0"
+      ]
+    }
+  ],
+  "unavailable_metrics": {
+    "verified_orders": {
+      "status": "UNAVAILABLE",
+      "reason": "No verified POS or checkout order source exists in P0; synthetic datasets and dashboard views must never fabricate order counts or revenue."
+    }
   }
 }

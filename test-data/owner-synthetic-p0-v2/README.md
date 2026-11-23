@@ -403,3 +403,32 @@ Expected answers and grading criteria are reserved for the evaluator, not the mo
 Suppressed metrics must remain suppressed. The model must not infer hidden counts, Save rates, or dish rankings from suppressed values.
 
 All 20 cases remain NOT RUN against the application AI. Passing local fixture tests does not establish application-AI performance.
+
+---
+
+## Explicit Data Scope & Reproduction Commands (S7-DATA-15)
+
+### Supported vs. Unavailable Metrics
+- **Supported Descriptive Metrics (`manifest.json -> supported_metrics`):**
+  - `active_sessions` (`sessions`) — source: `app_private.owner_observation_v1`
+  - `open_rate` (`ratio_0_1`) — source: `app_private.owner_observation_v1`
+  - `engagement_rate` (`ratio_0_1`) — source: `app_private.owner_observation_v1`
+  - `save_rate` (`ratio_0_1`) — source: `app_private.owner_observation_v1`
+  - `avg_interaction_time_seconds` (`seconds`) — source: `app_private.owner_opening_activity_v1`
+  - `timing_coverage` (`ratio_0_1`) — source: `app_private.owner_opening_activity_v1`
+  - All metrics enforce `EMPTY` at `0` sessions, `SUPPRESSED` (`null`) below `10` distinct sessions, and `NOT_MEASURABLE` (`null`) when denominators are zero.
+- **Explicitly Unavailable Metrics (`manifest.json -> unavailable_metrics`):**
+  - `verified_orders`: **`UNAVAILABLE`** — no verified POS or checkout order source exists in P0; synthetic datasets and console views never fabricate order counts.
+
+### Step-by-Step Reproduction (Dry-Run & Deterministic Replay)
+```bash
+# 1. Dry-run (computes deterministic SHA-256 summary without writing files)
+python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --dry-run
+
+# 2. Generate & validate full dataset
+python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py
+python3 test-data/owner-synthetic-p0-v2/validate_full_dataset.py
+
+# 3. Deterministic replay (verifies byte-identical output and identical manifest summary)
+python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --replay
+```

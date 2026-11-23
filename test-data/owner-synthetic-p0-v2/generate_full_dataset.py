@@ -1,59 +1,82 @@
+#!/usr/bin/env python3
+"""Expand the 2-session story into 300 deterministic sessions (150 pairs) with --dry-run and --replay support."""
 
-from pathlib import Path
+from __future__ import annotations
+
+import argparse
+import hashlib
 import json
+from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
-SOURCE = ROOT / "events" / "two_session_story.jsonl"
-OUTPUT = ROOT / "events" / "full_dataset.jsonl"
-
+BASE_FILE = ROOT / "events" / "two_session_story.jsonl"
+OUT_FILE = ROOT / "events" / "full_dataset.jsonl"
+MANIFEST_FILE = ROOT / "manifest.json"
 PAIR_COUNT = 150
 
 
-def main():
-    source_rows = [
-        json.loads(line)
-        for line in SOURCE.read_text(encoding="utf-8").splitlines()
+def build_expanded_lines(base_lines: list[str], pair_count: int = PAIR_COUNT) -> list[str]:
+    expanded: list[str] = []
+    for pair_idx in range(1, pair_count + 1):
+        suffix = f"-pair-{pair_idx:03d}"
+        for raw in base_lines:
+            record = json.loads(raw)
+            record["session_id"] = record["session_id"] + suffix
+            record["event_id"] = record["event_id"] + suffix
+            if record.get("exposure_id") is not None:
+                record["exposure_id"] = record["exposure_id"] + suffix
+            expanded.append(json.dumps(record, separators=(",", ":"), sort_keys=True))
+    return expanded
+
+
+def summarize_deterministically(lines: list[str]) -> dict[str, Any]:
+    unique_events: dict[str, dict[str, Any]] = {}
+    for line in lines:
+        rec = json.loads(line)
+        unique_events.setdefault(rec["event_id"], rec)
+    sessions = {rec["session_id"] for rec in unique_events.values()}
+    digest = hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+    manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+    return {
+        "pack_id": manifest["pack_id"],
+        "pair_count": PAIR_COUNT,
+        "delivered_lines": len(lines),
+        "unique_events": len(unique_events),
+        "distinct_sessions": len(sessions),
+        "verified_orders_status": manifest["unavailable_metrics"]["verified_orders"]["status"],
+        "supported_metric_names": [m["name"] for m in manifest["supported_metrics"]],
+        "sha256": digest,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Deterministic synthetic dataset generator (S7-DATA-15)")
+    parser.add_argument("--dry-run", action="store_true", help="Compute manifest summary without writing full_dataset.jsonl")
+    parser.add_argument("--replay", action="store_true", help="Regenerate and verify byte-identical replay determinism")
+    args = parser.parse_args()
+
+    base_lines = [
+        line.strip()
+        for line in BASE_FILE.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+    expanded = build_expanded_lines(base_lines, PAIR_COUNT)
+    summary = summarize_deterministically(expanded)
 
-    generated_rows = []
+    if args.dry_run:
+        print(json.dumps({"mode": "dry-run", **summary}, indent=2))
+        return
 
-    for pair_number in range(1, PAIR_COUNT + 1):
-        suffix = f"pair-{pair_number:03d}"
+    payload = "\n".join(expanded) + "\n"
+    if args.replay and OUT_FILE.exists():
+        existing = OUT_FILE.read_text(encoding="utf-8")
+        if existing != payload:
+            raise SystemExit("Replay determinism check failed: generated output differs from existing full_dataset.jsonl")
 
-        for original in source_rows:
-            row = original.copy()
-
-            # Give each repeated story its own event identities.
-            row["event_id"] = f"{original['event_id']}-{suffix}"
-            row["session_id"] = f"{original['session_id']}-{suffix}"
-
-            # Preserve relationships within each repeated story.
-            for field in (
-                "opening_id",
-                "exposure_id",
-                "comparison_id",
-            ):
-                if row.get(field):
-                    row[field] = f"{row[field]}-{suffix}"
-
-            generated_rows.append(row)
-
-    OUTPUT.write_text(
-        "".join(
-            json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
-            for row in generated_rows
-        ),
-        encoding="utf-8",
-    )
-
-    unique_ids = {row["event_id"] for row in generated_rows}
-    sessions = {row["session_id"] for row in generated_rows}
-
-    print(f"Delivery lines: {len(generated_rows)}")
-    print(f"Unique observations: {len(unique_ids)}")
-    print(f"Sessions: {len(sessions)}")
-    print(f"Output: {OUTPUT}")
+    OUT_FILE.write_text(payload, encoding="utf-8")
+    mode = "replay" if args.replay else "write"
+    print(json.dumps({"mode": mode, "output": str(OUT_FILE.relative_to(ROOT)), **summary}, indent=2))
 
 
 if __name__ == "__main__":
