@@ -1,0 +1,802 @@
+{
+  "authorization_status": "DRY_RUN_UNVERIFIED",
+  "batch_count": 2,
+  "batches": [
+    {
+      "contract": "observation.v2",
+      "events": [
+        {
+          "event_id": "007bc06a-6fd7-5312-8ab4-5fc0f8089a3b",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:00:00Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "8cf902df-64e4-5821-885b-18f21f5446a6",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "21cca2a7-d664-514d-9712-0a362838c227",
+          "type": "menu_viewed"
+        },
+        {
+          "event_id": "855af3b0-bd09-5a3e-b59b-5fd63b1bd6d3",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:00:01Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "749b102d-34ac-511b-83e5-a98407feb9de",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "8cf902df-64e4-5821-885b-18f21f5446a6",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "21cca2a7-d664-514d-9712-0a362838c227",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "9809db48-815c-5c85-9254-a07877594ce8",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:00:02Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "749b102d-34ac-511b-83e5-a98407feb9de",
+            "opening_id": "47dbbbf5-50f0-5ef4-af19-8f3f2c8f701e",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "8cf902df-64e4-5821-885b-18f21f5446a6",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "21cca2a7-d664-514d-9712-0a362838c227",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "f26d37a0-5f48-51b4-8f0e-ddcd42e2d952",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:00:10Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "47dbbbf5-50f0-5ef4-af19-8f3f2c8f701e"
+          },
+          "producer_id": "8cf902df-64e4-5821-885b-18f21f5446a6",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "21cca2a7-d664-514d-9712-0a362838c227",
+          "type": "dish_activity_checkpoint"
+        },
+        {
+          "event_id": "58a4cce2-dbd3-55f3-b4f8-a12c1327f65a",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:02:59Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "e0a7b89d-881e-5f21-9347-6a181d902e37",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "3b459a87-c4dd-579d-b741-13a602ba99bb",
+          "type": "menu_viewed"
+        },
+        {
+          "event_id": "f4098fdc-b9d2-54ea-830f-0cf0b412db35",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:03:00Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "7b8e04ac-1850-55a2-a2ff-a5329bfd4fca",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "e0a7b89d-881e-5f21-9347-6a181d902e37",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "3b459a87-c4dd-579d-b741-13a602ba99bb",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "49f179f6-6580-592a-9bb4-b81d468a13b9",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:03:01Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "7b8e04ac-1850-55a2-a2ff-a5329bfd4fca",
+            "opening_id": "6818f6ce-73c3-5215-bf96-b50c853abaeb",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "e0a7b89d-881e-5f21-9347-6a181d902e37",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "3b459a87-c4dd-579d-b741-13a602ba99bb",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "194f33bc-6a04-5a0b-97f8-ead73f266aa1",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:03:09Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "6818f6ce-73c3-5215-bf96-b50c853abaeb"
+          },
+          "producer_id": "e0a7b89d-881e-5f21-9347-6a181d902e37",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "3b459a87-c4dd-579d-b741-13a602ba99bb",
+          "type": "dish_activity_checkpoint"
+        },
+        {
+          "event_id": "3a4c82f3-1455-5bd2-b9d2-6cce42894457",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:05:58Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "511915d7-fa4b-581d-ba61-fbe7e0d78f9b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "8e43f3e1-bb5e-571b-8eeb-bc12b0a80405",
+          "type": "menu_viewed"
+        },
+        {
+          "event_id": "be321210-3e5d-5bc1-b830-d24a30523fec",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:05:59Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "48f2649e-9f86-5d4a-9660-9612792f4951",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "511915d7-fa4b-581d-ba61-fbe7e0d78f9b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "8e43f3e1-bb5e-571b-8eeb-bc12b0a80405",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "a1226cfa-e933-563c-960a-8435ae3a3f55",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:06:00Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "48f2649e-9f86-5d4a-9660-9612792f4951",
+            "opening_id": "3170d80c-ccf1-5fcb-abc7-870fa12f3a11",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "511915d7-fa4b-581d-ba61-fbe7e0d78f9b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "8e43f3e1-bb5e-571b-8eeb-bc12b0a80405",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "7dcd07c3-aae9-52ef-b39c-b2aa7533b144",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:06:08Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "3170d80c-ccf1-5fcb-abc7-870fa12f3a11"
+          },
+          "producer_id": "511915d7-fa4b-581d-ba61-fbe7e0d78f9b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "8e43f3e1-bb5e-571b-8eeb-bc12b0a80405",
+          "type": "dish_activity_checkpoint"
+        },
+        {
+          "event_id": "8db52032-b19b-5627-8674-97675002395c",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:08:57Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "e413625f-32a9-5a86-b0cd-2f84bcdb44e5",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "b092bc2e-93fe-583d-8839-3bdbda92ed75",
+          "type": "menu_viewed"
+        },
+        {
+          "event_id": "e3947fe7-dcae-5bda-905a-54ee28298c30",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:08:58Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "7d34e44f-b2eb-5a23-8dcb-99bf0a4825b5",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "e413625f-32a9-5a86-b0cd-2f84bcdb44e5",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "b092bc2e-93fe-583d-8839-3bdbda92ed75",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "2edd99d6-52e1-58c2-a98e-77c46167df8d",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:08:59Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "7d34e44f-b2eb-5a23-8dcb-99bf0a4825b5",
+            "opening_id": "d348d510-aad3-5999-aeab-e33b7afa50a8",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "e413625f-32a9-5a86-b0cd-2f84bcdb44e5",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "b092bc2e-93fe-583d-8839-3bdbda92ed75",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "ee29dcbf-edbe-5f22-ab19-a30d5937a431",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:09:07Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "d348d510-aad3-5999-aeab-e33b7afa50a8"
+          },
+          "producer_id": "e413625f-32a9-5a86-b0cd-2f84bcdb44e5",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "b092bc2e-93fe-583d-8839-3bdbda92ed75",
+          "type": "dish_activity_checkpoint"
+        },
+        {
+          "event_id": "a3194c9b-3eac-58e6-8443-973b0292978a",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:11:56Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "cdce46c7-d1b9-591a-a7f4-77fa63c8d50b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "c5a83946-5d7f-51a3-beba-59c5179dee30",
+          "type": "menu_viewed"
+        },
+        {
+          "event_id": "2c2acc06-e47b-55dc-ad69-0168819a7fae",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:11:57Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "9aa07dab-acf8-545e-a7f6-68342990b77a",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "cdce46c7-d1b9-591a-a7f4-77fa63c8d50b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "c5a83946-5d7f-51a3-beba-59c5179dee30",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "66f8f10f-bc2b-5684-9849-cb7359ac9013",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:11:58Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "9aa07dab-acf8-545e-a7f6-68342990b77a",
+            "opening_id": "74b2542c-13de-5f87-8560-f9b61a48a1a3",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "cdce46c7-d1b9-591a-a7f4-77fa63c8d50b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "c5a83946-5d7f-51a3-beba-59c5179dee30",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "cde18709-8903-58bf-9329-b80eca1bec01",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:12:06Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "74b2542c-13de-5f87-8560-f9b61a48a1a3"
+          },
+          "producer_id": "cdce46c7-d1b9-591a-a7f4-77fa63c8d50b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "c5a83946-5d7f-51a3-beba-59c5179dee30",
+          "type": "dish_activity_checkpoint"
+        },
+        {
+          "event_id": "9c04f7cb-58c7-5672-ae73-2664a9d9c7ec",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:14:55Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "96086f75-9c5d-5f28-83d0-139fc5ee220b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "11ec2d20-67a5-5e10-a822-4427926a135b",
+          "type": "menu_viewed"
+        },
+        {
+          "event_id": "85d5dff4-a8e9-51b5-ae16-8bd348f69719",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:14:56Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "91705ad8-5abd-54f6-af13-85e0e220428e",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "96086f75-9c5d-5f28-83d0-139fc5ee220b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "11ec2d20-67a5-5e10-a822-4427926a135b",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "c43081df-45a2-5f04-b919-30a3caaebefd",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:14:57Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "91705ad8-5abd-54f6-af13-85e0e220428e",
+            "opening_id": "3e011c6f-ffc2-5c0a-9912-2b8394c6eb61",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "96086f75-9c5d-5f28-83d0-139fc5ee220b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "11ec2d20-67a5-5e10-a822-4427926a135b",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "9b745b5f-9acd-5da8-a139-9a707b42d526",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:15:05Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "3e011c6f-ffc2-5c0a-9912-2b8394c6eb61"
+          },
+          "producer_id": "96086f75-9c5d-5f28-83d0-139fc5ee220b",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "11ec2d20-67a5-5e10-a822-4427926a135b",
+          "type": "dish_activity_checkpoint"
+        },
+        {
+          "event_id": "72d4cc9c-6fe9-5d8c-96ad-c17c84a22b5a",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:17:54Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "80644fe0-7710-5c7f-89d4-f6925e265964",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "86315409-bb5b-56d1-bc5b-e6081a1bbaf0",
+          "type": "menu_viewed"
+        }
+      ]
+    },
+    {
+      "contract": "observation.v2",
+      "events": [
+        {
+          "event_id": "9f0958b1-89c4-5ac6-bb43-a6bbf876c84d",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:17:55Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "4b7482b9-d3ad-5d0c-a12f-806d1071177c",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "80644fe0-7710-5c7f-89d4-f6925e265964",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "86315409-bb5b-56d1-bc5b-e6081a1bbaf0",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "c295e5f4-f47f-56f7-8554-1295664afabb",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:17:56Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "4b7482b9-d3ad-5d0c-a12f-806d1071177c",
+            "opening_id": "9e2e90eb-bb57-50b1-84c0-640d3b8164b8",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "80644fe0-7710-5c7f-89d4-f6925e265964",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "86315409-bb5b-56d1-bc5b-e6081a1bbaf0",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "45a9caaa-721b-50cb-98b8-ffb4e5004b26",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:18:04Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "9e2e90eb-bb57-50b1-84c0-640d3b8164b8"
+          },
+          "producer_id": "80644fe0-7710-5c7f-89d4-f6925e265964",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "86315409-bb5b-56d1-bc5b-e6081a1bbaf0",
+          "type": "dish_activity_checkpoint"
+        },
+        {
+          "event_id": "ca5628c9-494f-59e2-bd07-27b25de2bb77",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:20:53Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "71466bfd-cdd6-58f1-a3e1-49821694c294",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "829fb35c-9005-5bf0-81e7-fccee809de44",
+          "type": "menu_viewed"
+        },
+        {
+          "event_id": "5f52f2c2-9f22-553b-bf28-706a923f0480",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:20:54Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "9e9a5cf3-ecaf-536b-b41d-4088ab33d38f",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "71466bfd-cdd6-58f1-a3e1-49821694c294",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "829fb35c-9005-5bf0-81e7-fccee809de44",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "f6e08959-e8a5-50d9-9813-27f2bc24e3c7",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:20:55Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "9e9a5cf3-ecaf-536b-b41d-4088ab33d38f",
+            "opening_id": "4520fc00-3f40-599f-b8ce-76efc1e06ad9",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "71466bfd-cdd6-58f1-a3e1-49821694c294",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "829fb35c-9005-5bf0-81e7-fccee809de44",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "f41b53c3-454a-50d0-9ab3-6c2332b88c07",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:21:03Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "4520fc00-3f40-599f-b8ce-76efc1e06ad9"
+          },
+          "producer_id": "71466bfd-cdd6-58f1-a3e1-49821694c294",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "829fb35c-9005-5bf0-81e7-fccee809de44",
+          "type": "dish_activity_checkpoint"
+        },
+        {
+          "event_id": "9406ad4d-8c4c-5b51-a0fd-eb1c6569ab53",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:23:52Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "9a28a75d-c443-5f18-9636-f4f73c454c3e",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "943b16f1-5b5f-5fb7-9ed9-affd47752f02",
+          "type": "menu_viewed"
+        },
+        {
+          "event_id": "69daa6d8-4ec2-5296-92a8-1d9539a808ee",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:23:53Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "6f3f34ea-66de-5c2e-a725-d460d6682717",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "9a28a75d-c443-5f18-9636-f4f73c454c3e",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "943b16f1-5b5f-5fb7-9ed9-affd47752f02",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "08524a68-f06b-5cab-b044-c252518dda50",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:23:54Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "6f3f34ea-66de-5c2e-a725-d460d6682717",
+            "opening_id": "1a9b0557-3b60-592a-8538-5f3abf537210",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "9a28a75d-c443-5f18-9636-f4f73c454c3e",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "943b16f1-5b5f-5fb7-9ed9-affd47752f02",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "8afb1119-b253-56b3-b372-4145da0964af",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:24:02Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "1a9b0557-3b60-592a-8538-5f3abf537210"
+          },
+          "producer_id": "9a28a75d-c443-5f18-9636-f4f73c454c3e",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "943b16f1-5b5f-5fb7-9ed9-affd47752f02",
+          "type": "dish_activity_checkpoint"
+        },
+        {
+          "event_id": "d04651ee-9c9e-5e64-a27c-b83820da6001",
+          "local_sequence": 1,
+          "occurred_at": "2026-11-23T14:26:51Z",
+          "payload": {
+            "entry_source": "qr"
+          },
+          "producer_id": "5c99279b-6751-5800-acb0-ba7b8ce17529",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "c8d7be18-f722-5a50-8c12-b3b7a077bcd7",
+          "type": "menu_viewed"
+        },
+        {
+          "event_id": "91b01a57-d1e9-5667-ab62-8cb1c9249495",
+          "local_sequence": 2,
+          "occurred_at": "2026-11-23T14:26:52Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "exposure_basis": "viewport_50pct_1s",
+            "exposure_id": "1b64d289-93a1-5e89-8d80-881293c76109",
+            "position": 1,
+            "surface": "menu_list"
+          },
+          "producer_id": "5c99279b-6751-5800-acb0-ba7b8ce17529",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "c8d7be18-f722-5a50-8c12-b3b7a077bcd7",
+          "type": "dish_viewed"
+        },
+        {
+          "event_id": "d55502bf-77e2-5e8e-8e75-3cc9d67bd10a",
+          "local_sequence": 3,
+          "occurred_at": "2026-11-23T14:26:53Z",
+          "payload": {
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "from_exposure_id": "1b64d289-93a1-5e89-8d80-881293c76109",
+            "opening_id": "4cbd468a-fc92-5aa5-ad4f-5a793bfe2999",
+            "save_available": true,
+            "source": "menu_card"
+          },
+          "producer_id": "5c99279b-6751-5800-acb0-ba7b8ce17529",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "c8d7be18-f722-5a50-8c12-b3b7a077bcd7",
+          "type": "dish_detail_opened"
+        },
+        {
+          "event_id": "fc1bf107-d7ee-5dfb-914a-9b4b53f1133d",
+          "local_sequence": 4,
+          "occurred_at": "2026-11-23T14:27:01Z",
+          "payload": {
+            "active_ms": 8000,
+            "dish_id": "22222222-2222-4222-8222-222222222222",
+            "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+            "final": true,
+            "opening_id": "4cbd468a-fc92-5aa5-ad4f-5a793bfe2999"
+          },
+          "producer_id": "5c99279b-6751-5800-acb0-ba7b8ce17529",
+          "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+          "schema_version": "observation.v2",
+          "session_id": "c8d7be18-f722-5a50-8c12-b3b7a077bcd7",
+          "type": "dish_activity_checkpoint"
+        }
+      ]
+    }
+  ],
+  "destination": {
+    "api_base_url": "https://peekaplate-api-staging.vxkong.workers.dev",
+    "ingest_endpoint": "https://peekaplate-api-staging.vxkong.workers.dev/observations"
+  },
+  "dry_run": true,
+  "event_cap": 100,
+  "event_count": 40,
+  "event_ids": [
+    "007bc06a-6fd7-5312-8ab4-5fc0f8089a3b",
+    "855af3b0-bd09-5a3e-b59b-5fd63b1bd6d3",
+    "9809db48-815c-5c85-9254-a07877594ce8",
+    "f26d37a0-5f48-51b4-8f0e-ddcd42e2d952",
+    "58a4cce2-dbd3-55f3-b4f8-a12c1327f65a",
+    "f4098fdc-b9d2-54ea-830f-0cf0b412db35",
+    "49f179f6-6580-592a-9bb4-b81d468a13b9",
+    "194f33bc-6a04-5a0b-97f8-ead73f266aa1",
+    "3a4c82f3-1455-5bd2-b9d2-6cce42894457",
+    "be321210-3e5d-5bc1-b830-d24a30523fec",
+    "a1226cfa-e933-563c-960a-8435ae3a3f55",
+    "7dcd07c3-aae9-52ef-b39c-b2aa7533b144",
+    "8db52032-b19b-5627-8674-97675002395c",
+    "e3947fe7-dcae-5bda-905a-54ee28298c30",
+    "2edd99d6-52e1-58c2-a98e-77c46167df8d",
+    "ee29dcbf-edbe-5f22-ab19-a30d5937a431",
+    "a3194c9b-3eac-58e6-8443-973b0292978a",
+    "2c2acc06-e47b-55dc-ad69-0168819a7fae",
+    "66f8f10f-bc2b-5684-9849-cb7359ac9013",
+    "cde18709-8903-58bf-9329-b80eca1bec01",
+    "9c04f7cb-58c7-5672-ae73-2664a9d9c7ec",
+    "85d5dff4-a8e9-51b5-ae16-8bd348f69719",
+    "c43081df-45a2-5f04-b919-30a3caaebefd",
+    "9b745b5f-9acd-5da8-a139-9a707b42d526",
+    "72d4cc9c-6fe9-5d8c-96ad-c17c84a22b5a",
+    "9f0958b1-89c4-5ac6-bb43-a6bbf876c84d",
+    "c295e5f4-f47f-56f7-8554-1295664afabb",
+    "45a9caaa-721b-50cb-98b8-ffb4e5004b26",
+    "ca5628c9-494f-59e2-bd07-27b25de2bb77",
+    "5f52f2c2-9f22-553b-bf28-706a923f0480",
+    "f6e08959-e8a5-50d9-9813-27f2bc24e3c7",
+    "f41b53c3-454a-50d0-9ab3-6c2332b88c07",
+    "9406ad4d-8c4c-5b51-a0fd-eb1c6569ab53",
+    "69daa6d8-4ec2-5296-92a8-1d9539a808ee",
+    "08524a68-f06b-5cab-b044-c252518dda50",
+    "8afb1119-b253-56b3-b372-4145da0964af",
+    "d04651ee-9c9e-5e64-a27c-b83820da6001",
+    "91b01a57-d1e9-5667-ab62-8cb1c9249495",
+    "d55502bf-77e2-5e8e-8e75-3cc9d67bd10a",
+    "fc1bf107-d7ee-5dfb-914a-9b4b53f1133d"
+  ],
+  "expected_metrics": {
+    "evidence_state": "NORMAL",
+    "metrics": {
+      "active_sessions": {
+        "status": "NORMAL",
+        "value": 10
+      },
+      "avg_interaction_time_seconds": {
+        "denominator": 10,
+        "numerator": 80.0,
+        "status": "NORMAL",
+        "value": 8.0
+      },
+      "engagement_rate": {
+        "denominator": 10,
+        "numerator": 0,
+        "status": "VALID_ZERO",
+        "value": 0
+      },
+      "open_rate": {
+        "denominator": 10,
+        "numerator": 10,
+        "status": "NORMAL",
+        "value": 1.0
+      },
+      "save_rate": {
+        "denominator": 10,
+        "numerator": 0,
+        "status": "VALID_ZERO",
+        "value": 0
+      },
+      "timing_coverage": {
+        "denominator": 10,
+        "numerator": 10,
+        "status": "NORMAL",
+        "value": 1.0
+      }
+    },
+    "unique_events": 40
+  },
+  "fixture_version": "p0-v2-synthetic-1.0",
+  "generator_version": "s7-data-18-generator.v1",
+  "input_sha256": "2be921e96a6662565b2427ece871e3938f441f134d7d465cd8f47bc84764dfcc",
+  "manifest_sha256": "6e7f344004e7f674c72d795e31166814ee9add470fec136bbe51e673a031357e",
+  "output_sha256": "034cd873efba047108523a3b07756da72069d0fab5d30b16626c4dae7144ce26",
+  "provenance": {
+    "fictional_only": true,
+    "fixture_status": "DRAFT_FOR_INDEPENDENT_REVIEW",
+    "pack_id": "owner-synthetic-p0-v2"
+  },
+  "run_id": "c04bd38a-a19d-56b5-9b7e-b2fd5e03e2c4",
+  "scenario": "B",
+  "schema_version": "s7-data-18.manifest.v1",
+  "seed": "s7-data-18-scenario-b",
+  "session_ids": [
+    "11ec2d20-67a5-5e10-a822-4427926a135b",
+    "21cca2a7-d664-514d-9712-0a362838c227",
+    "3b459a87-c4dd-579d-b741-13a602ba99bb",
+    "829fb35c-9005-5bf0-81e7-fccee809de44",
+    "86315409-bb5b-56d1-bc5b-e6081a1bbaf0",
+    "8e43f3e1-bb5e-571b-8eeb-bc12b0a80405",
+    "943b16f1-5b5f-5fb7-9ed9-affd47752f02",
+    "b092bc2e-93fe-583d-8839-3bdbda92ed75",
+    "c5a83946-5d7f-51a3-beba-59c5179dee30",
+    "c8d7be18-f722-5a50-8c12-b3b7a077bcd7"
+  ],
+  "target": {
+    "dish_id": "22222222-2222-4222-8222-222222222222",
+    "dish_is_demo": false,
+    "dish_revision_id": "33333333-3333-4333-8333-333333333333",
+    "publication_revision_id": "11111111-1111-4111-8111-111111111111",
+    "venue_id": "00000000-0000-4000-8000-000000000123"
+  },
+  "window_utc": {
+    "end": "2026-11-23T14:30:00Z",
+    "start": "2026-11-23T14:00:00Z"
+  }
+}
