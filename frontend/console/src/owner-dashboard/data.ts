@@ -436,37 +436,24 @@ export const ANSWERS: Record<string, () => Answer> = {
     };
   },
   orders: () => ({
-    short: `The Salmon Poke Bowl is opened often (${p.open} opens, second most) and has ${p.ord} verified orders on record, the lowest of the dishes that have a record.`,
+    short: 'Verified orders are unavailable in the synthetic P0 scope because no verified POS or checkout order source is connected.',
     secs: [
-      {
-        k: 'obs',
-        items: [
-          `${p.open} opens · ${p.again} opened again · in ${p.cmp} comparisons`,
-          '22 of those comparisons were with the Harvest Power Bowl',
-        ],
-      },
-      { k: 'ver', items: DISH.filter((d) => d.ord !== null).map((d) => `${d.name}: ${d.ord}`) },
       {
         k: 'unk',
         items: [
-          'Berry Pancake Stack, Brioche French Toast and Garden Avocado Salad have no order record. Their outcome is Unknown, not zero.',
-          `Order records are entered by hand and may be incomplete, so ${p.ord} may undercount.`,
+          'Verified orders status: Unavailable across all dishes in P0 (no verified order source).',
+          'Synthetic datasets and console views never fabricate order counts or revenue.',
         ],
       },
       {
-        k: 'rsn',
+        k: 'obs',
         items: [
-          'Diners may be choosing between the two bowls (inferred from comparisons, not verified).',
-          'Some Poke Bowl orders may be unrecorded (possible).',
+          'Supported descriptive metrics remain active: menu sessions, dish opens, interaction time, timing coverage, save rate, and engagement rate.',
         ],
       },
     ],
-    ev: [
-      `Orders: manual records for ${T.withRec} of ${DISH.length} dishes.`,
-      'I do not describe a viewed dish as rejected or lost.',
-      EVT,
-    ],
-    follow: ['premise', 'improve'],
+    ev: ['Verified orders: Unavailable in P0 scope.', EVT],
+    follow: ['top', 'interact', 'week'],
   }),
   interact: () => ({
     short: `Across ${SESSIONS.now} menu sessions, diners opened ${T.open} dishes, about ${(T.open / SESSIONS.now).toFixed(1)} per session.`,
@@ -601,7 +588,7 @@ export const ANSWERS: Record<string, () => Answer> = {
       {
         k: 'unk',
         items: [
-          items: ['Try a question about opens, comparisons, 2.5D previews, or the weekly change.'],
+          'Try a question about opens, comparisons, 2.5D previews, or the weekly change.',
         ],
       },
     ],
