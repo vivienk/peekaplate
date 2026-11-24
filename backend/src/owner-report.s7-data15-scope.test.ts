@@ -134,11 +134,9 @@ describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determini
         if (hadOutputBefore) {
           fs.unlinkSync(FULL_DATASET_FILE);
         }
-        const missingReplay = spawnSync(
-          py.cmd,
-          [...py.prefixArgs, GENERATOR_SCRIPT, '--replay'],
-          { encoding: 'utf8' },
-        );
+        const missingReplay = spawnSync(py.cmd, [...py.prefixArgs, GENERATOR_SCRIPT, '--replay'], {
+          encoding: 'utf8',
+        });
         expect(missingReplay.status).not.toBe(0);
         expect(missingReplay.stderr).toContain('existing full_dataset.jsonl is missing');
 
