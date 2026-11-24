@@ -419,7 +419,9 @@
       "category": "excluded",
       "unit": "boolean_or_null",
       "source": "report_metadata.freshness.is_stale",
-      "unavailable_conditions": ["Pinned to null (Freshness not known) until post-MVP completeness watermark"]
+      "unavailable_conditions": [
+        "Pinned to null (Freshness not known) until post-MVP completeness watermark"
+      ]
     }
   ]
 }
