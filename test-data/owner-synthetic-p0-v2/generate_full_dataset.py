@@ -83,7 +83,9 @@ def main() -> None:
         return
 
     payload = "\n".join(expanded) + "\n"
-    if args.replay and OUTPUT.exists():
+    if args.replay:
+        if not OUTPUT.exists():
+            raise SystemExit("Replay verification failed: existing full_dataset.jsonl is missing")
         existing = OUTPUT.read_text(encoding="utf-8").replace("\r\n", "\n")
         if existing != payload:
             raise SystemExit("Replay determinism check failed: generated output differs from existing full_dataset.jsonl")

@@ -11,6 +11,29 @@ const FRONTEND_DATA_PATH = path.join(REPO_ROOT, 'frontend/console/src/owner-dash
 const FRONTEND_PAGES_PATH = path.join(REPO_ROOT, 'frontend/console/src/owner-dashboard/pages.tsx');
 const README_PATH = path.join(SYNTHETIC_DIR, 'README.md');
 
+const EXPECTED_DASHBOARD_FIELDS = [
+  'active_sessions',
+  'open_rate',
+  'engagement_rate',
+  'save_rate',
+  'avg_interaction_time_seconds',
+  'timing_coverage',
+  'revisit_rate',
+  'portion_previews_shown',
+  'photo_fallback_opens',
+  'comparison_rate',
+  'most_compared_pairs',
+  'weekly_trend_delta',
+  'verified_orders',
+  'dish_order_record_coverage',
+  'weekly_verified_orders',
+  'checkout_revenue',
+  'pos_ticket_value',
+  'unconsented_diner_events',
+  'test_traffic_events',
+  'realtime_ingestion_staleness',
+] as const;
+
 function resolvePythonCommand() {
   for (const candidate of [
     { cmd: 'python3', prefixArgs: [] },
@@ -25,8 +48,10 @@ function resolvePythonCommand() {
   return null;
 }
 
+const PYTHON_CLI = resolvePythonCommand();
+
 describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determinism', () => {
-  it('classifies every displayed dashboard field as supported, derived, unavailable, or excluded in manifest.json', () => {
+  it('classifies the complete inventory of displayed dashboard fields uniquely with unit and source metadata', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(SYNTHETIC_DIR, 'manifest.json'), 'utf8'));
     expect(manifest.expected_counts).toEqual({
       pair_count: 150,
@@ -35,10 +60,34 @@ describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determini
       distinct_sessions: 300,
     });
     expect(manifest.trusted_sha256).toMatch(/^[a-f0-9]{64}$/);
-    const categories = new Set(
-      manifest.dashboard_field_classification.map((f: { category: string }) => f.category),
-    );
+
+    const entries = manifest.dashboard_field_classification as Array<{
+      name: string;
+      dashboard_label: string;
+      category: string;
+      unit: string;
+      source: string;
+      unavailable_conditions: string[];
+    }>;
+
+    const names = entries.map((f) => f.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(new Set(names)).toEqual(new Set(EXPECTED_DASHBOARD_FIELDS));
+
+    const categories = new Set(entries.map((f) => f.category));
     expect(categories).toEqual(new Set(['supported', 'derived', 'unavailable', 'excluded']));
+
+    for (const entry of entries) {
+      expect(typeof entry.dashboard_label).toBe('string');
+      expect(entry.dashboard_label.trim().length).toBeGreaterThan(0);
+      expect(typeof entry.unit).toBe('string');
+      expect(entry.unit.trim().length).toBeGreaterThan(0);
+      expect(typeof entry.source).toBe('string');
+      expect(entry.source.trim().length).toBeGreaterThan(0);
+      expect(Array.isArray(entry.unavailable_conditions)).toBe(true);
+      expect(entry.unavailable_conditions.length).toBeGreaterThan(0);
+    }
+
     expect(manifest.unavailable_metrics.verified_orders.status).toBe('UNAVAILABLE');
   });
 
@@ -61,28 +110,59 @@ describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determini
     );
   });
 
-  it('executes the real generator CLI for --dry-run and --replay against trusted SHA-256', () => {
-    const py = resolvePythonCommand();
-    const manifest = JSON.parse(fs.readFileSync(path.join(SYNTHETIC_DIR, 'manifest.json'), 'utf8'));
-    if (!py) {
-      expect(fs.existsSync(GENERATOR_SCRIPT)).toBe(true);
-      return;
-    }
-    const hadOutputBefore = fs.existsSync(FULL_DATASET_FILE);
-    const dryRunStdout = execFileSync(py.cmd, [...py.prefixArgs, GENERATOR_SCRIPT, '--dry-run'], {
-      encoding: 'utf8',
-    });
-    const dryRun = JSON.parse(dryRunStdout);
-    expect(dryRun.mode).toBe('dry-run');
-    expect(dryRun.sha256).toBe(manifest.trusted_sha256);
-    expect(fs.existsSync(FULL_DATASET_FILE)).toBe(hadOutputBefore);
+  it.skipIf(!PYTHON_CLI)(
+    'executes the real generator CLI for --dry-run, --replay, and fails --replay when artifact is missing',
+    () => {
+      const py = PYTHON_CLI!;
+      const manifest = JSON.parse(
+        fs.readFileSync(path.join(SYNTHETIC_DIR, 'manifest.json'), 'utf8'),
+      );
+      const hadOutputBefore = fs.existsSync(FULL_DATASET_FILE);
+      const originalBytes = hadOutputBefore ? fs.readFileSync(FULL_DATASET_FILE) : null;
 
-    const replayStdout = execFileSync(py.cmd, [...py.prefixArgs, GENERATOR_SCRIPT, '--replay'], {
-      encoding: 'utf8',
-    });
-    const replay = JSON.parse(replayStdout);
-    expect(replay.mode).toBe('replay');
-    expect(replay.sha256).toBe(manifest.trusted_sha256);
-    if (!hadOutputBefore && fs.existsSync(FULL_DATASET_FILE)) fs.unlinkSync(FULL_DATASET_FILE);
-  });
+      try {
+        const dryRunStdout = execFileSync(
+          py.cmd,
+          [...py.prefixArgs, GENERATOR_SCRIPT, '--dry-run'],
+          { encoding: 'utf8' },
+        );
+        const dryRun = JSON.parse(dryRunStdout);
+        expect(dryRun.mode).toBe('dry-run');
+        expect(dryRun.sha256).toBe(manifest.trusted_sha256);
+        expect(fs.existsSync(FULL_DATASET_FILE)).toBe(hadOutputBefore);
+
+        if (hadOutputBefore) {
+          fs.unlinkSync(FULL_DATASET_FILE);
+        }
+        const missingReplay = spawnSync(
+          py.cmd,
+          [...py.prefixArgs, GENERATOR_SCRIPT, '--replay'],
+          { encoding: 'utf8' },
+        );
+        expect(missingReplay.status).not.toBe(0);
+        expect(missingReplay.stderr).toContain('existing full_dataset.jsonl is missing');
+
+        if (originalBytes) {
+          fs.writeFileSync(FULL_DATASET_FILE, originalBytes);
+        } else {
+          execFileSync(py.cmd, [...py.prefixArgs, GENERATOR_SCRIPT], { encoding: 'utf8' });
+        }
+
+        const replayStdout = execFileSync(
+          py.cmd,
+          [...py.prefixArgs, GENERATOR_SCRIPT, '--replay'],
+          { encoding: 'utf8' },
+        );
+        const replay = JSON.parse(replayStdout);
+        expect(replay.mode).toBe('replay');
+        expect(replay.sha256).toBe(manifest.trusted_sha256);
+      } finally {
+        if (originalBytes) {
+          fs.writeFileSync(FULL_DATASET_FILE, originalBytes);
+        } else if (fs.existsSync(FULL_DATASET_FILE)) {
+          fs.unlinkSync(FULL_DATASET_FILE);
+        }
+      }
+    },
+  );
 });
