@@ -373,9 +373,7 @@
       "category": "unavailable",
       "unit": "dishes",
       "source": "none (manual order records removed in S7-DATA-15)",
-      "unavailable_conditions": [
-        "Always UNAVAILABLE in P0"
-      ]
+      "unavailable_conditions": ["Always UNAVAILABLE in P0"]
     },
     {
       "name": "weekly_verified_orders",
@@ -383,9 +381,7 @@
       "category": "unavailable",
       "unit": "orders",
       "source": "none (no verified POS or checkout order source in P0)",
-      "unavailable_conditions": [
-        "Always UNAVAILABLE in P0"
-      ]
+      "unavailable_conditions": ["Always UNAVAILABLE in P0"]
     },
     {
       "name": "checkout_revenue",
@@ -393,9 +389,7 @@
       "category": "excluded",
       "unit": "currency",
       "source": "out_of_scope",
-      "unavailable_conditions": [
-        "Excluded from P0 owner analytics contract"
-      ]
+      "unavailable_conditions": ["Excluded from P0 owner analytics contract"]
     },
     {
       "name": "pos_ticket_value",
@@ -403,9 +397,7 @@
       "category": "excluded",
       "unit": "currency",
       "source": "out_of_scope",
-      "unavailable_conditions": [
-        "Excluded from P0 owner analytics contract"
-      ]
+      "unavailable_conditions": ["Excluded from P0 owner analytics contract"]
     },
     {
       "name": "unconsented_diner_events",
@@ -413,9 +405,7 @@
       "category": "excluded",
       "unit": "events",
       "source": "filtered at ingestion boundary",
-      "unavailable_conditions": [
-        "Excluded by consent gate; never persisted or reported"
-      ]
+      "unavailable_conditions": ["Excluded by consent gate; never persisted or reported"]
     },
     {
       "name": "test_traffic_events",
@@ -423,9 +413,7 @@
       "category": "excluded",
       "unit": "events",
       "source": "traffic_class == 'test'",
-      "unavailable_conditions": [
-        "Excluded from live restaurant owner reports"
-      ]
+      "unavailable_conditions": ["Excluded from live restaurant owner reports"]
     },
     {
       "name": "realtime_ingestion_staleness",
