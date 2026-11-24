@@ -524,13 +524,21 @@ export function EngagementPeriodChart({
   privacyFloor?: number;
 }) {
   const evaluate = (point: EngagementPeriodPoint) => {
-    if (point.status === 'SUPPRESSED') return { visible: false as const, text: 'Not enough visits yet', ratio: 0 };
-    if (point.status === 'NOT_MEASURABLE') return { visible: false as const, text: 'Not measurable', ratio: 0 };
-    if (point.status === 'MISSING' || point.engagedVisits === null || point.eligibleVisits === null) {
+    if (point.status === 'SUPPRESSED')
+      return { visible: false as const, text: 'Not enough visits yet', ratio: 0 };
+    if (point.status === 'NOT_MEASURABLE')
+      return { visible: false as const, text: 'Not measurable', ratio: 0 };
+    if (
+      point.status === 'MISSING' ||
+      point.engagedVisits === null ||
+      point.eligibleVisits === null
+    ) {
       return { visible: false as const, text: 'No data', ratio: 0 };
     }
-    if (point.eligibleVisits === 0) return { visible: false as const, text: 'Not measurable', ratio: 0 };
-    if (point.eligibleVisits < privacyFloor) return { visible: false as const, text: 'Not enough visits yet', ratio: 0 };
+    if (point.eligibleVisits === 0)
+      return { visible: false as const, text: 'Not measurable', ratio: 0 };
+    if (point.eligibleVisits < privacyFloor)
+      return { visible: false as const, text: 'Not enough visits yet', ratio: 0 };
     const ratio = point.engagedVisits / point.eligibleVisits;
     const pct = Math.round(ratio * 1000) / 10;
     return {
@@ -567,14 +575,24 @@ export function EngagementPeriodChart({
       id: 'baseline',
       label: baseline.label,
       ...(prev.visible
-        ? { sub: `${prev.engagedVisits} of ${prev.eligibleVisits} eligible visits`, vals: [prev.ratio], text: prev.text, ariaValue: () => prev.text }
+        ? {
+            sub: `${prev.engagedVisits} of ${prev.eligibleVisits} eligible visits`,
+            vals: [prev.ratio],
+            text: prev.text,
+            ariaValue: () => prev.text,
+          }
         : { vals: [], none: prev.text }),
     },
     {
       id: 'current',
       label: current.label,
       ...(curr.visible
-        ? { sub: `${curr.engagedVisits} of ${curr.eligibleVisits} eligible visits`, vals: [curr.ratio], text: curr.text, ariaValue: () => curr.text }
+        ? {
+            sub: `${curr.engagedVisits} of ${curr.eligibleVisits} eligible visits`,
+            vals: [curr.ratio],
+            text: curr.text,
+            ariaValue: () => curr.text,
+          }
         : { vals: [], none: curr.text }),
     },
   ];
@@ -589,8 +607,15 @@ export function EngagementPeriodChart({
         [current.label, current.engagedVisits ?? '—', current.eligibleVisits ?? '—', curr.text],
       ]}
     >
-      <p className="muted" role="status" style={{ marginBottom: '12px' }}>{takeaway}</p>
-      <HBars legend={false} max={1} segs={[{ name: 'Engagement rate', color: 'var(--pp-color-orange-600)' }]} rows={rows} />
+      <p className="muted" role="status" style={{ marginBottom: '12px' }}>
+        {takeaway}
+      </p>
+      <HBars
+        legend={false}
+        max={1}
+        segs={[{ name: 'Engagement rate', color: 'var(--pp-color-orange-600)' }]}
+        rows={rows}
+      />
     </ChartCard>
   );
 }
