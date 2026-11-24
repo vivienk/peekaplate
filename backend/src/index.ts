@@ -1117,7 +1117,12 @@ export async function approveDishDraftAtomic(
     }
     if (
       !draft.name ||
-      (manual && (!manual.category || manual.priceAmount === null || manual.priceCurrency === null))
+      (manual &&
+        (!manual.category ||
+          manual.priceAmount === null ||
+          manual.priceCurrency === null ||
+          manual.allergens.status === 'proposed')) ||
+      (!manual && corrected.allergens?.status === 'proposed')
     ) {
       throw new IngestionError('draft_incomplete', 409);
     }

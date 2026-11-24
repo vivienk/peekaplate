@@ -37,6 +37,7 @@ export class PublicationCommandError extends Error {
       | 'command_conflict'
       | 'review_subject_not_found'
       | 'approval_not_found'
+      | 'menu_not_verified'
       | 'not_published',
     readonly status: 403 | 409,
   ) {
@@ -169,6 +170,35 @@ async function recordCommandAndOutbox(
   );
 }
 
+async function assertActiveOwnerDraftsApproved(client: Client, venueId: string): Promise<void> {
+  const unapproved = await client.query<{ id: string }>(
+    `SELECT d.id
+       FROM app_private.dish_drafts d
+       LEFT JOIN app_private.menu_ingestion_jobs j
+         ON j.tenant_id = d.tenant_id AND j.id = d.job_id
+       LEFT JOIN app_private.candidate_review_current c
+         ON c.tenant_id = d.tenant_id
+        AND c.extraction_id = j.active_review_extraction_id
+        AND c.candidate_id = COALESCE(d.candidate_id, d.draft_id)
+      WHERE d.tenant_id = $1
+        AND d.removed_at IS NULL
+        AND d.review_status NOT IN ('rejected', 'superseded')
+        AND (c.review_status IS NULL OR c.review_status <> 'rejected')
+        AND (
+          d.verification_status <> 'verified'
+          OR d.review_status <> 'accepted'
+          OR d.published_dish_id IS NULL
+          OR c.review_status IN ('incomplete', 'rejected')
+          OR COALESCE(cardinality(c.incomplete_fields), 0) > 0
+        )
+      LIMIT 1`,
+    [venueId],
+  );
+  if (unapproved.rows.length > 0) {
+    throw new PublicationCommandError('menu_not_verified', 409);
+  }
+}
+
 export async function approveMenuRevision(
   client: Client,
   actorId: string,
@@ -231,6 +261,7 @@ export async function approveMenuRevision(
     if (!approvedSubject) {
       throw new PublicationCommandError('review_subject_not_found', 409);
     }
+    await assertActiveOwnerDraftsApproved(client, venueId);
 
     const version = currentVersion + 1;
     const approvalId = randomUUID();
@@ -365,6 +396,7 @@ export async function publishMenu(
     );
     const approved = approval.rows[0];
     if (!approved) throw new PublicationCommandError('approval_not_found', 409);
+    await assertActiveOwnerDraftsApproved(client, venueId);
 
     const version = currentVersion + 1;
     const availabilityVersion = (current.rows[0]?.availability_version ?? 0) + 1;

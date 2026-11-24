@@ -112,11 +112,12 @@ export function MenuProcessing({
                 <div className="pp-onboard-info__text">
                   <h2 className="pp-onboard-info__title">What's happening right now?</h2>
                   <p className="pp-onboard-info__body">
-                    We're identifying sections, dish names, prices, and descriptions. This step
-                    prepares an unverified draft for your review.
+                    We're identifying sections, dish names, prices, and descriptions, and
+                    automatically checking extracted menu information for completeness and
+                    confidence. This step prepares an unverified draft for your review.
                   </p>
                   <p className="pp-onboard-info__note">
-                    No items will go live or be published without your explicit confirmation.
+                    You review and approve your dishes before they can be published.
                   </p>
                 </div>
               </div>
