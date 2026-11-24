@@ -316,7 +316,7 @@ export const INSIGHTS: InsightItem[] = [
     evidence: [
       `${p.open} opens · ${p.again} opened again · in ${p.cmp} comparisons`,
       '22 comparisons were with the Harvest Power Bowl',
-      `Order records exist for ${T.withRec} of ${DISH.length} dishes and are entered by hand`,
+      'Verified order outcomes are unavailable in the synthetic P0 scope',
     ],
     uncertain: [
       'A dish that was viewed but not ordered is not assumed to be rejected.',
