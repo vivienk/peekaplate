@@ -480,7 +480,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Production San Francisco day dish aggregates use the first eligible event for the completed day. Owner AI uses checked report references and gates provider use on verified freshness. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. The separate production portion-only deployment requires matching source origin; menu OCR transport is separate.",
+      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Production San Francisco day dish aggregates use the first eligible event for the completed day. Production batch reports enforce a fail-closed batch freshness evaluator, keeping is_stale unknown until queue-drain watermark infra is deployed. Owner AI uses checked report references and gates provider use on verified freshness. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. The separate production portion-only deployment requires matching source origin; menu OCR transport is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -508,6 +508,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish.integration.ts",
         "backend/src/owner-report.test.ts",
         "backend/src/owner-report.ts",
+        "backend/src/owner-report-freshness.ts",
+        "backend/src/owner-report-freshness.test.ts",
+        "backend/src/owner-report.data17.test.ts",
         "backend/src/owner-report-evidence.ts",
         "backend/src/owner-report-display-actions.ts",
         "backend/src/owner-report-batches.ts",
@@ -753,7 +756,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "2fbea6845b9af43e8e2240957b1248a9d0964edcd746aaff688c8788960167bf"
+      "sourceFingerprint": "4c66d863739e069e297cfe46e011606de6eff225922b48a5592c25859991c7ba"
     },
     {
       "id": "database",
