@@ -97,6 +97,8 @@ export function DishEditor({
     alg: value.allergens.items,
     aiIng: value.aiIng ?? [],
     aiAlg: value.aiAlg ?? [],
+    // The owner draft contract has no dietary field yet, so saved dishes start empty.
+    diet: [],
     upload: photoUrl ?? (value.photoId ? 'private-photo' : null),
     rights: licenseConfirmed,
     aiUsed: value.aiUsed || value.origin === 'extracted',

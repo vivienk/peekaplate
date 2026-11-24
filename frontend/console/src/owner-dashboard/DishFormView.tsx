@@ -98,6 +98,7 @@ export function DishFormView({
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const [ingText, setIngText] = useState('');
   const [algText, setAlgText] = useState('');
+  const [dietText, setDietText] = useState('');
   const [suggestionError, setSuggestionError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const set = (p: Partial<MenuItem>) => setEd({ ...ed, draft: { ...dr, ...p } });
@@ -160,7 +161,7 @@ export function DishFormView({
         {err(id)}
       </p>
     );
-  const addTo = (key: 'ing' | 'alg', text: string, clear: () => void) => {
+  const addTo = (key: 'ing' | 'alg' | 'diet', text: string, clear: () => void) => {
     const t = text.trim();
     if (!t || dr[key].some((x) => x.toLowerCase() === t.toLowerCase())) return;
     set({ [key]: [...dr[key], t] });
@@ -196,6 +197,11 @@ export function DishFormView({
     );
   const addIng = () => addTo('ing', ingText, () => setIngText(''));
   const addAlg = () => addTo('alg', algText, () => setAlgText(''));
+  // Up to two dietary labels (ticket 86bd5pnc2); Add is disabled once two are listed.
+  const dietFull = dr.diet.length >= 2;
+  const addDiet = () => {
+    if (!dietFull) addTo('diet', dietText, () => setDietText(''));
+  };
   return (
     <form className="s09" onSubmit={submit} noValidate aria-busy={busy}>
       <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -578,6 +584,30 @@ export function DishFormView({
             {tags('Allergens', dr.alg, dr.aiAlg, (t) =>
               set({ alg: dr.alg.filter((x) => x !== t), aiAlg: dr.aiAlg.filter((x) => x !== t) }),
             )}
+          </div>
+          <div className="s09-list">
+            <div className="s09-inrow">
+              <TextField
+                id="f-diet"
+                label="Dietary"
+                placeholder="Add a dietary label"
+                hint="Up to two: Vegan, Vegetarian or Gluten-free"
+                value={dietText}
+                onChange={(e) => setDietText(e.target.value)}
+                onKeyDown={onEnter(addDiet)}
+              />
+              <Btn
+                kind="outlined"
+                size="md"
+                type="button"
+                disabled={!dietText.trim() || dietFull}
+                onClick={addDiet}
+                aria-label="Add dietary label"
+              >
+                Add
+              </Btn>
+            </div>
+            {tags('Dietary', dr.diet, [], (t) => set({ diet: dr.diet.filter((x) => x !== t) }))}
           </div>
           <div className="pp-field">
             <label

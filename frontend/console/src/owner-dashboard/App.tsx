@@ -197,7 +197,7 @@ export function App({ ownerAnalysis }: { ownerAnalysis?: OwnerAnalysisConnection
     if (!m) return;
     setEd({
       step: 'form',
-      draft: { ...m, ing: [...m.ing], alg: [...m.alg] },
+      draft: { ...m, ing: [...m.ing], alg: [...m.alg], diet: [...m.diet] },
       origId: id,
       from: from || null,
     });

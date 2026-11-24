@@ -717,6 +717,8 @@ export type MenuItem = {
   /** Allergens the owner listed on Screen 9; hidden from diners until approved. */
   alg: string[];
   aiAlg: string[];
+  /** Dietary labels the owner listed on Screen 9 (up to two of Vegan, Vegetarian, Gluten-free). */
+  diet: string[];
   upload: string | null;
   rights: boolean;
   aiUsed: boolean;
@@ -741,6 +743,7 @@ export const newDraft = (): MenuItem => ({
   aiIng: [],
   alg: [],
   aiAlg: [],
+  diet: [],
   upload: null,
   rights: false,
   aiUsed: false,
@@ -760,6 +763,7 @@ export const initialMenu = (): MenuItem[] =>
     aiIng: [],
     alg: [],
     aiAlg: [],
+    diet: [],
     upload: null,
     rights: false,
     aiUsed: false,

@@ -199,6 +199,12 @@ function DinerCard({ d, showIng }: { d: MenuItem; showIng: boolean }) {
               <b>Allergens:</b> {d.alg.join(', ')}
             </>
           )}
+          {d.diet.length > 0 && (
+            <>
+              <br />
+              <b>Dietary:</b> {d.diet.join(', ')}
+            </>
+          )}
         </p>
       ) : (
         <p className="muted" style={{ fontSize: 13 }}>
@@ -238,6 +244,7 @@ export function Review({
         ch('desc') && 'Description',
         orig.ing.join('|') !== dr.ing.join('|') && 'Ingredients',
         orig.alg.join('|') !== dr.alg.join('|') && 'Allergens',
+        orig.diet.join('|') !== dr.diet.join('|') && 'Dietary',
         (orig.upload || '') !== (dr.upload || '') && 'Photo',
       ].filter(Boolean)
     : ['New dish'];
