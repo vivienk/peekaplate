@@ -1,8 +1,15 @@
 import { ownerReportMidnight } from '@peekaplate/contracts/owner-report';
 import { describe, expect, it } from 'vitest';
-import { ownerReportDayWindow } from './owner-report-batches';
+import { ownerReportDayWindow, ownerReportDishDayStart } from './owner-report-batches';
 
 describe('San Francisco report window', () => {
+  it('accepts only an exact Pacific midnight as a protected-day cutover', () => {
+    const midnight = '2026-03-09T07:00:00.000Z';
+    expect(ownerReportDishDayStart(midnight)?.toISOString()).toBe(midnight);
+    expect(ownerReportDishDayStart(undefined)).toBeUndefined();
+    expect(() => ownerReportDishDayStart('2026-03-09T08:00:00.000Z')).toThrow();
+    expect(() => ownerReportDishDayStart('2026-03-09')).toThrow();
+  });
   it('includes the prior UTC evening and advances the settled end without moving midnight', () => {
     const eventTime = Date.parse('2026-11-24T04:50:00Z');
     for (const now of ['2026-11-24T04:56:00Z', '2026-11-24T05:16:00Z']) {

@@ -482,6 +482,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           extended = true,
           enabled = 'true',
           window?: 'sf-day',
+          cutover: string | null = '2035-02-03T08:00:00.000Z',
         ) =>
           app.request(
             `/api/v1/venues/${id}/analytics/dishes${suffix}?source=production${extended ? '&displayActions=true' : ''}`,
@@ -491,6 +492,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
             {
               ...env,
               OWNER_REPORT_DISPLAY_ACTIONS_ENABLED: enabled,
+              ...(cutover ? { OWNER_PRODUCTION_REPORT_DISH_DAY_START: cutover } : {}),
               ...(window ? { OWNER_PRODUCTION_REPORT_WINDOW: window } : {}),
             },
           );
@@ -527,6 +529,22 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           menu_sessions: { value: 10, status: 'NORMAL' },
           dish_opens: { value: 10, status: 'NORMAL' },
           portion_previews_shown: { value: 10, status: 'NORMAL' },
+        });
+        const withoutCutover = await request(
+          '',
+          token,
+          venue.venueId,
+          true,
+          'true',
+          undefined,
+          null,
+        );
+        expect(withoutCutover.status).toBe(200);
+        const countsOnly = OwnerDishReportSchema.parse(await withoutCutover.json());
+        expect(countsOnly.dishes).toEqual([]);
+        expect(countsOnly.summary?.current).toMatchObject({
+          dish_opens: { value: 10, status: 'NORMAL' },
+          portion_previews_shown: { value: null, status: 'MISSING' },
         });
         const legacy = OwnerDishReportSchema.parse(
           await (await request('', token, venue.venueId, false)).json(),
@@ -666,7 +684,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           start_time: '2035-02-02T08:00:00.000Z',
           end_time: '2035-02-03T07:55:00.000Z',
         });
-        postHogEvents.push(...(await visit(venue, '2035-02-03T07:59:00.000Z')));
+        postHogEvents.push(...(await visit(venue, '2035-02-03T07:59:00.000Z', true, false, true)));
 
         // At Pacific midnight, yesterday's evening still requires matching events after UTC midnight.
         vi.setSystemTime(new Date('2035-02-03T08:01:00.000Z'));
@@ -686,58 +704,78 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         });
         expect(newDay.summary?.current.dish_opens.value).toBeNull();
         expect(newDay.summary?.baseline.dish_opens).toEqual({ value: 43, status: 'NORMAL' });
+        // This day's legacy snapshot disclosed exactly ten previews. Publishing eleven from
+        // the same day would reveal the previously suppressed last preview by subtraction.
         expect(newDay.summary?.baseline.portion_previews_shown).toEqual({
-          value: 10,
-          status: 'NORMAL',
+          value: null,
+          status: 'MISSING',
         });
+        expect(newDay.dishes).toEqual([]);
         expect(newDay.report_metadata.date_window).toMatchObject(
           newDay.summary?.periods.baseline ?? {},
         );
-        expect(newDay.dishes[0]?.display_actions?.portion_previews_shown).toEqual({
-          value: 10,
-          status: 'NORMAL',
-        });
         expect(JSON.parse(String(postHog.mock.lastCall?.[1]?.body)).query.values).toMatchObject({
           window_start: '2035-02-03 00:00:00.000',
           window_end: '2035-02-03 08:00:00.000',
         });
-        // A lone preview today must not change the released dish cohort. A late arrival for
-        // yesterday must not change the sealed comparison period either.
-        postHogEvents.push(
-          ...(await visit(venue, '2035-02-03T07:59:10.000Z', true, false, true)),
-          ...(await visit(venue, '2035-02-03T08:02:00.000Z', true, false, true)),
-        );
+        for (let index = 0; index < 10; index++) {
+          postHogEvents.push(
+            ...(await visit(venue, '2035-02-03T08:02:00.000Z', true, false, true)),
+          );
+        }
+        // The rollback route can return venue counts but must never expose protected
+        // five-minute metrics for the same day as a future completed-day report.
         vi.setSystemTime(new Date('2035-02-03T08:06:00.000Z'));
-        const nextDayResponse = await request(
-          '',
-          await issueToken(venue.actorId),
-          venue.venueId,
-          true,
-          'true',
-          'sf-day',
+        const rollback = await request('', await issueToken(venue.actorId));
+        expect(rollback.status).toBe(200);
+        const rollbackReport = OwnerDishReportSchema.parse(await rollback.json());
+        expect(rollbackReport.dishes).toEqual([]);
+        expect(rollbackReport.summary?.current.portion_previews_shown.value).toBeNull();
+        expect(rollbackReport.summary?.current.dish_opens.value).toBe(10);
+        vi.setSystemTime(new Date('2035-02-03T08:11:00.000Z'));
+        const adjacent = await request('', await issueToken(venue.actorId));
+        expect(OwnerDishReportSchema.parse(await adjacent.json()).summary?.baseline).toMatchObject({
+          dish_opens: { value: 10, status: 'NORMAL' },
+          portion_previews_shown: { value: null, status: 'MISSING' },
+        });
+
+        const dailyWithFreshToken = async (suffix = '') =>
+          request(suffix, await issueToken(venue.actorId), venue.venueId, true, 'true', 'sf-day');
+        vi.setSystemTime(new Date('2035-02-04T08:01:00.000Z'));
+        const closedDayResponse = await dailyWithFreshToken();
+        expect(closedDayResponse.status).toBe(200);
+        const closedDay = OwnerDishReportSchema.parse(await closedDayResponse.json());
+        expect(closedDay.dishes[0]?.display_actions?.portion_previews_shown).toEqual({
+          value: 10,
+          status: 'NORMAL',
+        });
+        expect(closedDay.summary?.baseline.portion_previews_shown).toEqual({
+          value: 10,
+          status: 'NORMAL',
+        });
+
+        // A lone preview today and a late arrival yesterday must not change sealed dish data.
+        postHogEvents.push(
+          ...(await visit(venue, '2035-02-04T07:59:10.000Z', true, false, true)),
+          ...(await visit(venue, '2035-02-04T08:02:00.000Z', true, false, true)),
         );
+        vi.setSystemTime(new Date('2035-02-04T08:06:00.000Z'));
+        const nextDayResponse = await dailyWithFreshToken();
         expect(nextDayResponse.status).toBe(200);
         const nextDay = OwnerDishReportSchema.parse(await nextDayResponse.json());
         expect(nextDay.summary?.current.dish_opens).toEqual({ value: 1, status: 'NORMAL' });
         expect(nextDay.summary?.current.portion_previews_shown.value).toBeNull();
-        expect(nextDay.summary?.baseline).toEqual(newDay.summary?.baseline);
-        expect(nextDay.dishes).toEqual(newDay.dishes);
-        const csvDay = await request(
-          '/export',
-          await issueToken(venue.actorId),
-          venue.venueId,
-          true,
-          'true',
-          'sf-day',
-        );
+        expect(nextDay.summary?.baseline).toEqual(closedDay.summary?.baseline);
+        expect(nextDay.dishes).toEqual(closedDay.dishes);
+        const csvDay = await dailyWithFreshToken('/export');
         expect(csvDay.status).toBe(200);
         const [header, firstDish] = (await csvDay.text()).trim().split('\n');
         const dayCells = Object.fromEntries(
           header!.split(',').map((column, index) => [column, firstDish!.split(',')[index]]),
         );
         expect(dayCells).toMatchObject({
-          window_start: '2035-02-02T08:00:00.000Z',
-          window_end: '2035-02-03T08:00:00.000Z',
+          window_start: '2035-02-03T08:00:00.000Z',
+          window_end: '2035-02-04T08:00:00.000Z',
         });
         expect(otherRefreshed.dishes).toEqual([]);
         expect(otherRefreshed.summary?.baseline.dish_opens).toEqual({

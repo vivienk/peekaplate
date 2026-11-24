@@ -25,22 +25,69 @@ export function ownerReportDayWindow(now: Date) {
   };
 }
 
+export function ownerReportDishDayStart(value: string | undefined): Date | undefined {
+  if (value === undefined) return undefined;
+  const midnight = new Date(value);
+  if (
+    !Number.isFinite(midnight.getTime()) ||
+    value !== midnight.toISOString() ||
+    midnight.getTime() !== ownerReportMidnight(midnight).getTime()
+  ) {
+    throw new AuthUnavailableError();
+  }
+  return midnight;
+}
+
+function restaurantCountsOnly(report: OwnerDishReport): OwnerDishReport {
+  const missing = { value: null, status: 'MISSING' } as const;
+  const restaurantCounts = (metrics: NonNullable<OwnerDishReport['summary']>['current']) => ({
+    ...metrics,
+    avg_interaction_time_seconds: missing,
+    portion_previews_shown: missing,
+    verified_orders: missing,
+  });
+  const summary = report.summary;
+  return {
+    ...report,
+    dishes: [],
+    report_metadata: {
+      ...report.report_metadata,
+      coverage: { total_dishes_monitored: 0, measurable_dishes_count: 0 },
+      report_status: 'EMPTY',
+    },
+    ...(summary
+      ? {
+          summary: {
+            ...summary,
+            current: restaurantCounts(summary.current),
+            baseline: restaurantCounts(summary.baseline),
+          },
+        }
+      : {}),
+  };
+}
+
 export async function readBatchedOwnerReport(
   venueId: string,
   now: Date,
   storage: PreparedStorage,
   measure: (end: Date) => Promise<OwnerDishReport>,
+  dishDayStart?: Date,
 ): Promise<OwnerDishReport> {
   const lastEnd = latestOwnerReportBatchEnd(now);
-  const batch = (end: number) =>
-    readOrSeal(
+  const batch = async (end: number) => {
+    const expose = (report: OwnerDishReport) =>
+      !dishDayStart || end > dishDayStart.getTime() ? restaurantCountsOnly(report) : report;
+    const report = await readOrSeal(
       venueId,
       storage,
       OWNER_PRODUCTION_BATCH_VERSION,
       new Date(end - OWNER_BATCH_MS),
       new Date(end),
-      measure,
+      async (cutoff) => expose(await measure(cutoff)),
     );
+    return expose(report);
+  };
   const current = await batch(lastEnd);
   const previous = await batch(lastEnd - OWNER_BATCH_MS);
   if (!current.summary || !previous.summary) throw new AuthUnavailableError();
@@ -66,11 +113,16 @@ export function readDailyOwnerReport(
     window: ReturnType<typeof ownerReportDayWindow>,
     midnightReport?: OwnerDishReport,
   ) => Promise<OwnerDishReport>,
+  dishDayStart?: Date,
 ) {
   const window = ownerReportDayWindow(now);
+  const allowDishes = dishDayStart && window.baselineStart >= dishDayStart;
+  const expose = (report: OwnerDishReport) => (allowDishes ? report : restaurantCountsOnly(report));
   const seal = (end: Date, read: () => Promise<OwnerDishReport>) =>
-    readOrSeal(venueId, storage, OWNER_PRODUCTION_DAY_VERSION, window.start, end, read);
-  const measureMidnight = () => measure({ ...window, end: window.start });
+    readOrSeal(venueId, storage, OWNER_PRODUCTION_DAY_VERSION, window.start, end, read).then(
+      expose,
+    );
+  const measureMidnight = async () => expose(await measure({ ...window, end: window.start }));
   if (window.start.getTime() === window.end.getTime()) return seal(window.end, measureMidnight);
   return seal(window.end, async () => measure(window, await seal(window.start, measureMidnight)));
 }

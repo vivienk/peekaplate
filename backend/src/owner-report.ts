@@ -42,6 +42,7 @@ type ReportOptions = {
   readTodayEvents?: (venueId: string, start: Date, end: Date) => Promise<LivePostHogOwnerEvent[]>;
   productionPublications?: { storage: PreparedStorage; origin: string };
   productionDay?: boolean;
+  productionDishDayStart?: Date | undefined;
 };
 
 export async function readOwnerReport(
@@ -88,12 +89,14 @@ export async function readOwnerReport(
                 midnightReport
                   ? advanceDailyReport(client, venueId, start, end, options, midnightReport)
                   : measureReport(client, venueId, end, source, options, 0, baselineStart),
+              options.productionDishDayStart,
             )
           : await readBatchedOwnerReport(
               venueId,
               now,
               options.productionPublications.storage,
               (end) => measureReport(client, venueId, end, source, options, OWNER_BATCH_MS),
+              options.productionDishDayStart,
             )
         : await measureReport(client, venueId, now, source, options);
     await client.query('COMMIT');

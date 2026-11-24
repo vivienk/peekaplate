@@ -748,7 +748,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "981e058512ac29a1cdaa226ebc2076f9385abadb6c6a027dfd6a1d9c6facce33"
+      "sourceFingerprint": "53d3e252e5014a8aa4c0acfa55d5029fa223c03bf4578f6820fbce309d09166a"
     },
     {
       "id": "database",
@@ -911,7 +911,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "6c9d5eef2b3b36370e313d07d5f50243137371f1d7c350415c699b79343b08ae"
+      "sourceFingerprint": "8e83aef0b5429e68101152443ecf16bc080145d8f7c8f2a416c4704417cf3278"
     },
     {
       "id": "agents",
@@ -1290,7 +1290,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts"
       ],
       "summary": "Prepare production Overview totals from San Francisco midnight through the settled cutoff. Seal protected dish metrics once for the previous local day and use that same period in Dish Performance, CSV and AI. Capture and export timing remain independent.",
-      "next": "Release the compatible console before enabling sf-day on the production Worker. Verify the approved release on existing QA events without generating diner activity."
+      "next": "Release the compatible console before enabling sf-day. Pin the approved Pacific midnight cutover for closed-day dish metrics and retain it on rollback. Verify with existing QA events."
     }
   ]
 }
