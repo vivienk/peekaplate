@@ -144,6 +144,31 @@ function summarySchema(allowSmallCounts: boolean) {
 export const OwnerReportSummarySchema = summarySchema(false);
 export const ProductionBatchSummarySchema = summarySchema(true);
 export const OWNER_PRODUCTION_BATCH_VERSION = 'production.batch.v1';
+export const OWNER_PRODUCTION_DAY_VERSION = 'production.sf-day.v1';
+export const OWNER_REPORT_TIME_ZONE = 'America/Los_Angeles';
+
+const dayFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: OWNER_REPORT_TIME_ZONE,
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  hourCycle: 'h23',
+});
+
+export function ownerReportMidnight(time: Date, dayOffset = 0): Date {
+  const parts = Object.fromEntries(
+    dayFormat.formatToParts(time).map((part) => [part.type, part.value]),
+  );
+  // 08:00 UTC is midnight or 01:00 Pacific, before either DST transition.
+  const candidate = new Date(
+    Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + dayOffset, 8),
+  );
+  const localHour = Number(
+    dayFormat.formatToParts(candidate).find((part) => part.type === 'hour')?.value,
+  );
+  return new Date(candidate.getTime() - localHour * 3_600_000);
+}
 export type OwnerReportSummary = z.infer<typeof OwnerReportSummarySchema>;
 
 // The rates and the average: the metrics whose own cohort is checked against the floor.
@@ -307,9 +332,13 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
     })
     .superRefine((report, ctx) => {
       const metadata = report.report_metadata;
-      const batch =
+      const day =
         report.source === 'production' &&
-        metadata.calculation_version === OWNER_PRODUCTION_BATCH_VERSION;
+        metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION;
+      const batch =
+        day ||
+        (report.source === 'production' &&
+          metadata.calculation_version === OWNER_PRODUCTION_BATCH_VERSION);
       if (
         report.dishes.some(
           ({ display_actions, evidence_state }) =>
@@ -335,7 +364,15 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
         });
       }
       const summary = report.summary;
-      if (!summary) return;
+      if (!summary) {
+        if (day)
+          ctx.addIssue({
+            code: 'custom',
+            path: ['summary'],
+            message: 'San Francisco day reports require a summary',
+          });
+        return;
+      }
       if (!batch && !OwnerReportSummarySchema.safeParse(summary).success)
         ctx.addIssue({
           code: 'custom',
@@ -346,18 +383,27 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
       const current = summary.periods.current;
       const baseline = summary.periods.baseline;
       const window = report.report_metadata.date_window;
+      const start = at(current.start_time);
+      const end = at(current.end_time);
+      const validInterval = day
+        ? Number.isFinite(start) &&
+          Number.isFinite(end) &&
+          start === ownerReportMidnight(new Date(start)).getTime() &&
+          end >= start &&
+          end <= ownerReportMidnight(new Date(start), 1).getTime() &&
+          at(baseline.start_time) === ownerReportMidnight(new Date(start), -1).getTime() &&
+          !summary.daily_opens
+        : end > start && end - start === at(baseline.end_time) - at(baseline.start_time);
       if (
-        at(current.start_time) !== at(window.start_time) ||
-        at(current.end_time) !== at(window.end_time) ||
-        at(baseline.end_time) !== at(current.start_time) ||
-        at(current.end_time) <= at(current.start_time) ||
-        at(baseline.end_time) - at(baseline.start_time) !==
-          at(current.end_time) - at(current.start_time)
+        start !== at(window.start_time) ||
+        end !== at(window.end_time) ||
+        at(baseline.end_time) !== start ||
+        !validInterval
       )
         ctx.addIssue({
           code: 'custom',
           path: ['summary', 'periods'],
-          message: 'Summary periods must match the report and its adjacent equal-duration baseline',
+          message: 'Summary periods must match the report and its required adjacent baseline',
         });
       if (
         ['STALE', 'ERROR'].includes(report.report_metadata.report_status) &&

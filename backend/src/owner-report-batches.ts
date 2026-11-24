@@ -1,4 +1,10 @@
-import { type OwnerDishReport, OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
+import {
+  OWNER_PRODUCTION_BATCH_VERSION,
+  OWNER_PRODUCTION_DAY_VERSION,
+  type OwnerDishReport,
+  OwnerDishReportSchema,
+  ownerReportMidnight,
+} from '@peekaplate/contracts/owner-report';
 import { AuthUnavailableError } from './auth';
 import type { PreparedStorage } from './owner-prepare';
 
@@ -10,6 +16,15 @@ export function latestOwnerReportBatchEnd(now: Date): number {
   return Math.floor((now.getTime() - OWNER_BATCH_SETTLE_MS) / OWNER_BATCH_MS) * OWNER_BATCH_MS;
 }
 
+export function ownerReportDayWindow(now: Date) {
+  const start = ownerReportMidnight(now);
+  return {
+    start,
+    end: new Date(Math.max(start.getTime(), latestOwnerReportBatchEnd(now))),
+    baselineStart: ownerReportMidnight(now, -1),
+  };
+}
+
 export async function readBatchedOwnerReport(
   venueId: string,
   now: Date,
@@ -17,8 +32,17 @@ export async function readBatchedOwnerReport(
   measure: (end: Date) => Promise<OwnerDishReport>,
 ): Promise<OwnerDishReport> {
   const lastEnd = latestOwnerReportBatchEnd(now);
-  const current = await readOrSeal(lastEnd);
-  const previous = await readOrSeal(lastEnd - OWNER_BATCH_MS);
+  const batch = (end: number) =>
+    readOrSeal(
+      venueId,
+      storage,
+      OWNER_PRODUCTION_BATCH_VERSION,
+      new Date(end - OWNER_BATCH_MS),
+      new Date(end),
+      measure,
+    );
+  const current = await batch(lastEnd);
+  const previous = await batch(lastEnd - OWNER_BATCH_MS);
   if (!current.summary || !previous.summary) throw new AuthUnavailableError();
   const dailyOpens = current.summary.daily_opens?.current;
   const previousOpens = previous.summary.daily_opens?.current;
@@ -32,52 +56,75 @@ export async function readBatchedOwnerReport(
         : {}),
     },
   });
+}
 
-  async function readOrSeal(end: number): Promise<OwnerDishReport> {
-    const endsAt = new Date(end).toISOString();
-    const startsAt = new Date(end - OWNER_BATCH_MS).toISOString();
-    const key = `owner-report-batches/v1/${venueId}/${endsAt}.json`;
-    const validate = (candidate: unknown) => {
-      const report = OwnerDishReportSchema.safeParse(candidate);
-      if (
-        !report.success ||
-        report.data.source !== 'production' ||
-        report.data.venue_id !== venueId ||
-        report.data.report_metadata.calculation_version !== 'production.batch.v1' ||
-        report.data.report_metadata.date_window.start_time !== startsAt ||
-        report.data.report_metadata.date_window.end_time !== endsAt ||
-        report.data.summary?.periods.current.start_time !== startsAt ||
-        report.data.summary.periods.current.end_time !== endsAt
-      )
-        throw new AuthUnavailableError();
-      return report.data;
-    };
-    const read = async () => {
-      const object = await storage.get(key);
-      if (!object) return null;
-      const bytes = await object.arrayBuffer();
-      if (bytes.byteLength > MAX_REPORT_BYTES) throw new AuthUnavailableError();
-      try {
-        return validate(
-          JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)),
-        );
-      } catch {
-        throw new AuthUnavailableError();
-      }
-    };
-    const existing = await read();
-    if (existing) return existing;
+export function readDailyOwnerReport(
+  venueId: string,
+  now: Date,
+  storage: PreparedStorage,
+  measure: (window: ReturnType<typeof ownerReportDayWindow>) => Promise<OwnerDishReport>,
+) {
+  const window = ownerReportDayWindow(now);
+  return readOrSeal(venueId, storage, OWNER_PRODUCTION_DAY_VERSION, window.start, window.end, () =>
+    measure(window),
+  );
+}
 
-    const measured = validate(await measure(new Date(end)));
-    const bytes = new TextEncoder().encode(JSON.stringify(measured));
-    if (bytes.length > MAX_REPORT_BYTES) throw new AuthUnavailableError();
-    const created = await storage.put(key, Uint8Array.from(bytes).buffer, {
-      onlyIf: { etagDoesNotMatch: '*' },
-      httpMetadata: { contentType: 'application/json' },
-    });
-    if (created) return measured;
-    const winner = await read();
-    if (!winner) throw new AuthUnavailableError();
-    return winner;
-  }
+async function readOrSeal(
+  venueId: string,
+  storage: PreparedStorage,
+  version: string,
+  start: Date,
+  end: Date,
+  measure: (end: Date) => Promise<OwnerDishReport>,
+): Promise<OwnerDishReport> {
+  const endsAt = end.toISOString();
+  const startsAt = start.toISOString();
+  const prefix =
+    version === OWNER_PRODUCTION_DAY_VERSION
+      ? 'owner-report-batches/sf-day-v1'
+      : 'owner-report-batches/v1';
+  const key = `${prefix}/${venueId}/${endsAt}.json`;
+  const validate = (candidate: unknown) => {
+    const report = OwnerDishReportSchema.safeParse(candidate);
+    if (
+      !report.success ||
+      report.data.source !== 'production' ||
+      report.data.venue_id !== venueId ||
+      report.data.report_metadata.calculation_version !== version ||
+      report.data.report_metadata.date_window.start_time !== startsAt ||
+      report.data.report_metadata.date_window.end_time !== endsAt ||
+      report.data.summary?.periods.current.start_time !== startsAt ||
+      report.data.summary.periods.current.end_time !== endsAt
+    )
+      throw new AuthUnavailableError();
+    return report.data;
+  };
+  const read = async () => {
+    const object = await storage.get(key);
+    if (!object) return null;
+    const bytes = await object.arrayBuffer();
+    if (bytes.byteLength > MAX_REPORT_BYTES) throw new AuthUnavailableError();
+    try {
+      return validate(
+        JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)),
+      );
+    } catch {
+      throw new AuthUnavailableError();
+    }
+  };
+  const existing = await read();
+  if (existing) return existing;
+
+  const measured = validate(await measure(end));
+  const bytes = new TextEncoder().encode(JSON.stringify(measured));
+  if (bytes.length > MAX_REPORT_BYTES) throw new AuthUnavailableError();
+  const created = await storage.put(key, Uint8Array.from(bytes).buffer, {
+    onlyIf: { etagDoesNotMatch: '*' },
+    httpMetadata: { contentType: 'application/json' },
+  });
+  if (created) return measured;
+  const winner = await read();
+  if (!winner) throw new AuthUnavailableError();
+  return winner;
 }

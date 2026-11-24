@@ -16,7 +16,7 @@ Supported 2.5D preview counts use only rendered, non-sample previews for the exa
 
 ## Consequences
 
-A five-minute total can reveal that a visit happened. An owner who knows who was present may infer which visit contributed. Keep intervals fixed and adjacent. Do not combine the exception with arbitrary date filters, narrower drill-downs, a mutable live counter, or AI input. Record data/product approval before setting the production reporting flag.
+A small total can reveal that a visit happened. An owner who knows who was present may infer which visit contributed. When the San Francisco day report is enabled, its start stays anchored to local midnight and its end advances only at settled cutoffs. The earlier same-day totals remain visible during quiet intervals. Comparing saved snapshots can reveal changes between cutoffs. Do not combine the exception with arbitrary date filters, narrower drill-downs, a mutable intrabatch counter, or AI input. Record data/product approval before setting the production reporting flag.
 
 ## Verification
 

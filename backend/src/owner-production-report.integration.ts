@@ -481,13 +481,18 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           id = venue.venueId,
           extended = true,
           enabled = 'true',
+          window?: 'sf-day',
         ) =>
           app.request(
             `/api/v1/venues/${id}/analytics/dishes${suffix}?source=production${extended ? '&displayActions=true' : ''}`,
             {
               headers: { Authorization: `Bearer ${bearer}`, Origin: 'https://peekaplate.app' },
             },
-            { ...env, OWNER_REPORT_DISPLAY_ACTIONS_ENABLED: enabled },
+            {
+              ...env,
+              OWNER_REPORT_DISPLAY_ACTIONS_ENABLED: enabled,
+              ...(window ? { OWNER_PRODUCTION_REPORT_WINDOW: window } : {}),
+            },
           );
 
         for (const suffix of ['', '/export']) {
@@ -609,6 +614,62 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         expect(otherRefreshed.summary?.daily_opens?.current[0]?.opens).toEqual({
           value: 1,
           status: 'NORMAL',
+        });
+
+        const daily = () => request('', token, venue.venueId, true, 'true', 'sf-day');
+        const beforeDaily = await daily();
+        expect(beforeDaily.status).toBe(200);
+        const day = OwnerDishReportSchema.parse(await beforeDaily.json());
+        expect(day.report_metadata.calculation_version).toBe('production.sf-day.v1');
+        expect(day.summary?.periods).toEqual({
+          current: { start_time: '2035-02-02T08:00:00.000Z', end_time: '2035-02-03T00:10:00.000Z' },
+          baseline: {
+            start_time: '2035-02-01T08:00:00.000Z',
+            end_time: '2035-02-02T08:00:00.000Z',
+          },
+        });
+        expect(day.summary?.current.dish_opens).toEqual({ value: 42, status: 'NORMAL' });
+        expect(day.summary?.current.portion_previews_shown).toEqual({
+          value: 10,
+          status: 'NORMAL',
+        });
+        expect(await (await daily()).json()).toEqual(day);
+        const callsBeforeDenial = postHog.mock.calls.length;
+        expect((await request('', otherToken, venue.venueId, true, 'true', 'sf-day')).status).toBe(
+          403,
+        );
+        expect(postHog).toHaveBeenCalledTimes(callsBeforeDenial);
+
+        // No new diner events in the next five minutes. Earlier activity stays in today's report.
+        vi.setSystemTime(new Date('2035-02-03T00:16:00.000Z'));
+        const quiet = await daily();
+        expect(quiet.status).toBe(200);
+        const quietDay = OwnerDishReportSchema.parse(await quiet.json());
+        expect(quietDay.summary?.current).toEqual(day.summary?.current);
+        expect(quietDay.dishes).toEqual(day.dishes);
+        expect(quietDay.summary?.periods.current.end_time).toBe('2035-02-03T00:15:00.000Z');
+
+        // At Pacific midnight, yesterday's evening still requires matching events after UTC midnight.
+        vi.setSystemTime(new Date('2035-02-03T08:01:00.000Z'));
+        const midnight = await request(
+          '',
+          await issueToken(venue.actorId),
+          venue.venueId,
+          true,
+          'true',
+          'sf-day',
+        );
+        expect(midnight.status).toBe(200);
+        const newDay = OwnerDishReportSchema.parse(await midnight.json());
+        expect(newDay.summary?.periods.current).toEqual({
+          start_time: '2035-02-03T08:00:00.000Z',
+          end_time: '2035-02-03T08:00:00.000Z',
+        });
+        expect(newDay.summary?.current.dish_opens.value).toBeNull();
+        expect(newDay.summary?.baseline.dish_opens).toEqual({ value: 42, status: 'NORMAL' });
+        expect(JSON.parse(String(postHog.mock.lastCall?.[1]?.body)).query.values).toMatchObject({
+          window_start: '2035-02-03 00:00:00.000',
+          window_end: '2035-02-03 08:00:00.000',
         });
         expect(otherRefreshed.dishes).toEqual([]);
         expect(otherRefreshed.summary?.baseline.dish_opens).toEqual({

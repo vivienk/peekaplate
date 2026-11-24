@@ -2,10 +2,15 @@ import { createHash } from 'node:crypto';
 import { canonicalJson } from '@peekaplate/contracts';
 import {
   OWNER_PRODUCTION_BATCH_VERSION,
+  OWNER_PRODUCTION_DAY_VERSION,
   type OwnerDishReport,
 } from '@peekaplate/contracts/owner-report';
 import { jwtVerify, SignJWT } from 'jose';
-import { latestOwnerReportBatchEnd, OWNER_BATCH_MS } from '../owner-report-batches';
+import {
+  latestOwnerReportBatchEnd,
+  OWNER_BATCH_MS,
+  ownerReportDayWindow,
+} from '../owner-report-batches';
 
 export const OWNER_REPORT_REFERENCE_HEADER = 'X-Owner-Report-Ref';
 const referenceLifetime = 60;
@@ -43,12 +48,18 @@ export async function mintOwnerReportReference(
   const productionBatch =
     report.source === 'production' &&
     metadata.calculation_version === OWNER_PRODUCTION_BATCH_VERSION;
-  const expectedEnd = productionBatch ? latestOwnerReportBatchEnd(now) : anchor;
+  const day =
+    report.source === 'production' && metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION
+      ? ownerReportDayWindow(now)
+      : undefined;
+  const expectedEnd =
+    day?.end.getTime() ?? (productionBatch ? latestOwnerReportBatchEnd(now) : anchor);
+  const expectedStart =
+    day?.start.getTime() ?? (productionBatch ? expectedEnd - OWNER_BATCH_MS : undefined);
   if (
     report.venue_id !== scope.venueId ||
     Date.parse(metadata.date_window.end_time) !== expectedEnd ||
-    (productionBatch &&
-      Date.parse(metadata.date_window.start_time) !== expectedEnd - OWNER_BATCH_MS)
+    (expectedStart !== undefined && Date.parse(metadata.date_window.start_time) !== expectedStart)
   ) {
     throw new Error('Invalid owner report reference scope');
   }

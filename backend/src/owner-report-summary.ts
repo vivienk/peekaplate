@@ -159,15 +159,30 @@ export async function readOwnerReportSummary(
   liveEvidence?: OwnerReportLiveEvidence,
   durationMs = 86_400_000,
   productionBatch = false,
+  dayBaselineStart?: Date,
 ): Promise<OwnerReportSummary> {
   const start = new Date(now.getTime() - durationMs);
   const result = await client.query(
-    liveEvidence
-      ? productionQuery
-      : trafficClass === 'test'
-        ? query.replace('app_private.owner_observation_v1', 'app_private.owner_test_observation_v1')
-        : query,
-    [venueId, start, now, ...(liveEvidence ? liveEvidenceParameters(liveEvidence) : [])],
+    dayBaselineStart
+      ? productionQuery.replace(
+          '$2::timestamptz - ($3::timestamptz-$2::timestamptz)',
+          '$7::timestamptz',
+        )
+      : liveEvidence
+        ? productionQuery
+        : trafficClass === 'test'
+          ? query.replace(
+              'app_private.owner_observation_v1',
+              'app_private.owner_test_observation_v1',
+            )
+          : query,
+    [
+      venueId,
+      start,
+      now,
+      ...(liveEvidence ? liveEvidenceParameters(liveEvidence) : []),
+      ...(dayBaselineStart ? [dayBaselineStart] : []),
+    ],
   );
   const currentRow = result.rows.find((row) => row.period === 'current');
   const baselineRow = result.rows.find((row) => row.period === 'baseline');
@@ -184,14 +199,14 @@ export async function readOwnerReportSummary(
             ? { value: null, status: 'NOT_MEASURABLE' as const }
             : { value: bucket.opens, status: 'NORMAL' as const },
     }));
-  const currentDaily = daily(currentRow, current);
-  const baselineDaily = daily(baselineRow, baseline);
+  const currentDaily = dayBaselineStart ? undefined : daily(currentRow, current);
+  const baselineDaily = dayBaselineStart ? undefined : daily(baselineRow, baseline);
   const schema = productionBatch ? ProductionBatchSummarySchema : OwnerReportSummarySchema;
   return schema.parse({
     periods: {
       current: { start_time: start.toISOString(), end_time: now.toISOString() },
       baseline: {
-        start_time: new Date(start.getTime() - durationMs).toISOString(),
+        start_time: (dayBaselineStart ?? new Date(start.getTime() - durationMs)).toISOString(),
         end_time: start.toISOString(),
       },
     },

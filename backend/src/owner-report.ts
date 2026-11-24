@@ -1,5 +1,9 @@
 // Owner dish report (S3-RES-03 / S3-DATA-02).
 import { toOwnerReport } from '@peekaplate/contracts';
+import {
+  OWNER_PRODUCTION_BATCH_VERSION,
+  OWNER_PRODUCTION_DAY_VERSION,
+} from '@peekaplate/contracts/owner-report';
 import type { Client } from 'pg';
 import { AuthUnavailableError } from './auth';
 import { CommandError } from './dish-command';
@@ -9,6 +13,7 @@ import {
   OWNER_BATCH_MS,
   OWNER_BATCH_SETTLE_MS,
   readBatchedOwnerReport,
+  readDailyOwnerReport,
 } from './owner-report-batches';
 import { readOwnerReportDisplayActions } from './owner-report-display-actions';
 import {
@@ -34,6 +39,7 @@ type ReportOptions = {
   validationNow?: Date;
   readTodayEvents?: (venueId: string, start: Date, end: Date) => Promise<LivePostHogOwnerEvent[]>;
   productionPublications?: { storage: PreparedStorage; origin: string };
+  productionDay?: boolean;
 };
 
 export async function readOwnerReport(
@@ -71,12 +77,28 @@ export async function readOwnerReport(
 
     const report =
       source === 'production' && options.readTodayEvents && options.productionPublications
-        ? await readBatchedOwnerReport(
-            venueId,
-            now,
-            options.productionPublications.storage,
-            (end) => measureReport(client, venueId, end, source, options, OWNER_BATCH_MS),
-          )
+        ? options.productionDay
+          ? await readDailyOwnerReport(
+              venueId,
+              now,
+              options.productionPublications.storage,
+              ({ start, end, baselineStart }) =>
+                measureReport(
+                  client,
+                  venueId,
+                  end,
+                  source,
+                  options,
+                  end.getTime() - start.getTime(),
+                  baselineStart,
+                ),
+            )
+          : await readBatchedOwnerReport(
+              venueId,
+              now,
+              options.productionPublications.storage,
+              (end) => measureReport(client, venueId, end, source, options, OWNER_BATCH_MS),
+            )
         : await measureReport(client, venueId, now, source, options);
     await client.query('COMMIT');
     started = false;
@@ -100,8 +122,9 @@ async function measureReport(
   source: OwnerReportSource,
   options: ReportOptions,
   durationMs = 86_400_000,
+  dayBaselineStart?: Date,
 ) {
-  const isBatch = durationMs === OWNER_BATCH_MS;
+  const isBatch = Boolean(dayBaselineStart) || durationMs === OWNER_BATCH_MS;
   // Earliest release time makes source selection stable across UTC midnight.
   const today = new Date(now.getTime() + (isBatch ? OWNER_BATCH_SETTLE_MS : 0));
   today.setUTCHours(0, 0, 0, 0);
@@ -109,7 +132,9 @@ async function measureReport(
   if (source === 'production' && options.readTodayEvents) {
     if (!options.productionPublications) throw new AuthUnavailableError();
     const { storage, origin } = options.productionPublications;
-    const starts = new Date(Math.max(today.getTime(), now.getTime() - durationMs));
+    const starts = new Date(
+      Math.max(today.getTime(), dayBaselineStart?.getTime() ?? now.getTime() - durationMs),
+    );
     const evidence = {
       start: today,
       events: now > starts ? await options.readTodayEvents(venueId, starts, now) : [],
@@ -123,7 +148,7 @@ async function measureReport(
         venueId,
         now,
         evidence,
-        durationMs,
+        dayBaselineStart ?? new Date(now.getTime() - 2 * durationMs),
       ),
     };
   }
@@ -148,6 +173,7 @@ async function measureReport(
         liveEvidence,
         durationMs,
         isBatch,
+        dayBaselineStart,
       )
     : undefined;
   const complete =
@@ -159,7 +185,14 @@ async function measureReport(
       anchor: now,
       validationNow: options.validationNow ?? new Date(),
     }));
-  const internal = buildInternalReport(result.rows, venueId, now, source, durationMs);
+  const internal = buildInternalReport(
+    result.rows,
+    venueId,
+    now,
+    source,
+    durationMs,
+    Boolean(dayBaselineStart),
+  );
   const displayActions =
     isBatch && options.includeDisplayActions && liveEvidence
       ? await readOwnerReportDisplayActions(
@@ -492,9 +525,10 @@ function buildInternalReport(
   now: Date,
   source: OwnerReportSource = 'production',
   durationMs = 86_400_000,
+  productionDay = false,
 ) {
   const start = new Date(now.getTime() - durationMs);
-  const isBatch = durationMs === OWNER_BATCH_MS;
+  const isBatch = productionDay || durationMs === OWNER_BATCH_MS;
   const visibleRows = isBatch ? rows.filter((row) => Number(row.total_sessions) >= 10) : rows;
   const lastEventIngestedAt = rows.reduce<string | null>((latest, row) => {
     const timestamp = timestampOrNull(row.last_event_ingested_at);
@@ -506,7 +540,11 @@ function buildInternalReport(
     venue_id: venueId,
     source,
     report_metadata: {
-      calculation_version: isBatch ? 'production.batch.v1' : `${source}.v1`,
+      calculation_version: productionDay
+        ? OWNER_PRODUCTION_DAY_VERSION
+        : isBatch
+          ? OWNER_PRODUCTION_BATCH_VERSION
+          : `${source}.v1`,
       generated_at: now.toISOString(),
       date_window: {
         duration_hours: Math.floor(durationMs / 3_600_000),

@@ -1,12 +1,76 @@
-import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
+import {
+  OWNER_PRODUCTION_DAY_VERSION,
+  OwnerDishReportSchema,
+} from '@peekaplate/contracts/owner-report';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { Overview } from './pages';
 import { ReportView } from './report-data';
 import { UNEEZA_REPORT } from './uneeza-report';
 
 const REPORT = OwnerDishReportSchema.parse(UNEEZA_REPORT);
 
 describe('authored performance presentation with report API data', () => {
+  it('shows today so far and yesterday as San Francisco calendar periods', () => {
+    const current = {
+      start_time: '2026-11-23T08:00:00.000Z',
+      end_time: '2026-11-24T05:15:00.000Z',
+    };
+    const baseline = { start_time: '2026-11-22T08:00:00.000Z', end_time: current.start_time };
+    const missing = { value: null, status: 'MISSING' } as const;
+    const yesterday = {
+      menu_sessions: missing,
+      dish_opens: missing,
+      avg_interaction_time_seconds: missing,
+      portion_previews_shown: missing,
+      verified_orders: missing,
+    };
+    const report = OwnerDishReportSchema.parse({
+      ...REPORT,
+      source: 'production',
+      report_metadata: {
+        ...REPORT.report_metadata,
+        calculation_version: OWNER_PRODUCTION_DAY_VERSION,
+        date_window: { ...current, duration_hours: 21 },
+      },
+      summary: {
+        periods: { current, baseline },
+        current: {
+          ...yesterday,
+          menu_sessions: { value: 21, status: 'NORMAL' },
+          dish_opens: { value: 100, status: 'NORMAL' },
+        },
+        baseline: yesterday,
+      },
+    });
+    const page = renderToStaticMarkup(
+      <Overview
+        go={() => {}}
+        sim={{ scn: 'empty' }}
+        acts={{}}
+        openDish={() => {}}
+        openInsight={() => {}}
+        live={{
+          restaurantName: 'Production QA fixture',
+          menu: [],
+          summaryDay: true,
+          summarySource: 'production',
+          ...(report.summary ? { summary: report.summary } : {}),
+        }}
+      />,
+    );
+    expect(page).toContain('Nov 23, 12:00 AM PST');
+    expect(page).toContain('Nov 23, 9:15 PM PST');
+    expect(page).toContain('Today so far');
+    expect(page).toContain('Yesterday');
+    expect(page).toContain('100');
+    expect(page).not.toContain('Dish opens by batch');
+    expect(
+      renderToStaticMarkup(
+        <ReportView state={{ kind: 'ready', report }} presentation="performance" />,
+      ),
+    ).toContain('midnight San Francisco time');
+  });
   it('uses the authored screen with API values and truthful missing evidence', () => {
     const page = renderToStaticMarkup(
       <ReportView state={{ kind: 'ready', report: REPORT }} presentation="performance" />,

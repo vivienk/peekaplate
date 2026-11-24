@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "64e593bf2c6a4472c2b5faa39e2aeab6c2a6d6cf98a9ef9a7d9f2d78338cc4e4"
+      "sourceFingerprint": "3eea0bf9c05661b0be8a5db925ca844c9bd256429b314080317bf31ccab86b0e"
     },
     {
       "id": "tokens",
@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "740140a58afa303711664e905845ce1770665ff6cbbc8dd6bdb8263376d97e38"
+      "sourceFingerprint": "08acb0ffc542854bb403b02f1ea4d8f714880b2c861431bf0d8fb0c4ebabb137"
     },
     {
       "id": "backend",
@@ -509,6 +509,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-report-evidence.ts",
         "backend/src/owner-report-display-actions.ts",
         "backend/src/owner-report-batches.ts",
+        "backend/src/owner-report-batches.test.ts",
         "backend/src/owner-report-publications.ts",
         "backend/src/owner-report-posthog.ts",
         "backend/src/owner-report-posthog.test.ts",
@@ -747,7 +748,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a97613088c4db2a48ec6f4c05af31ef8ae90113b97e99991addbad599fb255d6"
+      "sourceFingerprint": "48dcac4065d96c02029aaa4dabd4a30af3a23e9fab42ce1315c6e7a1e686b7d7"
     },
     {
       "id": "database",
@@ -910,7 +911,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "220fd2243d5e8e0beb0e00d40c1cfdba30df0192b7adfc1d3ee804ed86e3e1c3"
+      "sourceFingerprint": "859d3ba300e76a6a60bf4807b0aed3e92407c241444bfa246f7062f0573ef721"
     },
     {
       "id": "agents",
@@ -1146,15 +1147,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-17",
       "modules": [
-        "console",
-        "contracts"
-      ],
-      "summary": "Reconcile main release fixes into develop without dropping comparison/order/local-AI work. Reuse the existing dish-assistance route for saved ingredient proposals and existing portion state to hide repeated consent copy.",
-      "next": "Run pinned CI and hosted signed-out S1/ingredient/portion checks. Protected staging credential deployment and authoritative report completeness remain separate AI activation gates."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
         "backend",
         "console",
         "diner",
@@ -1289,6 +1281,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/production-release.md"
       ],
       "next": "Release the approved production API and console with their dashboard AI flags enabled, then verify one signed-in report question."
+    },
+    {
+      "date": "2026-11-23",
+      "modules": [
+        "backend",
+        "console",
+        "contracts"
+      ],
+      "summary": "Prepare production owner reports from San Francisco midnight through the settled cutoff. Console, CSV and signed report references share the snapshot. Capture and export timing remain independent.",
+      "next": "Release the compatible console before enabling sf-day on the production Worker. Verify the approved release on existing QA events without generating diner activity."
     }
   ]
 }

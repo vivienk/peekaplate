@@ -195,6 +195,7 @@ export type Bindings = {
   APP_ENV?: string;
   OWNER_WORKFLOW_ENABLED?: string;
   OWNER_PRODUCTION_REPORTS_ENABLED?: string;
+  OWNER_PRODUCTION_REPORT_WINDOW?: string;
   OWNER_REPORT_DISPLAY_ACTIONS_ENABLED?: string;
   PRODUCTION_OBSERVATION_PROVENANCE_ENABLED?: string;
   DINER_PUBLIC_ORIGIN?: string;
@@ -805,6 +806,7 @@ const dependencies: Dependencies = {
       if (source === 'production' && productionOwnerReportingEnabled(env)) {
         return await queryOwnerReport(client, actorId, venueId, now, source, {
           includeSummary: true,
+          productionDay: env.OWNER_PRODUCTION_REPORT_WINDOW === 'sf-day',
           includeDisplayActions: env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED === 'true',
           productionPublications: {
             storage: preparedStorage(env),
