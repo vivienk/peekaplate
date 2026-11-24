@@ -219,7 +219,7 @@
     "unique_events": 3150,
     "distinct_sessions": 300
   },
-  "trusted_sha256": "08444aec618923b16489fae400d85ae68882d5478397d6568e9b835a4e73e671",
+  "trusted_sha256": "08444aec610923b16489fae400d85ae68882d5478397d6568e9b835a4e73e671",
   "dashboard_field_classification": [
     {
       "name": "active_sessions",
