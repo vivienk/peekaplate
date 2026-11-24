@@ -79,11 +79,12 @@ def main() -> None:
 
     payload = "\n".join(expanded) + "\n"
     if args.replay and OUT_FILE.exists():
-        existing = OUT_FILE.read_text(encoding="utf-8")
+        existing = OUT_FILE.read_text(encoding="utf-8").replace("\r\n", "\n")
         if existing != payload:
             raise SystemExit("Replay determinism check failed: generated output differs from existing full_dataset.jsonl")
 
-    OUT_FILE.write_text(payload, encoding="utf-8")
+    with OUT_FILE.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(payload)
     mode = "replay" if args.replay else "write"
     print(json.dumps({"mode": mode, "output": str(OUT_FILE.relative_to(ROOT)), **summary}, indent=2))
 
