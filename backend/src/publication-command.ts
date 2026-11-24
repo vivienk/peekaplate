@@ -9,6 +9,7 @@ import {
   type WithdrawMenu,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
+import { ownerMenuId } from './owner-prepare';
 import { assignRestaurantLink } from './restaurant-link';
 
 export type ApproveMenuRevisionInput = ApproveMenuRevision & { menuId: string };
@@ -170,7 +171,12 @@ async function recordCommandAndOutbox(
   );
 }
 
-async function assertActiveOwnerDraftsApproved(client: Client, venueId: string): Promise<void> {
+async function assertActiveOwnerDraftsApproved(
+  client: Client,
+  venueId: string,
+  menuId: string,
+): Promise<void> {
+  if (menuId !== (await ownerMenuId(venueId))) return;
   const unapproved = await client.query<{ id: string }>(
     `SELECT d.id
        FROM app_private.dish_drafts d
@@ -261,7 +267,7 @@ export async function approveMenuRevision(
     if (!approvedSubject) {
       throw new PublicationCommandError('review_subject_not_found', 409);
     }
-    await assertActiveOwnerDraftsApproved(client, venueId);
+    await assertActiveOwnerDraftsApproved(client, venueId, input.menuId);
 
     const version = currentVersion + 1;
     const approvalId = randomUUID();
@@ -396,7 +402,7 @@ export async function publishMenu(
     );
     const approved = approval.rows[0];
     if (!approved) throw new PublicationCommandError('approval_not_found', 409);
-    await assertActiveOwnerDraftsApproved(client, venueId);
+    await assertActiveOwnerDraftsApproved(client, venueId, input.menuId);
 
     const version = currentVersion + 1;
     const availabilityVersion = (current.rows[0]?.availability_version ?? 0) + 1;

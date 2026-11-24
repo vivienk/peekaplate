@@ -117,7 +117,8 @@ export function MenuProcessing({
                     confidence. This step prepares an unverified draft for your review.
                   </p>
                   <p className="pp-onboard-info__note">
-                    You review and approve your dishes before they can be published.
+                    No items will go live or be published without your explicit confirmation. You
+                    review and approve your dishes before they can be published.
                   </p>
                 </div>
               </div>
