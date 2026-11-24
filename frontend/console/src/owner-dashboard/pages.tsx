@@ -327,8 +327,8 @@ export function Overview({
               }
               {...(live && {
                 sub: live.summaryBatch
-                  ? 'Completed five-minute UTC batches. Unavailable measurements are gaps.'
-                  : 'UTC days clipped to each reporting period. Unavailable measurements are gaps, not zero.',
+                  ? 'Completed five-minute UTC batches (daily openings count). Unavailable measurements are gaps.'
+                  : 'UTC days clipped to each reporting period (daily openings count). Unavailable measurements are gaps, not zero.',
               })}
               head={
                 live?.summaryBatch
@@ -1638,31 +1638,57 @@ export function LivePerf({
     key === 'portion_previews_shown' || key === 'comparisons_started'
       ? (dish.display_actions?.[key] ?? missing)
       : dish.metrics[key];
+  const metricQuestion: Partial<Record<Metric, string>> = {
+    open_rate: 'Which dishes have the highest open rate?',
+    engagement_rate: 'Which dishes drive the highest engagement rate?',
+    save_rate: 'Which dishes are saved most often?',
+    active_sessions: 'Which dishes had the most exposed visits?',
+    avg_interaction_time_seconds: 'Which dishes hold diner attention longest?',
+    timing_coverage: 'Which dishes have usable timing coverage?',
+  };
+  const orderedDishes =
+    column && (column[0] === 'open_rate' || column[0] === 'engagement_rate')
+      ? [...dishes].sort((a, b) => {
+          const ca = cellFor(a, column[0]);
+          const cb = cellFor(b, column[0]);
+          const va =
+            (ca.status === 'NORMAL' || ca.status === 'VALID_ZERO') && ca.value !== null
+              ? ca.value
+              : -1;
+          const vb =
+            (cb.status === 'NORMAL' || cb.status === 'VALID_ZERO') && cb.value !== null
+              ? cb.value
+              : -1;
+          return vb - va;
+        })
+      : dishes;
   const body =
-    column && dishes.length ? (
+    column && orderedDishes.length ? (
       <ChartCard
-        title={column[1]}
+        title={metricQuestion[column[0]] ?? column[1]}
         sub={metricCopy[column[0]]}
         head={['Dish', column[1]]}
-        rows={dishes.map((d) => [d.name, display(cellFor(d, column[0]), column[2])])}
+        rows={orderedDishes.map((d) => [d.name, display(cellFor(d, column[0]), column[2])])}
       >
         <HBars
           legend={false}
           max={
             column[2] === 'rate'
               ? 1
-              : Math.max(1, ...dishes.map((d) => cellFor(d, column[0]).value ?? 0))
+              : Math.max(1, ...orderedDishes.map((d) => cellFor(d, column[0]).value ?? 0))
           }
           segs={[{ name: column[1], color: 'var(--pp-color-orange-600)' }]}
-          rows={dishes.map((d) => {
+          rows={orderedDishes.map((d) => {
             const cell = cellFor(d, column[0]);
             const visible = cell.status === 'NORMAL' || cell.status === 'VALID_ZERO';
+            const formatted = display(cell, column[2]);
             return {
               id: d.dish_id,
               label: d.name,
               vals: visible && cell.value !== null ? [cell.value] : [],
-              text: display(cell, column[2]),
-              ...(!visible ? { none: display(cell, column[2]) as string } : {}),
+              text: formatted,
+              ...(typeof formatted === 'string' ? { ariaValue: () => formatted } : {}),
+              ...(!visible ? { none: formatted as string } : {}),
             };
           })}
         />

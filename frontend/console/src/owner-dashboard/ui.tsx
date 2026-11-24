@@ -168,7 +168,9 @@ export function LineChart({
         className="chart"
         viewBox={`0 0 ${W} ${h}`}
         role="img"
-        aria-label={desc || 'Line chart'}
+        aria-label={
+          desc ? `${desc}. Use Left and Right arrow keys to inspect each point.` : 'Line chart'
+        }
         tabIndex={0}
         onMouseMove={move}
         onMouseLeave={() => setHi(null)}
@@ -255,7 +257,12 @@ export function LineChart({
         )}
       </svg>
       {hi !== null && (
-        <div className="tip" style={{ left: `${(x(hi) / W) * 100}%`, top: '28px' }}>
+        <div
+          className="tip"
+          role="status"
+          aria-live="polite"
+          style={{ left: `${(x(hi) / W) * 100}%`, top: '28px' }}
+        >
           <b>{labels[hi]}</b>
           {series.map((s) => (
             <div key={s.name}>
@@ -322,6 +329,7 @@ export type BarRow = {
   sub?: string;
   vals: number[];
   text?: ReactNode;
+  ariaValue?: (v: number, i: number) => string;
   none?: string;
   onClick?: () => void;
 };
@@ -356,7 +364,16 @@ export function HBars({
                 aria-label={
                   r.none
                     ? `${r.label}: ${r.none}`
-                    : `${r.label}: ${r.vals.map((v, i) => `${segs[i]?.name} ${v}`).join(', ')}`
+                    : `${r.label}: ${r.vals
+                        .map((v, i) => {
+                          const formatted = r.ariaValue
+                            ? r.ariaValue(v, i)
+                            : typeof r.text === 'string' && r.vals.length === 1
+                              ? r.text
+                              : String(v);
+                          return `${segs[i]?.name} ${formatted}`;
+                        })
+                        .join(', ')}`
                 }
               >
                 {!r.none &&
@@ -365,7 +382,13 @@ export function HBars({
                       key={i}
                       className="hb-seg"
                       style={{ width: `${(100 * v) / mx}%`, background: segs[i]?.color }}
-                      title={`${r.label}: ${segs[i]?.name} ${v}`}
+                      title={`${r.label}: ${segs[i]?.name} ${
+                        r.ariaValue
+                          ? r.ariaValue(v, i)
+                          : typeof r.text === 'string' && r.vals.length === 1
+                            ? r.text
+                            : String(v)
+                      }`}
                     />
                   ))}
               </span>
@@ -481,5 +504,93 @@ export function ChartCard({
       </div>
       {tv && head ? <DataTable head={head} rows={rows ?? []} /> : children}
     </section>
+  );
+}
+
+export type EngagementPeriodPoint = {
+  label: string;
+  engagedVisits: number | null;
+  eligibleVisits: number | null;
+  status?: 'NORMAL' | 'VALID_ZERO' | 'SUPPRESSED' | 'NOT_MEASURABLE' | 'MISSING';
+};
+
+export function EngagementPeriodChart({
+  baseline,
+  current,
+  privacyFloor = 10,
+}: {
+  baseline: EngagementPeriodPoint;
+  current: EngagementPeriodPoint;
+  privacyFloor?: number;
+}) {
+  const evaluate = (point: EngagementPeriodPoint) => {
+    if (point.status === 'SUPPRESSED') return { visible: false as const, text: 'Not enough visits yet', ratio: 0 };
+    if (point.status === 'NOT_MEASURABLE') return { visible: false as const, text: 'Not measurable', ratio: 0 };
+    if (point.status === 'MISSING' || point.engagedVisits === null || point.eligibleVisits === null) {
+      return { visible: false as const, text: 'No data', ratio: 0 };
+    }
+    if (point.eligibleVisits === 0) return { visible: false as const, text: 'Not measurable', ratio: 0 };
+    if (point.eligibleVisits < privacyFloor) return { visible: false as const, text: 'Not enough visits yet', ratio: 0 };
+    const ratio = point.engagedVisits / point.eligibleVisits;
+    const pct = Math.round(ratio * 1000) / 10;
+    return {
+      visible: true as const,
+      text: `${pct}%`,
+      ratio,
+      engagedVisits: point.engagedVisits,
+      eligibleVisits: point.eligibleVisits,
+    };
+  };
+
+  const prev = evaluate(baseline);
+  const curr = evaluate(current);
+
+  let takeaway = 'Engagement comparison across reporting periods.';
+  if (prev.visible && curr.visible) {
+    if (curr.engagedVisits > prev.engagedVisits && curr.ratio < prev.ratio) {
+      takeaway = `Engaged visits increased (${prev.engagedVisits} → ${curr.engagedVisits}), while engagement rate fell from ${prev.text} to ${curr.text}.`;
+    } else if (curr.engagedVisits < prev.engagedVisits && curr.ratio > prev.ratio) {
+      takeaway = `Engaged visits decreased (${prev.engagedVisits} → ${curr.engagedVisits}), while engagement rate rose from ${prev.text} to ${curr.text}.`;
+    } else if (curr.ratio > prev.ratio) {
+      takeaway = `Engaged visits changed (${prev.engagedVisits} → ${curr.engagedVisits}) and engagement rate rose from ${prev.text} to ${curr.text}.`;
+    } else if (curr.ratio < prev.ratio) {
+      takeaway = `Engaged visits changed (${prev.engagedVisits} → ${curr.engagedVisits}) and engagement rate fell from ${prev.text} to ${curr.text}.`;
+    } else {
+      takeaway = `Engaged visits changed (${prev.engagedVisits} → ${curr.engagedVisits}) while engagement rate remained at ${curr.text}.`;
+    }
+  } else {
+    takeaway = `Period comparison incomplete: ${baseline.label} (${prev.text}), ${current.label} (${curr.text}).`;
+  }
+
+  const rows: BarRow[] = [
+    {
+      id: 'baseline',
+      label: baseline.label,
+      ...(prev.visible
+        ? { sub: `${prev.engagedVisits} of ${prev.eligibleVisits} eligible visits`, vals: [prev.ratio], text: prev.text, ariaValue: () => prev.text }
+        : { vals: [], none: prev.text }),
+    },
+    {
+      id: 'current',
+      label: current.label,
+      ...(curr.visible
+        ? { sub: `${curr.engagedVisits} of ${curr.eligibleVisits} eligible visits`, vals: [curr.ratio], text: curr.text, ariaValue: () => curr.text }
+        : { vals: [], none: curr.text }),
+    },
+  ];
+
+  return (
+    <ChartCard
+      title="Did engagement change over the period?"
+      sub={takeaway}
+      head={['Period', 'Engaged visits', 'Eligible visits', 'Engagement rate']}
+      rows={[
+        [baseline.label, baseline.engagedVisits ?? '—', baseline.eligibleVisits ?? '—', prev.text],
+        [current.label, current.engagedVisits ?? '—', current.eligibleVisits ?? '—', curr.text],
+      ]}
+    >
+      <p className="muted" role="status" style={{ marginBottom: '12px' }}>{takeaway}</p>
+      <HBars legend={false} max={1} segs={[{ name: 'Engagement rate', color: 'var(--pp-color-orange-600)' }]} rows={rows} />
+    </ChartCard>
   );
 }
