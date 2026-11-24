@@ -219,7 +219,7 @@
     "unique_events": 3150,
     "distinct_sessions": 300
   },
-  "trusted_sha256": "7843e1be16a5f89ead79a52830a760eca0af96b1def73f6ec438505edb8c789b",
+  "trusted_sha256": "b8711e24fc26641a2b475df14a26a996b37df5e8ab0cdd78080bebac2d78ea46",
   "dashboard_field_classification": [
     {
       "name": "active_sessions",
@@ -373,7 +373,9 @@
       "category": "unavailable",
       "unit": "dishes",
       "source": "none (manual order records removed in S7-DATA-15)",
-      "unavailable_conditions": ["Always UNAVAILABLE in P0"]
+      "unavailable_conditions": [
+        "Always UNAVAILABLE in P0"
+      ]
     },
     {
       "name": "weekly_verified_orders",
@@ -381,7 +383,9 @@
       "category": "unavailable",
       "unit": "orders",
       "source": "none (no verified POS or checkout order source in P0)",
-      "unavailable_conditions": ["Always UNAVAILABLE in P0"]
+      "unavailable_conditions": [
+        "Always UNAVAILABLE in P0"
+      ]
     },
     {
       "name": "checkout_revenue",
@@ -389,7 +393,9 @@
       "category": "excluded",
       "unit": "currency",
       "source": "out_of_scope",
-      "unavailable_conditions": ["Excluded from P0 owner analytics contract"]
+      "unavailable_conditions": [
+        "Excluded from P0 owner analytics contract"
+      ]
     },
     {
       "name": "pos_ticket_value",
@@ -397,7 +403,9 @@
       "category": "excluded",
       "unit": "currency",
       "source": "out_of_scope",
-      "unavailable_conditions": ["Excluded from P0 owner analytics contract"]
+      "unavailable_conditions": [
+        "Excluded from P0 owner analytics contract"
+      ]
     },
     {
       "name": "unconsented_diner_events",
@@ -405,7 +413,9 @@
       "category": "excluded",
       "unit": "events",
       "source": "filtered at ingestion boundary",
-      "unavailable_conditions": ["Excluded by consent gate; never persisted or reported"]
+      "unavailable_conditions": [
+        "Excluded by consent gate; never persisted or reported"
+      ]
     },
     {
       "name": "test_traffic_events",
@@ -413,7 +423,9 @@
       "category": "excluded",
       "unit": "events",
       "source": "traffic_class == 'test'",
-      "unavailable_conditions": ["Excluded from live restaurant owner reports"]
+      "unavailable_conditions": [
+        "Excluded from live restaurant owner reports"
+      ]
     },
     {
       "name": "realtime_ingestion_staleness",
