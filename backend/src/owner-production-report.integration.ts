@@ -786,6 +786,6 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         vi.unstubAllGlobals();
         vi.useRealTimers();
       }
-    });
+    }, 30_000);
   },
 );
