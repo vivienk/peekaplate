@@ -10,23 +10,24 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent
-BASE_FILE = ROOT / "events" / "two_session_story.jsonl"
-OUT_FILE = ROOT / "events" / "full_dataset.jsonl"
+SOURCE = ROOT / "events" / "two_session_story.jsonl"
+OUTPUT = ROOT / "events" / "full_dataset.jsonl"
 MANIFEST_FILE = ROOT / "manifest.json"
 PAIR_COUNT = 150
 
 
-def build_expanded_lines(base_lines: list[str], pair_count: int = PAIR_COUNT) -> list[str]:
+def build_expanded_lines(source_rows: list[dict[str, Any]], pair_count: int = PAIR_COUNT) -> list[str]:
     expanded: list[str] = []
-    for pair_idx in range(1, pair_count + 1):
-        suffix = f"-pair-{pair_idx:03d}"
-        for raw in base_lines:
-            record = json.loads(raw)
-            record["session_id"] = record["session_id"] + suffix
-            record["event_id"] = record["event_id"] + suffix
-            if record.get("exposure_id") is not None:
-                record["exposure_id"] = record["exposure_id"] + suffix
-            expanded.append(json.dumps(record, separators=(",", ":")))
+    for pair_number in range(1, pair_count + 1):
+        suffix = f"pair-{pair_number:03d}"
+        for original in source_rows:
+            row = original.copy()
+            row["event_id"] = f"{original['event_id']}-{suffix}"
+            row["session_id"] = f"{original['session_id']}-{suffix}"
+            for field in ("opening_id", "exposure_id", "comparison_id"):
+                if row.get(field):
+                    row[field] = f"{row[field]}-{suffix}"
+            expanded.append(json.dumps(row, ensure_ascii=False, separators=(",", ":")))
     return expanded
 
 
@@ -69,8 +70,12 @@ def main() -> None:
     args = parser.parse_args()
 
     manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
-    base_lines = [line.strip() for line in BASE_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
-    expanded = build_expanded_lines(base_lines, PAIR_COUNT)
+    source_rows = [
+        json.loads(line)
+        for line in SOURCE.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    expanded = build_expanded_lines(source_rows, PAIR_COUNT)
     summary = summarize_and_verify(expanded, manifest)
 
     if args.dry_run:
@@ -78,16 +83,15 @@ def main() -> None:
         return
 
     payload = "\n".join(expanded) + "\n"
-    if args.replay and OUT_FILE.exists():
-        existing_records = [json.loads(line) for line in OUT_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
-        expected_records = [json.loads(line) for line in expanded]
-        if existing_records != expected_records:
-            raise SystemExit("Replay determinism check failed: generated records differ from existing full_dataset.jsonl")
+    if args.replay and OUTPUT.exists():
+        existing = OUTPUT.read_text(encoding="utf-8").replace("\r\n", "\n")
+        if existing != payload:
+            raise SystemExit("Replay determinism check failed: generated output differs from existing full_dataset.jsonl")
 
-    with OUT_FILE.open("w", encoding="utf-8", newline="\n") as f:
+    with OUTPUT.open("w", encoding="utf-8", newline="\n") as f:
         f.write(payload)
     mode = "replay" if args.replay else "write"
-    print(json.dumps({"mode": mode, "output": str(OUT_FILE.relative_to(ROOT)), **summary}, indent=2))
+    print(json.dumps({"mode": mode, "output": str(OUTPUT.relative_to(ROOT)), **summary}, indent=2))
 
 
 if __name__ == "__main__":
