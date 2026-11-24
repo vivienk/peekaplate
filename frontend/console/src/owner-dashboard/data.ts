@@ -436,7 +436,8 @@ export const ANSWERS: Record<string, () => Answer> = {
     };
   },
   orders: () => ({
-    short: 'Verified orders are unavailable in the synthetic P0 scope because no verified POS or checkout order source is connected.',
+    short:
+      'Verified orders are unavailable in the synthetic P0 scope because no verified POS or checkout order source is connected.',
     secs: [
       {
         k: 'unk',
@@ -587,9 +588,7 @@ export const ANSWERS: Record<string, () => Answer> = {
     secs: [
       {
         k: 'unk',
-        items: [
-          'Try a question about opens, comparisons, 2.5D previews, or the weekly change.',
-        ],
+        items: ['Try a question about opens, comparisons, 2.5D previews, or the weekly change.'],
       },
     ],
     ev: [EVT],

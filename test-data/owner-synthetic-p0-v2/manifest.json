@@ -363,7 +363,9 @@
       "category": "unavailable",
       "unit": "orders",
       "source": "none (no verified POS or checkout order source in P0)",
-      "unavailable_conditions": ["Always UNAVAILABLE in P0; synthetic datasets never fabricate order counts"]
+      "unavailable_conditions": [
+        "Always UNAVAILABLE in P0; synthetic datasets never fabricate order counts"
+      ]
     },
     {
       "name": "dish_order_record_coverage",

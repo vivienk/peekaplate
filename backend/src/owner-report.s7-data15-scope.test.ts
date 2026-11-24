@@ -17,7 +17,9 @@ function resolvePythonCommand() {
     { cmd: 'python', prefixArgs: [] },
     { cmd: 'py', prefixArgs: ['-3'] },
   ]) {
-    const res = spawnSync(candidate.cmd, [...candidate.prefixArgs, '--version'], { encoding: 'utf8' });
+    const res = spawnSync(candidate.cmd, [...candidate.prefixArgs, '--version'], {
+      encoding: 'utf8',
+    });
     if (res.status === 0) return candidate;
   }
   return null;
@@ -33,7 +35,9 @@ describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determini
       distinct_sessions: 300,
     });
     expect(manifest.trusted_sha256).toMatch(/^[a-f0-9]{64}$/);
-    const categories = new Set(manifest.dashboard_field_classification.map((f: { category: string }) => f.category));
+    const categories = new Set(
+      manifest.dashboard_field_classification.map((f: { category: string }) => f.category),
+    );
     expect(categories).toEqual(new Set(['supported', 'derived', 'unavailable', 'excluded']));
     expect(manifest.unavailable_metrics.verified_orders.status).toBe('UNAVAILABLE');
   });
@@ -52,7 +56,9 @@ describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determini
     const readme = fs.readFileSync(README_PATH, 'utf8');
     expect(readme).not.toContain('ΓÇö');
     expect(readme).not.toContain('ordercounts');
-    expect(readme).toContain('py -3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --dry-run');
+    expect(readme).toContain(
+      'py -3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --dry-run',
+    );
   });
 
   it('executes the real generator CLI for --dry-run and --replay against trusted SHA-256', () => {
@@ -63,13 +69,17 @@ describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determini
       return;
     }
     const hadOutputBefore = fs.existsSync(FULL_DATASET_FILE);
-    const dryRunStdout = execFileSync(py.cmd, [...py.prefixArgs, GENERATOR_SCRIPT, '--dry-run'], { encoding: 'utf8' });
+    const dryRunStdout = execFileSync(py.cmd, [...py.prefixArgs, GENERATOR_SCRIPT, '--dry-run'], {
+      encoding: 'utf8',
+    });
     const dryRun = JSON.parse(dryRunStdout);
     expect(dryRun.mode).toBe('dry-run');
     expect(dryRun.sha256).toBe(manifest.trusted_sha256);
     expect(fs.existsSync(FULL_DATASET_FILE)).toBe(hadOutputBefore);
 
-    const replayStdout = execFileSync(py.cmd, [...py.prefixArgs, GENERATOR_SCRIPT, '--replay'], { encoding: 'utf8' });
+    const replayStdout = execFileSync(py.cmd, [...py.prefixArgs, GENERATOR_SCRIPT, '--replay'], {
+      encoding: 'utf8',
+    });
     const replay = JSON.parse(replayStdout);
     expect(replay.mode).toBe('replay');
     expect(replay.sha256).toBe(manifest.trusted_sha256);

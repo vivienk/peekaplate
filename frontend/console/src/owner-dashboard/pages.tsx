@@ -986,7 +986,8 @@ export function Perf({
           />
         </ChartCard>
         <Note icon="info">
-          Verified orders are unavailable in the synthetic P0 scope because no verified POS or checkout order source exists. Order counts are never fabricated or shown as zero.
+          Verified orders are unavailable in the synthetic P0 scope because no verified POS or
+          checkout order source exists. Order counts are never fabricated or shown as zero.
         </Note>
       </div>
     );
