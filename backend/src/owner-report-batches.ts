@@ -17,11 +17,11 @@ export function latestOwnerReportBatchEnd(now: Date): number {
 }
 
 export function ownerReportDayWindow(now: Date) {
-  const start = ownerReportMidnight(now);
+  const end = new Date(latestOwnerReportBatchEnd(now));
   return {
-    start,
-    end: new Date(Math.max(start.getTime(), latestOwnerReportBatchEnd(now))),
-    baselineStart: ownerReportMidnight(now, -1),
+    start: ownerReportMidnight(end),
+    end,
+    baselineStart: ownerReportMidnight(end, -1),
   };
 }
 
@@ -62,12 +62,17 @@ export function readDailyOwnerReport(
   venueId: string,
   now: Date,
   storage: PreparedStorage,
-  measure: (window: ReturnType<typeof ownerReportDayWindow>) => Promise<OwnerDishReport>,
+  measure: (
+    window: ReturnType<typeof ownerReportDayWindow>,
+    midnightReport?: OwnerDishReport,
+  ) => Promise<OwnerDishReport>,
 ) {
   const window = ownerReportDayWindow(now);
-  return readOrSeal(venueId, storage, OWNER_PRODUCTION_DAY_VERSION, window.start, window.end, () =>
-    measure(window),
-  );
+  const seal = (end: Date, read: () => Promise<OwnerDishReport>) =>
+    readOrSeal(venueId, storage, OWNER_PRODUCTION_DAY_VERSION, window.start, end, read);
+  const measureMidnight = () => measure({ ...window, end: window.start });
+  if (window.start.getTime() === window.end.getTime()) return seal(window.end, measureMidnight);
+  return seal(window.end, async () => measure(window, await seal(window.start, measureMidnight)));
 }
 
 async function readOrSeal(
@@ -92,8 +97,6 @@ async function readOrSeal(
       report.data.source !== 'production' ||
       report.data.venue_id !== venueId ||
       report.data.report_metadata.calculation_version !== version ||
-      report.data.report_metadata.date_window.start_time !== startsAt ||
-      report.data.report_metadata.date_window.end_time !== endsAt ||
       report.data.summary?.periods.current.start_time !== startsAt ||
       report.data.summary.periods.current.end_time !== endsAt
     )

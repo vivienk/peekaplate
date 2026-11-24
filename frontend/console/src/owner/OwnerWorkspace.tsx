@@ -749,7 +749,12 @@ function LiveDashboardReport({
     summarySource: report?.source,
     summaryBatch: report?.report_metadata.calculation_version === 'production.batch.v1',
     summaryDay,
-    period: report ? reportPeriod(report.report_metadata.date_window, summaryDay) : undefined,
+    period: report
+      ? reportPeriod(
+          report.summary?.periods.current ?? report.report_metadata.date_window,
+          summaryDay,
+        )
+      : undefined,
   };
   return (
     <div className="owner-dashboard-content">

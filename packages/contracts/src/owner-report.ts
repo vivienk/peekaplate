@@ -392,11 +392,15 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
           end >= start &&
           end <= ownerReportMidnight(new Date(start), 1).getTime() &&
           at(baseline.start_time) === ownerReportMidnight(new Date(start), -1).getTime() &&
+          at(metadata.generated_at) === end &&
+          summary.current.avg_interaction_time_seconds.status === 'MISSING' &&
+          summary.current.portion_previews_shown.status === 'MISSING' &&
           !summary.daily_opens
         : end > start && end - start === at(baseline.end_time) - at(baseline.start_time);
+      const dishPeriod = day ? baseline : current;
       if (
-        start !== at(window.start_time) ||
-        end !== at(window.end_time) ||
+        at(dishPeriod.start_time) !== at(window.start_time) ||
+        at(dishPeriod.end_time) !== at(window.end_time) ||
         at(baseline.end_time) !== start ||
         !validInterval
       )

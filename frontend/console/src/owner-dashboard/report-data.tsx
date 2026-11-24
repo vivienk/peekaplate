@@ -319,8 +319,8 @@ function ReportTable({
             <Note kind="warn">Synthetic test data from the report API. Not real diners.</Note>
           ) : reportDay ? (
             <Note>
-              Today’s totals start at midnight San Francisco time and include settled activity.
-              Dish-level rates need enough eligible visits.
+              Dish Performance shows the previous completed San Francisco day. Each dish needs at
+              least ten eligible visits. Today’s restaurant totals are on Overview.
             </Note>
           ) : m.calculation_version === 'production.batch.v1' ? (
             <Note>

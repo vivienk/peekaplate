@@ -630,9 +630,10 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         });
         expect(day.summary?.current.dish_opens).toEqual({ value: 42, status: 'NORMAL' });
         expect(day.summary?.current.portion_previews_shown).toEqual({
-          value: 10,
-          status: 'NORMAL',
+          value: null,
+          status: 'MISSING',
         });
+        expect(day.dishes).toEqual([]);
         expect(await (await daily()).json()).toEqual(day);
         const callsBeforeDenial = postHog.mock.calls.length;
         expect((await request('', otherToken, venue.venueId, true, 'true', 'sf-day')).status).toBe(
@@ -648,6 +649,24 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         expect(quietDay.summary?.current).toEqual(day.summary?.current);
         expect(quietDay.dishes).toEqual(day.dishes);
         expect(quietDay.summary?.periods.current.end_time).toBe('2035-02-03T00:15:00.000Z');
+
+        vi.setSystemTime(new Date('2035-02-03T08:00:30.000Z'));
+        const pendingMidnight = await request(
+          '',
+          await issueToken(venue.actorId),
+          venue.venueId,
+          true,
+          'true',
+          'sf-day',
+        );
+        expect(pendingMidnight.status).toBe(200);
+        expect(
+          OwnerDishReportSchema.parse(await pendingMidnight.json()).summary?.periods.current,
+        ).toEqual({
+          start_time: '2035-02-02T08:00:00.000Z',
+          end_time: '2035-02-03T07:55:00.000Z',
+        });
+        postHogEvents.push(...(await visit(venue, '2035-02-03T07:59:00.000Z')));
 
         // At Pacific midnight, yesterday's evening still requires matching events after UTC midnight.
         vi.setSystemTime(new Date('2035-02-03T08:01:00.000Z'));
@@ -666,10 +685,59 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           end_time: '2035-02-03T08:00:00.000Z',
         });
         expect(newDay.summary?.current.dish_opens.value).toBeNull();
-        expect(newDay.summary?.baseline.dish_opens).toEqual({ value: 42, status: 'NORMAL' });
+        expect(newDay.summary?.baseline.dish_opens).toEqual({ value: 43, status: 'NORMAL' });
+        expect(newDay.summary?.baseline.portion_previews_shown).toEqual({
+          value: 10,
+          status: 'NORMAL',
+        });
+        expect(newDay.report_metadata.date_window).toMatchObject(
+          newDay.summary?.periods.baseline ?? {},
+        );
+        expect(newDay.dishes[0]?.display_actions?.portion_previews_shown).toEqual({
+          value: 10,
+          status: 'NORMAL',
+        });
         expect(JSON.parse(String(postHog.mock.lastCall?.[1]?.body)).query.values).toMatchObject({
           window_start: '2035-02-03 00:00:00.000',
           window_end: '2035-02-03 08:00:00.000',
+        });
+        // A lone preview today must not change the released dish cohort. A late arrival for
+        // yesterday must not change the sealed comparison period either.
+        postHogEvents.push(
+          ...(await visit(venue, '2035-02-03T07:59:10.000Z', true, false, true)),
+          ...(await visit(venue, '2035-02-03T08:02:00.000Z', true, false, true)),
+        );
+        vi.setSystemTime(new Date('2035-02-03T08:06:00.000Z'));
+        const nextDayResponse = await request(
+          '',
+          await issueToken(venue.actorId),
+          venue.venueId,
+          true,
+          'true',
+          'sf-day',
+        );
+        expect(nextDayResponse.status).toBe(200);
+        const nextDay = OwnerDishReportSchema.parse(await nextDayResponse.json());
+        expect(nextDay.summary?.current.dish_opens).toEqual({ value: 1, status: 'NORMAL' });
+        expect(nextDay.summary?.current.portion_previews_shown.value).toBeNull();
+        expect(nextDay.summary?.baseline).toEqual(newDay.summary?.baseline);
+        expect(nextDay.dishes).toEqual(newDay.dishes);
+        const csvDay = await request(
+          '/export',
+          await issueToken(venue.actorId),
+          venue.venueId,
+          true,
+          'true',
+          'sf-day',
+        );
+        expect(csvDay.status).toBe(200);
+        const [header, firstDish] = (await csvDay.text()).trim().split('\n');
+        const dayCells = Object.fromEntries(
+          header!.split(',').map((column, index) => [column, firstDish!.split(',')[index]]),
+        );
+        expect(dayCells).toMatchObject({
+          window_start: '2035-02-02T08:00:00.000Z',
+          window_end: '2035-02-03T08:00:00.000Z',
         });
         expect(otherRefreshed.dishes).toEqual([]);
         expect(otherRefreshed.summary?.baseline.dish_opens).toEqual({

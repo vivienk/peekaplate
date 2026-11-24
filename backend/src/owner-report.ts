@@ -3,6 +3,8 @@ import { toOwnerReport } from '@peekaplate/contracts';
 import {
   OWNER_PRODUCTION_BATCH_VERSION,
   OWNER_PRODUCTION_DAY_VERSION,
+  type OwnerDishReport,
+  OwnerDishReportSchema,
 } from '@peekaplate/contracts/owner-report';
 import type { Client } from 'pg';
 import { AuthUnavailableError } from './auth';
@@ -82,16 +84,10 @@ export async function readOwnerReport(
               venueId,
               now,
               options.productionPublications.storage,
-              ({ start, end, baselineStart }) =>
-                measureReport(
-                  client,
-                  venueId,
-                  end,
-                  source,
-                  options,
-                  end.getTime() - start.getTime(),
-                  baselineStart,
-                ),
+              ({ start, end, baselineStart }, midnightReport) =>
+                midnightReport
+                  ? advanceDailyReport(client, venueId, start, end, options, midnightReport)
+                  : measureReport(client, venueId, end, source, options, 0, baselineStart),
             )
           : await readBatchedOwnerReport(
               venueId,
@@ -115,6 +111,68 @@ export async function readOwnerReport(
   }
 }
 
+async function readReportEvidence(
+  client: Client,
+  venueId: string,
+  start: Date,
+  end: Date,
+  batch: boolean,
+  options: ReportOptions,
+  publicationStart = start,
+): Promise<OwnerReportLiveEvidence> {
+  if (!options.productionPublications || !options.readTodayEvents) throw new AuthUnavailableError();
+  const { storage, origin } = options.productionPublications;
+  // Earliest release time makes source selection stable across UTC midnight.
+  const today = new Date(end.getTime() + (batch ? OWNER_BATCH_SETTLE_MS : 0));
+  today.setUTCHours(0, 0, 0, 0);
+  const starts = new Date(Math.max(today.getTime(), start.getTime()));
+  const evidence = {
+    start: today,
+    events: end > starts ? await options.readTodayEvents(venueId, starts, end) : [],
+  };
+  return {
+    ...evidence,
+    publications: await readReportPublications(
+      client,
+      storage,
+      origin,
+      venueId,
+      end,
+      evidence,
+      publicationStart,
+    ),
+  };
+}
+
+async function advanceDailyReport(
+  client: Client,
+  venueId: string,
+  start: Date,
+  end: Date,
+  options: ReportOptions,
+  midnightReport: OwnerDishReport,
+) {
+  const midnight = midnightReport.summary;
+  if (!midnight) throw new AuthUnavailableError();
+  const evidence = await readReportEvidence(client, venueId, start, end, true, options);
+  const summary = await readOwnerReportSummary(
+    client,
+    venueId,
+    end,
+    'live',
+    evidence,
+    end.getTime() - start.getTime(),
+    true,
+    new Date(midnight.periods.baseline.start_time),
+    midnight.baseline,
+  );
+  return OwnerDishReportSchema.parse({
+    ...midnightReport,
+    summary,
+    report_metadata: { ...midnightReport.report_metadata, generated_at: end.toISOString() },
+  });
+}
+
 async function measureReport(
   client: Client,
   venueId: string,
@@ -125,42 +183,29 @@ async function measureReport(
   dayBaselineStart?: Date,
 ) {
   const isBatch = Boolean(dayBaselineStart) || durationMs === OWNER_BATCH_MS;
-  // Earliest release time makes source selection stable across UTC midnight.
-  const today = new Date(now.getTime() + (isBatch ? OWNER_BATCH_SETTLE_MS : 0));
-  today.setUTCHours(0, 0, 0, 0);
-  let liveEvidence: OwnerReportLiveEvidence | undefined;
-  if (source === 'production' && options.readTodayEvents) {
-    if (!options.productionPublications) throw new AuthUnavailableError();
-    const { storage, origin } = options.productionPublications;
-    const starts = new Date(
-      Math.max(today.getTime(), dayBaselineStart?.getTime() ?? now.getTime() - durationMs),
-    );
-    const evidence = {
-      start: today,
-      events: now > starts ? await options.readTodayEvents(venueId, starts, now) : [],
-    };
-    liveEvidence = {
-      ...evidence,
-      publications: await readReportPublications(
-        client,
-        storage,
-        origin,
-        venueId,
-        now,
-        evidence,
-        dayBaselineStart ?? new Date(now.getTime() - 2 * durationMs),
-      ),
-    };
-  }
+  const windowStart = new Date(now.getTime() - durationMs);
+  const dishStart = dayBaselineStart ?? windowStart;
+  // Daily dish metrics measure yesterday once, when the midnight cutoff becomes eligible.
+  const liveEvidence =
+    source === 'production' && options.readTodayEvents
+      ? await readReportEvidence(
+          client,
+          venueId,
+          dishStart,
+          now,
+          isBatch,
+          options,
+          dayBaselineStart ?? new Date(now.getTime() - 2 * durationMs),
+        )
+      : undefined;
   const query = liveEvidence
     ? PRODUCTION_OWNER_REPORT_QUERY
     : options.trafficClass === 'test'
       ? TEST_OWNER_REPORT_QUERY
       : OWNER_REPORT_QUERY;
-  const windowStart = new Date(now.getTime() - durationMs);
   const result = await client.query(query, [
     venueId,
-    windowStart,
+    dishStart,
     now,
     ...(liveEvidence ? liveEvidenceParameters(liveEvidence) : []),
   ]);
@@ -190,7 +235,7 @@ async function measureReport(
     venueId,
     now,
     source,
-    durationMs,
+    now.getTime() - dishStart.getTime(),
     Boolean(dayBaselineStart),
   );
   const displayActions =
@@ -198,7 +243,7 @@ async function measureReport(
       ? await readOwnerReportDisplayActions(
           client,
           venueId,
-          windowStart,
+          dishStart,
           now,
           liveEvidence,
           new Set(internal.dishes.map((dish) => String(dish.dish_id))),
@@ -228,10 +273,19 @@ async function measureReport(
           summary: displayActions
             ? {
                 ...summary,
-                current: {
-                  ...summary.current,
-                  portion_previews_shown: displayActions.portionTotal,
-                },
+                ...(dayBaselineStart
+                  ? {
+                      baseline: {
+                        ...summary.baseline,
+                        portion_previews_shown: displayActions.portionTotal,
+                      },
+                    }
+                  : {
+                      current: {
+                        ...summary.current,
+                        portion_previews_shown: displayActions.portionTotal,
+                      },
+                    }),
               }
             : summary,
         }

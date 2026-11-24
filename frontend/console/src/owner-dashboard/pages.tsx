@@ -1,4 +1,8 @@
-import { OWNER_REPORT_TIME_ZONE, type OwnerDishReport } from '@peekaplate/contracts/owner-report';
+import {
+  OWNER_PRODUCTION_DAY_VERSION,
+  OWNER_REPORT_TIME_ZONE,
+  type OwnerDishReport,
+} from '@peekaplate/contracts/owner-report';
 // Owner Dashboard screens: welcome, overview, report, dish performance, dish detail, actions.
 import { type ReactNode, useState } from 'react';
 import type { Chat } from './chat';
@@ -263,7 +267,7 @@ export function Overview({
       {live?.summary && live.summarySource === 'production' && (
         <Note icon="info">
           {live.summaryDay
-            ? 'Today’s totals start at midnight San Francisco time and update as activity settles. Yesterday shows its full calendar day.'
+            ? 'Today’s menu visits and dish opens update as activity settles. Dish performance, active time and 2.5D previews use the previous completed San Francisco day.'
             : live.summaryBatch
               ? 'Refresh shows the latest completed five-minute batch. Dish-level rates need enough visits.'
               : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
@@ -1661,18 +1665,22 @@ export function LivePerf({
 }) {
   const [q, setQ] = useState('');
   const [tab, setTab] = useState('open_rate');
+  const day =
+    report.source === 'production' &&
+    report.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION;
   const batch =
     report.source === 'production' &&
     report.report_metadata.calculation_version === 'production.batch.v1';
   type Dish = OwnerDishReport['dishes'][number];
   type Metric = keyof Dish['metrics'] | keyof NonNullable<Dish['display_actions']>;
-  const metrics: [Metric, string, 'count' | 'seconds' | 'rate'][] = batch
-    ? [
-        ...columns,
-        ['portion_previews_shown', '2.5D previews', 'count'],
-        ['comparisons_started', 'Comparisons started', 'count'],
-      ]
-    : columns;
+  const metrics: [Metric, string, 'count' | 'seconds' | 'rate'][] =
+    batch || day
+      ? [
+          ...columns,
+          ['portion_previews_shown', '2.5D previews', 'count'],
+          ['comparisons_started', 'Comparisons started', 'count'],
+        ]
+      : columns;
   const search = q.trim().toLowerCase();
   const dishes = report.dishes.filter((d) => d.name.toLowerCase().includes(search));
   const menuMatches = savedMenu.filter((dish) => dish.name.toLowerCase().includes(search));

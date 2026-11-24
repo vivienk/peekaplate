@@ -56,10 +56,12 @@ export async function mintOwnerReportReference(
     day?.end.getTime() ?? (productionBatch ? latestOwnerReportBatchEnd(now) : anchor);
   const expectedStart =
     day?.start.getTime() ?? (productionBatch ? expectedEnd - OWNER_BATCH_MS : undefined);
+  const window = day ? report.summary?.periods.current : metadata.date_window;
   if (
     report.venue_id !== scope.venueId ||
-    Date.parse(metadata.date_window.end_time) !== expectedEnd ||
-    (expectedStart !== undefined && Date.parse(metadata.date_window.start_time) !== expectedStart)
+    !window ||
+    Date.parse(window.end_time) !== expectedEnd ||
+    (expectedStart !== undefined && Date.parse(window.start_time) !== expectedStart)
   ) {
     throw new Error('Invalid owner report reference scope');
   }

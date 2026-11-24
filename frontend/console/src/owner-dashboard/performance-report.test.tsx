@@ -31,7 +31,8 @@ describe('authored performance presentation with report API data', () => {
       report_metadata: {
         ...REPORT.report_metadata,
         calculation_version: OWNER_PRODUCTION_DAY_VERSION,
-        date_window: { ...current, duration_hours: 21 },
+        generated_at: current.end_time,
+        date_window: { ...baseline, duration_hours: 24 },
       },
       summary: {
         periods: { current, baseline },
@@ -65,11 +66,13 @@ describe('authored performance presentation with report API data', () => {
     expect(page).toContain('Yesterday');
     expect(page).toContain('100');
     expect(page).not.toContain('Dish opens by batch');
-    expect(
-      renderToStaticMarkup(
-        <ReportView state={{ kind: 'ready', report }} presentation="performance" />,
-      ),
-    ).toContain('midnight San Francisco time');
+    const performance = renderToStaticMarkup(
+      <ReportView state={{ kind: 'ready', report }} presentation="performance" />,
+    );
+    expect(performance).toContain('previous completed San Francisco day');
+    expect(performance).toContain('Nov 22, 12:00 AM PST');
+    expect(performance).toContain('2.5D previews');
+    expect(performance).not.toContain('Nov 23, 9:15 PM PST');
   });
   it('uses the authored screen with API values and truthful missing evidence', () => {
     const page = renderToStaticMarkup(

@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "3eea0bf9c05661b0be8a5db925ca844c9bd256429b314080317bf31ccab86b0e"
+      "sourceFingerprint": "a2b4ed4db7a937ed99410bf4e26a5cea6ae714217046ebd492ea6ce859fb22a7"
     },
     {
       "id": "tokens",
@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "08acb0ffc542854bb403b02f1ea4d8f714880b2c861431bf0d8fb0c4ebabb137"
+      "sourceFingerprint": "1245b78ef3e1b2968d366259046953e8482488044f44706ca095e6b4168796ca"
     },
     {
       "id": "backend",
@@ -748,7 +748,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "48dcac4065d96c02029aaa4dabd4a30af3a23e9fab42ce1315c6e7a1e686b7d7"
+      "sourceFingerprint": "981e058512ac29a1cdaa226ebc2076f9385abadb6c6a027dfd6a1d9c6facce33"
     },
     {
       "id": "database",
@@ -911,7 +911,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "859d3ba300e76a6a60bf4807b0aed3e92407c241444bfa246f7062f0573ef721"
+      "sourceFingerprint": "6c9d5eef2b3b36370e313d07d5f50243137371f1d7c350415c699b79343b08ae"
     },
     {
       "id": "agents",
@@ -1289,7 +1289,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "contracts"
       ],
-      "summary": "Prepare production owner reports from San Francisco midnight through the settled cutoff. Console, CSV and signed report references share the snapshot. Capture and export timing remain independent.",
+      "summary": "Prepare production Overview totals from San Francisco midnight through the settled cutoff. Seal protected dish metrics once for the previous local day and use that same period in Dish Performance, CSV and AI. Capture and export timing remain independent.",
       "next": "Release the compatible console before enabling sf-day on the production Worker. Verify the approved release on existing QA events without generating diner activity."
     }
   ]

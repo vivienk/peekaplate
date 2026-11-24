@@ -13,11 +13,13 @@ import {
   TODAY_REPORT_EVIDENCE,
 } from './owner-report-evidence';
 
+const baselineStartExpression = '$2::timestamptz - ($3::timestamptz-$2::timestamptz)';
+const baselineInterval = `UNION ALL SELECT 'baseline', ${baselineStartExpression}, $2::timestamptz`;
 // The same authorized read-only snapshot and canonical traffic class as the dish report.
 const query = `/* owner_summary.v1 */
 WITH periods AS (
   SELECT 'current' AS period, $2::timestamptz AS starts, $3::timestamptz AS ends
-  UNION ALL SELECT 'baseline', $2::timestamptz - ($3::timestamptz-$2::timestamptz), $2::timestamptz
+  ${baselineInterval}
 ), scoped AS MATERIALIZED (
   SELECT p.period, obs.* FROM periods p
   JOIN app_private.owner_observation_v1 obs ON obs.tenant_id=$1
@@ -160,34 +162,37 @@ export async function readOwnerReportSummary(
   durationMs = 86_400_000,
   productionBatch = false,
   dayBaselineStart?: Date,
+  settledBaseline?: OwnerReportSummary['baseline'],
 ): Promise<OwnerReportSummary> {
   const start = new Date(now.getTime() - durationMs);
   const result = await client.query(
-    dayBaselineStart
-      ? productionQuery.replace(
-          '$2::timestamptz - ($3::timestamptz-$2::timestamptz)',
-          '$7::timestamptz',
-        )
-      : liveEvidence
-        ? productionQuery
-        : trafficClass === 'test'
-          ? query.replace(
-              'app_private.owner_observation_v1',
-              'app_private.owner_test_observation_v1',
-            )
-          : query,
+    settledBaseline
+      ? productionQuery.replace(baselineInterval, '')
+      : dayBaselineStart
+        ? productionQuery.replace(baselineStartExpression, '$7::timestamptz')
+        : liveEvidence
+          ? productionQuery
+          : trafficClass === 'test'
+            ? query.replace(
+                'app_private.owner_observation_v1',
+                'app_private.owner_test_observation_v1',
+              )
+            : query,
     [
       venueId,
       start,
       now,
       ...(liveEvidence ? liveEvidenceParameters(liveEvidence) : []),
-      ...(dayBaselineStart ? [dayBaselineStart] : []),
+      ...(dayBaselineStart && !settledBaseline ? [dayBaselineStart] : []),
     ],
   );
   const currentRow = result.rows.find((row) => row.period === 'current');
   const baselineRow = result.rows.find((row) => row.period === 'baseline');
   const current = metrics(currentRow, productionBatch);
-  const baseline = metrics(baselineRow, productionBatch);
+  if (dayBaselineStart) {
+    current.avg_interaction_time_seconds = { value: null, status: 'MISSING' };
+  }
+  const baseline = settledBaseline ?? metrics(baselineRow, productionBatch);
   const daily = (row: Row | undefined, totals: OwnerReportSummary['current']) =>
     dailyRows(row)?.map((bucket) => ({
       start_time: bucket.start_time,

@@ -15,11 +15,16 @@ describe('San Francisco report window', () => {
     }
   });
 
-  it('starts a new local day at midnight even before its first batch settles', () => {
-    const { start, end, baselineStart } = ownerReportDayWindow(new Date('2026-11-24T08:00:30Z'));
-    expect(start.toISOString()).toBe('2026-11-24T08:00:00.000Z');
-    expect(end).toEqual(start);
-    expect(baselineStart.toISOString()).toBe('2026-11-23T08:00:00.000Z');
+  it('waits for the midnight cutoff to settle before changing the local day', () => {
+    const pending = ownerReportDayWindow(new Date('2026-11-24T08:00:30Z'));
+    expect(pending.start.toISOString()).toBe('2026-11-23T08:00:00.000Z');
+    expect(pending.end.toISOString()).toBe('2026-11-24T07:55:00.000Z');
+    expect(pending.baselineStart.toISOString()).toBe('2026-11-22T08:00:00.000Z');
+
+    const settled = ownerReportDayWindow(new Date('2026-11-24T08:01:00Z'));
+    expect(settled.start.toISOString()).toBe('2026-11-24T08:00:00.000Z');
+    expect(settled.end).toEqual(settled.start);
+    expect(settled.baselineStart.toISOString()).toBe('2026-11-23T08:00:00.000Z');
   });
 
   it.each([

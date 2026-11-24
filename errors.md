@@ -5553,3 +5553,12 @@ therefore not send the question even with the UI and API flags configured. Use t
 completed-batch calculation when signing, preserve the request anchor across the next batch
 boundary and keep unknown freshness gated. The report reference and production browser tests
 cover the signed submission and the empty-report state.
+
+## Owner totals disappear after a quiet reporting interval
+
+The production owner route selected only the latest five-minute interval, so a quiet cutoff
+hid earlier activity still present in canonical storage. San Francisco day mode accumulates
+the restaurant-wide visit and open counts through settled cutoffs. Dish-level values and
+protected rollups use one sealed, completed local day so successive refreshes cannot expose a
+small intraday change. The production-report integration covers quiet cutoffs, late arrival
+at midnight, fixed dish data, the CSV period and cross-restaurant denial.
