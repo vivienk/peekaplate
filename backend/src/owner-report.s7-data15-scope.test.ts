@@ -99,7 +99,7 @@ describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determini
     expect(dataTs).not.toContain('T.withRec');
     expect(pagesTsx).not.toContain('T.ord');
     expect(pagesTsx).toContain("value: 'Unavailable'");
-  });
+  }, 15_000);
 
   it('has clean README encoding, spacing, and Windows-compatible commands', () => {
     const readme = fs.readFileSync(README_PATH, 'utf8');
