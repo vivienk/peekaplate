@@ -26,7 +26,7 @@ def build_expanded_lines(base_lines: list[str], pair_count: int = PAIR_COUNT) ->
             record["event_id"] = record["event_id"] + suffix
             if record.get("exposure_id") is not None:
                 record["exposure_id"] = record["exposure_id"] + suffix
-            expanded.append(json.dumps(record))
+            expanded.append(json.dumps(record, separators=(",", ":")))
     return expanded
 
 
