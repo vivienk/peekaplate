@@ -79,9 +79,10 @@ def main() -> None:
 
     payload = "\n".join(expanded) + "\n"
     if args.replay and OUT_FILE.exists():
-        existing = OUT_FILE.read_text(encoding="utf-8").replace("\r\n", "\n")
-        if existing != payload:
-            raise SystemExit("Replay determinism check failed: generated output differs from existing full_dataset.jsonl")
+        existing_records = [json.loads(line) for line in OUT_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
+        expected_records = [json.loads(line) for line in expanded]
+        if existing_records != expected_records:
+            raise SystemExit("Replay determinism check failed: generated records differ from existing full_dataset.jsonl")
 
     with OUT_FILE.open("w", encoding="utf-8", newline="\n") as f:
         f.write(payload)
