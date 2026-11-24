@@ -116,8 +116,9 @@ export function useOwnerReport(source: ReportSource): {
     request: { apiBase, venueId, getAccessToken },
     state: { kind: 'loading' } as ReportState,
     refreshing: false,
+    daily: false,
   }));
-  const { request, state, refreshing } = load;
+  const { request, state, refreshing, daily } = load;
   if (
     request.apiBase !== apiBase ||
     request.venueId !== venueId ||
@@ -128,6 +129,7 @@ export function useOwnerReport(source: ReportSource): {
       request: { apiBase, venueId, getAccessToken },
       state: { kind: 'loading' },
       refreshing: false,
+      daily: false,
     });
   }
   useEffect(() => {
@@ -145,16 +147,23 @@ export function useOwnerReport(source: ReportSource): {
         next = { kind: 'error' };
       }
       if (signal.aborted) return;
+      // Remember the validated report mode during a transient failure, while clearing its data.
       setLoad((current) =>
-        current.request === request ? { request, state: next, refreshing: false } : current,
+        current.request === request
+          ? {
+              request,
+              state: next,
+              refreshing: false,
+              daily:
+                next.kind === 'ready'
+                  ? next.report.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION
+                  : current.daily && (next.kind === 'error' || next.kind === 'unavailable'),
+            }
+          : current,
       );
     })();
     return () => controller.abort();
   }, [request]);
-  const daily =
-    source.mode === 'live' &&
-    state.kind === 'ready' &&
-    state.report.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION;
   useEffect(() => {
     if (!daily || !apiBase || !venueId || !getAccessToken) return;
     const timer = window.setInterval(() => {
@@ -165,7 +174,7 @@ export function useOwnerReport(source: ReportSource): {
           current.request.venueId !== venueId ||
           current.request.apiBase !== apiBase ||
           current.request.getAccessToken !== getAccessToken ||
-          current.state.kind !== 'ready'
+          !current.daily
         )
           return current;
         return { ...current, request: { ...current.request }, refreshing: true };

@@ -199,10 +199,12 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
       production = true,
       save = false,
       preview = false,
+      activeMs?: number,
     ) {
       const sessionId = crypto.randomUUID();
       const producerId = crypto.randomUUID();
       const exposureId = crypto.randomUUID();
+      const openingId = crypto.randomUUID();
       const dish = { dish_id: venue.dishId, dish_revision_id: venue.dishRevisionId };
       const events = [
         { type: 'menu_viewed', payload: { entry_source: 'direct_link' } },
@@ -220,12 +222,20 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           type: 'dish_detail_opened',
           payload: {
             ...dish,
-            opening_id: crypto.randomUUID(),
+            opening_id: openingId,
             source: 'menu_card',
             from_exposure_id: exposureId,
             save_available: true,
           },
         },
+        ...(activeMs === undefined
+          ? []
+          : [
+              {
+                type: 'dish_activity_checkpoint' as const,
+                payload: { ...dish, opening_id: openingId, active_ms: activeMs, final: true },
+              },
+            ]),
         ...(preview ? [{ type: 'dish_portion_opened' as const, payload: dish }] : []),
         ...(save
           ? [
@@ -718,11 +728,27 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           window_start: '2035-02-03 00:00:00.000',
           window_end: '2035-02-03 08:00:00.000',
         });
-        for (let index = 0; index < 10; index++) {
+        const cutover = '2035-02-03T08:00:00.000Z';
+        for (let index = 0; index < 9; index++) {
           postHogEvents.push(
-            ...(await visit(venue, '2035-02-03T08:02:00.000Z', true, false, true)),
+            ...(await visit(venue, '2035-02-03T07:59:00.000Z', true, false, true)),
+          );
+          postHogEvents.push(
+            ...(await visit(venue, '2035-02-03T08:02:00.000Z', true, false, true, 10_000)),
           );
         }
+        const boundary = await request('', await issueToken(venue.actorId));
+        expect(boundary.status).toBe(200);
+        const boundaryReport = OwnerDishReportSchema.parse(await boundary.json());
+        expect(boundaryReport.summary?.periods.current.end_time).toBe(cutover);
+        expect(boundaryReport.summary?.current.portion_previews_shown).toEqual({
+          value: 10,
+          status: 'NORMAL',
+        });
+        const boundaryKey = `owner-report-batches/v1/${venue.venueId}/${cutover}.json`;
+        const sealedBoundary = bundles.get(boundaryKey)?.slice(0);
+        expect(sealedBoundary).toBeDefined();
+
         // The rollback route can return venue counts but must never expose protected
         // five-minute metrics for the same day as a future completed-day report.
         vi.setSystemTime(new Date('2035-02-03T08:06:00.000Z'));
@@ -730,21 +756,45 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         expect(rollback.status).toBe(200);
         const rollbackReport = OwnerDishReportSchema.parse(await rollback.json());
         expect(rollbackReport.dishes).toEqual([]);
-        expect(rollbackReport.summary?.current.portion_previews_shown.value).toBeNull();
-        expect(rollbackReport.summary?.current.dish_opens.value).toBe(10);
+        expect(rollbackReport.summary?.current).toMatchObject({
+          menu_sessions: { value: 9, status: 'NORMAL' },
+          dish_opens: { value: 9, status: 'NORMAL' },
+          portion_previews_shown: { value: null, status: 'MISSING' },
+        });
+        expect(rollbackReport.summary?.baseline).toMatchObject({
+          menu_sessions: { value: 10, status: 'NORMAL' },
+          dish_opens: { value: 10, status: 'NORMAL' },
+          portion_previews_shown: { value: null, status: 'MISSING' },
+          avg_interaction_time_seconds: { value: null, status: 'MISSING' },
+          verified_orders: { value: null, status: 'MISSING' },
+        });
+        expect(bundles.get(boundaryKey)).toEqual(sealedBoundary);
         vi.setSystemTime(new Date('2035-02-03T08:11:00.000Z'));
         const adjacent = await request('', await issueToken(venue.actorId));
         expect(OwnerDishReportSchema.parse(await adjacent.json()).summary?.baseline).toMatchObject({
-          dish_opens: { value: 10, status: 'NORMAL' },
+          dish_opens: { value: 9, status: 'NORMAL' },
           portion_previews_shown: { value: null, status: 'MISSING' },
         });
 
+        // Ten finalized sessions from one Pacific day straddle UTC midnight 9 + 1.
+        postHogEvents.push(
+          ...(await visit(venue, '2035-02-04T00:00:00.000Z', true, false, true, 20_000)),
+        );
         const dailyWithFreshToken = async (suffix = '') =>
           request(suffix, await issueToken(venue.actorId), venue.venueId, true, 'true', 'sf-day');
         vi.setSystemTime(new Date('2035-02-04T08:01:00.000Z'));
         const closedDayResponse = await dailyWithFreshToken();
         expect(closedDayResponse.status).toBe(200);
         const closedDay = OwnerDishReportSchema.parse(await closedDayResponse.json());
+        expect(closedDay.summary?.daily_opens).toBeUndefined();
+        expect(closedDay.summary?.baseline.avg_interaction_time_seconds).toEqual({
+          value: 11,
+          status: 'NORMAL',
+        });
+        expect(closedDay.summary?.current.avg_interaction_time_seconds).toEqual({
+          value: null,
+          status: 'MISSING',
+        });
         expect(closedDay.dishes[0]?.display_actions?.portion_previews_shown).toEqual({
           value: 10,
           status: 'NORMAL',
@@ -757,7 +807,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         // A lone preview today and a late arrival yesterday must not change sealed dish data.
         postHogEvents.push(
           ...(await visit(venue, '2035-02-04T07:59:10.000Z', true, false, true)),
-          ...(await visit(venue, '2035-02-04T08:02:00.000Z', true, false, true)),
+          ...(await visit(venue, '2035-02-04T08:02:00.000Z', true, false, true, 12_000)),
         );
         vi.setSystemTime(new Date('2035-02-04T08:06:00.000Z'));
         const nextDayResponse = await dailyWithFreshToken();
@@ -776,6 +826,14 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         expect(dayCells).toMatchObject({
           window_start: '2035-02-03T08:00:00.000Z',
           window_end: '2035-02-04T08:00:00.000Z',
+        });
+        vi.setSystemTime(new Date('2035-02-05T08:01:00.000Z'));
+        const smallDayResponse = await dailyWithFreshToken();
+        expect(smallDayResponse.status).toBe(200);
+        const smallDay = OwnerDishReportSchema.parse(await smallDayResponse.json());
+        expect(smallDay.summary?.baseline.avg_interaction_time_seconds).toEqual({
+          value: null,
+          status: 'SUPPRESSED',
         });
         expect(otherRefreshed.dishes).toEqual([]);
         expect(otherRefreshed.summary?.baseline.dish_opens).toEqual({

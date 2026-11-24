@@ -75,25 +75,23 @@ export async function readBatchedOwnerReport(
   dishDayStart?: Date,
 ): Promise<OwnerDishReport> {
   const lastEnd = latestOwnerReportBatchEnd(now);
-  const batch = async (end: number) => {
-    const expose = (report: OwnerDishReport) =>
-      !dishDayStart || end > dishDayStart.getTime() ? restaurantCountsOnly(report) : report;
-    const report = await readOrSeal(
+  const expose = (report: OwnerDishReport, end: number) =>
+    !dishDayStart || end > dishDayStart.getTime() ? restaurantCountsOnly(report) : report;
+  const batch = (end: number) =>
+    readOrSeal(
       venueId,
       storage,
       OWNER_PRODUCTION_BATCH_VERSION,
       new Date(end - OWNER_BATCH_MS),
       new Date(end),
-      async (cutoff) => expose(await measure(cutoff)),
+      async (cutoff) => expose(await measure(cutoff), end),
     );
-    return expose(report);
-  };
   const current = await batch(lastEnd);
   const previous = await batch(lastEnd - OWNER_BATCH_MS);
   if (!current.summary || !previous.summary) throw new AuthUnavailableError();
   const dailyOpens = current.summary.daily_opens?.current;
   const previousOpens = previous.summary.daily_opens?.current;
-  return OwnerDishReportSchema.parse({
+  const report = {
     ...current,
     summary: {
       ...current.summary,
@@ -102,7 +100,9 @@ export async function readBatchedOwnerReport(
         ? { daily_opens: { current: dailyOpens, baseline: previousOpens } }
         : {}),
     },
-  });
+  };
+  // The cutoff governs both response periods, including a previously sealed baseline.
+  return OwnerDishReportSchema.parse(expose(report, lastEnd));
 }
 
 export function readDailyOwnerReport(

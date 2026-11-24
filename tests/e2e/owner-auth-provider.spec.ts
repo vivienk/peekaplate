@@ -1,6 +1,7 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { OWNER_PAGE_PATHS } from '../../frontend/console/src/owner/routes';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
+import { OWNER_PRODUCTION_DAY_VERSION } from '../../packages/contracts/src/owner-report';
 
 const origin = 'http://127.0.0.1:5174';
 const productionOrigin = 'https://peekaplate.app';
@@ -310,6 +311,122 @@ test('production deep links resume after sign-in and keep orientation through br
     page.getByText('There are no dishes with report data in this period.'),
   ).toBeVisible();
   expect(analysisRequests).toBe(1);
+});
+
+test('the production day report retries transient failures on the next visible minute', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.route(`${productionOrigin}/**`, serveConsole);
+  await provider(page, {}, productionOrigin);
+  const venue = { venueId: user.id, name: 'Synthetic Corner Cafe', permission: 'owner' };
+  const baseline = { start_time: '2026-11-22T08:00:00Z', end_time: '2026-11-23T08:00:00Z' };
+  const current = { start_time: baseline.end_time, end_time: '2026-11-23T17:00:00Z' };
+  const missing = { value: null, status: 'MISSING' };
+  const totals = {
+    menu_sessions: missing,
+    dish_opens: missing,
+    avg_interaction_time_seconds: missing,
+    portion_previews_shown: missing,
+    verified_orders: missing,
+  };
+  let reportReads = 0;
+  let daily = true;
+  await page.route('https://api.peekaplate.app/**', async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const headers = {
+      'Access-Control-Allow-Origin': productionOrigin,
+      'Access-Control-Allow-Headers': 'Authorization',
+    };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    expect(route.request().headers().authorization).toBe(`Bearer ${session.access_token}`);
+    if (pathname === '/staff/venues') {
+      return route.fulfill({
+        headers,
+        json: { actorId: user.id, venues: reportReads >= 7 ? [] : [venue] },
+      });
+    }
+    if (pathname.endsWith('/setup')) {
+      return route.fulfill({
+        headers,
+        json: {
+          venueId: venue.venueId,
+          restaurantName: venue.name,
+          detailsStatus: 'verified',
+          menuAdded: true,
+          menuVerified: true,
+          published: true,
+        },
+      });
+    }
+    if (pathname.endsWith('/profile')) return route.fulfill({ headers, json: { profile: null } });
+    if (pathname.endsWith('/jobs')) return route.fulfill({ headers, json: { jobs: [] } });
+    if (pathname.endsWith('/drafts')) return route.fulfill({ headers, json: { drafts: [] } });
+    if (!pathname.endsWith('/analytics/dishes')) return route.fulfill({ status: 404, headers });
+    reportReads++;
+    if (reportReads === 2) return route.fulfill({ status: 503, headers });
+    if (reportReads === 3) return route.abort('failed');
+    if (reportReads === 7) return route.fulfill({ status: 403, headers });
+    return route.fulfill({
+      headers,
+      json: {
+        ...UNEEZA_REPORT,
+        source: 'production',
+        venue_id: venue.venueId,
+        dishes: UNEEZA_REPORT.dishes.map((dish, index) =>
+          index === 0 ? { ...dish, name: `Report response ${reportReads}` } : dish,
+        ),
+        report_metadata: {
+          ...UNEEZA_REPORT.report_metadata,
+          calculation_version: daily ? OWNER_PRODUCTION_DAY_VERSION : 'production.batch.v1',
+          ...(daily && {
+            generated_at: current.end_time,
+            date_window: { ...baseline, duration_hours: 24 },
+          }),
+        },
+        ...(daily && {
+          summary: { periods: { current, baseline }, current: totals, baseline: totals },
+        }),
+      },
+    });
+  });
+  await page.goto(`${productionOrigin}/dish-performance`);
+  await enterEmail(page);
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  const table = page.getByRole('table');
+  await expect(table.getByText('Report response 1')).toBeVisible();
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+  });
+  await page.clock.runFor(60_000);
+  expect(reportReads).toBe(1);
+  await page.evaluate(() => {
+    Reflect.deleteProperty(document, 'visibilityState');
+  });
+  await page.clock.runFor(60_000);
+  await expect(page.getByText('Reports aren’t available for this restaurant yet.')).toBeVisible();
+  await expect(table).toHaveCount(0);
+  await page.clock.runFor(60_000);
+  await expect(page.getByRole('alert')).toContainText('We couldn’t load the report.');
+  await page.clock.runFor(60_000);
+  await expect(table.getByText('Report response 4')).toBeVisible();
+
+  daily = false;
+  await page.clock.runFor(60_000);
+  await expect(table.getByText('Report response 5')).toBeVisible();
+  await page.clock.runFor(120_000);
+  expect(reportReads).toBe(5);
+
+  daily = true;
+  await page.getByRole('button', { name: 'Refresh report' }).click();
+  await expect(table.getByText('Report response 6')).toBeVisible();
+  await page.clock.runFor(60_000);
+  await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
+  await expect(table).toHaveCount(0);
+  await page.clock.runFor(120_000);
+  expect(reportReads).toBe(7);
 });
 
 test('production confirms to sign-in, opens S05, resumes saves and retains the authorized workspace', async ({

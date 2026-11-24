@@ -286,7 +286,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Owners can refresh in place. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
+      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart show validated summaries and gaps. Visible San Francisco day reports retry transient refresh failures for the same source. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1245b78ef3e1b2968d366259046953e8482488044f44706ca095e6b4168796ca"
+      "sourceFingerprint": "e4b3cc820ff1cdc012656816f6acf74edee86184974bb44a7172a7c693c11107"
     },
     {
       "id": "backend",
@@ -748,7 +748,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "2387b13aae24fd3bf5e80f7c19b8c13860854071196452bd310720cf8dc79eba"
+      "sourceFingerprint": "923706515055a0d0f508cf5289a6a7949e58e4b11e4beca1d02dfc78b975035f"
     },
     {
       "id": "database",
@@ -911,7 +911,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "7c6a9df6e6ddea68f418b70ee76cebdf2f19026035fa847e71d95defe9a3ce06"
+      "sourceFingerprint": "2401af124f2d24d323f4ac802d0e1563b823352aa0bc86abb09812c7df022b0a"
     },
     {
       "id": "agents",
@@ -1289,8 +1289,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "contracts"
       ],
-      "summary": "Prepare production Overview totals from San Francisco midnight through the settled cutoff. Seal protected dish metrics once for the previous local day and use that same period in Dish Performance, CSV and AI. Capture and export timing remain independent.",
-      "next": "Release the compatible console before enabling sf-day. Pin the approved Pacific midnight cutover for closed-day dish metrics and retain it on rollback. Verify with existing QA events."
+      "summary": "Prepare production Overview totals from San Francisco midnight through settled cutoffs and recover after transient refresh failures. Protect both legacy comparison periods at cutover. The previous complete local day supplies protected active time and the shared Dish Performance, CSV and AI period. Capture and export stay independent.",
+      "next": "Obtain independent approval on the corrected head. Verify private snapshot retention and the approved Pacific midnight before activating the compatible console and Worker in release order."
     }
   ]
 }

@@ -5562,3 +5562,19 @@ the restaurant-wide visit and open counts through settled cutoffs. Dish-level va
 protected rollups use one sealed, completed local day so successive refreshes cannot expose a
 small intraday change. The production-report integration covers quiet cutoffs, late arrival
 at midnight, fixed dish data, the CSV period and cross-restaurant denial.
+
+The daily refresh timer stopped when a retryable error replaced the ready report. Keep its daily
+mode tied to the same authorized report source while displaying the error, and clear it on terminal
+access failures. The owner authentication browser test covers recovery on a later visible tick.
+
+The first legacy fallback after the cutover still reused protected metrics from the previous
+interval ending at the boundary. Mask both intervals in the response once the current cutoff is
+past that boundary while retaining the underlying sealed report. The first daily active-time
+summary also applied suppression from UTC buckets it did not expose. Use the completed Pacific
+day and per-dish privacy floors for that summary. The signed production-report integration checks
+the first fallback response and a ten-session cohort split across UTC midnight.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-24T07:21:11.647Z","exitCode":1}
+```

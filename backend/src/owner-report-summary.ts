@@ -104,7 +104,11 @@ function dailyRows(row: Row | undefined): DailyRow[] | undefined {
     };
   });
 }
-function metrics(row: Row | undefined, productionBatch: boolean): OwnerReportSummary['current'] {
+function metrics(
+  row: Row | undefined,
+  productionBatch: boolean,
+  includeUtcBuckets: boolean,
+): OwnerReportSummary['current'] {
   const missing = { value: null, status: 'MISSING' } as const;
   if (!row)
     return {
@@ -128,7 +132,8 @@ function metrics(row: Row | undefined, productionBatch: boolean): OwnerReportSum
   const protectedSubset =
     row.has_small_dish ||
     row.has_small_timed_dish ||
-    dailyRows(row)?.some((bucket) => bucket.sessions > 0 && bucket.sessions < 10);
+    (includeUtcBuckets &&
+      dailyRows(row)?.some((bucket) => bucket.sessions > 0 && bucket.sessions < 10));
   const value = (number: number | null, cohort: number) => {
     if (protectedSubset) return { value: null, status: 'SUPPRESSED' } as const;
     if (cohort === 0) return { value: null, status: 'NOT_MEASURABLE' } as const;
@@ -188,11 +193,13 @@ export async function readOwnerReportSummary(
   );
   const currentRow = result.rows.find((row) => row.period === 'current');
   const baselineRow = result.rows.find((row) => row.period === 'baseline');
-  const current = metrics(currentRow, productionBatch);
+  // The Pacific-day report displays whole-day cohorts without UTC buckets.
+  const includeUtcBuckets = !dayBaselineStart;
+  const current = metrics(currentRow, productionBatch, includeUtcBuckets);
   if (dayBaselineStart) {
     current.avg_interaction_time_seconds = { value: null, status: 'MISSING' };
   }
-  const baseline = settledBaseline ?? metrics(baselineRow, productionBatch);
+  const baseline = settledBaseline ?? metrics(baselineRow, productionBatch, includeUtcBuckets);
   const daily = (row: Row | undefined, totals: OwnerReportSummary['current']) =>
     dailyRows(row)?.map((bucket) => ({
       start_time: bucket.start_time,
@@ -204,8 +211,8 @@ export async function readOwnerReportSummary(
             ? { value: null, status: 'NOT_MEASURABLE' as const }
             : { value: bucket.opens, status: 'NORMAL' as const },
     }));
-  const currentDaily = dayBaselineStart ? undefined : daily(currentRow, current);
-  const baselineDaily = dayBaselineStart ? undefined : daily(baselineRow, baseline);
+  const currentDaily = includeUtcBuckets ? daily(currentRow, current) : undefined;
+  const baselineDaily = includeUtcBuckets ? daily(baselineRow, baseline) : undefined;
   const schema = productionBatch ? ProductionBatchSummarySchema : OwnerReportSummarySchema;
   return schema.parse({
     periods: {
