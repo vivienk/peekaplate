@@ -2,6 +2,7 @@
 // renders into a container and navigates through callbacks; it is built with DOM methods, so dish
 // text is never parsed as markup. Copy and look are provisional until the Figma Saved frames are
 // applied.
+import savedEmptyIcon from '../assets/icons/ui/cutllery.svg';
 import { BACK_ICON } from '../menu/navButton';
 import { formatPrice } from '../menu/price';
 import type { CompleteDish, Menu } from '../menu/types';
@@ -141,12 +142,20 @@ export function renderSavedScreen(
     notice.hidden = saveState.mode() !== 'session-only';
     const items = savedItems(saveState, menu);
     if (items.length === 0) {
-      // Figma Saved_Empty (722:8589). The plate-and-cutlery illustration comes in a follow-up PR.
+      // Figma Saved_Empty (722:8589): the plate-and-cutlery picture, then the words and the hint.
       const empty = el('div', 'pp-saved__empty');
+      // Decoration only: the words below carry the meaning.
+      const picture = el('img', 'pp-saved__empty-image');
+      picture.src = savedEmptyIcon;
+      picture.alt = '';
+      picture.width = 120;
+      picture.height = 120;
+      picture.setAttribute('aria-hidden', 'true');
       const browse = el('button', 'pp-saved__browse', 'Browse menu');
       browse.type = 'button';
       browse.addEventListener('click', onBack);
       empty.append(
+        picture,
         el('p', 'pp-saved__empty-text', 'No saved dishes yet'),
         el('p', 'pp-saved__empty-hint', 'Save dishes you like to find them here later.'),
         browse,

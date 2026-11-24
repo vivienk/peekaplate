@@ -484,7 +484,8 @@ main:has(> .pp-compare) {
 }
 
 .pp-search-panel {
-  padding: 4px 0 0;
+  /* Figma Search State: an 88px block, bar 48px with 20px above and below. */
+  padding: 20px 0;
 }
 
 .pp-search-panel .pp-search-bar,
@@ -573,23 +574,27 @@ main:has(> .pp-compare) {
    button keeps a 28px target. Typed text stays 16px so phones do not zoom on focus. */
 .pp-search-panel .pp-search-bar {
   box-sizing: border-box;
-  height: 44px;
+  height: 48px;
+  max-width: 335px;
+  margin: 0 auto;
   padding: 8px 6px;
-  border: 1px solid var(--pp-role-primary);
+  border: 0;
+  /* Figma stroke is outside the 48px frame, so it is a shadow, not a border. */
+  box-shadow: 0 0 0 1px var(--pp-role-primary);
   border-radius: 12px;
 }
 
 .pp-search-panel .pp-search-bar:hover {
-  border-color: var(--pp-color-orange-400, var(--pp-role-primary));
+  box-shadow: 0 0 0 1px var(--pp-color-orange-400, var(--pp-role-primary));
 }
 
 .pp-search-panel .pp-search-bar:focus-within {
-  border-color: transparent;
+  box-shadow: none;
 }
 
 .pp-search-panel .pp-search-input {
   box-sizing: border-box;
-  height: 28px;
+  height: 32px;
   padding: 0 34px 0 34px;
   border: 0;
   border-radius: 999px;
@@ -625,7 +630,7 @@ main:has(> .pp-compare) {
 .pp-search-panel__icon {
   position: absolute;
   top: 50%;
-  left: 19px;
+  left: 18px;
   width: 16px;
   height: 16px;
   transform: translateY(-50%);
@@ -637,7 +642,7 @@ main:has(> .pp-compare) {
 .pp-search-panel .pp-search-close {
   position: absolute;
   top: 50%;
-  right: 9px;
+  right: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -659,6 +664,21 @@ main:has(> .pp-compare) {
   background: var(--pp-color-neutral-700);
 }
 
+.pp-search-panel .pp-search-close__icon {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--pp-color-neutral-700);
+}
+
+/* Active: the circle fill is hidden and the cross is dark (#2A2D36). */
+.pp-search-panel .pp-search-bar:focus-within .pp-search-close__icon {
+  background: transparent;
+  filter: brightness(0);
+}
+
 .pp-search-staff {
   margin: 8px 0 0;
   color: #fafafa;
@@ -673,41 +693,50 @@ main:has(> .pp-compare) {
   display: none;
 }
 
+/* Figma Search State, No result: 32px above, a 150px icon, 24px, a 24/32 title, a 252px two-line
+   text, 20px, then a 126x40 button. */
 .pp-search-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 48px 16px 24px;
+  gap: 0;
+  padding: 32px 16px 20px;
   text-align: center;
 }
 
 .pp-search-empty__icon {
-  width: 72px;
-  height: 72px;
-  border: 6px solid #f89537;
-  border-radius: 999px;
-  box-sizing: border-box;
+  width: 170px;
+  height: 170px;
+  margin-bottom: 24px;
+  background: url("./assets/icons/ui/dish.svg") center / 150px 150px no-repeat;
 }
 
 .pp-search-empty__title {
-  margin: 12px 0 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #fafafa;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 32px;
+  color: #fff8ed;
 }
 
 .pp-search-empty__text {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
+  max-width: 252px;
+  margin: 8px 0 0;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 28px;
   color: #a8a59e;
 }
 
 .pp-search-empty__clear {
   flex: none;
-  margin-top: 8px;
-  padding: 8px 20px;
+  box-sizing: border-box;
+  height: 40px;
+  margin-top: 20px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 24px;
   border-radius: 999px;
 }
 
@@ -738,7 +767,9 @@ main:has(> .pp-compare) {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 16px;
-  padding: 6px 0;
+  box-sizing: border-box;
+  min-height: 54px;
+  padding: 0;
   width: 100%;
 }
 
@@ -746,8 +777,8 @@ main:has(> .pp-compare) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   padding: 0;
   border: 1px solid rgba(255, 248, 237, 0.1);
   border-radius: 999px;
@@ -807,7 +838,7 @@ main:has(> .pp-compare) {
 .pp-detail__image-wrap {
   display: flex;
   justify-content: center;
-  padding: 0 0 16px;
+  padding: 4px 0;
 }
 
 .pp-detail__image {
@@ -847,6 +878,7 @@ main:has(> .pp-compare) {
 
 .pp-detail__category {
   font-size: 12px;
+  line-height: 16px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #a8a59e;
@@ -1037,6 +1069,9 @@ main:has(> .pp-compare) {
 .pp-detail__save.pp-save-heart {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
+  min-width: 66px;
+  height: 28px;
   gap: 6px;
   font-size: 18px;
   line-height: 28px;
@@ -1984,7 +2019,7 @@ main:has(> .pp-compare) {
   display: block;
   width: calc(100% - 40px);
   height: 40px;
-  margin: 48px 20px 0;
+  margin: 24px 20px 0;
   border: 0;
   border-radius: 999px;
   background: #f89537;
@@ -2326,4 +2361,114 @@ main:has(> .pp-compare) {
   display: block;
   width: 18px;
   height: 18px;
+}
+
+/* Figma DishDetail_OpenFailed: the dish name in the top bar, no heart; picture 150px, text 32px
+   below it, Try again 318x40 24px below the text, the block starting 149px under the top bar. */
+.pp-detail--failed > .pp-detail__topbar {
+  grid-template-columns: auto 1fr;
+}
+
+.pp-open-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 145px;
+}
+
+.pp-open-failed__image {
+  display: block;
+  width: 150px;
+  height: 150px;
+}
+
+.pp-open-failed__text {
+  max-width: 205px;
+  margin: 32px 0 0;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 28px;
+  text-align: center;
+  color: #fafafa;
+}
+
+.pp-open-failed__retry {
+  flex: none;
+  align-self: stretch;
+  box-sizing: border-box;
+  height: 40px;
+  margin: 24px 20px 0;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+/* Figma DishDetail_Loading: the same layout drawn as grey placeholders until the photo loads. */
+.pp-detail--loading {
+  pointer-events: none;
+}
+
+.pp-detail--loading .pp-detail__title,
+.pp-detail--loading .pp-detail__category,
+.pp-detail--loading .pp-detail__name,
+.pp-detail--loading .pp-detail__price,
+.pp-detail--loading .pp-detail__description,
+.pp-detail--loading .pp-detail__servings,
+.pp-detail--loading .pp-detail__save,
+.pp-detail--loading .pp-ingredient__name,
+.pp-detail--loading .pp-detail__actions .pp-btn {
+  border-radius: 8px;
+  background: #3a3d46;
+  color: transparent;
+  animation: pp-skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.pp-detail--loading .pp-detail__title {
+  width: 207px;
+  justify-self: start;
+}
+
+.pp-detail--loading .pp-detail__save {
+  width: 77px;
+  min-width: 77px;
+  border: 0;
+}
+
+.pp-detail--loading .pp-detail__save * {
+  visibility: hidden;
+}
+
+.pp-detail--loading .pp-detail__image-wrap {
+  background:
+    linear-gradient(#3a3d46, #3a3d46) center / min(320px, 100%) min(320px, 100%) no-repeat;
+  animation: pp-skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.pp-detail--loading .pp-detail__image,
+.pp-detail--loading .pp-ingredient__icon,
+.pp-detail--loading .pp-chip,
+.pp-detail--loading .pp-allergen-section {
+  visibility: hidden;
+}
+
+@keyframes pp-skeleton-pulse {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-detail--loading .pp-detail__title,
+  .pp-detail--loading .pp-detail__category,
+  .pp-detail--loading .pp-detail__name,
+  .pp-detail--loading .pp-detail__price,
+  .pp-detail--loading .pp-detail__description,
+  .pp-detail--loading .pp-detail__servings,
+  .pp-detail--loading .pp-detail__save,
+  .pp-detail--loading .pp-ingredient__name,
+  .pp-detail--loading .pp-detail__actions .pp-btn,
+  .pp-detail--loading .pp-detail__image-wrap {
+    animation: none;
+  }
 }

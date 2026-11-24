@@ -11,6 +11,11 @@ import type { SaveState } from './save-state';
 const REMOVED_TEXT = 'Removed from saved dishes';
 const RESTORED_TEXT = 'Added back to Saved';
 const UNDO_TEXT = 'Undo';
+const DISMISS_LABEL = 'Dismiss';
+
+// The removed toast's close button, drawn like its status icon: a circle with a cross.
+const CLOSE_ICON =
+  '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="10" fill="currentColor"/><path d="m7 7 6 6M13 7l-6 6" fill="none" stroke="var(--pp-toast-icon-mark)" stroke-width="2" stroke-linecap="round"/></svg>';
 
 // Each toast's status icon sits in a circle (review #3); the colours come from save.css.
 const STATUS_ICONS = {
@@ -60,7 +65,19 @@ function draw(hub: Hub) {
   const text = document.createElement('span');
   text.className = 'pp-toast__text';
   text.textContent = toast.kind === 'removed' ? REMOVED_TEXT : RESTORED_TEXT;
-  box.append(icon, text);
+  if (toast.kind === 'removed') {
+    // Rania (PR 145 review): a close button takes the place of the dash icon, so the diner can
+    // dismiss the toast without waiting. Dismissing it also ends the chance to undo.
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'pp-toast__close';
+    close.setAttribute('aria-label', DISMISS_LABEL);
+    close.innerHTML = CLOSE_ICON;
+    close.addEventListener('click', () => hub.feedback.dismiss());
+    box.append(close, text);
+  } else {
+    box.append(icon, text);
+  }
   if (toast.kind === 'removed') {
     const undo = document.createElement('button');
     undo.type = 'button';

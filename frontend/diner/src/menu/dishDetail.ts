@@ -1,3 +1,4 @@
+import sadIcon from '../assets/icons/ui/sad-01.svg';
 import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
 import { allergenIcon, dietaryIcon, ingredientIcon } from './icons';
 import { navButtonMarkup } from './navButton';
@@ -61,6 +62,35 @@ function ingredientTiles(dish: CompleteDish): string {
       `;
     })
     .join('');
+}
+
+export function renderDishOpenFailed(
+  container: HTMLElement,
+  dishName: string,
+  onBack: () => void,
+  onRetry: () => void,
+  backLabel = 'Back to menu',
+): void {
+  // Figma DishDetail_OpenFailed: back button and the dish name, no heart; a 150px sad picture, the
+  // message 32px below it, then a full-width Try again button 24px below the message.
+  container.innerHTML = `
+    <div class="pp-detail pp-detail--failed">
+      <header class="pp-detail__topbar">
+        ${navButtonMarkup('back', 'pp-detail__back', backLabel)}
+        <h1 class="pp-detail__title" tabindex="-1">${escapeHtml(dishName)}</h1>
+      </header>
+      <div class="pp-open-failed" role="alert">
+        <img class="pp-open-failed__image" src="${escapeHtml(sadIcon)}" alt="" aria-hidden="true" width="150" height="150" />
+        <p class="pp-open-failed__text">Something went wrong! Please try again</p>
+        <button class="pp-btn pp-btn--primary pp-open-failed__retry" type="button">Try again</button>
+      </div>
+    </div>
+  `;
+  container.querySelector<HTMLButtonElement>('.pp-detail__back')?.addEventListener('click', onBack);
+  container
+    .querySelector<HTMLButtonElement>('.pp-open-failed__retry')
+    ?.addEventListener('click', onRetry);
+  container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 }
 
 export function renderDishDetail(
@@ -169,6 +199,18 @@ export function renderDishDetail(
   container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 
   const detailImg = container.querySelector<HTMLImageElement>('img.pp-detail__image');
+  // Figma DishDetail_Loading: the same layout as grey placeholders until the photo has loaded.
+  const detailRoot = container.querySelector<HTMLElement>('.pp-detail');
+  if (detailImg && detailRoot && !detailImg.complete) {
+    detailRoot.classList.add('pp-detail--loading');
+    detailRoot.setAttribute('aria-busy', 'true');
+    const loaded = () => {
+      detailRoot.classList.remove('pp-detail--loading');
+      detailRoot.removeAttribute('aria-busy');
+    };
+    detailImg.addEventListener('load', loaded, { once: true });
+    detailImg.addEventListener('error', loaded, { once: true });
+  }
   if (detailImg) {
     let triedCard = false;
     const handleFailure = () => {

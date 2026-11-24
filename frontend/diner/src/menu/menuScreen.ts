@@ -37,7 +37,7 @@ import {
 import type { MenuToken } from '../tracking/delivery';
 import { completeDishes } from './adapter';
 import { menuMode } from './config';
-import { renderDishDetail } from './dishDetail';
+import { renderDishDetail, renderDishOpenFailed } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
@@ -628,11 +628,28 @@ export function mountMenuScreen(container: HTMLElement): void {
   ) => {
     if (!currentMenu || !saveState) return;
     const menu = currentMenu;
-    const dish = completeDishById(menu, requestedDish.dishId);
+    // Review only: ?preview=open-failed shows the Open failed screen for any dish (never in production).
+    const forceOpenFailed =
+      import.meta.env.MODE !== 'production' &&
+      new URLSearchParams(window.location.search).get('preview') === 'open-failed';
+    const dish = forceOpenFailed ? undefined : completeDishById(menu, requestedDish.dishId);
     if (!dish) {
-      if (compareBack) leaveCompare();
-      else if (from === 'saved_screen') showSaved();
-      else showMenu('opener');
+      // Figma DishDetail_OpenFailed: the dish can no longer be opened, so say so instead of
+      // silently jumping back. Back goes where the diner came from; Try again opens it again.
+      switchScreen('detail');
+      const leave = () => {
+        if (compareBack) leaveCompare();
+        else if (from === 'saved_screen') showSaved();
+        else showMenu('opener');
+      };
+      renderDishOpenFailed(
+        container,
+        requestedDish.name,
+        leave,
+        () => showDetail(requestedDish, from, returning, compareBack),
+        from === 'saved_screen' && !compareBack ? 'Back to Saved' : 'Back to menu',
+      );
+      window.scrollTo(0, 0);
       return;
     }
     switchScreen('detail');

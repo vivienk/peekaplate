@@ -101,6 +101,7 @@
 
 /* Removed: Orange/500 with an Orange/600 stroke (751:10189). Dark text keeps 4.5:1 contrast. */
 .pp-toast--removed {
+  padding-left: 0;
   border-color: var(--pp-color-orange-600);
   background: var(--pp-color-orange-500);
   color: var(--pp-color-orange-950);
@@ -127,6 +128,28 @@
 .pp-toast__text {
   flex: 1;
   padding-block: 12px;
+}
+
+/* The close button replaces the dash icon on the removed toast and keeps a 44px touch target. */
+.pp-toast__close {
+  box-sizing: border-box;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-inline-end: -4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.pp-toast__close:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -4px;
 }
 
 .pp-toast__undo {
@@ -288,6 +311,14 @@ main:has(> .pp-saved-screen) {
   gap: 8px;
   padding-bottom: 48px;
   text-align: center;
+}
+
+/* Figma Saved_Empty: the plate-and-cutlery picture is 120px and sits above the words. */
+.pp-saved__empty-image {
+  display: block;
+  flex: none;
+  width: 120px;
+  height: 120px;
 }
 
 .pp-saved__empty-text {
