@@ -135,7 +135,7 @@ function summarySchema(allowSmallCounts: boolean, allowSmallPortions = false) {
 }
 export const OwnerReportSummarySchema = summarySchema(false);
 export const ProductionBatchSummarySchema = summarySchema(true);
-const ProductionDaySummarySchema = summarySchema(true, true);
+export const ProductionDaySummarySchema = summarySchema(true, true);
 export const OWNER_PRODUCTION_BATCH_VERSION = 'production.batch.v1';
 export const OWNER_PRODUCTION_DAY_VERSION = 'production.sf-day.v1';
 export const OWNER_REPORT_TIME_ZONE = 'America/Los_Angeles';

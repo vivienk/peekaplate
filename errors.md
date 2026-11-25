@@ -5586,6 +5586,11 @@ change, which was corrected by narrowing to the existing metric-cell shape.
 The local PostgreSQL fixture uses a temporary Vitest config with the embedded database adapter.
 Vitest does not accept the setup-file setting as a command-line argument.
 
+An initial daily refresh returned HTTP 503 after a completed day with one rendered portion.
+The refresh used the legacy summary validator for the sealed daily baseline. The report reader
+now validates the baseline with the production day schema, and the first settled refresh and
+CSV export are covered in the production report integration.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-24T07:21:11.647Z","exitCode":1}

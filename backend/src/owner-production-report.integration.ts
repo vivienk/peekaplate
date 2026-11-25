@@ -880,6 +880,15 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           save_rate: '1',
           avg_interaction_time_seconds: '12',
         });
+        vi.setSystemTime(new Date('2035-02-05T08:06:00.000Z'));
+        const refreshedSmallDay = await dailyWithFreshToken();
+        expect(refreshedSmallDay.status).toBe(200);
+        const refreshedReport = OwnerDishReportSchema.parse(await refreshedSmallDay.json());
+        expect(refreshedReport.summary?.baseline).toEqual(smallDay.summary?.baseline);
+        expect(refreshedReport.dishes).toEqual(smallDay.dishes);
+        const refreshedCsv = await dailyWithFreshToken('/export');
+        expect(refreshedCsv.status).toBe(200);
+        expect(await refreshedCsv.text()).toContain(',1,NORMAL,12,NORMAL,');
         expect(otherRefreshed.dishes).toEqual([]);
         expect(otherRefreshed.summary?.baseline.dish_opens).toEqual({
           value: 10,

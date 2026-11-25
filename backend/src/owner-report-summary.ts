@@ -2,6 +2,7 @@ import {
   type OwnerReportSummary,
   OwnerReportSummarySchema,
   ProductionBatchSummarySchema,
+  ProductionDaySummarySchema,
 } from '@peekaplate/contracts/owner-report';
 import type { Client } from 'pg';
 import {
@@ -213,7 +214,11 @@ export async function readOwnerReportSummary(
     }));
   const currentDaily = includeUtcBuckets ? daily(currentRow, current) : undefined;
   const baselineDaily = includeUtcBuckets ? daily(baselineRow, baseline) : undefined;
-  const schema = productionBatch ? ProductionBatchSummarySchema : OwnerReportSummarySchema;
+  const schema = dayBaselineStart
+    ? ProductionDaySummarySchema
+    : productionBatch
+      ? ProductionBatchSummarySchema
+      : OwnerReportSummarySchema;
   return schema.parse({
     periods: {
       current: { start_time: start.toISOString(), end_time: now.toISOString() },
