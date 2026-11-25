@@ -389,9 +389,10 @@
   right: calc(var(--pp-space-16) + 1.5px);
 }
 
-.pp-onboard .pp-onboard-link__input {
+/* Reserve room for both icons even when the shared onboarding input styles load later. */
+.pp-onboard-link__control > .pp-input.pp-onboard-link__input {
   width: 100%;
-  padding-inline: calc(var(--pp-space-16) + var(--pp-space-20)) var(--pp-space-40);
+  padding-inline: calc(var(--pp-space-16) + var(--pp-space-16) + var(--pp-space-12));
 }
 
 /* S07 Upload card: 80 above and below, 48 at the sides; the upload area is up to 800 wide and

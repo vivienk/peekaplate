@@ -78,6 +78,7 @@ export type BundleDiagnosticCode =
   | 'ingredients_missing'
   | 'alt_missing'
   | 'asset_missing'
+  | 'allergens_unreviewed'
   | 'asset_revision_mismatch';
 
 export type BundleDiagnostic = { dishId: string; code: BundleDiagnosticCode };
@@ -171,7 +172,12 @@ export async function produceMenuBundle(
           'invalid_request',
           `Dish ${source.dishId} category differs from its approved revision`,
         );
-      const built = await buildDish(input, requested, source, assets, options);
+      const effectiveAllergens =
+        source.approvedAllergens === undefined ? requested.allergens : source.approvedAllergens;
+      const built = await buildDish(input, requested, source, assets, effectiveAllergens, options);
+      if (effectiveAllergens === null) {
+        diagnostics.push({ dishId: requested.dish_id, code: 'allergens_unreviewed' });
+      }
       diagnostics.push(...built.gaps.map((code) => ({ dishId: requested.dish_id, code })));
       categoryDishes.push(built.dish);
       if (built.asset) assetEntries.push(built.asset);
@@ -239,6 +245,7 @@ async function buildDish(
   requested: MenuBundleRequestDish,
   source: ApprovedDishSource,
   assets: ReadonlyMap<string, VerifiedT0Asset>,
+  effectiveAllergens: MenuBundleRequestDish['allergens'],
   options: ProduceOptions,
 ): Promise<{
   dish: PublicMenuDish;
@@ -432,8 +439,7 @@ async function buildDish(
       description,
       price: { amount: price.amount, currency },
       ingredients,
-      allergens:
-        source.approvedAllergens === undefined ? requested.allergens : source.approvedAllergens,
+      allergens: effectiveAllergens,
       dietary: requested.dietary,
       images,
     },

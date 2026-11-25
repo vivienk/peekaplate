@@ -3,6 +3,7 @@ import {
   COHORT_METRICS,
   InternalOwnerDishReportSchema,
   MAX_AVERAGE_ACTIVE_SECONDS,
+  OWNER_PRODUCTION_DAY_VERSION,
   OwnerDishReportSchema,
   PRIVACY_FLOOR_SESSIONS,
   toOwnerReport,
@@ -75,6 +76,52 @@ const issuePaths = (input: unknown) => {
 };
 
 describe('OwnerDishReportSchema', () => {
+  it('shows single-session evidence and strips cohort counts on the completed production day', () => {
+    const baseline = { start_time: '2026-11-22T08:00:00Z', end_time: '2026-11-23T08:00:00Z' };
+    const current = { start_time: baseline.end_time, end_time: '2026-11-23T08:05:00Z' };
+    const missing = metric(null, 'MISSING');
+    const counts = {
+      menu_sessions: metric(1),
+      dish_opens: metric(1),
+      avg_interaction_time_seconds: missing,
+      portion_previews_shown: missing,
+      verified_orders: missing,
+    };
+    const evidence = report({
+      metadata: {
+        calculation_version: OWNER_PRODUCTION_DAY_VERSION,
+        generated_at: current.end_time,
+        date_window: { ...baseline, duration_hours: 24 },
+      },
+      dish: {
+        display_actions: { portion_previews_shown: metric(1), comparisons_started: metric(1) },
+      },
+      metrics: {
+        ...Object.fromEntries(
+          COHORT_METRICS.map((name) => [name, { ...validMetrics()[name], eligible_sessions: 1 }]),
+        ),
+        active_sessions: metric(1),
+      },
+      extra: {
+        source: 'production',
+        summary: {
+          periods: { current, baseline },
+          current: counts,
+          baseline: { ...counts, portion_previews_shown: metric(1) },
+        },
+      },
+    });
+    const published = toOwnerReport(evidence);
+    expect(published.dishes[0]?.metrics.active_sessions).toEqual(metric(1));
+    expect(published.dishes[0]?.metrics.open_rate).toEqual(validMetrics().open_rate);
+    expect(published.dishes[0]?.display_actions?.portion_previews_shown).toEqual(metric(1));
+    expect(published.summary?.baseline.portion_previews_shown).toEqual(metric(1));
+    expect(JSON.stringify(published)).not.toContain('eligible_sessions');
+    expect(
+      InternalOwnerDishReportSchema.safeParse({ ...evidence, source: 'synthetic' }).success,
+    ).toBe(false);
+  });
+
   it('accepts a valid synthetic report', () => {
     expect(accepts(report())).toBe(true);
   });

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Callable, Literal
+from typing import Any, ClassVar, Literal
 from urllib.parse import urlsplit
 
 import httpx
@@ -45,13 +45,51 @@ class ModelProviderConfig:
     model_var: str | None
     default_url: str | None
     default_model: str | None
-    extra_body: dict[str, Any] | Callable[[str], dict[str, Any]] | None = None
+    extra_body: dict[str, Any] | None = None
     reasoning_effort: str | None = None
+    strict_vision_schema: ClassVar[bool] = False
+
+    def request_options(self, model: str) -> dict[str, Any]:
+        options: dict[str, Any] = {"extra_body": dict(self.extra_body or {})}
+        if self.reasoning_effort:
+            options["reasoning_effort"] = self.reasoning_effort
+        return options
+
+
+class GoogleAIStudioProvider(ModelProviderConfig):
+    strict_vision_schema = True
+
+
+class OpenRouterProvider(ModelProviderConfig):
+    strict_vision_schema = True
+
+    def request_options(self, model: str) -> dict[str, Any]:
+        extra = {"provider": {"require_parameters": True}, **(self.extra_body or {})}
+        if model in {"google/gemini-3-flash-preview", "google/gemini-3-flash-preview:free"}:
+            extra["reasoning"] = {"effort": "low"}
+        return {"extra_body": extra}
+
+
+def supports_strict_vision_schema(base_url: str | None) -> bool:
+    if not base_url:
+        return False
+    try:
+        host = urlsplit(base_url).hostname
+    except ValueError:
+        return False
+    return _VISION_PROVIDERS.get(host, ModelProviderConfig).strict_vision_schema
+
+
+GOOGLE_AI_STUDIO_HOST = "generativelanguage.googleapis.com"
+_VISION_PROVIDERS = {
+    GOOGLE_AI_STUDIO_HOST: GoogleAIStudioProvider,
+    "openrouter.ai": OpenRouterProvider,
+}
 
 
 # Registry of known supported providers
 PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
-    "google_studio": ModelProviderConfig(
+    "google_studio": GoogleAIStudioProvider(
         name="google_studio",
         key_vars=("GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "GOOGLE_API_KEY"),
         url_var="GEMINI_API_URL",
@@ -62,7 +100,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
         # Gemini 3 thinking tokens count against max_tokens; dense menus were truncated at default effort.
         reasoning_effort="low",
     ),
-    "gemini": ModelProviderConfig(
+    "gemini": GoogleAIStudioProvider(
         name="gemini",
         key_vars=("GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "GOOGLE_API_KEY"),
         url_var="GEMINI_API_URL",
@@ -72,41 +110,39 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
         extra_body=None,
         reasoning_effort="low",
     ),
-    "openrouter": ModelProviderConfig(
+    "openrouter": OpenRouterProvider(
         name="openrouter",
         key_vars=("OPENROUTER_API_KEY",),
-        url_var="MENU_AI_API_URL",
-        model_var="MENU_AI_MODEL",
+        url_var="OPENROUTER_API_URL",
+        model_var="OPENROUTER_MODEL",
         default_url="https://openrouter.ai/api/v1",
         default_model="google/gemini-3-flash-preview",
-        extra_body={"reasoning": {"enabled": False}, "provider": {"require_parameters": True}},
+        extra_body={"reasoning": {"enabled": False}},
     ),
-    "qwen": ModelProviderConfig(
+    "qwen": OpenRouterProvider(
         name="qwen",
         key_vars=("OPENROUTER_API_KEY",),
         url_var="MENU_AI_API_URL",
         model_var="MENU_AI_MODEL",
         default_url="https://openrouter.ai/api/v1",
         default_model="qwen/qwen3.8-flash",
-        extra_body={"reasoning": {"enabled": False}, "provider": {"require_parameters": True}},
+        extra_body={"reasoning": {"enabled": False}},
     ),
-    "glm": ModelProviderConfig(
+    "glm": OpenRouterProvider(
         name="glm",
         key_vars=("OPENROUTER_API_KEY",),
         url_var="MENU_AI_API_URL",
         model_var="MENU_AI_MODEL",
         default_url="https://openrouter.ai/api/v1",
         default_model="z-ai/glm-5.3-flash",
-        extra_body={"provider": {"require_parameters": True}},
     ),
-    "deepseek": ModelProviderConfig(
+    "deepseek": OpenRouterProvider(
         name="deepseek",
         key_vars=("OPENROUTER_API_KEY",),
         url_var="MENU_AI_API_URL",
         model_var="MENU_AI_MODEL",
         default_url="https://openrouter.ai/api/v1",
         default_model="deepseek/deepseek-v4.1-flash",
-        extra_body={"provider": {"require_parameters": True}},
     ),
     "nara": ModelProviderConfig(
         name="nara",
@@ -174,22 +210,21 @@ def create_model_client(
     if (url.hostname or "").endswith("googleapis.com") and not model.startswith("models/"):
         model = f"models/{model}"
 
-    extra = (
-        {"reasoning": {"enabled": False}, "provider": {"require_parameters": True}}
-        if url.hostname == "openrouter.ai"
-        else {}
-    )
-    reasoning = {"reasoning_effort": "none"} if url.hostname == "router.bynara.id" else {}
+    if url.hostname == "openrouter.ai":
+        options = PROVIDER_REGISTRY["openrouter"].request_options(model)
+    elif url.hostname == "router.bynara.id":
+        options = PROVIDER_REGISTRY["nara"].request_options(model)
+    else:
+        options = {"extra_body": {}}
 
     return ChatOpenAI(
-        **reasoning,
+        **options,
         model=model,
         api_key=key,
         base_url=base_url,
         timeout=timeout,
         max_retries=0,
         max_tokens=max_tokens,
-        extra_body=extra,
         http_async_client=httpx.AsyncClient(timeout=timeout),
     )
 
@@ -214,11 +249,15 @@ def _build_client_from_config(
 
     # Resolve URL & Model
     url_val = (environ.get(config.url_var, "") if config.url_var else "").strip()
+    if config.name == "openrouter":
+        url_val = url_val or environ.get("MENU_AI_API_URL", "").strip()
     endpoint = url_val or config.default_url
     if not endpoint:
         raise ExtractionError(f"Provider '{config.name}' missing URL configuration.")
 
     model_val = (environ.get(config.model_var, "") if config.model_var else "").strip()
+    if config.name == "openrouter":
+        model_val = model_val or environ.get("MENU_AI_MODEL", "").strip()
     model = model_val or config.default_model
     if not model:
         raise ExtractionError(f"Provider '{config.name}' missing Model configuration.")
@@ -233,26 +272,14 @@ def _build_client_from_config(
     if (url.hostname or "").endswith("googleapis.com") and not model.startswith("models/"):
         model = f"models/{model}"
 
-    # Compute extra body
-    extra: dict[str, Any] = {}
-    if callable(config.extra_body):
-        extra = config.extra_body(url.hostname or "")
-    elif isinstance(config.extra_body, dict):
-        extra = dict(config.extra_body)
-
-    reasoning: dict[str, Any] = {}
-    if config.reasoning_effort:
-        reasoning["reasoning_effort"] = config.reasoning_effort
-
     return ChatOpenAI(
-        **reasoning,
+        **config.request_options(model),
         model=model,
         api_key=key,
         base_url=base_url,
         timeout=timeout,
         max_retries=0,
         max_tokens=max_tokens,
-        extra_body=extra,
         http_async_client=httpx.AsyncClient(timeout=timeout),
     )
 def create_cascading_clients(*, timeout: int | float = DEFAULT_TIMEOUT) -> list[tuple[str, ChatOpenAI]]:
@@ -269,6 +296,8 @@ def create_cascading_clients(*, timeout: int | float = DEFAULT_TIMEOUT) -> list[
     cascade_env = dict(os.environ)
     cascade_env.pop("MENU_AI_API_URL", None)
     cascade_env.pop("MENU_AI_MODEL", None)
+    cascade_env.pop("OPENROUTER_API_URL", None)
+    cascade_env.pop("OPENROUTER_MODEL", None)
     for prov_name in cascade_order:
         try:
             client = create_model_client(provider_name=prov_name, timeout=timeout, env=cascade_env)

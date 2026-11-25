@@ -24,10 +24,57 @@ request: sideways images, skew above 15° and very low contrast (2nd–98th perc
 luminance spread below 60) are rejected with a `failed` report and
 `configuration.preflight` estimates; 10–15° skew adds a review-only warning. The
 estimates are approximate and calibrated on the evaluation images; PDFs and
-`--pages-json` reuse are not gated. In `vision_v4`, one short retry follows a
-transient 429 (daily quotas move on), a deadline timeout cancels the request and
-ends the run without fallback, and repeated entries of one printed title are merged
-into a single item with all price options.
+`--pages-json` reuse are not gated. In `vision_v4`, one short retry may resume
+from a transient 429 when no dishes have been parsed (daily quotas move on).
+If a later request fails after usable dishes were extracted, the run retains
+those candidates as `incomplete` and records failed and unread page states.
+Neither path replays successful vision pages.
+A deadline or budget denial remains terminal: no further provider or OCR call
+starts. Repeated entries for one printed title still merge into one item with all
+price options.
+
+The V4 prompt asks the model to scan every section and column, including offers
+and separately priced add-ons. It asks for one candidate per printed occurrence
+and preserves the full price group for a single item, rather than splitting price
+options into separate candidates. Coverage is a model instruction, not a
+completeness guarantee. The schema and provider-call count are unchanged.
+Price groups beyond the 160-character review field limit stay unknown with a
+review warning rather than being cut into a misleading partial price.
+Direct vision leaves currency unset for the owner, even when the model proposes
+a code. Printed price text, including any printed currency symbols or codes,
+is preserved for review.
+
+V4 asks the model to copy the description before selecting ingredient phrases.
+Commas and dashes can mark component boundaries, but not inside a food name
+or where the text merely describes preparation, tasting notes or choices.
+Printed punctuation and option text stay in the description; ingredient
+proposals list only explicitly included components.
+
+Direct vision output may also propose printed ingredients. Python retains at most
+100 model-proposed terms of at most 256 characters each, and only when the same
+dish's printed description contains the phrase literally; absent, cross-dish,
+substring-only or truncated terms are dropped with review warnings, and an
+unsupported result stays null rather than an empty list. Python also filters
+explicit negated and optional phrases conservatively. This does not infer
+recipes, classify allergens, or make the transcription independently verified. The
+retained description is appended to that dish's vision transcription segment and
+evidence span, so proposed terms remain traceable to `source_text`; this transcript
+is still a vision-model transcription, not independent OCR. Candidates remain
+`needs_review`, and AI-02 keeps its classifications `unknown` because it
+deliberately refuses vision grounding. Approximate vision boxes remain run-local
+metadata and never populate OCR `box_evidence`. The hosted V1 transport convention
+is unchanged: callers still see `input_mode: ocr_image` with
+`configuration.extraction_mode: vision_v4` and a nonnull empty review-suggestions
+list.
+
+On Google AI Studio and OpenRouter, V4 also sends `response_format` type `json_schema`
+using the unchanged `V4Batch.model_json_schema()` dictionary with `strict: true`;
+the prompt's `box`/`price_box` examples use that schema's named object
+(`ymin`/`xmin`/`ymax`/`xmax`). No SDK schema conversion runs, so optional/default
+fields stay optional. A rejected format is a provider error, never a silent
+prompt-only downgrade. Other endpoints keep the prompt-embedded schema only. This
+constrains response syntax only, not transcription accuracy, and malformed-output
+recovery is unchanged.
 
 The OCR and image graph saves private `review-suggestions.json` beside
 `extraction.json` and final `timings.json`. It retains schema-validated raw dish

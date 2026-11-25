@@ -38,6 +38,17 @@ optional fields and can recover unique source-supported prices using existing
 OCR geometry as described in [processing behavior](processing-v3.md#prices).
 A human must inspect the menu and correct the remaining draft values.
 
+### Allergen review warning
+
+The producer emits `allergens_unreviewed` when the effective allergen
+declaration is unavailable (`null`). `null` means unavailable or unreviewed;
+`[]` means reviewed with no listed allergens, not a guarantee of allergen-free
+status. This advisory warning does not change dish completeness or approve a dish.
+
+Restaurant verification, dish verification, menu approval and publication are
+separate steps. See [owner publication handoff](owner-publish-handoff.md) and
+[owner verification boundaries](owner-flow-corrections.md).
+
 ## Versioned contract
 
 The consumer schema is `ReviewCandidateResultSchema`, exported from

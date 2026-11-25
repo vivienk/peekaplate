@@ -23,7 +23,7 @@ export async function readReportPublications(
   venueId: string,
   now: Date,
   { start, events }: OwnerReportLiveEvidence,
-  durationMs: number,
+  earliest: Date,
 ): Promise<ReportPublication[]> {
   const wanted = await client.query<{ publicationId: string }>(
     `WITH ${TODAY_REPORT_EVIDENCE}
@@ -32,7 +32,7 @@ export async function readReportPublications(
      WHERE obs.tenant_id=$1 AND obs.occurred_at >= $2 AND obs.occurred_at < $3
      ${PRODUCTION_REPORT_FILTER}
      ORDER BY "publicationId" LIMIT ${MAX_PUBLICATIONS + 1}`,
-    [venueId, new Date(now.getTime() - 2 * durationMs), now, start, JSON.stringify(events)],
+    [venueId, earliest, now, start, JSON.stringify(events)],
   );
   if (wanted.rows.length === 0) return [];
   if (wanted.rows.length > MAX_PUBLICATIONS) throw new AuthUnavailableError();

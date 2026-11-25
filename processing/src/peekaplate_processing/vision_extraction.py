@@ -1,18 +1,31 @@
 """V4 Multimodal Vision Extraction with native normalized bounding boxes.
 
 Extracts structured menu dishes and drinks directly from page images; no OCR text is read.
-Maps [ymin, xmin, ymax, xmax] normalized coordinates (0..1000) to pixel rectangles.
-Everything here is a vision-model transcription: names, prices, descriptions and boxes
-are unverified proposals for human review, not OCR evidence.
+Maps named ymin/xmin/ymax/xmax normalized coordinates (0..1000) to pixel rectangles.
+Everything here is a vision-model transcription: names, prices, descriptions, ingredient
+proposals and boxes are unverified proposals for human review, not OCR evidence.
 """
-import hashlib
-import json
 import asyncio
+import json
 import re
-from datetime import datetime, timezone
-from decimal import Decimal
-from typing import Any
+import sys
+from typing import Any, Literal
+
 import openai
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from peekaplate_processing._vision_projection import (
+    MAX_V4_INGREDIENT_CHARS as MAX_V4_INGREDIENT_CHARS,
+    MAX_V4_INGREDIENTS as MAX_V4_INGREDIENTS,
+    VISION_REVIEW_WARNING as VISION_REVIEW_WARNING,
+    build_v4_result as build_v4_result,
+    grounded_ingredients as grounded_ingredients,
+    merge_split_options as merge_split_options,
+    scale_box as scale_box,
+    single_price_amount as single_price_amount,
+)
+from peekaplate_processing.model_providers import supports_strict_vision_schema
 
 MAX_VISION_RESPONSE_BYTES = 1_000_000
 MAX_VISION_SERIALIZED_BYTES = 6_000_000
@@ -22,22 +35,6 @@ MAX_VISION_ATTEMPTS = 400
 
 class VisionCaptureLimitError(Exception):
     """The private attempt history cannot be represented safely."""
-
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from peekaplate_processing.product_validation import MINIMUM_PRICE_WARNING, NON_FOOD_ERROR, is_wrapping_cloth, minimum_price_literals
-from peekaplate_processing.schemas import (
-    DishDraft,
-    DraftEvidence,
-    MenuExtractionResult,
-    SourceRecord,
-    SourceSegment,
-    SourceSpan,
-)
-
-VISION_REVIEW_WARNING = (
-    "Transcribed by a vision model without OCR: name, price and description are unverified, "
-    "and boxes are approximate model proposals."
-)
 
 
 class NormalizedBox(BaseModel):
@@ -72,6 +69,10 @@ class V4Dish(BaseModel):
     page_number: int | None = Field(default=None, ge=1)
     name: str = Field(min_length=1)
     description: str | None = None
+    ingredients: list[str] | None = Field(
+        default=None,
+        description="At most 100 printed ingredient phrases (each at most 256 characters) copied from this item's printed description; never inferred.",
+    )
     category: str | None = None
     price_text: str | None = None
     price_amount: str | None = None
@@ -87,81 +88,40 @@ class V4Batch(BaseModel):
 
 
 V4_VISION_PROMPT = """Detect all distinct food and drink items from this menu page image.
-Copy text exactly as printed. Never invent descriptions, prices or currencies; use null when absent.
+Copy text exactly as printed. Never invent descriptions, prices, currencies or ingredients; use null when absent.
 Exclude non-food merchandise such as wrapping cloths. Preserve plus-qualified prices in price_text; they are not fixed prices.
 For each item, output:
 - name: dish title
-- description: printed item description (e.g. ingredients, sides, details), or null if none
+- description: copy this item's printed description verbatim, or null if absent. Read wrapped lines as one block. Keep the original order, commas, dashes, conjunctions and wording; do not rewrite it into an ingredient list or borrow text from neighboring items.
+- ingredients: after copying the description, identify the distinct food, drink or garnish components it explicitly says are included. Copy each as a separate contiguous phrase from that same description (at most 100 phrases, each at most 256 characters), or use null if none qualify.
+  - Commas, semicolons, spaced dashes, em dashes and conjunctions can separate components, but are only clues. Split only when both parts independently name included components. Keep compounds and names intact, such as \"house-made cheese cream\", \"deep-fried tofu\" and \"sweet and sour sauce\".
+  - Do not turn preparation adjectives, measurements, tasting notes, marketing copy or serving instructions into ingredients. If a printed fragment does not clearly name a component, omit it rather than expanding it from recipe knowledge. Do not infer from the title or another item.
+  - Keep included accompaniments and garnishes (such as \"served with rice\" or \"topped with sesame\"), but omit exclusions, alternatives, selectable flavors, substitutions and optional or separately priced add-ons. Keep those words in description, not in ingredients.
+  - Example: \"Fresh-cut fries — garlic truffle oil, served with herb aioli; optional bacon\" stays unchanged in description. Ingredients are [\"fries\", \"garlic truffle oil\", \"herb aioli\"], not \"Fresh-cut\" or \"bacon\".
 - category: section heading (e.g. STARTERS, SALADS, DESSERTS) or null
 - price_text: verbatim price text (e.g. "25.99", "12/15") or null. If one item prints several prices (sizes or options), output ONE entry with every price in price_text separated by " / "; never repeat the item once per price.
 - price_amount: numeric price (e.g. "25.99") only when exactly one price is printed, else null
 - price_currency: 3-letter currency code only if printed or unambiguous from a symbol, else null
-- box: [ymin, xmin, ymax, xmax] around item title in 0..1000 normalized coordinates
-- price_box: [ymin, xmin, ymax, xmax] around printed price, or null"""
+- box: {"ymin": int, "xmin": int, "ymax": int, "xmax": int} around item title, each value 0..1000 normalized
+- price_box: the same object shape around the printed price, or null"""
 
-_SINGLE_PRICE = re.compile(r"\s*(?:[A-Za-z]{3}\s*|[$€£¥₱]\s*)?(\d{1,6}(?:\.\d{1,2})?)\s*(?:[A-Za-z]{3}|[$€£¥₱])?\s*")
-
-def single_price_amount(price_text: str | None, price_amount: str | None) -> Decimal | None:
-    """Return a decimal only for one unambiguous plain price; options, separators and mismatches give None."""
-    if not price_amount:
-        return None
-    match = _SINGLE_PRICE.fullmatch(price_amount)
-    if not match:
-        return None
-    amount = Decimal(match.group(1))
-    if price_text:
-        text_match = _SINGLE_PRICE.fullmatch(price_text)
-        if not text_match or Decimal(text_match.group(1)) != amount:
-            return None
-    return amount
-
-
-def _same_title(a: NormalizedBox, b: NormalizedBox) -> bool:
-    """True when two title boxes cover the same printed title (intersection over union >= 0.8)."""
-    width = min(a.xmax, b.xmax) - max(a.xmin, b.xmin)
-    height = min(a.ymax, b.ymax) - max(a.ymin, b.ymin)
-    if width <= 0 or height <= 0:
-        return False
-    overlap = width * height
-    union = (a.xmax - a.xmin) * (a.ymax - a.ymin) + (b.xmax - b.xmin) * (b.ymax - b.ymin) - overlap
-    return union > 0 and overlap / union >= 0.8
-
-
-def merge_split_options(dishes: list[V4Dish]) -> tuple[list[V4Dish], list[str]]:
-    """Rejoin price options the model split into repeated entries of one printed title.
-
-    Entries merge only when they are adjacent, on the same page, have the same name and their
-    title boxes cover the same printed title. Distinct items sharing a name (different title
-    boxes) stay separate. The merged entry keeps every price in price_text and no single amount.
-    """
-    merged: list[V4Dish] = []
-    warnings: list[str] = []
-    for dish in dishes:
-        last = merged[-1] if merged else None
-        if (last is not None and last.page_number == dish.page_number
-                and last.name.strip().casefold() == dish.name.strip().casefold()
-                and last.price_text and dish.price_text and _same_title(last.box, dish.box)):
-            merged[-1] = last.model_copy(update={
-                "price_text": f"{last.price_text} / {dish.price_text}",
-                "price_amount": None,
-                "description": last.description or dish.description,
-                "price_box": None,
-            })
-            warnings.append(f"Page {dish.page_number}: merged repeated entries of '{dish.name.strip()}' into one item with price options; option meanings require review.")
-            continue
-        merged.append(dish)
-    return merged, warnings
-
-
-def scale_box(box: NormalizedBox, width: int, height: int) -> dict[str, int] | None:
-    """Convert normalized 0..1000 coordinates to a pixel box; None when the box is empty or inverted."""
-    if box.xmax <= box.xmin or box.ymax <= box.ymin:
-        return None
-    left = min(width - 1, int(box.xmin / 1000.0 * width))
-    top = min(height - 1, int(box.ymin / 1000.0 * height))
-    right = max(left + 1, min(width, int(box.xmax / 1000.0 * width)))
-    bottom = max(top + 1, min(height, int(box.ymax / 1000.0 * height)))
-    return {"left": left, "top": top, "width": right - left, "height": bottom - top}
+_COVERAGE_INSTRUCTION = (
+    "GENERAL COVERAGE INSTRUCTION: Enumerate every separately priced menu entry visible on the page, "
+    "not only the main dishes: every column, section, sidebar, special-offer panel, standalone priced "
+    "item, and separately priced add-on. Do not drop an entry because the same food appears elsewhere; "
+    "an offer printed under a different heading, size, or price is its own record. Record a separately "
+    "priced add-on as its own candidate using the existing fields: keep its printed name/text exactly as "
+    "printed (for example text that begins with a printed 'add'), and put the actual printed section "
+    "heading in category when the page prints one, or null when it does not; never invent an 'Add-on' or "
+    "any other category label the page does not print, and never add schema fields. Do not list a "
+    "separately priced addition as an ingredient of the main dish. When one printed item carries several "
+    "price groups (for example member and non-member, sizes, or variants), output one entry that keeps "
+    "every printed price in price_text rather than only the first price; only separately listed priced "
+    "items become separate records. Printed headings, section labels, qualifiers, and serving notes that "
+    "carry no price are not standalone items: do not emit them as candidates. Before finishing, silently "
+    "re-check the whole image and confirm every headed section, column, sidebar, and special-offer panel "
+    "is represented by the records you emit, then output the JSON only."
+)
 
 
 def _parse_page(text: str, page_num: int, errors: list[str]) -> list[V4Dish]:
@@ -192,54 +152,142 @@ def _parse_page(text: str, page_num: int, errors: list[str]) -> list[V4Dish]:
         return recovered
 
 
+V4_RESPONSE_FORMAT_NAME = "v4_batch"
+
+
+def _provider_transport(llm: Any) -> tuple[str | None, dict[str, Any]]:
+    """Best-effort base URL and request options through client wrappers."""
+    pending = [llm]
+    visited: set[int] = set()
+    while pending and len(visited) < 8:
+        current = pending.pop(0)
+        if id(current) in visited:
+            continue
+        visited.add(id(current))
+        for attribute in ("openai_api_base", "base_url"):
+            value = getattr(current, attribute, None)
+            if isinstance(value, str) and value:
+                return value, getattr(current, "extra_body", None) or {}
+        for attribute in ("client", "bound", "llm"):
+            nested = getattr(current, attribute, None)
+            if nested is not None and nested is not current and not isinstance(nested, (str, bytes)):
+                pending.append(nested)
+    return None, {}
+
+
+def vision_response_format(base_url: str | None, schema: dict[str, Any]) -> dict[str, Any] | None:
+    """API-level json_schema constraint for providers supporting strict vision output.
+
+    The provider receives V4Batch.model_json_schema() unchanged. LangChain's
+    with_structured_output/openai helpers rewrite the schema (every property becomes
+    required and defaults are dropped), which would change the wire contract. We set
+    strict ourselves while passing the original dictionary, and let a provider
+    rejection surface as an error instead of retrying without the constraint.
+    """
+    if not supports_strict_vision_schema(base_url):
+        return None
+    if not isinstance(schema, dict) or schema.get("type") != "object":
+        raise ValueError("V4Batch.model_json_schema() did not produce a JSON-schema object.")
+    if "dishes" not in (schema.get("properties") or {}):
+        raise ValueError("V4Batch schema is missing its 'dishes' property; refusing an incompatible format.")
+    return {
+        "type": "json_schema",
+        "json_schema": {"name": V4_RESPONSE_FORMAT_NAME, "schema": schema, "strict": True},
+    }
+
+
+class VisionProgress:
+    """Parsed results and page dispositions for one provider attempt."""
+
+    def __init__(self) -> None:
+        self.dishes: list[V4Dish] = []
+        self.errors: list[str] = []
+        self.page_dispositions: dict[int, tuple[Literal["failed", "skipped"], str]] = {}
+        self.active_page: int | None = None
+
+
 def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | None = None,
                       attempts: list[dict] | None = None, provider: str = "default",
-                      budget_gate: Any | None = None) -> tuple[list[V4Dish], list[str]]:
+                      budget_gate: Any | None = None,
+                      progress: VisionProgress | None = None,
+                      rate_limit_retry_delay: float | None = None) -> tuple[list[V4Dish], list[str]]:
     """Run direct multimodal extraction per page.
 
     Returns dishes (page numbers forced to the page that was sent) and page-level errors
-    describing possible dish loss.
+    describing possible dish loss. Supplied progress retains completed results if a
+    subsequent page raises; the exception type is preserved for the caller. A configured
+    retry delay allows one transient rate-limit retry without replaying completed pages.
     """
+    if progress is None:
+        progress = VisionProgress()
     max_tok = getattr(llm, "max_tokens", 16384) or 16384
     bind_kwargs: dict[str, Any] = {"max_tokens": max_tok}
     if timeout is not None:
         bind_kwargs["timeout"] = timeout
+    schema = V4Batch.model_json_schema()
+    base_url, extra_body = _provider_transport(llm)
+    response_format = vision_response_format(base_url, schema)
+    if response_format is not None:
+        # extra_body keeps the SDK on its plain create path: binding response_format
+        # directly makes langchain-openai use beta parse(), which raises on
+        # finish_reason=length and would bypass the existing truncation evidence
+        # and regex salvage.
+        bind_kwargs["extra_body"] = {**extra_body, "response_format": response_format}
     vision_llm = llm.bind(**bind_kwargs)
-    prompt = f"{V4_VISION_PROMPT}\n\nREQUIRED JSON SCHEMA:\n{json.dumps(V4Batch.model_json_schema())}"
+    prompt = (
+        f"{V4_VISION_PROMPT}\n\nREQUIRED JSON SCHEMA:\n{json.dumps(schema)}"
+        f"\n\n{_COVERAGE_INSTRUCTION}"
+    )
+
+    async def _request_page(messages, page_num):
+        record = None
+        if attempts is not None:
+            if len(attempts) >= MAX_VISION_ATTEMPTS:
+                raise VisionCaptureLimitError("Vision attempt limit exceeded.")
+            record = {"attempt": len(attempts) + 1, "provider": provider,
+                      "page_number": page_num, "outcome": "error", "response": None,
+                      "truncated": False, "failure_class": "provider_error"}
+            attempts.append(record)
+        try:
+            if budget_gate is not None:
+                await budget_gate.areserve(provider)
+            if timeout is not None and timeout > 0:
+                try:
+                    response = await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)
+                except asyncio.TimeoutError:
+                    raise TimeoutError(f"Vision request exceeded its {timeout:g}s deadline and was cancelled.") from None
+            else:
+                response = await vision_llm.ainvoke(messages)
+        except Exception as error:
+            if record is not None:
+                record["failure_class"] = ("timeout" if isinstance(error, (TimeoutError, openai.APITimeoutError)) else
+                                           "rate_limit" if isinstance(error, openai.RateLimitError) else
+                                           "provider_error")
+            raise
+        return response, record
+
     async def _extract_all() -> tuple[list[V4Dish], list[str]]:
-        all_dishes: list[V4Dish] = []
-        errors: list[str] = []
+        all_dishes = progress.dishes
+        errors = progress.errors
+        retry_delay = rate_limit_retry_delay
         for page in page_images:
             page_num = page["page_number"]
+            progress.active_page = page_num
             content = [
                 {"type": "text", "text": f"Extract all menu items from Page {page_num}."},
                 {"type": "image_url", "image_url": {"url": page["image_url"]}},
             ]
             messages = [("system", prompt), ("human", content)]
-            record = None
-            if attempts is not None:
-                if len(attempts) >= MAX_VISION_ATTEMPTS:
-                    raise VisionCaptureLimitError("Vision attempt limit exceeded.")
-                record = {"attempt": len(attempts) + 1, "provider": provider,
-                          "page_number": page_num, "outcome": "error", "response": None,
-                          "truncated": False, "failure_class": "provider_error"}
-                attempts.append(record)
             try:
-                if budget_gate is not None:
-                    await budget_gate.areserve(provider)
-                if timeout is not None and timeout > 0:
-                    try:
-                        response = await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)
-                    except asyncio.TimeoutError:
-                        raise TimeoutError(f"Vision request exceeded its {timeout:g}s deadline and was cancelled.") from None
-                else:
-                    response = await vision_llm.ainvoke(messages)
-            except Exception as error:
-                if record is not None:
-                    record["failure_class"] = ("timeout" if isinstance(error, TimeoutError) else
-                                               "rate_limit" if isinstance(error, openai.RateLimitError) else
-                                               "provider_error")
-                raise
+                response, record = await _request_page(messages, page_num)
+            except openai.RateLimitError as error:
+                error_text = str(error).lower()
+                if retry_delay is None or "per day" in error_text or "perday" in error_text:
+                    raise
+                print(f"Rate limited; retrying once in {retry_delay:g}s...", file=sys.stderr, flush=True)
+                await asyncio.sleep(retry_delay)
+                retry_delay = None
+                response, record = await _request_page(messages, page_num)
             raw_content = getattr(response, "content", None)
             capture_content = raw_content
             structured = not isinstance(raw_content, str)
@@ -282,7 +330,9 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
             elif record is not None:
                 record["failure_class"] = "invalid_response"
             if structured or not raw_content.strip():
-                errors.append(f"Page {page_num}: vision model returned no usable text content.")
+                message = "vision model returned no usable text content."
+                progress.page_dispositions[page_num] = ("failed", message)
+                errors.append(f"Page {page_num}: {message}")
                 continue
             metadata = getattr(response, "response_metadata", None) or {}
             if metadata.get("finish_reason") == "length":
@@ -292,127 +342,9 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
             except ValueError:
                 if record is not None and record["outcome"] == "response":
                     record["failure_class"] = "parse_error"
+                progress.page_dispositions[page_num] = ("failed", "Vision model response could not be parsed.")
                 raise
             all_dishes.extend(d.model_copy(update={"page_number": page_num}) for d in dishes)
         return all_dishes, errors
 
     return asyncio.run(_extract_all())
-
-
-def build_v4_result(
-    source: SourceRecord,
-    page_images_list: list[dict],
-    v4_dishes: list[V4Dish],
-    started_at: datetime,
-    *,
-    errors: list[str] | None = None,
-) -> MenuExtractionResult:
-    """Construct a MenuExtractionResult from V4 dishes; any error makes it incomplete."""
-    errors = list(errors or [])
-    v4_dishes, warnings = merge_split_options(v4_dishes)
-    segments: list[SourceSegment] = []
-    by_page_img = {p["page_number"]: p for p in page_images_list}
-
-    for page in page_images_list:
-        p_num = page["page_number"]
-        ref = page.get("image_reference", {})
-        lines = [d.name.strip()[:160] for d in v4_dishes if d.page_number == p_num]
-        segments.append(
-            SourceSegment(
-                segment_id=f"{source.source_id}#page-{p_num}",
-                page_number=p_num,
-                # Model-transcribed dish names, not OCR text; spans index into this transcript.
-                text="\n".join(lines) if lines else f"Page {p_num}",
-                method="text",
-                status="ready",
-                warnings=[VISION_REVIEW_WARNING],
-                metadata={
-                    "width": ref.get("width"),
-                    "height": ref.get("height"),
-                    "mime_type": ref.get("mime_type", "image/jpeg"),
-                    "v4_vision": True,
-                    "text_origin": "vision_model_transcription",
-                    "vision_boxes": {},
-                },
-            )
-        )
-
-    drafts: list[DishDraft] = []
-    evidence: list[DraftEvidence] = []
-    seg_by_num = {s.page_number: s for s in segments}
-    cursor = {s.page_number: 0 for s in segments}
-
-    for d in v4_dishes:
-        p_num = d.page_number
-        seg = seg_by_num.get(p_num)
-        if seg is None:
-            errors.append(f"Page {p_num}: dish {d.name!r} cites a page without an image; rejected.")
-            continue
-        ref = by_page_img[p_num].get("image_reference", {})
-        width, height = ref.get("width"), ref.get("height")
-        clean_name = d.name.strip()[:160]
-        if is_wrapping_cloth(clean_name):
-            errors.append(f"Page {p_num}: {NON_FOOD_ERROR}")
-            continue
-        clean_price_text = d.price_text.strip()[:160] if d.price_text and d.price_text.strip() else None
-        clean_currency = d.price_currency.strip().upper() if d.price_currency and re.fullmatch(r"[A-Za-z]{3}", d.price_currency.strip()) else None
-        try:
-            draft = DishDraft(
-                name=clean_name,
-                description=d.description.strip()[:4000] if d.description and d.description.strip() else None,
-                category=d.category.strip()[:160] if d.category and d.category.strip() else None,
-                category_page_number=p_num,
-                price_text=clean_price_text,
-                price_amount=single_price_amount(clean_price_text, d.price_amount),
-                price_currency=clean_currency,
-                ingredients=None,
-                source_id=source.source_id,
-                source_text=clean_name,
-                review_warnings=[VISION_REVIEW_WARNING, *([MINIMUM_PRICE_WARNING] if minimum_price_literals(clean_price_text) else [])],
-            )
-        except ValueError as exc:
-            errors.append(f"Page {p_num}: dish {clean_name!r} rejected by the draft schema ({type(exc).__name__}).")
-            continue
-        idx = len(drafts)
-        draft_id = f"draft:{hashlib.sha256(f'{source.sha256}:{idx}:{draft.model_dump_json()}'.encode()).hexdigest()[:32]}"
-        # Each dish owns its own transcript line, so repeated names get distinct spans.
-        start = seg.text.index(clean_name, cursor[p_num])
-        cursor[p_num] = start + len(clean_name)
-
-        box_records = []
-        if width and height:
-            for kind, box, text in (("title", d.box, clean_name), ("price", d.price_box, clean_price_text)):
-                if box is None or (kind == "price" and not text):
-                    continue
-                pixels = scale_box(box, width, height)
-                if pixels is None:
-                    warnings.append(f"Page {p_num}: dish {clean_name!r} {kind} box was empty or inverted; omitted.")
-                    continue
-                box_records.append({"page_number": p_num, "box": pixels, "text": text, "type": kind})
-        if box_records:
-            seg.metadata["vision_boxes"][draft_id] = box_records
-
-        drafts.append(draft)
-        evidence.append(
-            DraftEvidence(
-                draft_id=draft_id,
-                draft_index=idx,
-                spans=[SourceSpan(segment_id=seg.segment_id, start=start, end=cursor[p_num])],
-                box_evidence=[],
-            )
-        )
-    return MenuExtractionResult(
-        schema_version=2,
-        pipeline_version="3",
-        status="incomplete" if errors else "complete",
-        started_at=started_at,
-        finished_at=datetime.now(timezone.utc),
-        extraction_mode="ai",
-        source=source,
-        segments=segments,
-        drafts=drafts,
-        evidence=evidence,
-        configuration={"pipeline_version": "3", "v4_vision": True, "input_mode": "vision_v4"},
-        warnings=warnings,
-        errors=errors,
-    )
