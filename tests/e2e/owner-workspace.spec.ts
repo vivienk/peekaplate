@@ -1775,7 +1775,10 @@ test('URL and manual sources share saved work and queued status is not a fake su
   await page.getByText('Paste URL', { exact: true }).click();
   await expect(page.getByRole('radio', { name: 'Paste URL' })).toBeChecked();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Menu URL').fill('https://restaurant.example/menu.pdf');
+  const menuUrl = page.getByLabel('Menu URL');
+  await menuUrl.fill('https://restaurant.example/menu.pdf');
+  await expect(menuUrl).toHaveCSS('padding-left', '44px');
+  await expect(menuUrl).toHaveCSS('padding-right', '44px');
   await page.getByRole('button', { name: 'Import menu', exact: true }).click();
   await expect(page.getByText('Queued for processing', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'View saved dishes', exact: true }).click();

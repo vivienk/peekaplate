@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "0dd4fdd3fdc728511be10b3db33c8acdcf6d79a2dbd99582c12eaf1fc106817d"
+      "sourceFingerprint": "c0dd5750a9deb0693e9b32b2d16a48db119433d74c6ce7a90eb6dc861e79a163"
     },
     {
       "id": "backend",
@@ -1160,24 +1160,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "diner"
       ],
-      "summary": "Connect S09 Serving Size in cm to confirmed saved-photo boundaries, approved dish facts and published physical_size. People served remains optional. Exact photo/foreground checks and immutable snapshot asset reads preserve the existing approval and publication boundaries; size edits do not call the processor.",
-      "files": [
-        "docs/screen9-portion-publish.md",
-        "packages/contracts/src/portion.ts",
-        "frontend/console/src/owner-menu/PortionCalibrationEditor.tsx",
-        "backend/src/owner-prepare.ts",
-        "frontend/diner/src/menu/portionSize.ts"
-      ],
-      "next": "Complete pinned checks and independent review, then human review and exact staging release. Verify round/rectangular inputs through save, review, publish and supported-device table AR; ordinary camera and 2.5D remain approximate."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "contracts",
-        "console",
-        "backend",
-        "diner"
-      ],
       "summary": "Correct the earlier interpretation: Serving size means people served. One count field replaces the duplicate People served input, while optional plate measurements independently authorize measured AR. Preserve canonical null/absent semantics, legacy notes, saved-photo evidence and immutable publication. Clearing old calibration preserves unknown people counts. Count changes require renewed confirmation and never multiply dimensions.",
       "files": [
         "docs/screen9-portion-publish.md",
@@ -1311,6 +1293,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_vision_ingredients.py"
       ],
       "next": "Complete review of the processing patch. S6-VIS-04 live URL/PDF/staging checks and QA-02 holdout scoring remain separate."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "console"
+      ],
+      "summary": "The signed-in menu URL form reserves space for both icons even when the shared auth stylesheet is loaded after the onboarding stylesheet.",
+      "files": [
+        "frontend/console/src/onboarding/onboarding.css",
+        "tests/e2e/owner-workspace.spec.ts"
+      ],
+      "next": "Verify a long pasted URL on the published owner build without submitting an import."
     }
   ]
 }
