@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "64e593bf2c6a4472c2b5faa39e2aeab6c2a6d6cf98a9ef9a7d9f2d78338cc4e4"
+      "sourceFingerprint": "cbe959641dd9c3ca90ee2bfe68a9b57df02101186d23b6ecaf78d8c278e00272"
     },
     {
       "id": "tokens",
@@ -473,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "740140a58afa303711664e905845ce1770665ff6cbbc8dd6bdb8263376d97e38"
+      "sourceFingerprint": "58f206fc92f9d782df0890da3271642e7cddca81cdbd036fc0f19838cfbda8f2"
     },
     {
       "id": "backend",
@@ -582,6 +582,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/repository.ts",
         "backend/src/bundle-producer/request.ts",
         "backend/src/bundle-producer/bundle-producer.integration.ts",
+        "backend/src/bundle-producer/handoff-file.ts",
+        "backend/src/bundle-producer/handoff-file.test.ts",
         "backend/scripts/produce-menu-bundle.ts",
         "docs/s4-res-bundle-producer.md",
         "docs/owner-report-staging.md",
@@ -747,7 +749,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a97613088c4db2a48ec6f4c05af31ef8ae90113b97e99991addbad599fb255d6"
+      "sourceFingerprint": "4430b1b18487921f994be26e084a761524c71729819d643759344a9c4741fc16"
     },
     {
       "id": "database",
@@ -1114,7 +1116,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "273cff47906c00006c15f5f6f07a7d24680f2b0bf457e9be8fe44e962490537b"
+      "sourceFingerprint": "a8bc68e759ee2e7e43be6891cbecbce0799fd903bd3e940259f3e3064c10ef21"
     },
     {
       "id": "assets",
@@ -1149,17 +1151,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console",
-        "diner",
-        "contracts"
-      ],
-      "summary": "Sync the same reviewed main ingredient/consent commits into develop, preserving existing order/comparison/local AI work. Active extraction authority and real SQL fixture regressions are included.",
-      "next": "Wait for PR227 CI, merge main normally, then update develop without force or bypass. Deploy exact main only; credential approval and report completeness remain external AI gates."
-    },
     {
       "date": "2026-11-17",
       "modules": [
@@ -1286,6 +1277,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/production-release.md"
       ],
       "next": "Release the approved production API and console with their dashboard AI flags enabled, then verify one signed-in report question."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "contracts",
+        "backend",
+        "processing"
+      ],
+      "summary": "Restore the prepared-page dimensions symbol and document the bundle producer's exact-byte output rule and six-field handoff retry comparison.",
+      "files": [
+        "docs/review-candidates.md",
+        "docs/s4-res-bundle-producer.md",
+        "qa-reports/S4-RES-test-plan.md"
+      ],
+      "next": "Use the linked CLI admission regression to verify retries against pre-diagnostics handoffs."
     },
     {
       "date": "2026-11-25",

@@ -44,7 +44,9 @@ pnpm produce:bundle --request <request.json> --t0-root <asset-root> \
   --database-url <privileged-db-url> --out work/menu-bundles --admit
 ```
 
-`PEEKAPLATE_PRODUCER_DATABASE_URL` can supply the URL. Without `--admit` no database rows are written. Existing output files must match exactly and are never overwritten. Protect credentials from shell history and logs. The handoff report contains hashes, IDs, URL and diagnostics; it is not a substitute for approvals.
+`PEEKAPLATE_PRODUCER_DATABASE_URL` can supply the URL. Without `--admit` no database rows are written. Protect credentials from shell history and logs.
+
+Existing bundle JSON and emitted asset files must match byte for byte. The producer preserves existing files in place. For an existing `<menu_revision_id>.handoff.json`, it compares six parsed fields (`bundleUrl`, `contentHash`, `assetManifestHash`, `menuRevisionId`, `contentApprovalId` and `assetApprovalId`). JSON whitespace and field order may differ. The optional `diagnostics` array may differ or be absent in older handoffs. Malformed handoffs, unexpected fields and mismatched metadata block the retry. Approvals remain separate.
 
 ## 7. Remaining integration gates
 
