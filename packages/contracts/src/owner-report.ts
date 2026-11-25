@@ -29,8 +29,7 @@ const metric = (value: z.ZodNumber) =>
     .strictObject({ value: value.nullable(), status: MetricStatusSchema })
     .refine(valueMatchesStatus, { message: VALUE_MESSAGE });
 
-// The report API's internal version of a rate or average: it also carries eligible_sessions, the
-// cohort the privacy floor is checked against (Sai, 2 Nov). For a rate, the distinct eligible
+// The report API's internal rate or average also carries eligible_sessions. For a rate, the distinct eligible
 // sessions in its denominator; for an average, the distinct sessions that supplied a valid
 // measurement. Sessions are counted, never events or openings. These counts never reach owners:
 // toOwnerReport() removes them, and the owner schema rejects them.
@@ -41,16 +40,7 @@ const cohortMetric = (value: z.ZodNumber) =>
       status: MetricStatusSchema,
       eligible_sessions: z.number().int().nonnegative(),
     })
-    .refine(valueMatchesStatus, { message: VALUE_MESSAGE })
-    .superRefine((data, ctx) => {
-      if (shows(data.status) && data.eligible_sessions < PRIVACY_FLOOR_SESSIONS) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['status'],
-          message: `A shown value needs at least ${PRIVACY_FLOOR_SESSIONS} eligible sessions; suppress below that`,
-        });
-      }
-    });
+    .refine(valueMatchesStatus, { message: VALUE_MESSAGE });
 
 // Whole-number counts.
 const count = () => metric(z.number().int().nonnegative());
@@ -74,20 +64,22 @@ const summaryCount = (allowSmallCounts: boolean) =>
       (cell.value !== null && cell.value >= PRIVACY_FLOOR_SESSIONS),
     { message: 'A visible summary count must meet the ten-session floor' },
   );
-const summaryMetrics = (allowSmallCounts: boolean) =>
+const summaryMetrics = (allowSmallCounts: boolean, allowSmallPortions: boolean) =>
   z.strictObject({
     menu_sessions: summaryCount(allowSmallCounts),
     dish_opens: summaryCount(allowSmallCounts),
     avg_interaction_time_seconds: metric(averageValue()),
-    portion_previews_shown: allowSmallCounts ? summaryCount(false) : unavailableSummaryMetric,
+    portion_previews_shown: allowSmallCounts
+      ? summaryCount(allowSmallPortions)
+      : unavailableSummaryMetric,
     verified_orders: unavailableSummaryMetric,
   });
-function summarySchema(allowSmallCounts: boolean) {
+function summarySchema(allowSmallCounts: boolean, allowSmallPortions = false) {
   return z
     .strictObject({
       periods: z.strictObject({ current: summaryWindow, baseline: summaryWindow }),
-      current: summaryMetrics(allowSmallCounts),
-      baseline: summaryMetrics(allowSmallCounts),
+      current: summaryMetrics(allowSmallCounts, allowSmallPortions),
+      baseline: summaryMetrics(allowSmallCounts, allowSmallPortions),
       daily_opens: z
         .strictObject({
           current: z
@@ -143,6 +135,7 @@ function summarySchema(allowSmallCounts: boolean) {
 }
 export const OwnerReportSummarySchema = summarySchema(false);
 export const ProductionBatchSummarySchema = summarySchema(true);
+const ProductionDaySummarySchema = summarySchema(true, true);
 export const OWNER_PRODUCTION_BATCH_VERSION = 'production.batch.v1';
 export const OWNER_PRODUCTION_DAY_VERSION = 'production.sf-day.v1';
 export const OWNER_REPORT_TIME_ZONE = 'America/Los_Angeles';
@@ -186,6 +179,16 @@ const COMPLEMENTARY_SUPPRESSION_METRICS = [
   'open_rate',
 ] as const;
 
+function isProductionDay(report: {
+  source: string;
+  report_metadata: { calculation_version: string };
+}) {
+  return (
+    report.source === 'production' &&
+    report.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION
+  );
+}
+
 function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.ZodType<MetricValue>>(
   rate: () => Rate,
   average: () => Average,
@@ -196,7 +199,7 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
       schema_version: z.literal('owner_report.v1'),
       venue_id: z.uuid(),
       source: z.enum(['synthetic', 'production']),
-      summary: ProductionBatchSummarySchema.optional(),
+      summary: ProductionDaySummarySchema.optional(),
       report_metadata: z.strictObject({
         calculation_version: z.string(),
         generated_at: z.iso.datetime(),
@@ -243,33 +246,14 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
               }),
               display_actions: z
                 .strictObject({
-                  portion_previews_shown: summaryCount(false).optional(),
-                  comparisons_started: summaryCount(false).optional(),
+                  portion_previews_shown: count().optional(),
+                  comparisons_started: count().optional(),
                 })
                 .optional(),
             })
             .superRefine((dish, ctx) => {
-              // ADR 0015 privacy floor: behavioral values are shown only from ten active sessions.
               const sessions = dish.metrics.active_sessions;
-              if (sessions.status === 'NORMAL' && (sessions.value ?? 0) < PRIVACY_FLOOR_SESSIONS) {
-                ctx.addIssue({
-                  code: 'custom',
-                  path: ['metrics', 'active_sessions', 'value'],
-                  message: `NORMAL needs at least ${PRIVACY_FLOOR_SESSIONS} active sessions; suppress below that`,
-                });
-              }
-              // Zero sessions is below the floor too, so it is SUPPRESSED (or MISSING when there is
-              // no usable data), never VALID_ZERO.
-              if (sessions.status === 'VALID_ZERO') {
-                ctx.addIssue({
-                  code: 'custom',
-                  path: ['metrics', 'active_sessions', 'status'],
-                  message:
-                    'Zero active sessions is below the privacy floor: use SUPPRESSED or MISSING',
-                });
-              }
-              // Until the floor is shown to be met, nothing may reveal behavior, including the
-              // other metrics.
+              // A proven open or display action can have no eligible card exposure.
               const complementarySuppression =
                 !checkCohorts &&
                 sessions.status === 'SUPPRESSED' &&
@@ -280,7 +264,7 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
                   ),
                 );
               // The serializer may hide these cells while retaining independently safe cohorts.
-              if (sessions.status !== 'NORMAL' && !complementarySuppression) {
+              if (!shows(sessions.status) && !complementarySuppression) {
                 for (const [name, value] of Object.entries(dish.metrics)) {
                   if (shows(value.status)) {
                     ctx.addIssue({
@@ -295,7 +279,7 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
               // A zero denominator (no eligible sessions) is NOT_MEASURABLE, never 0% and never a
               // suppressed value (implementation plan; ADR 0015). On a dish below the floor every
               // metric stays SUPPRESSED instead, since "not measurable" would itself reveal the zero.
-              if (checkCohorts && sessions.status === 'NORMAL') {
+              if (checkCohorts && shows(sessions.status)) {
                 for (const name of COHORT_METRICS) {
                   const cells = dish.metrics as Record<
                     string,
@@ -332,13 +316,60 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
     })
     .superRefine((report, ctx) => {
       const metadata = report.report_metadata;
-      const day =
-        report.source === 'production' &&
-        metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION;
+      const day = isProductionDay(report);
       const batch =
         day ||
         (report.source === 'production' &&
           metadata.calculation_version === OWNER_PRODUCTION_BATCH_VERSION);
+      const minimumSessions = day ? 1 : PRIVACY_FLOOR_SESSIONS;
+      for (const [index, dish] of report.dishes.entries()) {
+        const path = ['dishes', index] as const;
+        const sessions = dish.metrics.active_sessions;
+        if (sessions.status === 'NORMAL' && (sessions.value ?? 0) < minimumSessions) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [...path, 'metrics', 'active_sessions', 'value'],
+            message: 'Normal active sessions must be positive and meet the report minimum',
+          });
+        }
+        if (!day && sessions.status === 'VALID_ZERO') {
+          ctx.addIssue({
+            code: 'custom',
+            path: [...path, 'metrics', 'active_sessions', 'status'],
+            message: 'Legacy reports do not expose zero active sessions',
+          });
+        }
+        if (checkCohorts) {
+          const metrics = dish.metrics as Record<
+            string,
+            MetricValue & { eligible_sessions?: number }
+          >;
+          for (const name of COHORT_METRICS) {
+            const cell = metrics[name];
+            if (
+              cell?.eligible_sessions !== undefined &&
+              shows(cell.status) &&
+              cell.eligible_sessions < minimumSessions
+            ) {
+              ctx.addIssue({
+                code: 'custom',
+                path: [...path, 'metrics', name, 'status'],
+                message: 'A visible rate or average must meet the report minimum',
+              });
+            }
+          }
+        }
+        if (!day) {
+          for (const [name, cell] of Object.entries(dish.display_actions ?? {})) {
+            if (!summaryCount(false).safeParse(cell).success)
+              ctx.addIssue({
+                code: 'custom',
+                path: [...path, 'display_actions', name],
+                message: 'A visible legacy display-action count must meet the ten-session floor',
+              });
+          }
+        }
+      }
       if (
         report.dishes.some(
           ({ display_actions, evidence_state }) =>
@@ -378,6 +409,12 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
           code: 'custom',
           path: ['summary'],
           message: 'Only the completed production batch can expose sub-ten restaurant totals',
+        });
+      if (batch && !day && !ProductionBatchSummarySchema.safeParse(summary).success)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['summary'],
+          message: 'Legacy visible portion totals must meet the ten-session floor',
         });
       const at = Date.parse;
       const current = summary.periods.current;
@@ -437,10 +474,7 @@ export const OwnerDishReportSchema = reportSchema(
   false,
 );
 
-// What the report API builds first. Every rate and average carries its eligible_sessions, and is
-// shown only when that cohort reaches the floor. Passing this check does not make a cell safe on
-// its own: the API must still suppress cells whose rate, counts or related cells would reveal a
-// protected small group (complementary suppression, implementation plan; agreed with Sai).
+// Internal rates and averages keep their eligible_sessions for evidence validation.
 export const InternalOwnerDishReportSchema = reportSchema(
   () => cohortMetric(rateValue()),
   () => cohortMetric(averageValue()),
@@ -454,6 +488,7 @@ export type InternalOwnerDishReport = z.infer<typeof InternalOwnerDishReportSche
 // cohort counts can never be sent to an owner.
 export function toOwnerReport(internal: unknown): OwnerDishReport {
   const report = InternalOwnerDishReportSchema.parse(internal);
+  const day = isProductionDay(report);
   return OwnerDishReportSchema.parse({
     ...report,
     dishes: report.dishes.map((dish) => {
@@ -475,7 +510,9 @@ export function toOwnerReport(internal: unknown): OwnerDishReport {
         metrics: Object.fromEntries(
           Object.entries(dish.metrics).map(([name, { value, status }]) => [
             name,
-            (hideTimingRelatedMetrics || hideSmallOpenedCohort) && timingRelatedMetrics.has(name)
+            !day &&
+            (hideTimingRelatedMetrics || hideSmallOpenedCohort) &&
+            timingRelatedMetrics.has(name)
               ? { value: null, status: 'SUPPRESSED' }
               : { value, status },
           ]),

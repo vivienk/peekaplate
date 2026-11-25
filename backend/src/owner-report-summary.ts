@@ -130,14 +130,14 @@ function metrics(
   if (typeof row.has_small_dish !== 'boolean' || typeof row.has_small_timed_dish !== 'boolean')
     throw new Error('Invalid summary cohort evidence');
   const protectedSubset =
-    row.has_small_dish ||
-    row.has_small_timed_dish ||
-    (includeUtcBuckets &&
+    includeUtcBuckets &&
+    (row.has_small_dish ||
+      row.has_small_timed_dish ||
       dailyRows(row)?.some((bucket) => bucket.sessions > 0 && bucket.sessions < 10));
   const value = (number: number | null, cohort: number) => {
     if (protectedSubset) return { value: null, status: 'SUPPRESSED' } as const;
     if (cohort === 0) return { value: null, status: 'NOT_MEASURABLE' } as const;
-    if (cohort < 10) return { value: null, status: 'SUPPRESSED' } as const;
+    if (includeUtcBuckets && cohort < 10) return { value: null, status: 'SUPPRESSED' } as const;
     if (number === null || !Number.isFinite(number))
       throw new Error('Missing measured summary value');
     return { value: number, status: number === 0 ? 'VALID_ZERO' : 'NORMAL' } as const;

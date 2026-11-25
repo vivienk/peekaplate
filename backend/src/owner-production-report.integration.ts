@@ -386,6 +386,23 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         });
         expect(result.byDish.get(sideA.id)).toEqual({ comparisons_started: observed });
         expect(result.byDish.get(sideB.id)).toEqual({ comparisons_started: observed });
+        const firstVisit = await readOwnerReportDisplayActions(
+          runtime,
+          venue.venueId,
+          new Date(today),
+          new Date(latestEnd),
+          { start: new Date(today), events: events.slice(0, 4), publications: [published] },
+          new Set(),
+          true,
+        );
+        const singleAction = { value: 1, status: 'NORMAL' };
+        expect(firstVisit.portionTotal).toEqual(singleAction);
+        expect(firstVisit.byDish.get(anchor.id)).toEqual({
+          comparisons_started: singleAction,
+          portion_previews_shown: singleAction,
+        });
+        expect(firstVisit.byDish.get(sideA.id)).toEqual({ comparisons_started: singleAction });
+        expect(firstVisit.dishNames.get(anchor.id)).toBe('Display action fixture');
         const smallComplement = await readOwnerReportDisplayActions(
           runtime,
           venue.venueId,
@@ -807,7 +824,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         // A lone preview today and a late arrival yesterday must not change sealed dish data.
         postHogEvents.push(
           ...(await visit(venue, '2035-02-04T07:59:10.000Z', true, false, true)),
-          ...(await visit(venue, '2035-02-04T08:02:00.000Z', true, false, true, 12_000)),
+          ...(await visit(venue, '2035-02-04T08:02:00.000Z', true, true, true, 12_000)),
         );
         vi.setSystemTime(new Date('2035-02-04T08:06:00.000Z'));
         const nextDayResponse = await dailyWithFreshToken();
@@ -831,9 +848,37 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
         const smallDayResponse = await dailyWithFreshToken();
         expect(smallDayResponse.status).toBe(200);
         const smallDay = OwnerDishReportSchema.parse(await smallDayResponse.json());
-        expect(smallDay.summary?.baseline.avg_interaction_time_seconds).toEqual({
-          value: null,
-          status: 'SUPPRESSED',
+        expect(smallDay.summary?.baseline).toMatchObject({
+          menu_sessions: { value: 1, status: 'NORMAL' },
+          dish_opens: { value: 1, status: 'NORMAL' },
+          avg_interaction_time_seconds: { value: 12, status: 'NORMAL' },
+          portion_previews_shown: { value: 1, status: 'NORMAL' },
+          verified_orders: { value: null, status: 'MISSING' },
+        });
+        expect(smallDay.dishes[0]?.metrics).toEqual({
+          active_sessions: { value: 1, status: 'NORMAL' },
+          avg_interaction_time_seconds: { value: 12, status: 'NORMAL' },
+          timing_coverage: { value: 1, status: 'NORMAL' },
+          open_rate: { value: 1, status: 'NORMAL' },
+          engagement_rate: { value: 1, status: 'NORMAL' },
+          save_rate: { value: 1, status: 'NORMAL' },
+        });
+        expect(smallDay.dishes[0]?.display_actions?.portion_previews_shown).toEqual({
+          value: 1,
+          status: 'NORMAL',
+        });
+        expect(smallDay.report_metadata.freshness.is_stale).toBeNull();
+        const smallDayCsv = await dailyWithFreshToken('/export');
+        expect(smallDayCsv.status).toBe(200);
+        const [columns, row] = (await smallDayCsv.text()).trim().split('\n');
+        const metrics = Object.fromEntries(
+          columns!.split(',').map((key, index) => [key, row!.split(',')[index]]),
+        );
+        expect(metrics).toMatchObject({
+          active_sessions: '1',
+          open_rate: '1',
+          save_rate: '1',
+          avg_interaction_time_seconds: '12',
         });
         expect(otherRefreshed.dishes).toEqual([]);
         expect(otherRefreshed.summary?.baseline.dish_opens).toEqual({

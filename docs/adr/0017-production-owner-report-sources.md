@@ -18,7 +18,7 @@ If the provider request fails or is truncated, return report unavailable. A succ
 
 ## Consequences
 
-PostHog captures can lag canonical ingestion and vice versa. Public capture identifiers alone are not an authenticated independent receipt. Immutable releases prevent repeated reads of the same cutoff from exposing an intrabatch delta. Consecutive day-to-date snapshots can expose changes between cutoffs. The venue-wide exception and dish-level suppression are documented in [ADR 0018](0018-production-batch-counts.md). Keep rollout disabled until the authorized PostHog project, publication provenance, history separation and release behavior are verified. Do not repurpose the frozen staging environment's GitHub credentials.
+PostHog captures can lag canonical ingestion and vice versa. Public capture identifiers alone are not an authenticated independent receipt. Immutable releases prevent repeated reads of the same cutoff from exposing an intrabatch delta. Consecutive day-to-date snapshots can expose changes between cutoffs. [ADR 0018](0018-production-batch-counts.md) records the original venue-count exception, and [ADR 0019](0019-production-single-session-reporting.md) records single-session disclosure in the San Francisco day dashboard. Keep rollout disabled until the authorized PostHog project, publication provenance, history separation and release behavior are verified. Do not repurpose the frozen staging environment's GitHub credentials.
 
 ## Verification
 

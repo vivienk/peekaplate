@@ -5574,7 +5574,24 @@ summary also applied suppression from UTC buckets it did not expose. Use the com
 day and per-dish privacy floors for that summary. The signed production-report integration checks
 the first fallback response and a ten-session cohort split across UTC midnight.
 
+## Single-session production day reports
+
+The new production day disclosure rule exposed legacy gates in the SQL reader, display-action
+aggregation, and shared report serialization. The one-session contract regression failed before
+the fix. Daily mode now accepts eligible single-session aggregates while retaining the legacy
+floor outside that mode. The internal schema still validates nonzero denominators and strips
+cohort counts from every public response. Typechecking caught generic schema indexing during the
+change, which was corrected by narrowing to the existing metric-cell shape.
+
+The local PostgreSQL fixture uses a temporary Vitest config with the embedded database adapter.
+Vitest does not accept the setup-file setting as a command-line argument.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-24T07:21:11.647Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-25T06:21:30.913Z","exitCode":2}
 ```

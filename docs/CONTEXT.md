@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. Optional summary and clipped UTC daily opening buckets preserve per-cell privacy statuses; absent measurements are not zero. Food and portion evidence remain revision-bound. Serving size parses integer people counts; separate optional photo-bound plate calibration provides physical dimensions. Legacy text alone never creates measurement evidence.",
+      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. The production San Francisco day report permits positive single-session metrics under ADR 0019. Legacy scopes retain their original privacy rules. Missing denominators remain unavailable and internal cohort counts stay private. Food and portion evidence remain revision-bound. Serving size parses integer people counts; separate optional photo-bound calibration provides physical dimensions.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "a2b4ed4db7a937ed99410bf4e26a5cea6ae714217046ebd492ea6ce859fb22a7"
+      "sourceFingerprint": "71096ce9187ff8f00e2aefb84bf6c4ef117c2e4481e7248631bd539a4c051858"
     },
     {
       "id": "tokens",
@@ -473,12 +473,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "e4b3cc820ff1cdc012656816f6acf74edee86184974bb44a7172a7c693c11107"
+      "sourceFingerprint": "ead91cc24b35f2bb7e03d3fd5067170ff8ca794186f6fae46a54140ca3b137f6"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Owner AI uses checked report references and currently gates to approved synthetic reports; its diagnostic path and private portion processing remain separate. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. Hosted production binding and provider compatibility still require verification. The production extraction host supports a separate portion-only deployment with no provider credentials or Internet egress. Its container requires the source origin to match its environment. The existing menu OCR transport is separate.",
+      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Production San Francisco day dish aggregates use the first eligible event for the completed day. Owner AI uses checked report references and gates provider use on verified freshness. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. The separate production portion-only deployment requires matching source origin; menu OCR transport is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -748,7 +748,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "923706515055a0d0f508cf5289a6a7949e58e4b11e4beca1d02dfc78b975035f"
+      "sourceFingerprint": "e8f31385feda4b9584a87d24facd5d80d45a107b0a9565e1ab9c93394bc08357"
     },
     {
       "id": "database",
@@ -911,7 +911,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "2401af124f2d24d323f4ac802d0e1563b823352aa0bc86abb09812c7df022b0a"
+      "sourceFingerprint": "5aef001859d32fd2483fa9b9e23f0b3da0fd2913eccd30f0fb590821b14ab432"
     },
     {
       "id": "agents",
@@ -1289,8 +1289,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "contracts"
       ],
-      "summary": "Prepare production Overview totals from San Francisco midnight through settled cutoffs and recover after transient refresh failures. Protect both legacy comparison periods at cutover. The previous complete local day supplies protected active time and the shared Dish Performance, CSV and AI period. Capture and export stay independent.",
-      "next": "Obtain independent approval on the corrected head. Verify private snapshot retention and the approved Pacific midnight before activating the compatible console and Worker in release order."
+      "summary": "Production Overview accumulates from San Francisco midnight and recovers after transient refresh failures. Dish Performance and CSV expose supported aggregates from the first eligible session in the previous complete local day under ADR 0019. The signed AI period stays aligned and unknown freshness still prevents provider use. The cutover withholds overlapping legacy dish reports.",
+      "files": [
+        "docs/adr/0019-production-single-session-reporting.md",
+        "backend/src/owner-production-report.integration.ts",
+        "packages/contracts/src/owner-report.ts"
+      ],
+      "next": "Review single-session disclosure and verify private snapshot retention and the approved Pacific midnight before activating the compatible production console and Worker."
     }
   ]
 }

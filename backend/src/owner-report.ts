@@ -5,6 +5,7 @@ import {
   OWNER_PRODUCTION_DAY_VERSION,
   type OwnerDishReport,
   OwnerDishReportSchema,
+  PRIVACY_FLOOR_SESSIONS,
 } from '@peekaplate/contracts/owner-report';
 import type { Client } from 'pg';
 import { AuthUnavailableError } from './auth';
@@ -186,6 +187,7 @@ async function measureReport(
   dayBaselineStart?: Date,
 ) {
   const isBatch = Boolean(dayBaselineStart) || durationMs === OWNER_BATCH_MS;
+  const productionDay = source === 'production' && dayBaselineStart !== undefined;
   const windowStart = new Date(now.getTime() - durationMs);
   const dishStart = dayBaselineStart ?? windowStart;
   // Daily dish metrics measure yesterday once, when the midnight cutoff becomes eligible.
@@ -233,13 +235,11 @@ async function measureReport(
       anchor: now,
       validationNow: options.validationNow ?? new Date(),
     }));
-  const internal = buildInternalReport(
-    result.rows,
-    venueId,
-    now,
-    source,
-    now.getTime() - dishStart.getTime(),
-    Boolean(dayBaselineStart),
+  const rows = result.rows;
+  const exposedDishes = new Set(
+    rows
+      .filter((row) => Number(row.total_sessions) >= PRIVACY_FLOOR_SESSIONS)
+      .map((row) => String(row.dish_id)),
   );
   const displayActions =
     isBatch && options.includeDisplayActions && liveEvidence
@@ -249,9 +249,36 @@ async function measureReport(
           dishStart,
           now,
           liveEvidence,
-          new Set(internal.dishes.map((dish) => String(dish.dish_id))),
+          exposedDishes,
+          productionDay,
         )
       : undefined;
+  if (productionDay && displayActions) {
+    const observedDishes = new Set(rows.map((row) => String(row.dish_id)));
+    for (const [dishId, name] of displayActions.dishNames) {
+      if (observedDishes.has(dishId)) continue;
+      // A comparison partner or a rendered portion can have no exposure or open
+      // in the reporting window. The action is still measured on that dish.
+      rows.push({
+        dish_id: dishId,
+        dish_name: name,
+        total_sessions: 0,
+        open_eligible_sessions: 0,
+        timed_sessions: 0,
+        total_openings: 0,
+        average_active_seconds: null,
+        last_event_ingested_at: null,
+      });
+    }
+  }
+  const internal = buildInternalReport(
+    rows,
+    venueId,
+    now,
+    source,
+    now.getTime() - dishStart.getTime(),
+    productionDay,
+  );
   return toOwnerReport({
     ...internal,
     ...(displayActions
@@ -533,19 +560,20 @@ function rateMetric(
   denominator: number,
   belowDishFloor: boolean,
   eligibleSessions: number,
+  minimumSessions: number,
   protectSmallPartitions = false,
 ) {
   if (belowDishFloor)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (denominator === 0)
     return { value: null, status: 'NOT_MEASURABLE', eligible_sessions: eligibleSessions };
-  if (eligibleSessions < 10)
+  if (eligibleSessions < minimumSessions)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (
     protectSmallPartitions &&
     numerator > 0 &&
     numerator < denominator &&
-    Math.min(numerator, denominator - numerator) < 10
+    Math.min(numerator, denominator - numerator) < PRIVACY_FLOOR_SESSIONS
   )
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (numerator === 0)
@@ -557,12 +585,17 @@ function rateMetric(
   };
 }
 
-function averageMetric(value: number | null, eligibleSessions: number, belowDishFloor: boolean) {
+function averageMetric(
+  value: number | null,
+  eligibleSessions: number,
+  belowDishFloor: boolean,
+  minimumSessions: number,
+) {
   if (belowDishFloor)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (eligibleSessions === 0)
     return { value: null, status: 'NOT_MEASURABLE', eligible_sessions: eligibleSessions };
-  if (eligibleSessions < 10)
+  if (eligibleSessions < minimumSessions)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (value === null) throw new Error('Timed sessions have no average active time');
   if (value === 0) return { value: 0, status: 'VALID_ZERO', eligible_sessions: eligibleSessions };
@@ -586,7 +619,11 @@ function buildInternalReport(
 ) {
   const start = new Date(now.getTime() - durationMs);
   const isBatch = productionDay || durationMs === OWNER_BATCH_MS;
-  const visibleRows = isBatch ? rows.filter((row) => Number(row.total_sessions) >= 10) : rows;
+  const legacyBatch = isBatch && !productionDay;
+  const minimumSessions = productionDay ? 1 : PRIVACY_FLOOR_SESSIONS;
+  const visibleRows = legacyBatch
+    ? rows.filter((row) => Number(row.total_sessions) >= minimumSessions)
+    : rows;
   const lastEventIngestedAt = rows.reduce<string | null>((latest, row) => {
     const timestamp = timestampOrNull(row.last_event_ingested_at);
     return timestamp && (!latest || timestamp > latest) ? timestamp : latest;
@@ -610,8 +647,9 @@ function buildInternalReport(
       },
       coverage: {
         total_dishes_monitored: visibleRows.length,
-        measurable_dishes_count: visibleRows.filter((row) => Number(row.total_sessions) >= 10)
-          .length,
+        measurable_dishes_count: productionDay
+          ? visibleRows.length
+          : visibleRows.filter((row) => Number(row.total_sessions) >= minimumSessions).length,
       },
       freshness: {
         is_stale: null,
@@ -623,12 +661,12 @@ function buildInternalReport(
       const totalSessions = Number(row.total_sessions);
       const openEligibleSessions = Number(row.open_eligible_sessions);
       const timedSessions = Number(row.timed_sessions);
-      const belowDishFloor = totalSessions < 10;
+      const belowDishFloor = !productionDay && totalSessions < minimumSessions;
       const coverageHasSmallSessionGroup =
-        isBatch &&
+        legacyBatch &&
         [row.timed_opening_sessions, row.untimed_opening_sessions]
           .map(Number)
-          .some((count) => count > 0 && count < 10);
+          .some((count) => count > 0 && count < minimumSessions);
 
       return {
         dish_id: row.dish_id,
@@ -637,40 +675,45 @@ function buildInternalReport(
         metrics: {
           active_sessions: {
             value: belowDishFloor ? null : totalSessions,
-            status: belowDishFloor ? 'SUPPRESSED' : 'NORMAL',
+            status: belowDishFloor ? 'SUPPRESSED' : totalSessions === 0 ? 'VALID_ZERO' : 'NORMAL',
           },
           avg_interaction_time_seconds: averageMetric(
             numberOrNull(row.average_active_seconds),
             timedSessions,
             belowDishFloor,
+            minimumSessions,
           ),
           timing_coverage: rateMetric(
             Number(row.timed_openings),
             Number(row.total_openings),
             belowDishFloor || coverageHasSmallSessionGroup,
             openEligibleSessions,
-            isBatch,
+            minimumSessions,
+            legacyBatch,
           ),
           open_rate: rateMetric(
             Number(row.exposed_open_sessions),
             totalSessions,
             belowDishFloor,
             totalSessions,
-            isBatch,
+            minimumSessions,
+            legacyBatch,
           ),
           engagement_rate: rateMetric(
             Number(row.engaged_sessions),
             openEligibleSessions,
             belowDishFloor,
             openEligibleSessions,
-            isBatch,
+            minimumSessions,
+            legacyBatch,
           ),
           save_rate: rateMetric(
             Number(row.saved_sessions),
             totalSessions,
             belowDishFloor,
             totalSessions,
-            isBatch,
+            minimumSessions,
+            legacyBatch,
           ),
         },
       };
