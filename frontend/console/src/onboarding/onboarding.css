@@ -389,9 +389,12 @@
   right: calc(var(--pp-space-16) + 1.5px);
 }
 
-.pp-onboard .pp-onboard-link__input {
+/* Scoped to the field's own wrapper so the space for the link and check icons also applies on
+ * the signed-in Menu page, which renders this form outside .pp-onboard. Each side keeps the
+ * 16px inset, the 16px icon and a 12px gap so pasted links never run under an icon. */
+.pp-onboard-link__control .pp-onboard-link__input {
   width: 100%;
-  padding-inline: calc(var(--pp-space-16) + var(--pp-space-20)) var(--pp-space-40);
+  padding-inline: calc(var(--pp-space-16) + var(--pp-space-16) + var(--pp-space-12));
 }
 
 /* S07 Upload card: 80 above and below, 48 at the sides; the upload area is up to 800 wide and
