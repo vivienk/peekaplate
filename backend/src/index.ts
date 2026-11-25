@@ -1550,12 +1550,12 @@ export function createApp(services: Dependencies = dependencies) {
     const venueId = scope.data.venueId.toLowerCase();
     const report = await services.readOwnerReport(actorId, venueId, now, env, source);
     c.header('Cache-Control', 'no-store');
+    const showDisplayActions =
+      source !== 'production' ||
+      (env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED === 'true' &&
+        c.req.query('displayActions') === 'true');
     let responseReport = report;
-    if (
-      source === 'production' &&
-      (env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED !== 'true' ||
-        c.req.query('displayActions') !== 'true')
-    ) {
+    if (!showDisplayActions) {
       const legacy = OwnerDishReportSchema.parse(report);
       const missing = { value: null, status: 'MISSING' } as const;
       responseReport = {
@@ -1580,6 +1580,7 @@ export function createApp(services: Dependencies = dependencies) {
           { actorId, venueId },
           env.OWNER_AI_REPORT_REFERENCE_SECRET,
           now,
+          showDisplayActions,
         );
         c.header(OWNER_REPORT_REFERENCE_HEADER, reference);
       } catch {

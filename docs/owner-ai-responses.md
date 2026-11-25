@@ -1,7 +1,8 @@
 # Owner dashboard Responses connection
 
-This development integration connects the owner dashboard panel to a server-side
-Responses adapter. It is off by default and does not enable production reports.
+The owner dashboard question panel reads an authorized report through the Worker.
+The legacy analysis route separately connects to the server-side Responses adapter.
+Both are off by default and depend on the existing report configuration.
 It builds on the AI report validation and dashboard preview branches (#112/#124).
 
 ## Behavior and authority
@@ -13,20 +14,33 @@ or refresh access. Provider credentials remain server-only. Origin validation
 is a dependency-free shared helper, keeping unrelated report contracts out of
 the synthetic demo dependency path.
 
-The signed-in owner shell mounts the panel beside the displayed report pages only when
-`VITE_OWNER_AI_ENABLED=true`. Owners choose a dish and review focus; editors do
-not receive the panel. Session, restaurant, dish, focus or displayed-report changes
-cancel pending work. A 401 returns to sign-in; a 403 removes private report output
-and refreshes restaurant access. The menu workspace remains available separately.
+The signed-in owner shell mounts the question panel beside the displayed report
+pages only when `VITE_OWNER_AI_ENABLED=true`. The panel is available to owners.
+Session, restaurant or displayed-report changes cancel pending work and clear the
+answer. A 401 returns to sign-in. A 403 removes private report output and refreshes
+restaurant access.
 
 The Worker issues an `X-Owner-Report-Ref` response header on a successful owner
-report GET when analysis and its reference signing secret are configured. It
-binds the report's exact UTC end timestamp and content digest to the authenticated
-owner, venue and synthetic source for up to 60 seconds. The frontend handoff is
-implemented by passing this same header on POST for the report currently on screen. The JSON
-request body remains `{dishId, goal}`. The header is for this exchange only.
+report GET when dashboard AI and the reference signing secret are configured. The
+reference binds the report anchor and content digest to the authenticated owner,
+restaurant and environment-specific source for up to 60 seconds. The frontend
+passes the reference for the report currently on screen.
 
-`POST /api/v1/venues/:venueId/ai/analysis` accepts only a dish ID and one review goal
+`POST /api/v1/venues/:venueId/ai/questions` accepts `{question}` and requires that
+reference. It rechecks current owner access and reads the exact signed snapshot.
+It answers supported English questions about the visible Dish Performance window,
+including a named dish, comparisons, rankings and requests for a bar chart. For
+example, ask “What was the save rate for Avocado Toast?” or “Chart open rate by
+dish.” Answers and charts use the same visible report metric values. A measured
+zero is displayed as zero. Unknown freshness, missing or suppressed values, or
+incomplete whole-menu evidence produce an abstention. The route does not answer
+about other restaurants, arbitrary date ranges, orders or unsupported metrics.
+The signed reference also preserves whether display-action counts were visible
+on the report. A question cannot enable counts hidden by the report settings.
+It does not send questions, dish names or report data to an external provider.
+Deploy the API route before publishing a console build that uses it.
+
+The legacy `POST /api/v1/venues/:venueId/ai/analysis` accepts a dish ID and one review goal
 (menu, engagement or CRM). The normal Worker verifies the signed owner session and
 uses the existing owner report reader, which checks current owner membership and
 reads the pinned window in a tenant-scoped read-only transaction. The Worker
@@ -39,8 +53,9 @@ cannot provide metrics, a prompt, a model, a policy or OpenAI credentials.
 The existing console origin allowlist applies to both routes. GET exposes the
 reference header and POST permits it in preflight for allowed origins.
 
-The route is off unless `OWNER_AI_RESPONSES_ENABLED=true`, `APP_ENV` is local or
-staging, and the server-approved synthetic venue matches. Production is rejected.
+Both routes require `OWNER_AI_RESPONSES_ENABLED=true`. Local and staging are
+restricted to configured synthetic venues. Production uses the existing owner
+workflow and report gates. The legacy route also requires provider credentials.
 The separate owner-analysis.v1 contract does not relax the existing deterministic
 recommendation validator or pretend a new model policy has passed independent QA.
 

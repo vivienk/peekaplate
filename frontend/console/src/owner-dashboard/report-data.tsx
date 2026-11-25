@@ -35,14 +35,17 @@ const STATUS_TEXT: Record<Exclude<Status, 'NORMAL' | 'VALID_ZERO'>, string> = {
   EVIDENCE_CHECK_FAILED: 'Couldn’t verify',
 };
 
+export function formatOwnerReportValue(value: number, kind: Kind): string {
+  if (kind === 'rate') return `${Math.round(value * 1000) / 10}%`;
+  if (kind === 'seconds') return `${value} s`;
+  return value.toLocaleString('en-US');
+}
+
 function show(cell: Cell, kind: Kind) {
   if (cell.status !== 'NORMAL' && cell.status !== 'VALID_ZERO') {
     return <span className="muted">{STATUS_TEXT[cell.status]}</span>;
   }
-  const v = cell.value ?? 0;
-  if (kind === 'rate') return `${Math.round(v * 1000) / 10}%`;
-  if (kind === 'seconds') return `${v} s`;
-  return v.toLocaleString('en-US');
+  return formatOwnerReportValue(cell.value ?? 0, kind);
 }
 
 const COLUMNS: [keyof OwnerDishReport['dishes'][number]['metrics'], string, Kind][] = [

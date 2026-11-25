@@ -11,6 +11,7 @@ import {
 } from '../../scripts/owner-ai-local-fixture';
 import { CommandError } from '../dish-command';
 import { type Bindings, createApp } from '../index';
+import { ownerReportDayWindow } from '../owner-report-batches';
 import {
   mintOwnerReportReference,
   OWNER_REPORT_REFERENCE_HEADER,
@@ -75,16 +76,41 @@ it('signs the current cutoff for both completed-day and today dish evidence', as
   }
 });
 
-function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = false) {
+function setup(
+  source: 'synthetic' | 'production' = 'synthetic',
+  sealedBatch: boolean | 'today' = false,
+) {
   let now = start;
   const reportOrigin = source === 'production' ? productionOrigin : origin;
-  const reportState = { allowed: true, fresh: true, rate: 0.5, reversed: false };
+  const reportState = { allowed: true, fresh: true, rate: 0.5, reversed: false, actions: false };
   const readOwnerReport = vi.fn(async (actorId: string, venueId: string, anchor: Date) => {
     if (!reportState.allowed || actorId !== owner || venueId !== LOCAL_AI_VENUE) {
       throw new CommandError('forbidden', 403);
     }
     const report = OwnerDishReportSchema.parse({ ...localOwnerAiReport(anchor), source });
-    if (sealedBatch) {
+    if (sealedBatch === 'today') {
+      const { start, end, baselineStart } = ownerReportDayWindow(anchor);
+      const current = { start_time: start.toISOString(), end_time: end.toISOString() };
+      const baseline = { start_time: baselineStart.toISOString(), end_time: current.start_time };
+      const missing = { value: null, status: 'MISSING' } as const;
+      const metrics = {
+        menu_sessions: missing,
+        dish_opens: missing,
+        avg_interaction_time_seconds: missing,
+        portion_previews_shown: missing,
+        verified_orders: missing,
+      };
+      report.report_metadata.calculation_version = OWNER_PRODUCTION_TODAY_VERSION;
+      report.report_metadata.generated_at = current.end_time;
+      report.report_metadata.freshness.last_event_ingested_at = current.end_time;
+      const dishStart = '2026-11-25T08:35:00.000Z';
+      report.report_metadata.date_window = {
+        start_time: dishStart,
+        end_time: current.end_time,
+        duration_hours: Math.floor((end.getTime() - Date.parse(dishStart)) / 3_600_000),
+      };
+      report.summary = { periods: { current, baseline }, current: metrics, baseline: metrics };
+    } else if (sealedBatch) {
       const end = Math.floor((anchor.getTime() - 60_000) / 300_000) * 300_000;
       report.report_metadata.calculation_version = 'production.batch.v1';
       report.report_metadata.date_window = {
@@ -96,7 +122,17 @@ function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = f
     }
     const dish = report.dishes[0]!;
     dish.metrics.open_rate.value = reportState.rate;
-    report.dishes.push({ ...dish, dish_id: '00000000-0000-4000-8000-000000000789' });
+    if (reportState.actions) {
+      dish.display_actions = {
+        portion_previews_shown: { value: 24, status: 'NORMAL' },
+        comparisons_started: { value: 16, status: 'NORMAL' },
+      };
+    }
+    report.dishes.push({
+      ...dish,
+      dish_id: '00000000-0000-4000-8000-000000000789',
+      ...(sealedBatch === 'today' ? { name: 'Garden Salad' } : {}),
+    });
     report.report_metadata.coverage = { total_dishes_monitored: 2, measurable_dishes_count: 2 };
     if (reportState.reversed) report.dishes.reverse();
     if (!reportState.fresh) report.report_metadata.freshness.is_stale = null;
@@ -139,14 +175,14 @@ function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = f
     OWNER_AI_OPENAI_PROJECT_ID: 'proj_synthetic',
     OWNER_AI_REPORT_REFERENCE_SECRET: secret,
   };
-  const get = () =>
+  const get = (displayActions = false) =>
     worker.request(
-      `${venuePath}/analytics/dishes?source=${source}`,
+      `${venuePath}/analytics/dishes?source=${source}${displayActions ? '&displayActions=true' : ''}`,
       { headers: { Authorization: `Bearer ${owner}`, Origin: reportOrigin } },
       env,
     );
-  async function reference() {
-    const response = await get();
+  async function reference(displayActions = false) {
+    const response = await get(displayActions);
     expect(response.status).toBe(200);
     const token = response.headers.get(OWNER_REPORT_REFERENCE_HEADER);
     expect(token).toBeTruthy();
@@ -167,9 +203,30 @@ function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = f
       },
       env,
     );
-  async function preflight() {
+  const ask = (
+    token: string | undefined,
+    body: unknown,
+    actorId = owner,
+    requestOrigin = reportOrigin,
+    venueId = LOCAL_AI_VENUE,
+  ) =>
+    worker.request(
+      `/api/v1/venues/${venueId}/ai/questions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${actorId}`,
+          'Content-Type': 'application/json',
+          Origin: requestOrigin,
+          ...(token ? { [OWNER_REPORT_REFERENCE_HEADER]: token } : {}),
+        },
+        body: JSON.stringify(body),
+      },
+      env,
+    );
+  async function preflight(endpoint = 'analysis') {
     return worker.request(
-      `${venuePath}/ai/analysis`,
+      `${venuePath}/ai/${endpoint}`,
       {
         method: 'OPTIONS',
         headers: {
@@ -185,6 +242,7 @@ function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = f
     get,
     reference,
     analyze,
+    ask,
     preflight,
     env,
     advance(ms: number) {
@@ -196,6 +254,148 @@ function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = f
     limit,
   };
 }
+
+it('answers and charts the original authorized #272 dish window across its next cutoff', async () => {
+  const s = setup('production', 'today');
+  const signedAt = Date.parse('2026-11-25T12:00:59.000Z');
+  s.advance(signedAt - start);
+  delete s.env.OWNER_AI_OPENAI_API_KEY;
+  delete s.env.OWNER_AI_OPENAI_PROJECT_ID;
+
+  const preflight = await s.preflight('questions');
+  expect(preflight.status).toBe(204);
+  expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe(productionOrigin);
+  expect(preflight.headers.get('Access-Control-Allow-Headers')?.toLowerCase()).toContain(
+    OWNER_REPORT_REFERENCE_HEADER.toLowerCase(),
+  );
+
+  const report = await s.get();
+  expect(report.status).toBe(200);
+  const shown = OwnerDishReportSchema.parse(await report.json());
+  const ref = report.headers.get(OWNER_REPORT_REFERENCE_HEADER) ?? undefined;
+  expect(ref).toBeTruthy();
+  s.advance(10_000);
+  const latest = OwnerDishReportSchema.parse(await (await s.get()).json());
+  expect(latest.report_metadata.date_window.end_time).toBe('2026-11-25T12:00:00.000Z');
+  expect(shown.summary?.periods.current.start_time).toBe('2026-11-25T08:00:00.000Z');
+  expect(shown.report_metadata.date_window.start_time).toBe('2026-11-25T08:35:00.000Z');
+
+  const response = await s.ask(ref, {
+    question: 'Show me a chart of the save rate for Garden Salad today.',
+  });
+  expect(response.status).toBe(200);
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
+  expect(await response.json()).toEqual({
+    schemaVersion: 'owner-report-question.v1',
+    venueId: shown.venue_id,
+    source: 'production',
+    reportSnapshot: ownerReportSnapshot(shown),
+    timeWindow: { start: '2026-11-25T08:35:00.000Z', end: '2026-11-25T11:55:00.000Z' },
+    status: 'answered',
+    metric: 'save_rate',
+    points: [{ label: 'Garden Salad', value: 0 }],
+    chart: true,
+  });
+  expect(s.readOwnerReport.mock.calls.map((call) => call[2].getTime())).toEqual([
+    signedAt,
+    signedAt + 10_000,
+    signedAt,
+  ]);
+  expect(s.limit).toHaveBeenCalledExactlyOnceWith({ key: `${LOCAL_AI_VENUE}:${owner}:questions` });
+  expect(s.provider).not.toHaveBeenCalled();
+});
+
+it('refuses unknown freshness and enforces original report scope without any provider calls', async () => {
+  const s = setup('production', 'today');
+  s.advance(Date.parse('2026-11-25T12:01:09.000Z') - start);
+  s.reportState.fresh = false;
+  const ref = await s.reference();
+  const question = { question: 'What was the open rate for Garden Salad?' };
+  expect((await s.ask(ref, { ...question, venueId: LOCAL_AI_VENUE })).status).toBe(400);
+  expect((await s.ask(ref, question, 'other-owner')).status).toBe(409);
+  expect(
+    (await s.ask(ref, question, owner, productionOrigin, '00000000-0000-4000-8000-000000000321'))
+      .status,
+  ).toBe(409);
+  expect((await s.ask(undefined, question)).status).toBe(409);
+  expect((await s.ask(ref, question, owner, origin)).status).toBe(403);
+  expect(s.readOwnerReport).toHaveBeenCalledOnce();
+
+  const response = await s.ask(ref, question);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+
+  s.reportState.allowed = false;
+  expect((await s.ask(ref, question)).status).toBe(403);
+  s.reportState.allowed = true;
+  s.reportState.rate = 0.714;
+  expect((await s.ask(ref, question)).status).toBe(409);
+  s.advance(60_000);
+  expect((await s.ask(ref, question)).status).toBe(409);
+  expect(s.provider).not.toHaveBeenCalled();
+});
+
+it('enforces the answer budget without consuming a provider request', async () => {
+  const s = setup('production', 'today');
+  s.advance(Date.parse('2026-11-25T12:01:09.000Z') - start);
+  const ref = await s.reference();
+  s.limit.mockResolvedValueOnce({ success: false });
+  const response = await s.ask(ref, { question: 'What was the open rate for Garden Salad?' });
+  expect(response.status).toBe(429);
+  expect(await response.json()).toEqual({ error: 'rate_limited' });
+  expect(s.readOwnerReport).toHaveBeenCalledOnce();
+  expect(s.provider).not.toHaveBeenCalled();
+});
+
+it('only answers display action counts when the original report exposed them and the server still allows them', async () => {
+  const s = setup('production', 'today');
+  s.advance(Date.parse('2026-11-25T12:01:09.000Z') - start);
+  s.reportState.actions = true;
+  s.env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED = 'true';
+  const ask = { question: 'Plot comparison starts by dish.' };
+  const hidden = await s.get();
+  expect(hidden.status).toBe(200);
+  expect(
+    OwnerDishReportSchema.parse(await hidden.json()).dishes[0]?.display_actions,
+  ).toBeUndefined();
+  const hiddenRef = hidden.headers.get(OWNER_REPORT_REFERENCE_HEADER) ?? undefined;
+  expect(hiddenRef).toBeTruthy();
+  const hiddenAnswer = await s.ask(hiddenRef, ask);
+  expect(hiddenAnswer.status).toBe(200);
+  expect(await hiddenAnswer.json()).toMatchObject({
+    status: 'abstained',
+    reason: 'unusable_evidence',
+  });
+
+  const visible = await s.get(true);
+  expect(visible.status).toBe(200);
+  expect(
+    OwnerDishReportSchema.parse(await visible.json()).dishes[0]?.display_actions
+      ?.comparisons_started?.value,
+  ).toBe(16);
+  const visibleRef = visible.headers.get(OWNER_REPORT_REFERENCE_HEADER) ?? undefined;
+  expect(visibleRef).toBeTruthy();
+  const withOptIn = await s.ask(visibleRef, ask);
+  expect(withOptIn.status).toBe(200);
+  expect(await withOptIn.json()).toMatchObject({
+    status: 'answered',
+    metric: 'comparisons_started',
+    chart: true,
+    points: [
+      { label: 'Garden Salad', value: 16 },
+      { label: 'Synthetic development dish', value: 16 },
+    ],
+  });
+
+  s.env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED = 'false';
+  const featureDisabled = await s.ask(visibleRef, ask);
+  expect(featureDisabled.status).toBe(200);
+  expect(await featureDisabled.json()).toMatchObject({
+    status: 'abstained',
+    reason: 'unusable_evidence',
+  });
+  expect(s.provider).not.toHaveBeenCalled();
+});
 
 it('submits a sealed production batch across the next batch boundary without using unknown evidence', async () => {
   const s = setup('production', true);

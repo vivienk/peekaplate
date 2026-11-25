@@ -588,25 +588,6 @@ body:has(.owner-root) {
   line-height: var(--pp-line-height-paragraph-1);
   font-weight: var(--pp-font-weight-semibold);
 }
-/* Live AI panel (#187): the analysis API takes a dish and a focus, so the composer stacks two
- * pickers styled as the Figma composer input, with the send button beside the focus. */
-.owner-ai__composer.owner-ai__composer--pickers {
-  flex-direction: column;
-  align-items: stretch;
-}
-.owner-ai__composer--pickers > .owner-ai__input.owner-ai__input {
-  box-sizing: border-box;
-  flex: none;
-  width: 100%;
-}
-.owner-ai__row {
-  display: flex;
-  align-items: center;
-  gap: var(--pp-space-8);
-}
-select.owner-ai__input {
-  appearance: auto;
-}
 .owner-ai__answer {
   display: flex;
   flex-direction: column;
@@ -620,6 +601,36 @@ select.owner-ai__input {
 .owner-ai__answer p {
   font-size: var(--pp-font-size-paragraph-2);
   line-height: var(--pp-line-height-button-label);
+}
+.owner-ai__chart {
+  margin: 0;
+}
+.owner-ai__values {
+  display: grid;
+  gap: var(--pp-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.owner-ai__values li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--pp-space-4) var(--pp-space-8);
+  overflow-wrap: anywhere;
+}
+.owner-ai__chart-track {
+  grid-column: 1 / -1;
+  display: block;
+  height: var(--pp-space-8);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-neutral-200);
+  overflow: hidden;
+}
+.owner-ai__chart-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--pp-color-orange-500);
 }
 .owner-ai__error {
   color: var(--pp-role-input-text-error); /* error-700 on light; Figma color/error */

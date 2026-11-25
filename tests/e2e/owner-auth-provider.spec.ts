@@ -158,26 +158,21 @@ test('production deep links resume after sign-in and keep orientation through br
     else if (pathname.endsWith('/drafts')) json = { drafts: [] };
     else if (pathname.endsWith('/owner-insight-actions')) {
       json = { schemaVersion: 1, actions: [] };
-    } else if (pathname.endsWith('/ai/analysis')) {
+    } else if (pathname.endsWith('/ai/questions')) {
       analysisRequests++;
       expect(route.request().headers()['x-owner-report-ref']).toBe('fixture-report-reference');
-      const { dishId, goal } = route.request().postDataJSON();
-      expect(goal).toBe('engagement');
+      expect(route.request().postDataJSON()).toEqual({
+        question: 'What was the engagement rate for the lentil soup?',
+      });
       const period = UNEEZA_REPORT.report_metadata.date_window;
       json = {
-        schemaVersion: 'owner-analysis.v1',
+        schemaVersion: 'owner-report-question.v1',
         venueId: venue.venueId,
-        dishId,
-        goal,
         source: 'production',
         reportSnapshot: 'a'.repeat(64),
         timeWindow: { start: period.start_time, end: period.end_time },
         status: 'abstained',
-        metric: null,
-        value: null,
         reason: 'unusable_evidence',
-        approvalRequired: true,
-        allowedEffects: [],
       };
     } else if (pathname.endsWith('/analytics/dishes')) {
       expect(searchParams.get('source')).toBe('production');
@@ -221,11 +216,11 @@ test('production deep links resume after sign-in and keep orientation through br
   await expect(page).toHaveURL(`${productionOrigin}/dish-performance`);
   await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
   const question = page.getByRole('textbox', { name: 'Ask a report question' });
-  const sendQuestion = page.getByRole('button', { name: 'Review report' });
-  await question.fill('Dish engagement');
+  const sendQuestion = page.getByRole('button', { name: 'Send question' });
+  await question.fill('What was the engagement rate for the lentil soup?');
   await sendQuestion.click();
   await expect(
-    page.getByText('There is not enough verified evidence to suggest a next step.'),
+    page.getByText('There is not enough verified evidence in this report to answer that question.'),
   ).toBeVisible();
   expect(analysisRequests).toBe(1);
   await page.getByRole('button', { name: '2.5D previews', exact: true }).click();
@@ -305,12 +300,12 @@ test('production deep links resume after sign-in and keep orientation through br
   expect(reportReads).toBe(3);
   emptyReport = true;
   await visit('Overview', '/overview', 'How your menu did this period');
-  await question.fill('Dish engagement');
+  await question.fill('What was the engagement rate for the lentil soup?');
   await sendQuestion.click();
   await expect(
-    page.getByText('There are no dishes with report data in this period.'),
+    page.getByText('There is not enough verified evidence in this report to answer that question.'),
   ).toBeVisible();
-  expect(analysisRequests).toBe(1);
+  expect(analysisRequests).toBe(2);
 });
 
 test('the production day report retries transient failures on the next visible minute', async ({
@@ -396,6 +391,16 @@ test('the production day report retries transient failures on the next visible m
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   const table = page.getByRole('table');
   await expect(table.getByText('Report response 1')).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('button', { name: 'Overview', exact: true })
+    .click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  await expect(panel.getByText('Dish Performance uses a different report period.')).toBeVisible();
+  await expect(panel.getByRole('textbox', { name: 'Ask a report question' })).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Open Dish Performance to ask a question' }).click();
+  await expect(table.getByText('Report response 1')).toBeVisible();
+  await expect(panel.getByText(/Dish Performance period:/)).toBeVisible();
 
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });

@@ -18,6 +18,7 @@ const issuer = 'peekaplate-api';
 const audience = 'peekaplate-owner-report-analysis';
 
 type ReportScope = { actorId: string; venueId: string };
+type VerifiedReportReference = { anchor: Date; snapshot: string; displayActions?: true };
 
 export function ownerReportSnapshot(report: OwnerDishReport): string {
   return createHash('sha256')
@@ -42,6 +43,7 @@ export async function mintOwnerReportReference(
   scope: ReportScope,
   secret: string,
   now: Date,
+  displayActions = false,
 ): Promise<string> {
   const anchor = now.getTime();
   const metadata = report.report_metadata;
@@ -72,6 +74,7 @@ export async function mintOwnerReportReference(
     source: report.source,
     anchor,
     snapshot: ownerReportSnapshot(report),
+    ...(displayActions ? { displayActions: true } : {}),
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(issuer)
@@ -88,7 +91,7 @@ export async function readOwnerReportReference(
   secret: string,
   now: Date,
   source: OwnerDishReport['source'],
-): Promise<{ anchor: Date; snapshot: string } | null> {
+): Promise<VerifiedReportReference | null> {
   if (!token || token.length > 2048) return null;
   try {
     const { payload } = await jwtVerify(token, signingKey(secret), {
@@ -98,7 +101,7 @@ export async function readOwnerReportReference(
       currentDate: now,
       requiredClaims: ['sub', 'iat', 'exp'],
     });
-    const { anchor, snapshot } = payload;
+    const { anchor, snapshot, displayActions } = payload;
     if (
       payload.version !== 1 ||
       payload.sub !== scope.actorId ||
@@ -109,12 +112,13 @@ export async function readOwnerReportReference(
       anchor > now.getTime() ||
       payload.iat !== Math.floor(anchor / 1000) ||
       payload.exp !== payload.iat + referenceLifetime ||
+      (displayActions !== undefined && displayActions !== true) ||
       typeof snapshot !== 'string' ||
       !/^[a-f0-9]{64}$/.test(snapshot)
     ) {
       return null;
     }
-    return { anchor: new Date(anchor), snapshot };
+    return { anchor: new Date(anchor), snapshot, ...(displayActions ? { displayActions } : {}) };
   } catch {
     return null;
   }

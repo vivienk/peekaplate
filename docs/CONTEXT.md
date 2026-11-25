@@ -86,7 +86,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "628092849f0f187ee8b4e88d6b1a401b5265e6798ab55b6b104be5a7f52f74d1"
+      "sourceFingerprint": "eea32461377dc6807c60f48f4c8dfad9022234b78bfe7b3357d823109430fab4"
     },
     {
       "id": "tokens",
@@ -456,6 +456,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-menu/dish-assistance-api.test.ts",
         "docs/owner-flow-retest.md",
         "frontend/console/src/owner/owner-workspace-live.test.tsx",
+        "frontend/console/src/owner/report-question-client.ts",
         "scripts/owner-dashboard-css-isolation.test.mjs",
         "docs/screen9-portion-publish.md",
         "frontend/console/src/owner-dashboard/line-chart.test.tsx",
@@ -475,7 +476,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "e9154dff7f7a91b0515366dca4cbc2deca9c4af061ed5befe0aeb72be4f9a852"
+      "sourceFingerprint": "3aa17ea9c51bd620530892cdc68fa69e0519eae1ffb06b96e7d573ef89d68d0e"
     },
     {
       "id": "backend",
@@ -655,6 +656,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/responses.test.ts",
         "backend/src/owner-ai/routes.ts",
         "backend/src/owner-ai/routes.test.ts",
+        "backend/src/owner-ai/questions.ts",
+        "backend/src/owner-ai/questions.test.ts",
         "backend/scripts/owner-ai-local.ts",
         "backend/scripts/owner-ai-local-fixture.ts",
         "scripts/start-owner-ai-private.py",
@@ -753,7 +756,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "2fbea6845b9af43e8e2240957b1248a9d0964edcd746aaff688c8788960167bf"
+      "sourceFingerprint": "011896069aa934d662fcc1db4c41cd398b683729aaff2f391e6929e2aba7853d"
     },
     {
       "id": "database",
@@ -916,7 +919,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "7dfc2e2b95f32348a9633821068710a60219c027e17348fd9ee575552ef2c8b4"
+      "sourceFingerprint": "2a4d21b766c43ffb4ef9e23e57f62560c9e4e20d679cb5c63cfc34340f17e8a8"
     },
     {
       "id": "agents",
@@ -1297,14 +1300,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "console"
       ],
-      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff alongside Overview. A separate snapshot prefix and explicit live cutover protect the partial first day; CSV and AI reuse the same report window.",
+      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff. CSV and AI reuse the dish snapshot, which retains a separate prefix and a partial-first-day cutover. The owner question box replaces dish and goal selectors. The Worker returns visible cells for supported questions and bar charts without calling a provider. Unknown freshness, missing evidence and unsupported questions abstain.",
       "files": [
         "backend/src/owner-report.ts",
         "packages/contracts/src/owner-report.ts",
         "frontend/console/src/owner-dashboard/report-data.tsx",
-        "docs/adr/0020-production-today-dish-performance.md"
+        "docs/adr/0020-production-today-dish-performance.md",
+        "backend/src/owner-ai/questions.ts",
+        "backend/src/owner-ai/report-reference.test.ts",
+        "frontend/console/src/owner/OwnerWorkspace.tsx"
       ],
-      "next": "Deploy the compatible owner console first and verify an eligible single dish event in the actual production window."
+      "next": "For the question box rollout, release the compatible API before the console. Verify one eligible dish event and a signed-in answer on a trusted hosted report separately from mock QA."
     }
   ]
 }
