@@ -84,6 +84,8 @@ export function OwnerMenuWorkspace({
   apiBase,
   actorId,
   venueId,
+  addedCategories,
+  onAddCategory,
   restaurantName,
   canPublish,
   section,
@@ -104,6 +106,8 @@ export function OwnerMenuWorkspace({
   apiBase: string;
   actorId: string;
   venueId: string;
+  addedCategories: readonly string[];
+  onAddCategory: (category: string) => void;
   restaurantName: string;
   canPublish: boolean;
   section: 'overview' | 'menu';
@@ -134,9 +138,6 @@ export function OwnerMenuWorkspace({
   const photoPicker = useRef<HTMLInputElement>(null);
   const [jobs, setJobs] = useState<MenuJob[]>([]);
   const [drafts, setDrafts] = useState<DishDraft[]>([]);
-  // Categories the owner created in a dish form, per restaurant, so later forms offer them before
-  // any saved dish uses them. Kept for this visit only: there is no stored category list yet.
-  const [addedCategories, setAddedCategories] = useState<Record<string, string[]>>({});
   const [reviews, setReviews] = useState<Record<string, ExtractionReviewSessionResponse>>({});
   const [reviewUnavailable, setReviewUnavailable] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -1252,15 +1253,10 @@ export function OwnerMenuWorkspace({
           }}
           existing={Boolean(editing.draft)}
           categories={mergeCategories(
-            drafts.filter((draft) => !draft.removed_at).map((draft) => draft.category ?? ''),
-            addedCategories[venueId] ?? [],
+            reviewDishes.map((dish) => dish.category ?? ''),
+            addedCategories,
           )}
-          onAddCategory={(category) =>
-            setAddedCategories((all) => ({
-              ...all,
-              [venueId]: mergeCategories(all[venueId] ?? [], [category]),
-            }))
-          }
+          onAddCategory={onAddCategory}
           photo={
             <>
               <div className={`s09-photo${photoUrl ? ' has' : ''}`}>
