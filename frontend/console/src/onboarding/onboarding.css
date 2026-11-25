@@ -389,10 +389,8 @@
   right: calc(var(--pp-space-16) + 1.5px);
 }
 
-/* Scoped to the field's own wrapper so the space for the link and check icons also applies on
- * the signed-in Menu page, which renders this form outside .pp-onboard. Each side keeps the
- * 16px inset, the 16px icon and a 12px gap so pasted links never run under an icon. */
-.pp-onboard-link__control .pp-onboard-link__input {
+/* Reserve room for both icons even when the shared onboarding input styles load later. */
+.pp-onboard-link__control > .pp-input.pp-onboard-link__input {
   width: 100%;
   padding-inline: calc(var(--pp-space-16) + var(--pp-space-16) + var(--pp-space-12));
 }
