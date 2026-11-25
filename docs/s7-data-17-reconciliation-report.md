@@ -4,7 +4,7 @@
 - **Ticket:** S7-DATA-17
 - **PRs:** [#261](https://github.com/vivienk/peekaplate/pull/261) (`d7a3bc6d`), [#263](https://github.com/vivienk/peekaplate/pull/263) (`20ae4cdb`, rebased onto `origin/develop` `c66b328f`)
 - **Existing Artifacts Reused:** `docs/s7-data-17-metric-acceptance.md` (PR #261), `docs/data-17-18-acceptance-readiness.md` (PR #263), `scripts/sql/data-17-production-reconciliation.sql` (PR #263)
-- **Final Status:** **IN PROGRESS / PENDING EXTERNAL SIGNOFF** (Technical implementation, local tests, and live Supabase/PostHog reconciliation in `icwhkrlsecpzcomfjsso` / `675372` **PASS**; PR review/merge, Harshita arithmetic sign-off, and Sai's production-project/watermark-deferral confirmation **PENDING**)
+- **Final Status:** **PARTIAL / PENDING EXTERNAL SIGNOFF** (Technical implementation and local tests **PASS**; aggregate Batch B reconciliation completed with event-level differences and session-identity limitations documented; PR review/merge, Harshita arithmetic sign-off, and Sai's production-project/watermark-deferral confirmation **PENDING**)
 
 ---
 
@@ -30,7 +30,7 @@ Executed on `feat/data-17-reconciliation` (`20ae4cdb`):
 - **`peekaplate_production_qa_b_nov_21` (`f3f84a41-b000-4f5f-9245-d401c7da6026`):** `0` rows in Batch A (`01:45–01:50Z`) and Batch B (`17:45–17:50Z`), though `490` total rows (`44` sessions) exist across `2026-11-22T02:39:47Z`–`2026-11-25T04:56:38Z`.
 - **`PeekaPlate Production AI QA` (`29363367-eb65-48bb-81bd-fb25e6407f43`):**
   - **Batch A:** `0` rows in Supabase and PostHog.
-  - **Batch B (`2026-11-23T17:45:00Z`–`17:50:00Z`):** Exact 1-to-1 event alignment between `app_private.owner_observation_v1` and PostHog (`properties.environment = 'production'`):
+  - **Batch B (`2026-11-23T17:45:00Z`–`17:50:00Z`):** Aggregate event-count agreement (`56` total events) between `app_private.owner_observation_v1` and PostHog (`properties.environment = 'production'`), not event-level equivalence (`distinct_id` is an in-memory `visitId`, not canonical `session_id`):
     - `dish_activity_checkpoint`: `13` (`10` `session_id` / `10` `distinct_id`)
     - `dish_compared`: `10` (`10` / `10`)
     - `dish_detail_opened`: `10` (`10` / `10`)

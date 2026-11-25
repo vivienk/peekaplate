@@ -11,12 +11,12 @@
 
 ## 1. Final Status Table
 
-| Ticket | PRs | CI | Review | Merge | Deployment | Hosted acceptance | Remaining dependencies & owners | Status |
+| Ticket | PRs | CI | Review | Merge | Deployment | Hosted acceptance | Remaining dependencies & owners | Ticket closure |
 |---|---|---|---|---|---|---|---|---|
-| DATA-17 | #261 (`d7a3bc6d`), #263 (`20ae4cdb`) | PASS | PENDING (`0` approvals; `@hemu77`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN | PARTIAL (Supabase `icwhkrlsecpzcomfjsso` & PostHog `675372` Batch B reconciled 1-to-1) | **Reviewers** (`@hemu77`, `@vivienk`), **Harshita** (14-visit arithmetic), **Sai** (prod DB project & watermark-deferral confirmation) | **PENDING** |
-| DATA-18 | #264 (`e00a039a`) | PASS | PENDING (`0` approvals; `@hemu77`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN | BLOCKED (`00000000-...-0123` has `0` published menus/`0` drafts; console auth disabled; missing `menuToken`) | **Reviewers** (`@hemu77`, `@vivienk`), **Sai** (publish menu/dish on `...0123`, `menuToken`, owner JWT, UTC window/cap, ClickUp scope), **Harshita** (2nd-tester repro) | **BLOCKED** |
-| RES-09 | #266 (`8f89bbab`) | PASS | PENDING (`0` approvals; `@hemu77`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN (`deploy-staging.yml` requires `main` promotion + `workflow_dispatch`; `STAGING_DEPLOYMENT_APPROVED=true` is set) | NOT RUN | **Reviewers** (`@hemu77`, `@vivienk`), **Sai** (`main` promotion, `deploy-staging.yml` dispatch & staging console auth) | **PENDING** |
-| Sprint 7 Docs | #273 (`docs/sprint-7-closure-reports`) | Pending CI | PENDING (`0` approvals) | PENDING (`MERGEABLE`) | N/A | N/A | **Reviewers** (`@hemu77`, `@vivienk`) | **PENDING** |
+| DATA-17 | #261 (`d7a3bc6d`), #263 (`20ae4cdb`) | PASS | PENDING (`0` approvals; `Sai (@hemu77)`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN | PARTIAL: aggregate Batch B reconciliation completed; event-level differences and session identity limitations documented. | **Reviewers** (`Sai (@hemu77)`, `@vivienk`), **Harshita** (14-visit arithmetic), **Sai** (prod DB project & watermark-deferral confirmation) | **PENDING** |
+| DATA-18 | #264 (`e00a039a`) | PASS | PENDING (`0` approvals; `Sai (@hemu77)`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN | BLOCKED (`00000000-...-0123` has `0` published menus/`0` drafts; console auth disabled; missing `menuToken`) | **Reviewers** (`Sai (@hemu77)`, `@vivienk`), **Sai** (publish menu/dish on `...0123`, secure `menuToken`/owner session provisioning, UTC window/cap, ClickUp scope), **Harshita** (2nd-tester repro) | **BLOCKED** |
+| RES-09 | #266 (`8f89bbab`) | PASS | PENDING (`0` approvals; `Sai (@hemu77)`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN (`deploy-staging.yml` requires `develop` → `main` promotion + authorized `workflow_dispatch`; `STAGING_DEPLOYMENT_APPROVED=true` is a workflow gate, not standalone authorization) | NOT RUN | **Reviewers** (`Sai (@hemu77)`, `@vivienk`), **Sai** (`main` promotion, `deploy-staging.yml` dispatch & staging console auth) | **PENDING** |
+| Sprint 7 Docs | #273 (`docs/sprint-7-closure-reports`) | PASS (5/5, 5 skipped) | PENDING (`0` approvals; `Sai (@hemu77)`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | N/A | N/A | **Reviewers** (`Sai (@hemu77)`, `@vivienk`) | **PENDING** |
 
 ---
 
