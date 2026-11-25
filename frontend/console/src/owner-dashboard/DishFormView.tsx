@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 import { TextField } from '../foundations/TextField';
-import { CategoryField } from './category-field';
+import { CategoryField, mergeCategories } from './category-field';
 import { Btn, Icon } from './controls';
 import type { MenuItem } from './data';
 import type { EditState } from './menu';
@@ -29,6 +29,7 @@ export function DishFormView({
   toReview,
   requireReviewBox = false,
   categories,
+  onAddCategory,
   imageFor,
   onSelectPhoto,
   suggestIngredients,
@@ -55,6 +56,8 @@ export function DishFormView({
   /** Onboarding (S9 -> S10): "I reviewed the AI-drafted text and ingredients" must always be ticked. */
   requireReviewBox?: boolean;
   categories: readonly string[];
+  /** Keeps a new category for the page, so the next Add or Edit form offers it too. */
+  onAddCategory?: (category: string) => void;
   imageFor: (dish: MenuItem) => string | null | undefined;
   onSelectPhoto: (file: File) => void;
   suggestIngredients?: (name: string) => Promise<string[]>;
@@ -91,10 +94,8 @@ export function DishFormView({
   }, []);
   const stillCurrent = () => mounted.current && latest.current === ed;
   const [errs, setErrs] = useState<Record<string, string>>({});
-  // Categories offered in the Category field: the demo's, plus the dish's own and any the owner adds.
-  const [cats, setCats] = useState<string[]>(() =>
-    dr.cat && !categories.includes(dr.cat) ? [...categories, dr.cat] : [...categories],
-  );
+  // Categories offered in the Category field: the page's, plus the dish's own and any the owner adds.
+  const [cats, setCats] = useState<string[]>(() => mergeCategories(categories, [dr.cat]));
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const [ingText, setIngText] = useState('');
   const [algText, setAlgText] = useState('');
@@ -365,7 +366,10 @@ export function DishFormView({
                 categories={cats}
                 error={err('f-cat')}
                 onSelect={(cat) => set({ cat })}
-                onAddCategory={(cat) => setCats((list) => [...list, cat])}
+                onAddCategory={(cat) => {
+                  setCats((list) => mergeCategories(list, [cat]));
+                  onAddCategory?.(cat);
+                }}
               />
               {fieldErr('f-cat')}
             </div>

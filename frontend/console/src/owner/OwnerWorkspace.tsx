@@ -30,6 +30,7 @@ import {
   OwnerAnalysisAccessError,
   OwnerAnalysisReferenceError,
 } from '../owner-dashboard/ai-preview/analysis-client';
+import { mergeCategories } from '../owner-dashboard/category-field';
 import { Btn } from '../owner-dashboard/controls';
 import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
 import { formatOwnerReportTime, ReportView, useOwnerReport } from '../owner-dashboard/report-data';
@@ -91,6 +92,7 @@ export function OwnerWorkspace({
   const [state, setState] = useState<WorkspaceState>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState('');
+  const [createdCategories, setCreatedCategories] = useState<Record<string, string[]>>({});
   const [navigation, setNavigation] = useState(0);
   const [firstProfile, setFirstProfile] = useState<{
     venueId: string;
@@ -458,6 +460,13 @@ export function OwnerWorkspace({
           apiBase={apiBase}
           actorId={owner.id}
           venueId={selected.venueId}
+          addedCategories={createdCategories[scope] ?? []}
+          onAddCategory={(category) =>
+            setCreatedCategories((previous) => ({
+              ...previous,
+              [scope]: mergeCategories(previous[scope] ?? [], [category]),
+            }))
+          }
           restaurantName={selected.name}
           canPublish={selected.permission === 'owner'}
           dishAssistanceEnabled={dishAssistanceEnabled}
