@@ -18,7 +18,7 @@ Pacific midnight snapshot. A later cutoff can pick up late matches for the same 
 Deploy a compatible console before switching the Worker to `OWNER_PRODUCTION_REPORT_WINDOW=sf-today`.
 Set the approved `OWNER_PRODUCTION_REPORT_DISH_LIVE_START` to an exact UTC five-minute boundary
 after legacy dish metrics stopped serving. A partial first day uses that timestamp as its marked
-dish window start. Keep both approved cutover values when changing modes. Retain private report
+dish window start. Overview withholds the 2.5D total when the dish window covers only part of its labeled day. Keep both approved cutover values when changing modes. Retain private report
 objects, including the `owner-report-batches/sf-today-v1/` prefix.
 
 With a missing live cutoff, venue-wide totals are still available. The current source and delivery

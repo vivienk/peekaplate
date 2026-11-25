@@ -162,7 +162,10 @@ export function readDailyOwnerReport(
         exposeToday(
           await today.measure(window, dishStart, await seal(window.start, measureMidnight)),
         ),
-      { dishStart, policy: today.startsAt?.toISOString() ?? 'gated' },
+      {
+        dishStart,
+        policy: `${today.startsAt?.toISOString() ?? 'gated'}/${dishDayStart?.toISOString() ?? 'gated'}`,
+      },
     ).then(exposeToday);
   }
   if (window.start.getTime() === window.end.getTime()) return seal(window.end, measureMidnight);

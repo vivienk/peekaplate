@@ -347,24 +347,26 @@ async function measureReport(
     },
     ...(summary
       ? {
-          summary: displayActions
-            ? {
-                ...summary,
-                ...(productionDay && !productionToday
-                  ? {
-                      baseline: {
-                        ...summary.baseline,
-                        portion_previews_shown: displayActions.portionTotal,
-                      },
-                    }
-                  : {
-                      current: {
-                        ...summary.current,
-                        portion_previews_shown: displayActions.portionTotal,
-                      },
-                    }),
-              }
-            : summary,
+          // Overview labels the whole day. A partial cutover count belongs only on Dish Performance.
+          summary:
+            displayActions && (!productionToday || dishStart.getTime() === windowStart.getTime())
+              ? {
+                  ...summary,
+                  ...(productionDay && !productionToday
+                    ? {
+                        baseline: {
+                          ...summary.baseline,
+                          portion_previews_shown: displayActions.portionTotal,
+                        },
+                      }
+                    : {
+                        current: {
+                          ...summary.current,
+                          portion_previews_shown: displayActions.portionTotal,
+                        },
+                      }),
+                }
+              : summary,
         }
       : {}),
   });

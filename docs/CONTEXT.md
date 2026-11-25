@@ -86,7 +86,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "a60bcee0dbcee43c4f3737b678e97ce41469681bb9dfa2dabe36aeb7457b93ba"
+      "sourceFingerprint": "628092849f0f187ee8b4e88d6b1a401b5265e6798ab55b6b104be5a7f52f74d1"
     },
     {
       "id": "tokens",
@@ -475,7 +475,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a21d0d82b8e3f604e39c7317d113401db908400874ff7028b8f99e5016855b62"
+      "sourceFingerprint": "e9154dff7f7a91b0515366dca4cbc2deca9c4af061ed5befe0aeb72be4f9a852"
     },
     {
       "id": "backend",
@@ -753,7 +753,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "abcd780c8b62bf944b0dd326f199076e3da3b82439d93e43d5edc65dc26019b3"
+      "sourceFingerprint": "2fbea6845b9af43e8e2240957b1248a9d0964edcd746aaff688c8788960167bf"
     },
     {
       "id": "database",

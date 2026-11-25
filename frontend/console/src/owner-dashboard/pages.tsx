@@ -268,7 +268,7 @@ export function Overview({
       {live?.summary && live.summarySource === 'production' && (
         <Note icon="info">
           {live.summaryToday
-            ? 'Today’s visits, dish opens and previews update as activity settles. Open Dish Performance for today’s dish metrics.'
+            ? 'Today’s visits and dish opens update as activity settles. Dish Performance shows verified dish metrics for the range on that page.'
             : live.summaryDay
               ? 'Today’s menu visits and dish opens update as activity settles. Dish performance, active time and 2.5D previews use the previous completed San Francisco day.'
               : live.summaryBatch

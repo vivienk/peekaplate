@@ -902,7 +902,11 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           ...(await visit(venue, '2035-02-05T08:02:00.000Z', true, true, true, 15_000)),
           ...(await visit(venue, '2035-02-05T08:07:00.000Z', true, true, true, 18_000)),
         );
-        const todayWithFreshToken = async (suffix = '', actor = venue.actorId) =>
+        const todayWithFreshToken = async (
+          suffix = '',
+          actor = venue.actorId,
+          closedDayCutover = '2035-02-04T08:00:00.000Z',
+        ) =>
           request(
             suffix,
             await issueToken(actor),
@@ -910,7 +914,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
             true,
             'true',
             'sf-today',
-            '2035-02-05T08:00:00.000Z',
+            closedDayCutover,
             '2035-02-05T08:05:00.000Z',
           );
         const pending = await todayWithFreshToken();
@@ -938,8 +942,19 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           status: 'NORMAL',
         });
         expect(todayReport.summary?.current.portion_previews_shown).toEqual({
+          value: null,
+          status: 'MISSING',
+        });
+        expect(todayReport.summary?.baseline.portion_previews_shown).toEqual({
           value: 1,
           status: 'NORMAL',
+        });
+        const stricter = await todayWithFreshToken('', venue.actorId, '2035-02-06T08:00:00.000Z');
+        const gated = OwnerDishReportSchema.parse(await stricter.json());
+        expect(gated.dishes).toEqual(todayReport.dishes);
+        expect(gated.summary?.baseline.portion_previews_shown).toEqual({
+          value: null,
+          status: 'MISSING',
         });
         const todayCsv = await todayWithFreshToken('/export');
         expect(todayCsv.status).toBe(200);
