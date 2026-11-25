@@ -141,7 +141,7 @@ marks this honestly rather than presenting it as OCR evidence:
   report `errors`, so the status is `incomplete`, never silently `complete`.
 - `segments[].metadata.vision_boxes` maps candidate ID to
   `[{page_number, type: "title" | "price", text, box}]`, `box` being integer
-  `left`, `top`, `width`, `height` in pixels of the segment's `width` ÃƒÆ’Ã¢â‚¬â€ `height`
+  `left`, `top`, `width`, `height` in pixels of the segment's `width` × `height`
   prepared page image. Empty or inverted model boxes are omitted with a warning.
   These are model proposals, not OCR-joined `candidate_box_evidence`: on clean
   single-column menus they align well, on dense multi-column photos they were

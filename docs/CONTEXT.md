@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "3fab9af3060e160bcbcdf1a3f8ea76b2908820f49ad0d8d500c191e4c132c750"
+      "sourceFingerprint": "cbe959641dd9c3ca90ee2bfe68a9b57df02101186d23b6ecaf78d8c278e00272"
     },
     {
       "id": "tokens",
@@ -582,6 +582,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/repository.ts",
         "backend/src/bundle-producer/request.ts",
         "backend/src/bundle-producer/bundle-producer.integration.ts",
+        "backend/src/bundle-producer/handoff-file.ts",
+        "backend/src/bundle-producer/handoff-file.test.ts",
         "backend/scripts/produce-menu-bundle.ts",
         "docs/s4-res-bundle-producer.md",
         "docs/owner-report-staging.md",
@@ -747,7 +749,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "bc9787e3edca851b9766529a02bfc96815c8e252278ccab22b6bf519636ea514"
+      "sourceFingerprint": "4430b1b18487921f994be26e084a761524c71729819d643759344a9c4741fc16"
     },
     {
       "id": "database",
@@ -1108,7 +1110,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "ed2c7b3159145208514d3e7c2a21eec439908040542499eb53b825da93b7e863"
+      "sourceFingerprint": "6382ba3705ec1b9a15c0fded410ee2e49d9297798f535045bb1070c15f696fd3"
     },
     {
       "id": "assets",
@@ -1143,15 +1145,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "console",
-        "contracts"
-      ],
-      "summary": "Reconcile main release fixes into develop without dropping comparison/order/local-AI work. Reuse the existing dish-assistance route for saved ingredient proposals and existing portion state to hide repeated consent copy.",
-      "next": "Run pinned CI and hosted signed-out S1/ingredient/portion checks. Protected staging credential deployment and authoritative report completeness remain separate AI activation gates."
-    },
     {
       "date": "2026-11-17",
       "modules": [
@@ -1289,6 +1282,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/production-release.md"
       ],
       "next": "Release the approved production API and console with their dashboard AI flags enabled, then verify one signed-in report question."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "contracts",
+        "backend",
+        "processing"
+      ],
+      "summary": "Restore the prepared-page dimensions symbol and document the bundle producer's exact-byte output rule and six-field handoff retry comparison.",
+      "files": [
+        "docs/review-candidates.md",
+        "docs/s4-res-bundle-producer.md",
+        "qa-reports/S4-RES-test-plan.md"
+      ],
+      "next": "Use the linked CLI admission regression to verify retries against pre-diagnostics handoffs."
     }
   ]
 }
