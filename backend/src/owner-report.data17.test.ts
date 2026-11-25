@@ -220,7 +220,7 @@ describe('DATA-17 November 23 production batch reconciliation regression', () =>
     expect(report.summary?.current.menu_sessions).toEqual({ value: 8, status: 'NORMAL' });
     expect(report.summary?.current.avg_interaction_time_seconds).toEqual({
       value: null,
-      status: 'SUPPRESSED',
+      status: 'MISSING',
     });
     expect(report.summary?.current.verified_orders).toEqual({ value: null, status: 'MISSING' });
     expect(report.summary?.current.portion_previews_shown).toEqual({
