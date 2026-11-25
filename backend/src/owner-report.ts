@@ -3,8 +3,10 @@ import { toOwnerReport } from '@peekaplate/contracts';
 import {
   OWNER_PRODUCTION_BATCH_VERSION,
   OWNER_PRODUCTION_DAY_VERSION,
+  OWNER_PRODUCTION_TODAY_VERSION,
   type OwnerDishReport,
   OwnerDishReportSchema,
+  type OwnerReportSummary,
   PRIVACY_FLOOR_SESSIONS,
 } from '@peekaplate/contracts/owner-report';
 import type { Client } from 'pg';
@@ -43,7 +45,15 @@ type ReportOptions = {
   readTodayEvents?: (venueId: string, start: Date, end: Date) => Promise<LivePostHogOwnerEvent[]>;
   productionPublications?: { storage: PreparedStorage; origin: string };
   productionDay?: boolean;
+  productionToday?: boolean;
   productionDishDayStart?: Date | undefined;
+  productionDishLiveStart?: Date | undefined;
+};
+
+type DailyScope = {
+  baselineStart: Date;
+  dishStart: Date;
+  settledBaseline?: OwnerReportSummary['baseline'];
 };
 
 export async function readOwnerReport(
@@ -79,9 +89,15 @@ export async function readOwnerReport(
     // Tenant scope is set only after the owner permission is confirmed.
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
+    const { productionDishDayStart, productionDishLiveStart } = options;
+    const legacyCutover =
+      productionDishLiveStart &&
+      (!productionDishDayStart || productionDishLiveStart < productionDishDayStart)
+        ? productionDishLiveStart
+        : productionDishDayStart;
     const report =
       source === 'production' && options.readTodayEvents && options.productionPublications
-        ? options.productionDay
+        ? options.productionDay || options.productionToday
           ? await readDailyOwnerReport(
               venueId,
               now,
@@ -89,15 +105,39 @@ export async function readOwnerReport(
               ({ start, end, baselineStart }, midnightReport) =>
                 midnightReport
                   ? advanceDailyReport(client, venueId, start, end, options, midnightReport)
-                  : measureReport(client, venueId, end, source, options, 0, baselineStart),
-              options.productionDishDayStart,
+                  : measureReport(client, venueId, end, source, options, 0, {
+                      baselineStart,
+                      dishStart: baselineStart,
+                    }),
+              productionDishDayStart,
+              options.productionToday
+                ? {
+                    startsAt: productionDishLiveStart,
+                    measure: ({ start, end, baselineStart }, dishStart, midnight) => {
+                      if (!midnight.summary) throw new AuthUnavailableError();
+                      return measureReport(
+                        client,
+                        venueId,
+                        end,
+                        source,
+                        options,
+                        end.getTime() - start.getTime(),
+                        {
+                          baselineStart,
+                          dishStart,
+                          settledBaseline: midnight.summary.baseline,
+                        },
+                      );
+                    },
+                  }
+                : undefined,
             )
           : await readBatchedOwnerReport(
               venueId,
               now,
               options.productionPublications.storage,
               (end) => measureReport(client, venueId, end, source, options, OWNER_BATCH_MS),
-              options.productionDishDayStart,
+              legacyCutover,
             )
         : await measureReport(client, venueId, now, source, options);
     await client.query('COMMIT');
@@ -184,23 +224,25 @@ async function measureReport(
   source: OwnerReportSource,
   options: ReportOptions,
   durationMs = 86_400_000,
-  dayBaselineStart?: Date,
+  day?: DailyScope,
 ) {
-  const isBatch = Boolean(dayBaselineStart) || durationMs === OWNER_BATCH_MS;
-  const productionDay = source === 'production' && dayBaselineStart !== undefined;
+  const isBatch = Boolean(day) || durationMs === OWNER_BATCH_MS;
+  const productionDay = source === 'production' && day !== undefined;
+  const productionToday = productionDay && day.settledBaseline !== undefined;
   const windowStart = new Date(now.getTime() - durationMs);
-  const dishStart = dayBaselineStart ?? windowStart;
-  // Daily dish metrics measure yesterday once, when the midnight cutoff becomes eligible.
+  const dishStart = day?.dishStart ?? windowStart;
   const liveEvidence =
     source === 'production' && options.readTodayEvents
       ? await readReportEvidence(
           client,
           venueId,
-          dishStart,
+          productionToday ? windowStart : dishStart,
           now,
           isBatch,
           options,
-          dayBaselineStart ?? new Date(now.getTime() - 2 * durationMs),
+          productionToday
+            ? windowStart
+            : (day?.baselineStart ?? new Date(now.getTime() - 2 * durationMs)),
         )
       : undefined;
   const query = liveEvidence
@@ -223,7 +265,8 @@ async function measureReport(
         liveEvidence,
         durationMs,
         isBatch,
-        dayBaselineStart,
+        day?.baselineStart,
+        day?.settledBaseline,
       )
     : undefined;
   const complete =
@@ -277,7 +320,11 @@ async function measureReport(
     now,
     source,
     now.getTime() - dishStart.getTime(),
-    productionDay,
+    productionToday
+      ? OWNER_PRODUCTION_TODAY_VERSION
+      : productionDay
+        ? OWNER_PRODUCTION_DAY_VERSION
+        : undefined,
   );
   return toOwnerReport({
     ...internal,
@@ -300,24 +347,26 @@ async function measureReport(
     },
     ...(summary
       ? {
-          summary: displayActions
-            ? {
-                ...summary,
-                ...(dayBaselineStart
-                  ? {
-                      baseline: {
-                        ...summary.baseline,
-                        portion_previews_shown: displayActions.portionTotal,
-                      },
-                    }
-                  : {
-                      current: {
-                        ...summary.current,
-                        portion_previews_shown: displayActions.portionTotal,
-                      },
-                    }),
-              }
-            : summary,
+          // Overview labels the whole day. A partial cutover count belongs only on Dish Performance.
+          summary:
+            displayActions && (!productionToday || dishStart.getTime() === windowStart.getTime())
+              ? {
+                  ...summary,
+                  ...(productionDay && !productionToday
+                    ? {
+                        baseline: {
+                          ...summary.baseline,
+                          portion_previews_shown: displayActions.portionTotal,
+                        },
+                      }
+                    : {
+                        current: {
+                          ...summary.current,
+                          portion_previews_shown: displayActions.portionTotal,
+                        },
+                      }),
+                }
+              : summary,
         }
       : {}),
   });
@@ -615,8 +664,9 @@ function buildInternalReport(
   now: Date,
   source: OwnerReportSource = 'production',
   durationMs = 86_400_000,
-  productionDay = false,
+  dayVersion?: typeof OWNER_PRODUCTION_DAY_VERSION | typeof OWNER_PRODUCTION_TODAY_VERSION,
 ) {
+  const productionDay = dayVersion !== undefined;
   const start = new Date(now.getTime() - durationMs);
   const isBatch = productionDay || durationMs === OWNER_BATCH_MS;
   const legacyBatch = isBatch && !productionDay;
@@ -634,11 +684,8 @@ function buildInternalReport(
     venue_id: venueId,
     source,
     report_metadata: {
-      calculation_version: productionDay
-        ? OWNER_PRODUCTION_DAY_VERSION
-        : isBatch
-          ? OWNER_PRODUCTION_BATCH_VERSION
-          : `${source}.v1`,
+      calculation_version:
+        dayVersion ?? (isBatch ? OWNER_PRODUCTION_BATCH_VERSION : `${source}.v1`),
       generated_at: now.toISOString(),
       date_window: {
         duration_hours: Math.floor(durationMs / 3_600_000),

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '@peekaplate/contracts';
 import {
+  isOwnerProductionCalendarVersion,
   OWNER_PRODUCTION_BATCH_VERSION,
-  OWNER_PRODUCTION_DAY_VERSION,
   type OwnerDishReport,
 } from '@peekaplate/contracts/owner-report';
 import { jwtVerify, SignJWT } from 'jose';
@@ -49,7 +49,7 @@ export async function mintOwnerReportReference(
     report.source === 'production' &&
     metadata.calculation_version === OWNER_PRODUCTION_BATCH_VERSION;
   const day =
-    report.source === 'production' && metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION
+    report.source === 'production' && isOwnerProductionCalendarVersion(metadata.calculation_version)
       ? ownerReportDayWindow(now)
       : undefined;
   const expectedEnd =

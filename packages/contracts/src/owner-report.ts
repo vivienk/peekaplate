@@ -138,6 +138,11 @@ export const ProductionBatchSummarySchema = summarySchema(true);
 export const ProductionDaySummarySchema = summarySchema(true, true);
 export const OWNER_PRODUCTION_BATCH_VERSION = 'production.batch.v1';
 export const OWNER_PRODUCTION_DAY_VERSION = 'production.sf-day.v1';
+export const OWNER_PRODUCTION_TODAY_VERSION = 'production.sf-today.v1';
+
+export function isOwnerProductionCalendarVersion(version?: string): boolean {
+  return version === OWNER_PRODUCTION_DAY_VERSION || version === OWNER_PRODUCTION_TODAY_VERSION;
+}
 export const OWNER_REPORT_TIME_ZONE = 'America/Los_Angeles';
 
 const dayFormat = new Intl.DateTimeFormat('en-US', {
@@ -185,7 +190,7 @@ function isProductionDay(report: {
 }) {
   return (
     report.source === 'production' &&
-    report.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION
+    isOwnerProductionCalendarVersion(report.report_metadata.calculation_version)
   );
 }
 
@@ -317,6 +322,7 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
     .superRefine((report, ctx) => {
       const metadata = report.report_metadata;
       const day = isProductionDay(report);
+      const today = day && metadata.calculation_version === OWNER_PRODUCTION_TODAY_VERSION;
       const batch =
         day ||
         (report.source === 'production' &&
@@ -431,12 +437,16 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
           at(baseline.start_time) === ownerReportMidnight(new Date(start), -1).getTime() &&
           at(metadata.generated_at) === end &&
           summary.current.avg_interaction_time_seconds.status === 'MISSING' &&
-          summary.current.portion_previews_shown.status === 'MISSING' &&
+          (today || summary.current.portion_previews_shown.status === 'MISSING') &&
           !summary.daily_opens
         : end > start && end - start === at(baseline.end_time) - at(baseline.start_time);
-      const dishPeriod = day ? baseline : current;
+      const dishPeriod = day && !today ? baseline : current;
+      const dishStart = at(window.start_time);
+      const validDishStart = today
+        ? dishStart >= start && dishStart <= end
+        : at(dishPeriod.start_time) === dishStart;
       if (
-        at(dishPeriod.start_time) !== at(window.start_time) ||
+        !validDishStart ||
         at(dishPeriod.end_time) !== at(window.end_time) ||
         at(baseline.end_time) !== start ||
         !validInterval

@@ -1,5 +1,5 @@
 import {
-  OWNER_PRODUCTION_DAY_VERSION,
+  isOwnerProductionCalendarVersion,
   OWNER_REPORT_TIME_ZONE,
   type OwnerDishReport,
 } from '@peekaplate/contracts/owner-report';
@@ -69,6 +69,7 @@ export interface LiveDashboardInput {
   summarySource?: OwnerDishReport['source'] | undefined;
   summaryBatch?: boolean;
   summaryDay?: boolean;
+  summaryToday?: boolean;
 }
 
 type OverviewSummary = NonNullable<OwnerDishReport['summary']>;
@@ -266,11 +267,13 @@ export function Overview({
       )}
       {live?.summary && live.summarySource === 'production' && (
         <Note icon="info">
-          {live.summaryDay
-            ? 'Today’s menu visits and dish opens update as activity settles. Dish performance, active time and 2.5D previews use the previous completed San Francisco day.'
-            : live.summaryBatch
-              ? 'Refresh shows the latest completed five-minute batch. Dish-level rates need enough visits.'
-              : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
+          {live.summaryToday
+            ? 'Today’s visits and dish opens update as activity settles. Dish Performance shows verified dish metrics for the range on that page.'
+            : live.summaryDay
+              ? 'Today’s menu visits and dish opens update as activity settles. Dish performance, active time and 2.5D previews use the previous completed San Francisco day.'
+              : live.summaryBatch
+                ? 'Refresh shows the latest completed five-minute batch. Dish-level rates need enough visits.'
+                : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
         </Note>
       )}
       {(live || !empty) && (
@@ -1667,7 +1670,7 @@ export function LivePerf({
   const [tab, setTab] = useState('open_rate');
   const day =
     report.source === 'production' &&
-    report.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION;
+    isOwnerProductionCalendarVersion(report.report_metadata.calculation_version);
   const batch =
     report.source === 'production' &&
     report.report_metadata.calculation_version === 'production.batch.v1';

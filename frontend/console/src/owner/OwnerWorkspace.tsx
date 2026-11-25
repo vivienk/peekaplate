@@ -6,7 +6,8 @@ import {
   type OwnerAnalysisResult,
 } from '@peekaplate/contracts/owner-analysis';
 import {
-  OWNER_PRODUCTION_DAY_VERSION,
+  isOwnerProductionCalendarVersion,
+  OWNER_PRODUCTION_TODAY_VERSION,
   OWNER_REPORT_TIME_ZONE,
   type OwnerDishReport,
 } from '@peekaplate/contracts/owner-report';
@@ -748,7 +749,8 @@ function LiveDashboardReport({
       presentation={page === 'performance' ? 'performance' : 'data'}
     />
   );
-  const summaryDay = report?.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION;
+  const version = report?.report_metadata.calculation_version;
+  const summaryDay = isOwnerProductionCalendarVersion(version);
   const live = {
     restaurantName,
     reportContent,
@@ -758,6 +760,7 @@ function LiveDashboardReport({
     summarySource: report?.source,
     summaryBatch: report?.report_metadata.calculation_version === 'production.batch.v1',
     summaryDay,
+    summaryToday: version === OWNER_PRODUCTION_TODAY_VERSION,
     period: report
       ? reportPeriod(
           report.summary?.periods.current ?? report.report_metadata.date_window,
@@ -1046,7 +1049,7 @@ function LiveAiPanel({
             Displayed report period:{' '}
             {reportPeriod(
               report.report_metadata.date_window,
-              report.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION,
+              isOwnerProductionCalendarVersion(report.report_metadata.calculation_version),
             )}
           </span>
         </div>
