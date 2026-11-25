@@ -79,7 +79,7 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
       apiBase: 'https://example.test',
       venueId: VENUE_A,
       accessToken: 'tok',
-      fetchImpl: fetchMock,
+      fetch: fetchMock,
     });
     expect(aInitial.kind).toBe('ready');
     if (aInitial.kind === 'ready') {
@@ -94,7 +94,7 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
       apiBase: 'https://example.test',
       venueId: VENUE_A,
       accessToken: 'tok',
-      fetchImpl: fetchMock,
+      fetch: fetchMock,
     });
     expect(aRefreshed.kind).toBe('ready');
     if (aRefreshed.kind === 'ready') {
@@ -109,7 +109,7 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
       apiBase: 'https://example.test',
       venueId: VENUE_B,
       accessToken: 'tok',
-      fetchImpl: fetchMock,
+      fetch: fetchMock,
     });
     expect(bSnapshot.kind).toBe('ready');
     if (bSnapshot.kind === 'ready') {
@@ -142,7 +142,7 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
       venueId: VENUE_A,
       accessToken: 'tok',
       signal: controllerA.signal,
-      fetchImpl: fetchMock,
+      fetch: fetchMock,
     });
     controllerA.abort();
 
@@ -150,10 +150,10 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
       apiBase: 'https://example.test',
       venueId: VENUE_B,
       accessToken: 'tok',
-      fetchImpl: fetchMock,
+      fetch: fetchMock,
     });
 
-    await expect(pendingA).rejects.toThrow();
+    expect(await pendingA).toEqual({ kind: 'error' });
     expect(activeB.kind).toBe('ready');
     if (activeB.kind === 'ready') {
       const html = renderToStaticMarkup(
@@ -194,7 +194,7 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
       apiBase: 'https://example.test',
       venueId: VENUE_A,
       accessToken: 'revoked-tok',
-      fetchImpl: async () => new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 }),
+      fetch: async () => new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 }),
     });
     expect(revoked).toEqual({ kind: 'denied' });
 
