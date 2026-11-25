@@ -5654,3 +5654,8 @@ CSV export are covered in the production report integration.
 ## 2026-11-25 signed-in menu URL padding
 
 The released owner menu URL field rendered with 16 px horizontal padding and the pasted text overlapped both icons. The shared auth input rule loaded later with equal specificity inside the signed-in onboarding layout. The component-specific selector now keeps 44 px of padding on both sides. The signed-in URL/manual-source browser regression failed at 16 px before the fix.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-25T09:00:01.094Z","exitCode":2}
+```

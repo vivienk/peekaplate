@@ -3,7 +3,8 @@
 // report API (#107). Without the API settings (static previews) it shows a saved copy of a report
 // from Uneeza's synthetic P0 v2 data, labelled as such.
 import {
-  OWNER_PRODUCTION_DAY_VERSION,
+  isOwnerProductionCalendarVersion,
+  OWNER_PRODUCTION_TODAY_VERSION,
   OWNER_REPORT_TIME_ZONE,
   type OwnerDishReport,
   OwnerDishReportSchema,
@@ -156,7 +157,9 @@ export function useOwnerReport(source: ReportSource): {
               refreshing: false,
               daily:
                 next.kind === 'ready'
-                  ? next.report.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION
+                  ? isOwnerProductionCalendarVersion(
+                      next.report.report_metadata.calculation_version,
+                    )
                   : current.daily && (next.kind === 'error' || next.kind === 'unavailable'),
             }
           : current,
@@ -311,7 +314,7 @@ function ReportTable({
   refreshControl?: ReactNode;
 }) {
   const m = r.report_metadata;
-  const reportDay = m.calculation_version === OWNER_PRODUCTION_DAY_VERSION;
+  const reportDay = isOwnerProductionCalendarVersion(m.calculation_version);
   const zone = reportDay ? OWNER_REPORT_TIME_ZONE : 'UTC';
   if (presentation === 'performance')
     return (
@@ -326,6 +329,8 @@ function ReportTable({
             <Note kind="warn">Saved copy of a report: synthetic test data. Not real diners.</Note>
           ) : r.source === 'synthetic' ? (
             <Note kind="warn">Synthetic test data from the report API. Not real diners.</Note>
+          ) : m.calculation_version === OWNER_PRODUCTION_TODAY_VERSION ? (
+            <Note>Today’s verified dish activity updates through the cutoff shown above.</Note>
           ) : reportDay ? (
             <Note>
               Dish Performance shows the previous completed San Francisco day. Today’s restaurant

@@ -24,3 +24,4 @@ Accepted decisions express intent, not proof of completed implementation. Review
 - [0017 — Production owner report sources](0017-production-owner-report-sources.md) — Proposed; production source and disclosure verification required before rollout.
 - [0018 — Restaurant totals in completed production batches](0018-production-batch-counts.md) — Proposed; data/product approval required before the production count exception is activated.
 - [0019 — Single-session production owner reporting](0019-production-single-session-reporting.md) — Proposed; removes the minimum session count from the San Francisco day report.
+- [0020 — Today’s Dish Performance in production](0020-production-today-dish-performance.md) — Proposed; measures eligible dish activity within the current Pacific day.

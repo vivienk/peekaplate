@@ -1,5 +1,6 @@
 import {
   OWNER_PRODUCTION_DAY_VERSION,
+  OWNER_PRODUCTION_TODAY_VERSION,
   OwnerDishReportSchema,
 } from '@peekaplate/contracts/owner-report';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -26,7 +27,7 @@ const start = Date.parse('2026-11-16T12:00:00.219Z');
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('signs the settled current cutoff while the dish evidence is from the closed day', async () => {
+it('signs the current cutoff for both completed-day and today dish evidence', async () => {
   const now = new Date('2026-11-24T05:16:00.000Z');
   const current = {
     start_time: '2026-11-23T08:00:00.000Z',
@@ -57,11 +58,21 @@ it('signs the settled current cutoff while the dish evidence is from the closed 
     summary: { periods: { current, baseline }, current: metrics, baseline: metrics },
   });
   const scope = { actorId: owner, venueId: LOCAL_AI_VENUE };
-  const reference = await mintOwnerReportReference(report, scope, secret, now);
-  expect(await readOwnerReportReference(reference, scope, secret, now, 'production')).toEqual({
-    anchor: now,
-    snapshot: ownerReportSnapshot(report),
+  const today = OwnerDishReportSchema.parse({
+    ...report,
+    report_metadata: {
+      ...report.report_metadata,
+      calculation_version: OWNER_PRODUCTION_TODAY_VERSION,
+      date_window: { ...current, duration_hours: 21 },
+    },
   });
+  for (const snapshot of [report, today]) {
+    const reference = await mintOwnerReportReference(snapshot, scope, secret, now);
+    expect(await readOwnerReportReference(reference, scope, secret, now, 'production')).toEqual({
+      anchor: now,
+      snapshot: ownerReportSnapshot(snapshot),
+    });
+  }
 });
 
 function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = false) {

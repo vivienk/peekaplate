@@ -82,10 +82,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md",
-        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md",
+        "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "4843ba75c74f1dbad7beb2996149e38e02b095050eebc52febce2d9439229942"
+      "sourceFingerprint": "a60bcee0dbcee43c4f3737b678e97ce41469681bb9dfa2dabe36aeb7457b93ba"
     },
     {
       "id": "tokens",
@@ -467,13 +468,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
-        "docs/adr/0005-tenancy-and-privacy.md"
+        "docs/adr/0005-tenancy-and-privacy.md",
+        "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c0dd5750a9deb0693e9b32b2d16a48db119433d74c6ce7a90eb6dc861e79a163"
+      "sourceFingerprint": "a21d0d82b8e3f604e39c7317d113401db908400874ff7028b8f99e5016855b62"
     },
     {
       "id": "backend",
@@ -744,13 +746,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0005-tenancy-and-privacy.md",
         "docs/adr/0014-team-analytics-access.md",
-        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md",
+        "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c4d65e03614f9f3fa80669fd852ccacff2fe3db37f4d340968b8529c419f2956"
+      "sourceFingerprint": "abcd780c8b62bf944b0dd326f199076e3da3b82439d93e43d5edc65dc26019b3"
     },
     {
       "id": "database",
@@ -913,7 +916,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "5aef001859d32fd2483fa9b9e23f0b3da0fd2913eccd30f0fb590821b14ab432"
+      "sourceFingerprint": "7dfc2e2b95f32348a9633821068710a60219c027e17348fd9ee575552ef2c8b4"
     },
     {
       "id": "agents",
@@ -1155,25 +1158,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-17",
       "modules": [
-        "contracts",
-        "console",
-        "backend",
-        "diner"
-      ],
-      "summary": "Correct the earlier interpretation: Serving size means people served. One count field replaces the duplicate People served input, while optional plate measurements independently authorize measured AR. Preserve canonical null/absent semantics, legacy notes, saved-photo evidence and immutable publication. Clearing old calibration preserves unknown people counts. Count changes require renewed confirmation and never multiply dimensions.",
-      "files": [
-        "docs/screen9-portion-publish.md",
-        "packages/contracts/src/portion.ts",
-        "frontend/console/src/owner-menu/DishEditor.tsx",
-        "frontend/console/src/owner-menu/PortionCalibrationEditor.tsx",
-        "backend/src/owner-menu.ts",
-        "frontend/diner/src/menu/portionSize.ts"
-      ],
-      "next": "Complete focused and repository checks, independently review the pinned correction, and update PR237. Human review and exact staging release remain required; physical-device scale acceptance is separate."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
         "backend",
         "console",
         "diner",
@@ -1305,6 +1289,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-workspace.spec.ts"
       ],
       "next": "Verify a long pasted URL on the published owner build without submitting an import."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "contracts",
+        "backend",
+        "console"
+      ],
+      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff alongside Overview. A separate snapshot prefix and explicit live cutover protect the partial first day; CSV and AI reuse the same report window.",
+      "files": [
+        "backend/src/owner-report.ts",
+        "packages/contracts/src/owner-report.ts",
+        "frontend/console/src/owner-dashboard/report-data.tsx",
+        "docs/adr/0020-production-today-dish-performance.md"
+      ],
+      "next": "Deploy the compatible owner console first and verify an eligible single dish event in the actual production window."
     }
   ]
 }

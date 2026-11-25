@@ -1,6 +1,7 @@
 import {
   OWNER_PRODUCTION_BATCH_VERSION,
   OWNER_PRODUCTION_DAY_VERSION,
+  OWNER_PRODUCTION_TODAY_VERSION,
   type OwnerDishReport,
   OwnerDishReportSchema,
   ownerReportMidnight,
@@ -36,6 +37,19 @@ export function ownerReportDishDayStart(value: string | undefined): Date | undef
     throw new AuthUnavailableError();
   }
   return midnight;
+}
+
+export function ownerReportDishLiveStart(value: string | undefined): Date | undefined {
+  if (value === undefined) return undefined;
+  const start = new Date(value);
+  if (
+    !Number.isFinite(start.getTime()) ||
+    value !== start.toISOString() ||
+    start.getTime() % OWNER_BATCH_MS !== 0
+  ) {
+    throw new AuthUnavailableError();
+  }
+  return start;
 }
 
 function restaurantCountsOnly(report: OwnerDishReport): OwnerDishReport {
@@ -114,6 +128,14 @@ export function readDailyOwnerReport(
     midnightReport?: OwnerDishReport,
   ) => Promise<OwnerDishReport>,
   dishDayStart?: Date,
+  today?: {
+    startsAt: Date | undefined;
+    measure: (
+      window: ReturnType<typeof ownerReportDayWindow>,
+      dishStart: Date,
+      midnightReport: OwnerDishReport,
+    ) => Promise<OwnerDishReport>;
+  },
 ) {
   const window = ownerReportDayWindow(now);
   const allowDishes = dishDayStart && window.baselineStart >= dishDayStart;
@@ -123,6 +145,26 @@ export function readDailyOwnerReport(
       expose,
     );
   const measureMidnight = async () => expose(await measure({ ...window, end: window.start }));
+  if (today) {
+    const end = window.end.getTime();
+    const dishStart = new Date(
+      Math.min(end, Math.max(window.start.getTime(), today.startsAt?.getTime() ?? end)),
+    );
+    const exposeToday = (report: OwnerDishReport) =>
+      window.end > dishStart ? report : restaurantCountsOnly(report);
+    return readOrSeal(
+      venueId,
+      storage,
+      OWNER_PRODUCTION_TODAY_VERSION,
+      window.start,
+      window.end,
+      async () =>
+        exposeToday(
+          await today.measure(window, dishStart, await seal(window.start, measureMidnight)),
+        ),
+      { dishStart, policy: today.startsAt?.toISOString() ?? 'gated' },
+    ).then(exposeToday);
+  }
   if (window.start.getTime() === window.end.getTime()) return seal(window.end, measureMidnight);
   return seal(window.end, async () => measure(window, await seal(window.start, measureMidnight)));
 }
@@ -134,11 +176,13 @@ async function readOrSeal(
   start: Date,
   end: Date,
   measure: (end: Date) => Promise<OwnerDishReport>,
+  today?: { dishStart: Date; policy: string },
 ): Promise<OwnerDishReport> {
   const endsAt = end.toISOString();
   const startsAt = start.toISOString();
-  const prefix =
-    version === OWNER_PRODUCTION_DAY_VERSION
+  const prefix = today
+    ? `owner-report-batches/sf-today-v1/${today.policy}`
+    : version === OWNER_PRODUCTION_DAY_VERSION
       ? 'owner-report-batches/sf-day-v1'
       : 'owner-report-batches/v1';
   const key = `${prefix}/${venueId}/${endsAt}.json`;
@@ -150,7 +194,9 @@ async function readOrSeal(
       report.data.venue_id !== venueId ||
       report.data.report_metadata.calculation_version !== version ||
       report.data.summary?.periods.current.start_time !== startsAt ||
-      report.data.summary.periods.current.end_time !== endsAt
+      report.data.summary.periods.current.end_time !== endsAt ||
+      (today &&
+        report.data.report_metadata.date_window.start_time !== today.dishStart.toISOString())
     )
       throw new AuthUnavailableError();
     return report.data;

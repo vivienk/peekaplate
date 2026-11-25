@@ -508,8 +508,9 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           id = venue.venueId,
           extended = true,
           enabled = 'true',
-          window?: 'sf-day',
+          window?: 'sf-day' | 'sf-today',
           cutover: string | null = '2035-02-03T08:00:00.000Z',
+          liveStart?: string,
         ) =>
           app.request(
             `/api/v1/venues/${id}/analytics/dishes${suffix}?source=production${extended ? '&displayActions=true' : ''}`,
@@ -521,6 +522,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
               OWNER_REPORT_DISPLAY_ACTIONS_ENABLED: enabled,
               ...(cutover ? { OWNER_PRODUCTION_REPORT_DISH_DAY_START: cutover } : {}),
               ...(window ? { OWNER_PRODUCTION_REPORT_WINDOW: window } : {}),
+              ...(liveStart ? { OWNER_PRODUCTION_REPORT_DISH_LIVE_START: liveStart } : {}),
             },
           );
 
@@ -894,6 +896,64 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           value: 10,
           status: 'NORMAL',
         });
+
+        // One visit before the partial-day cutover and one eligible matched visit after it.
+        postHogEvents.push(
+          ...(await visit(venue, '2035-02-05T08:02:00.000Z', true, true, true, 15_000)),
+          ...(await visit(venue, '2035-02-05T08:07:00.000Z', true, true, true, 18_000)),
+        );
+        const todayWithFreshToken = async (suffix = '', actor = venue.actorId) =>
+          request(
+            suffix,
+            await issueToken(actor),
+            venue.venueId,
+            true,
+            'true',
+            'sf-today',
+            '2035-02-05T08:00:00.000Z',
+            '2035-02-05T08:05:00.000Z',
+          );
+        const pending = await todayWithFreshToken();
+        expect(OwnerDishReportSchema.parse(await pending.json()).dishes).toEqual([]);
+        vi.setSystemTime(new Date('2035-02-05T08:11:00.000Z'));
+        const live = await todayWithFreshToken();
+        expect(live.status).toBe(200);
+        const todayReport = OwnerDishReportSchema.parse(await live.json());
+        expect(todayReport.report_metadata.calculation_version).toBe('production.sf-today.v1');
+        expect(todayReport.report_metadata.date_window).toMatchObject({
+          start_time: '2035-02-05T08:05:00.000Z',
+          end_time: '2035-02-05T08:10:00.000Z',
+        });
+        expect(todayReport.summary?.current.dish_opens).toEqual({ value: 2, status: 'NORMAL' });
+        expect(todayReport.dishes[0]?.metrics.active_sessions).toEqual({
+          value: 1,
+          status: 'NORMAL',
+        });
+        expect(todayReport.dishes[0]?.metrics.avg_interaction_time_seconds).toEqual({
+          value: 18,
+          status: 'NORMAL',
+        });
+        expect(todayReport.dishes[0]?.display_actions?.portion_previews_shown).toEqual({
+          value: 1,
+          status: 'NORMAL',
+        });
+        expect(todayReport.summary?.current.portion_previews_shown).toEqual({
+          value: 1,
+          status: 'NORMAL',
+        });
+        const todayCsv = await todayWithFreshToken('/export');
+        expect(todayCsv.status).toBe(200);
+        expect(await todayCsv.text()).toContain(
+          '2035-02-05T08:05:00.000Z,2035-02-05T08:10:00.000Z',
+        );
+        expect((await todayWithFreshToken('', otherVenue.actorId)).status).toBe(403);
+        expect((await todayWithFreshToken('/export', otherVenue.actorId)).status).toBe(403);
+        vi.setSystemTime(new Date('2035-02-05T08:16:00.000Z'));
+        const quietToday = await todayWithFreshToken();
+        expect(quietToday.status).toBe(200);
+        expect(OwnerDishReportSchema.parse(await quietToday.json()).dishes).toEqual(
+          todayReport.dishes,
+        );
       } finally {
         vi.unstubAllGlobals();
         vi.useRealTimers();

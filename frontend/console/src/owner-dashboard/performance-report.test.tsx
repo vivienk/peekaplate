@@ -1,5 +1,6 @@
 import {
   OWNER_PRODUCTION_DAY_VERSION,
+  OWNER_PRODUCTION_TODAY_VERSION,
   OwnerDishReportSchema,
 } from '@peekaplate/contracts/owner-report';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -85,6 +86,22 @@ describe('authored performance presentation with report API data', () => {
     expect(performance).toContain('2.5D previews');
     expect(performance).toContain('Single-session dish: Open rate 1');
     expect(performance).not.toContain('Nov 23, 9:15 PM PST');
+
+    const today = OwnerDishReportSchema.parse({
+      ...report,
+      report_metadata: {
+        ...report.report_metadata,
+        calculation_version: OWNER_PRODUCTION_TODAY_VERSION,
+        date_window: { ...current, duration_hours: 21 },
+      },
+    });
+    const livePerformance = renderToStaticMarkup(
+      <ReportView state={{ kind: 'ready', report: today }} presentation="performance" />,
+    );
+    expect(livePerformance).toContain('verified dish activity updates through the cutoff');
+    expect(livePerformance).toContain('Nov 23, 9:15 PM PST');
+    expect(livePerformance).toContain('Single-session dish: Open rate 1');
+    expect(livePerformance).not.toContain('previous completed San Francisco day');
   });
   it('uses the authored screen with API values and truthful missing evidence', () => {
     const page = renderToStaticMarkup(
