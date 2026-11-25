@@ -1128,7 +1128,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "90561eeefa7fdf91532cf9753f0eb1057d1e59f885e4bc67683cc24b08701767"
+      "sourceFingerprint": "60b6194f98170975e8bfa15e4e5295013ecf39256c725245ae0c375aa9a37d22"
     },
     {
       "id": "assets",
@@ -1334,8 +1334,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-menu/jobs.ts",
         "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
         "backend/src/owner-menu-routes.ts",
-        "processing/src/peekaplate_processing/cutout.py",
-        "processing/Dockerfile"
+        "processing/src/peekaplate_processing/cutout.py"
       ],
       "next": "Verify hosted S09 Save photo and generate 2.5D end-to-end timing and Worker logs after deploying the updated processing container, API Worker, and console."
     }

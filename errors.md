@@ -5671,6 +5671,15 @@ The released owner menu URL field rendered with 16 px horizontal padding and the
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-25T11:19:02.122Z","exitCode":1}
 ```
 
+Clarification for `ERR-20261125-PORTION-001`: both settings apply to the runtime cutout subprocess. The final change uses the existing Dockerfile and model download step.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-25T13:08:57.700Z","exitCode":1}
+```
+
+The Worker transport integration test reported SQLITE_BUSY_RECOVERY and timed out in the parallel suite. The full suite passed with `pnpm exec vitest run --maxWorkers=1` (2575 passed, 5 skipped). The source of the lock is unconfirmed.
+
 ## 2026-11-26 owner review gate database fixtures
 
 The [database check on f50aba4e](https://github.com/vivienk/peekaplate/actions/runs/45947289663/job/140334842094)
