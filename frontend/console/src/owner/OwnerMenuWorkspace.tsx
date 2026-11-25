@@ -35,7 +35,7 @@ import {
   reviewCorrection,
 } from '../owner-menu/dishForm';
 import { evidenceExcerpts } from '../owner-menu/evidence';
-import { errorMessage, menuProcessingState } from '../owner-menu/jobs';
+import { errorMessage, menuProcessingState, portionFailureMessage } from '../owner-menu/jobs';
 import {
   type CalibrationPhoto,
   calibrationMatchesPhoto,
@@ -578,12 +578,11 @@ export function OwnerMenuWorkspace({
         previewUrl = URL.createObjectURL(blob);
         setPortionReview({ status: 'needs_review', previewUrl, approved: result.approved });
       })
-      .catch(() => {
+      .catch((reason: unknown) => {
         if (!disposed && current(active)) {
           setPortionReview({
             status: 'failed',
-            message:
-              '2.5D processing failed. Please try again or use another photo. The original photo is retained.',
+            message: portionFailureMessage(reason),
           });
         }
       });

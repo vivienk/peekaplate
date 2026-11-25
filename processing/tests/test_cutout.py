@@ -37,3 +37,21 @@ class AutomaticMaskTests(unittest.TestCase):
                             self.assertEqual(mask.size, photo.size)
                             self.assertEqual(mask.mode, 'L')
                             self.assertEqual(mask.getextrema(), (0, 255))
+
+    def test_subprocess_disables_numba_jit_and_pins_single_omp_thread(self):
+        captured_env = {}
+
+        def model(command, **kwargs):
+            captured_env.update(kwargs.get('env', {}))
+            root = Path(command[-1])
+            with Image.new('L', (40, 30), 255) as mask:
+                mask.paste(0, (0, 0, 40, 10))
+                mask.save(root / 'mask.png')
+            (root / 'model.json').write_text(json.dumps({'model': 'test'}))
+            return SimpleNamespace(returncode=0)
+
+        with Image.new('RGB', (40, 30), 'orange') as photo:
+            with patch('peekaplate_processing.cutout.subprocess.run', side_effect=model):
+                automatic_mask(photo)
+        self.assertEqual(captured_env.get('NUMBA_DISABLE_JIT'), '1')
+        self.assertEqual(captured_env.get('OMP_NUM_THREADS'), '1')

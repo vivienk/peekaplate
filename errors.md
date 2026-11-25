@@ -5660,6 +5660,17 @@ The released owner menu URL field rendered with 16 px horizontal padding and the
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-25T09:00:01.094Z","exitCode":2}
 ```
 
+## 2026-11-25 2.5D portion generation timeouts
+
+```json
+{"id":"ERR-20261125-PORTION-001","status":"resolved","area":"portion-cutout-timeouts","cause":"Each disposable cutout subprocess imported rembg, which unconditionally imports pymatting and triggers Numba JIT compilation/caching of unused alpha-matting kernels (>180s at 0.5 vCPU in production, or fast cache-locator failure under --read-only), while the console aborted portion POSTs at 120s and the Worker lacked waitUntil for R2 persistence.","prevention":"Set NUMBA_DISABLE_JIT=1 and OMP_NUM_THREADS=1 in cutout.py and Dockerfile warmup; give generateDraftPortion a 240s per-call timeout with timeout-specific copy; wrap processPrivateDishPhoto in executionCtx.waitUntil.","sources":["processing/src/peekaplate_processing/cutout.py","processing/Dockerfile","backend/src/owner-menu-routes.ts","frontend/console/src/owner-menu/api.ts","frontend/console/src/owner-menu/jobs.ts","frontend/console/src/owner/OwnerMenuWorkspace.tsx"],"regression":"0.5-vCPU 4g --read-only container repro with noka-ikari-steak-ramen.png: BEFORE took 3.54s (fallback_retained/automatic_cutout_unavailable with /tmp tmpfs only) and 69.04s (ready with writable /home/extractor tmpfs); AFTER took 9.36s (ready, matching portion_bd9fdd60ac726fa6c2a7ae055f27b93c). Unit, vitest, lint, typecheck, context:check and docs:check passed."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-25T11:19:02.122Z","exitCode":1}
+```
+
 ## 2026-11-26 owner review gate database fixtures
 
 The [database check on f50aba4e](https://github.com/vivienk/peekaplate/actions/runs/45947289663/job/140334842094)

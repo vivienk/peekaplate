@@ -141,6 +141,9 @@ export type OwnerMenuClientOptions = {
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{16,128}$/;
 export const MAX_FILE_BYTES = 12_000_000;
+// Covers the server's 220s portion-processing deadline (30s container start + 180s segmentation
+// + delivery) plus a client-side margin so the browser does not abort mid-flight.
+export const PORTION_TIMEOUT_MS = 240_000;
 
 export function newCommandId(): string {
   return crypto.randomUUID();
@@ -253,15 +256,16 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
       headers?: Record<string, string>;
       upload?: boolean;
       blob?: boolean;
+      timeoutMs?: number;
     },
     parse: (body: unknown) => T,
   ): Promise<T> {
     const token = await options.getToken();
     if (options.signal?.aborted) throw new OwnerMenuApiError(0, 'aborted');
     if (!token) throw new OwnerMenuApiError(401, 'unauthorized');
-    const limit = init.upload
-      ? (options.uploadTimeoutMs ?? 120_000)
-      : (options.timeoutMs ?? 30_000);
+    const limit =
+      init.timeoutMs ??
+      (init.upload ? (options.uploadTimeoutMs ?? 120_000) : (options.timeoutMs ?? 30_000));
     const controller = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => {
@@ -539,7 +543,7 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           venueId,
           `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion`,
         ),
-        { method: 'POST', upload: true },
+        { method: 'POST', timeoutMs: PORTION_TIMEOUT_MS },
         (body) => {
           const record = field(body, 'portionReview') as Record<string, unknown>;
           if (

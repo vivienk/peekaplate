@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createOwnerMenuClient, OwnerMenuApiError, sha256Hex } from './api';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createOwnerMenuClient, OwnerMenuApiError, PORTION_TIMEOUT_MS, sha256Hex } from './api';
 import { JOB, reviewSession, VENUE } from './fixtures.test-helpers';
 
 type Call = { url: string; init: RequestInit };
@@ -378,6 +378,10 @@ describe('owner menu client', () => {
 });
 
 describe('timeouts', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('fails a request with no answer as a retryable timeout instead of waiting forever', async () => {
     // A fetch that never answers until it is aborted.
     const hanging = ((_url: string, init: RequestInit) =>
@@ -396,6 +400,43 @@ describe('timeouts', () => {
       code: 'timeout',
       isRetryable: true,
     });
+  });
+
+  it('gives portion generation longer than the 220s server bound without raising regular upload timeouts', async () => {
+    vi.useFakeTimers();
+    const hanging = ((_url: string, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () =>
+          reject(new DOMException('aborted', 'AbortError')),
+        );
+      })) as unknown as typeof fetch;
+    const api = createOwnerMenuClient({
+      baseUrl: 'https://peekaplate-api-staging.vxkong.workers.dev',
+      getToken: () => 'staff-token',
+      fetch: hanging,
+    });
+    expect(PORTION_TIMEOUT_MS).toBeGreaterThan(220_000);
+
+    // Regular photo uploads still time out at 120s.
+    const uploadFailure = api
+      .uploadDraftPhoto(VENUE, JOB, new Blob(['x'], { type: 'image/png' }), 'photo_key_0123456789')
+      .catch((error: unknown) => error);
+    // Portion generation stays alive past 120s and past the 220s server bound.
+    let portionSettled = false;
+    const portionFailure = api.generateDraftPortion(VENUE, JOB, JOB).catch((error: unknown) => {
+      portionSettled = true;
+      return error;
+    });
+
+    await vi.advanceTimersByTimeAsync(120_000);
+    await expect(uploadFailure).resolves.toMatchObject({ code: 'timeout', isRetryable: true });
+    expect(portionSettled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(100_000);
+    expect(portionSettled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(PORTION_TIMEOUT_MS - 220_000);
+    await expect(portionFailure).resolves.toMatchObject({ code: 'timeout', isRetryable: true });
   });
 });
 

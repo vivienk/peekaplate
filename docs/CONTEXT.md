@@ -282,7 +282,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "8f62524d2f037e2676a4baf7dc4a4c8e373ae9df871dd63093f260b05af7451d"
+      "sourceFingerprint": "eeadc9c64a369571b2f0d1bc46a488df5bc808132eef5a407469dd974170b60e"
     },
     {
       "id": "console",
@@ -1109,6 +1109,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/tripo-cutout-to-3d.md",
         "processing/src/peekaplate_processing/portion_ingestion.py",
         "processing/src/peekaplate_processing/plate_calibration.py",
+        "processing/src/peekaplate_processing/cutout.py",
+        "processing/tests/test_cutout.py",
         "processing/tests/test_portion_ingestion.py",
         "processing/src/peekaplate_processing/prepare_assets.py",
         "processing/src/peekaplate_processing/provider_budget.py",
@@ -1126,7 +1128,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "a8bc68e759ee2e7e43be6891cbecbce0799fd903bd3e940259f3e3064c10ef21"
+      "sourceFingerprint": "90561eeefa7fdf91532cf9753f0eb1057d1e59f885e4bc67683cc24b08701767"
     },
     {
       "id": "assets",
@@ -1318,6 +1320,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/s7-res-09-owner-review-gate.md"
       ],
       "next": "Review exact-snapshot and concurrent draft behavior before authorized staging verification."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "console",
+        "backend",
+        "processing"
+      ],
+      "summary": "Fix S09 2.5D portion timeouts: give generateDraftPortion a per-call 240s client timeout (>220s Worker bound) with honest timeout copy, keep Worker R2 writes alive with waitUntil on client abort, and disable Numba JIT with OMP_NUM_THREADS=1 in cutout subprocesses so unused pymatting kernels are not compiled on every 0.5-vCPU run.",
+      "files": [
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/jobs.ts",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "backend/src/owner-menu-routes.ts",
+        "processing/src/peekaplate_processing/cutout.py",
+        "processing/Dockerfile"
+      ],
+      "next": "Verify hosted S09 Save photo and generate 2.5D end-to-end timing and Worker logs after deploying the updated processing container, API Worker, and console."
     }
   ]
 }

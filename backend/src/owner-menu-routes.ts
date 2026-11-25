@@ -300,7 +300,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
   app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/portion', async (c) => {
     const scope = await portionScope(c);
     try {
-      const record = await processPrivateDishPhoto({
+      const pending = processPrivateDishPhoto({
         env: c.env,
         bucket: scope.bucket,
         venueId: scope.venue,
@@ -310,6 +310,13 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
         sourceHash: scope.photo.source_hash,
         sourceSize: scope.photo.size_bytes,
       });
+      // Keep R2 persistence alive if the browser aborts/navigates away while segmentation runs.
+      try {
+        c.executionCtx.waitUntil(pending.catch(() => {}));
+      } catch {
+        // Tests invoking Hono without an ExecutionContext do not expose waitUntil.
+      }
+      const record = await pending;
       const approval = await readPrivatePortionApproval(scope.bucket, scope.key, record);
       c.header('Cache-Control', 'no-store');
       return c.json({ portionReview: { ...record, approved: Boolean(approval) } });

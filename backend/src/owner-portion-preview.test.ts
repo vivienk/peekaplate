@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
 import { fileURLToPath, URL } from 'node:url';
+import { Hono } from 'hono';
+import type { Client } from 'pg';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { unstable_dev } from 'wrangler';
 import type { Bindings } from './index';
+import { registerOwnerMenuRoutes } from './owner-menu-routes';
 import { previewKey, processPrivateDishPhoto } from './owner-portion-preview';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -166,5 +169,54 @@ describe('private portion service transport', () => {
     );
     await vi.advanceTimersByTimeAsync(220_000);
     expect(await pending).toMatchObject({ message: 'aborted' });
+  });
+  it('registers portion processing with executionCtx.waitUntil so client abort does not drop R2 persistence', async () => {
+    const app = new Hono<{ Bindings: Bindings }>();
+    const photoRow = {
+      id: id(3),
+      tenant_id: id(1),
+      draft_id: id(2),
+      storage_key: 'source',
+      content_type: 'image/png',
+      size_bytes: source.byteLength,
+      source_hash: sourceHash,
+      verification_status: 'not_verified',
+    };
+    const fakeClient = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('FROM app_private.staff_membership'))
+          return { rows: [{ permission: 'owner' }] };
+        if (sql.includes('FROM app_private.dish_draft_photo')) return { rows: [photoRow] };
+        return { rows: [] };
+      }),
+    } as unknown as Client;
+    registerOwnerMenuRoutes(app, {
+      verify: async () => id(4),
+      authorizeVenue: async () => {},
+      database: async (_env, work) => work(fakeClient),
+    });
+    const base = fixture({
+      APP_ENV: 'staging',
+      OWNER_WORKFLOW_ENABLED: 'true',
+    });
+    base.env.INGESTION_REPORTS_BUCKET = base.bucket;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(noCutout)),
+    );
+    const waitUntil = vi.fn();
+    const res = await app.request(
+      `https://test/venues/${id(1)}/drafts/${id(2)}/photos/${id(3)}/portion`,
+      { method: 'POST', headers: { Authorization: 'Bearer staff-token' } },
+      base.env as Bindings,
+      { waitUntil, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext,
+    );
+    expect(res.status).toBe(200);
+    expect(waitUntil).toHaveBeenCalledOnce();
+    await waitUntil.mock.calls[0]?.[0];
+    expect(base.bucket.put).toHaveBeenCalledWith(
+      `${previewKey(id(1), id(2), id(3), sourceHash)}/record.json`,
+      expect.any(String),
+    );
   });
 });

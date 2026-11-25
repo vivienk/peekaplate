@@ -6,7 +6,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 RUN uv sync --frozen --extra service --extra cutout --no-dev --no-editable --no-cache \
-    && /app/.venv/bin/python -c "from rembg.sessions.u2netp import U2netpSession; U2netpSession.download_models()" \
+    && NUMBA_DISABLE_JIT=1 /app/.venv/bin/python -c "from rembg.sessions.u2netp import U2netpSession; U2netpSession.download_models()" \
     && chmod 0555 /app/models && chmod 0444 /app/models/u2netp.onnx \
     && useradd --uid 10001 --create-home extractor
 USER extractor
