@@ -47,7 +47,7 @@ export const NO_ICON_ALLERGEN = 'Mustard';
 export const NO_ICON_INGREDIENT = 'Black pepper';
 
 function placeholderImage(label: string): WireImage {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="#3a3d45"/><text x="320" y="320" fill="#c9cbd1" font-family="sans-serif" font-size="28" text-anchor="middle">Fixture photo</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="#3a3d45"/></svg>`;
   return {
     url: `data:image/svg+xml,${encodeURIComponent(svg)}`,
     width: 640,

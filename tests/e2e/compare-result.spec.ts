@@ -136,52 +136,41 @@ test('confirming a pick shows both dishes side by side and fires dish_compared s
   await expectNoAxeViolations(page);
 });
 
-test('three dishes render at 320px and track only newly completed pairs', async ({ page }) => {
+test('two dishes render at 320px and track the completed pair', async ({ page }) => {
   const events = captureEvents(page);
   await openDetail(page, 'Avocado Toast');
   await page.setViewportSize({ width: 320, height: 780 });
   await page.locator('.pp-detail__compare').click();
   await page.getByRole('button', { name: 'Compare with Harvest Power Bowl' }).click();
+  // One replacement dish only (Rania, Nov 2026): choosing another moves the choice.
   await page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' }).click();
+  await page.getByRole('button', { name: 'Compare with Harvest Power Bowl' }).click();
   expect(compared(events)).toHaveLength(0);
   await page.locator('.pp-picker__confirm').click();
-  await expect(sideNames(page)).toHaveText([
-    'Avocado Toast',
-    'Harvest Power Bowl',
-    'Salmon Poke Bowl',
-  ]);
+  await expect(sideNames(page)).toHaveText(['Avocado Toast', 'Harvest Power Bowl']);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
   await expectNoAxeViolations(page);
 
-  await expect.poll(() => compared(events).length).toBe(2);
+  await expect.poll(() => compared(events).length).toBe(1);
   const starts = compared(events).map((event) => event.payload);
-  expect(new Set(starts.map((payload) => payload.comparison_id)).size).toBe(1);
-  expect(starts.map((payload) => payload.compare_action)).toEqual(['start', 'start']);
+  expect(starts.map((payload) => payload.compare_action)).toEqual(['start']);
   expect(starts.map((payload) => payload.other_dish_id)).toEqual([
     'a1000000-0000-4000-8000-000000000002',
-    'a1000000-0000-4000-8000-000000000006',
   ]);
 
-  const viewDetails = page.getByRole('button', { name: 'View details of Salmon Poke Bowl' });
+  const viewDetails = page.getByRole('button', { name: 'View details of Harvest Power Bowl' });
   await viewDetails.click();
   await page.getByRole('button', { name: 'Back to compare' }).click();
   await expect(viewDetails).toBeFocused();
-  expect(compared(events)).toHaveLength(2);
+  expect(compared(events)).toHaveLength(1);
 
-  await page.getByRole('button', { name: 'Replace Salmon Poke Bowl' }).click();
-  await expect(page.locator('.pp-picker__kept-name')).toHaveText([
-    'Avocado Toast',
-    'Harvest Power Bowl',
-  ]);
+  await page.getByRole('button', { name: 'Replace Harvest Power Bowl' }).click();
+  await expect(page.locator('.pp-picker__kept-name')).toHaveText(['Avocado Toast']);
   await page.getByRole('button', { name: 'Compare with Classic Eggs Benedict' }).click();
   await page.locator('.pp-picker__confirm').click();
-  await expect(sideNames(page)).toHaveText([
-    'Avocado Toast',
-    'Harvest Power Bowl',
-    'Classic Eggs Benedict',
-  ]);
+  await expect(sideNames(page)).toHaveText(['Avocado Toast', 'Classic Eggs Benedict']);
   await expect(page.getByRole('button', { name: 'Replace Classic Eggs Benedict' })).toBeFocused();
-  await expect.poll(() => compared(events).length).toBe(3);
+  await expect.poll(() => compared(events).length).toBe(2);
   expect(compared(events).at(-1)?.payload).toMatchObject({
     comparison_id: starts[0]?.comparison_id,
     compare_action: 'replace',

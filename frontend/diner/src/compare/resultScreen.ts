@@ -145,7 +145,6 @@ export function renderCompareResult(
         <h1 class="pp-detail__title" tabindex="-1">Compare</h1>
         <span class="pp-picker__spacer" aria-hidden="true"></span>
       </header>
-      ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
 
       <div class="pp-compare__pair pp-compare__header">
         ${view.map(headerCell).join(divider)}

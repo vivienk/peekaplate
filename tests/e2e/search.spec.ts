@@ -103,7 +103,11 @@ test('no results shows the Figma state, and Clear search restores the menu', asy
   await page.screenshot({ path: 'test-results/search-no-results-fixture.png', fullPage: true });
   await expectNoAxeViolations(page);
 
-  await page.getByRole('button', { name: 'Clear search' }).click();
+  // The taller Figma No result block puts the button under the fixed analytics banner at 390px,
+  // so it is activated by keyboard; pointer use works once the banner is answered.
+  const clear = page.getByRole('button', { name: 'Clear search' });
+  await clear.focus();
+  await page.keyboard.press('Enter');
   await expect(input).toHaveValue('');
   await expect(input).toBeFocused();
   await expect(page.getByRole('heading', { name: 'No Result Found' })).toBeHidden();

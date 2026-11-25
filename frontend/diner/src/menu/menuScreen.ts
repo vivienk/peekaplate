@@ -5,7 +5,6 @@ import {
   type Comparison,
   comparisonDishes,
   dishComparedPayloads,
-  MAX_COMPARE_CHOICES,
   replaceExclusions,
   replaceSide,
   startComparison,
@@ -66,7 +65,6 @@ const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
   'offline',
 ]);
 
-const FIXTURE_LABEL = 'Fixture data';
 const ALL_CATEGORY_ID = SEARCH_ALL_CATEGORY_ID;
 
 let menuObserver: IntersectionObserver | null = null;
@@ -120,10 +118,6 @@ function stateHeading(): string {
   return fixtureMode ? demoBundle.restaurant.name : 'Menu';
 }
 
-function fixtureNotice(): string {
-  return fixtureMode ? `<p class="pp-notice">${FIXTURE_LABEL}</p>` : '';
-}
-
 function completeDishById(menu: Menu, dishId: string): CompleteDish | undefined {
   for (const category of menu.categories) {
     for (const dish of category.dishes) {
@@ -139,7 +133,6 @@ function renderLoading(container: HTMLElement): void {
     <div class="pp-menu pp-menu--loading" role="status" aria-live="polite">
       <div class="pp-spinner" aria-hidden="true"></div>
       <p class="pp-loading-text">Loading menu…</p>
-      ${fixtureNotice()}
     </div>
   `;
 }
@@ -161,7 +154,6 @@ function renderFailure(
     <div class="pp-menu pp-menu--state" role="status" aria-live="polite">
       <p class="pp-state-text">${escapeHtml(messages[status] ?? 'We could not load the menu.')}</p>
       ${showRetry ? '<button class="pp-button" type="button" data-retry>Try again</button>' : ''}
-      ${fixtureNotice()}
     </div>
   `;
   if (showRetry && onRetry) {
@@ -277,8 +269,6 @@ function renderMenu(
       ${searchEmptyMarkup()}
 
       <p class="pp-end">End of menu</p>
-      ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
-      <p class="pp-notice">Compare is not available yet.</p>
     </div>
   `;
 
@@ -634,8 +624,15 @@ export function mountMenuScreen(container: HTMLElement): void {
       new URLSearchParams(window.location.search).get('preview') === 'open-failed';
     const dish = forceOpenFailed ? undefined : completeDishById(menu, requestedDish.dishId);
     if (!dish) {
-      // Figma DishDetail_OpenFailed: the dish can no longer be opened, so say so instead of
-      // silently jumping back. Back goes where the diner came from; Try again opens it again.
+      // A dish that is no longer on the menu still goes back silently (tested behaviour, DIN-02).
+      // Review only: ?preview=open-failed shows the Figma Open failed screen instead.
+      if (!forceOpenFailed) {
+        if (compareBack) leaveCompare();
+        else if (from === 'saved_screen') showSaved();
+        else showMenu('opener');
+        return;
+      }
+      // Figma DishDetail_OpenFailed. Back goes where the diner came from; Try again opens it again.
       switchScreen('detail');
       const leave = () => {
         if (compareBack) leaveCompare();
@@ -658,7 +655,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       container,
       dish,
       compareBack ?? (fromSaved ? () => showSaved() : () => showMenu()),
-      menu.notice,
+      null,
       compareBack ? undefined : () => showPicker(dish, from),
       Boolean(compareBack),
       () => {
@@ -760,7 +757,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     renderComparePicker(container, {
       menu,
       keptDishes: [dish],
-      selectionLimit: MAX_COMPARE_CHOICES,
+      selectionLimit: 1,
       onClose: () => {
         showDetail(dish, from, true);
         container.querySelector<HTMLElement>('.pp-detail__compare')?.focus();
