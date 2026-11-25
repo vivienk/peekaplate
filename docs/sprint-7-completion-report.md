@@ -15,7 +15,8 @@
 |---|---|---|---|---|---|---|---|---|
 | DATA-17 | #261 (`d7a3bc6d`), #263 (`20ae4cdb`) | PASS | PENDING (`0` approvals; `@hemu77`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN | PARTIAL (Supabase `icwhkrlsecpzcomfjsso` & PostHog `675372` Batch B reconciled 1-to-1) | **Reviewers** (`@hemu77`, `@vivienk`), **Harshita** (14-visit arithmetic), **Sai** (prod DB project & watermark-deferral confirmation) | **PENDING** |
 | DATA-18 | #264 (`e00a039a`) | PASS | PENDING (`0` approvals; `@hemu77`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN | BLOCKED (`00000000-...-0123` has `0` published menus/`0` drafts; console auth disabled; missing `menuToken`) | **Reviewers** (`@hemu77`, `@vivienk`), **Sai** (publish menu/dish on `...0123`, `menuToken`, owner JWT, UTC window/cap, ClickUp scope), **Harshita** (2nd-tester repro) | **BLOCKED** |
-| RES-09 | #266 (`8f89bbab`) | PASS | PENDING (`0` approvals; `@hemu77`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN (`deploy-staging.yml` requires `main` + `STAGING_DEPLOYMENT_APPROVED=true`) | NOT RUN | **Reviewers** (`@hemu77`, `@vivienk`), **Sai** (`main` promotion, `deploy-staging.yml` approval/dispatch & staging console auth) | **PENDING** |
+| RES-09 | #266 (`8f89bbab`) | PASS | PENDING (`0` approvals; `@hemu77`, `@vivienk`) | PENDING (`MERGEABLE`/`CLEAN`) | NOT RUN (`deploy-staging.yml` requires `main` promotion + `workflow_dispatch`; `STAGING_DEPLOYMENT_APPROVED=true` is set) | NOT RUN | **Reviewers** (`@hemu77`, `@vivienk`), **Sai** (`main` promotion, `deploy-staging.yml` dispatch & staging console auth) | **PENDING** |
+| Sprint 7 Docs | #273 (`docs/sprint-7-closure-reports`) | Pending CI | PENDING (`0` approvals) | PENDING (`MERGEABLE`) | N/A | N/A | **Reviewers** (`@hemu77`, `@vivienk`) | **PENDING** |
 
 ---
 
@@ -26,6 +27,7 @@
   1. Merge **#261** and **#264** in any order (zero file overlap with any other Sprint 7 PR).
   2. Merge **#266** (`8f89bbab`) or **#263** (`20ae4cdb`) next.
   3. Whichever of **#263** / **#266** merges last will need a quick `docs/CONTEXT.md` rebase/refresh.
+  4. Merge **#273** (`docs/sprint-7-closure-reports`) after updating final merge SHAs if needed.
 
 ---
 
