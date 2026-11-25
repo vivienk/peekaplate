@@ -979,7 +979,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Vision-first source-linked needs_review drafts preserve private attempts and bounded retries. Ingredient sidecars/artwork retain provenance; FE-06.4 verification is read-only and upstream usage remains separately gated. QA-02 strict offline scoring binds frozen reference/export bytes and occurrence mappings; exposed sources stay development, new holdouts provisional. Private single-tenant portion/cutout/model helpers validate hashes and bound uploads. Screen 9 processing uses request-scoped temporary files. Ambiguous provider submissions cannot auto-resubmit. Generated assets stay review-only and publication-ineligible. No human reference truth, fresh AI accuracy, physical-device scale or hosted acceptance follows from offline checks.",
+      "summary": "Vision-first needs_review drafts preserve source links and private attempts. V4 retries one transient 429 on the active page in the same loop, with a fresh budget reservation. It grounds ingredient proposals in printed descriptions, excludes priced add-ons, requires matching printed text for scalar prices, and leaves currency for owner review. Google AI Studio and OpenRouter receive strict V4Batch without format downgrade. Vision never upgrades AI-02 allergen/diet confidence. Ingredient sidecars/artwork retain provenance; FE-06.4 is read-only and upstream usage separately gated. QA-02 strict scoring binds frozen reference/export bytes and occurrence mappings. Private portion/cutout/model helpers validate hashes with request-scoped temp files; ambiguous submissions cannot auto-resubmit and generated assets stay publication-ineligible. Offline checks do not establish human reference truth, real-menu accuracy, physical scale or hosted acceptance.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -991,6 +991,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/extract_menus.py",
         "processing/src/peekaplate_processing/images.py",
         "processing/src/peekaplate_processing/model_cache.py",
+        "processing/src/peekaplate_processing/model_providers.py",
         "processing/src/peekaplate_processing/ocr_regions.py",
         "processing/src/peekaplate_processing/ocr_space.py",
         "processing/src/peekaplate_processing/pdf.py",
@@ -1101,7 +1102,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_portion_ingestion.py",
         "processing/src/peekaplate_processing/prepare_assets.py",
         "processing/src/peekaplate_processing/provider_budget.py",
-        "processing/tests/test_provider_budget.py"
+        "processing/tests/test_provider_budget.py",
+        "processing/src/peekaplate_processing/vision_extraction.py",
+        "processing/src/peekaplate_processing/_vision_projection.py",
+        "processing/tests/test_vision_ingredients.py",
+        "processing/tests/test_vision_ingredient_handoff.py",
+        "processing/tests/test_vision_structured_output.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -1110,7 +1116,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "6382ba3705ec1b9a15c0fded410ee2e49d9297798f535045bb1070c15f696fd3"
+      "sourceFingerprint": "a8bc68e759ee2e7e43be6891cbecbce0799fd903bd3e940259f3e3064c10ef21"
     },
     {
       "id": "assets",
@@ -1145,17 +1151,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console",
-        "diner",
-        "contracts"
-      ],
-      "summary": "Sync the same reviewed main ingredient/consent commits into develop, preserving existing order/comparison/local AI work. Active extraction authority and real SQL fixture regressions are included.",
-      "next": "Wait for PR227 CI, merge main normally, then update develop without force or bypass. Deploy exact main only; credential approval and report completeness remain external AI gates."
-    },
     {
       "date": "2026-11-17",
       "modules": [
@@ -1297,6 +1292,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "qa-reports/S4-RES-test-plan.md"
       ],
       "next": "Use the linked CLI admission regression to verify retries against pre-diagnostics handoffs."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "processing"
+      ],
+      "summary": "Vision V4 resumes at the active page on one transient HTTP 429 per provider run. Prior drafts and private attempts survive. Daily quotas and budget denials retain their stop behavior. Explicitly priced additions are excluded from base ingredients while printed descriptions stay intact. Offline cases cover continuation, quota and budget stops, and the review export.",
+      "files": [
+        "processing/src/peekaplate_processing/vision_extraction.py",
+        "processing/src/peekaplate_processing/_vision_projection.py",
+        "processing/src/peekaplate_processing/run_pipeline.py",
+        "processing/tests/test_input_modes.py",
+        "processing/tests/test_vision_ingredients.py"
+      ],
+      "next": "Complete review of the processing patch. S6-VIS-04 live URL/PDF/staging checks and QA-02 holdout scoring remain separate."
     }
   ]
 }
