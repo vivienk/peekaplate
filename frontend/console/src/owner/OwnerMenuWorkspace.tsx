@@ -1497,8 +1497,12 @@ export function OwnerMenuWorkspace({
                         {effective?.category ?? draft.category ?? 'Not set'}
                       </span>
                       <span className="hidem num">
-                        {effective?.priceAmount ?? draft.price_amount ?? '—'}{' '}
-                        {effective?.priceCurrency ?? draft.price_currency ?? ''}
+                        {(effective?.priceAmount ?? draft.price_amount)
+                          ? `${effective?.priceAmount ?? draft.price_amount} ${
+                              effective?.priceCurrency ?? draft.price_currency ?? ''
+                            }`
+                          : // Printed price options (S7-VIS-05), never shown as a missing price.
+                            (effective?.priceText ?? draft.price_text ?? '—')}
                       </span>
                       <span className="lab st">{draft.review_status}</span>
                       <span className="hidem">

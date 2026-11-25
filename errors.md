@@ -5659,3 +5659,11 @@ The released owner menu URL field rendered with 16 px horizontal padding and the
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-25T09:00:01.094Z","exitCode":2}
 ```
+
+## 2026-11-25 menu-review first-run timeout during S7-VIS-05
+
+- Check: `pnpm exec playwright test tests/e2e/menu-review.spec.ts tests/e2e/owner-menu-preview.spec.ts tests/e2e/owner-onboarding-screens.spec.ts tests/e2e/owner-onboarding.spec.ts --project=chromium` on feat/s7-vis-05-preserve-extracted-fields.
+- Result: `menu-review.spec.ts:127` timed out waiting for the demo's "Menu state" control on the first run; `menu-review.spec.ts --repeat-each 3` then passed 27/27.
+- Cause: not confirmed; cold dev-server start, not the price-options change (the test does not touch prices).
+- Prevention: rerun a single first-run timeout before treating it as a regression.
+- Also in this run: `backend/src/owner-publication.test.ts` ("uses Worker-compatible manual redirects without following a hostile Location") failed once inside the full `pnpm exec vitest run`; alone it passed 12/12 both with and without this branch's console changes. Likely load-sensitive; rerun alone before treating it as a regression.

@@ -38,6 +38,12 @@ export interface ReviewDish {
   /** Currency of priceAmount (three letters), when the source provides it. */
   priceCurrency?: string | null;
   /**
+   * The price exactly as printed on the menu, kept by extraction when it is not one amount (e.g.
+   * "Small USD 9.00 / Large USD 14.00"). Shown as printed so the options are never lost or read as a
+   * missing price (S7-VIS-05). It does not replace priceAmount for verification.
+   */
+  priceText?: string | null;
+  /**
    * True once the owner has reviewed the dish in S09 (checked "I have reviewed the AI-drafted text and
    * ingredients" and saved). false: an extracted dish nobody has reviewed yet, so it is "Pending
    * Review" even when nothing is missing. undefined counts as reviewed (dishes the owner typed in).
@@ -146,6 +152,13 @@ export function formatPrice(priceAmount: string | null, currency?: string | null
   if (currency === null || currency === '') return Number(priceAmount).toFixed(2);
   if (currency && currency !== 'USD') return `${Number(priceAmount).toFixed(2)} ${currency}`;
   return `$${Number(priceAmount).toFixed(2)}`;
+}
+
+/** The Price cell: the single price, or the printed price options, or "Not found" (S7-VIS-05). */
+export function priceLabel(dish: ReviewDish): string {
+  if (priceValid(dish.priceAmount)) return formatPrice(dish.priceAmount, dish.priceCurrency);
+  const printed = dish.priceText?.trim();
+  return printed ? printed : NOT_FOUND;
 }
 
 export function categoryLabel(dish: ReviewDish): string {

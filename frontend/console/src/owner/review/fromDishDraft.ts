@@ -44,6 +44,7 @@ export function draftToReviewDish(
     return {
       id: draft.id,
       ...form,
+      priceText: form.source?.priceText ?? null,
       servingCount: servingCountValue(form.servingCount ?? ''),
       reviewed: item.review.reviewStatus === 'corrected',
     };
@@ -58,6 +59,7 @@ export function draftToReviewDish(
     description: draft.description,
     priceAmount: draft.price_amount,
     priceCurrency: pilotPriceCurrency(draft.price_currency),
+    priceText: draft.price_text ?? null,
     ingredients: { status: proposed.length > 0 ? 'proposed' : 'unknown', items: proposed },
     allergens: { status: 'unknown', items: [] },
     photoId: null,
