@@ -164,13 +164,7 @@ describe('S7-RES-08 clear, exact, and accessible dashboard charts', () => {
   it('renders the 10/10 -> 12/20 period engagement comparison directly on Overview', () => {
     const noop = () => {};
     const html = renderToStaticMarkup(
-      <Overview
-        go={noop}
-        sim={{ scn: 'A' }}
-        acts={{}}
-        openDish={noop}
-        openInsight={noop}
-      />,
+      <Overview go={noop} sim={{ scn: 'A' }} acts={{}} openDish={noop} openInsight={noop} />,
     );
     expect(html).toContain('Did engagement change over the period?');
     expect(html).toContain(
