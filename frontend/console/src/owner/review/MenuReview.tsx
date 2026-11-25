@@ -11,8 +11,8 @@ import {
   categoryLabel,
   dishMeta,
   dishStatus,
-  formatPrice,
   isMenuReady,
+  priceLabel,
   type ReviewDish,
   type ReviewState,
 } from './reviewDishes';
@@ -241,7 +241,7 @@ export function ReviewDishes({
                         <span className="review-dish__meta">{dishMeta(dish)}</span>
                       </th>
                       <td>{categoryLabel(dish)}</td>
-                      <td>{formatPrice(dish.priceAmount, dish.priceCurrency)}</td>
+                      <td>{priceLabel(dish)}</td>
                       <td>
                         <span className={`review-status review-status--${status.tone}`}>
                           {status.label}
