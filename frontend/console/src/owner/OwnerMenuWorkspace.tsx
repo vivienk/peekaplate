@@ -12,6 +12,7 @@ import { menuFileKind } from '../onboarding/menu-source';
 import { OnboardingLayout } from '../onboarding/OnboardingLayout';
 import { RestaurantDetails } from '../onboarding/RestaurantDetails';
 import { type MenuUpload, UploadMenu } from '../onboarding/UploadMenu';
+import { mergeCategories } from '../owner-dashboard/category-field';
 import { Btn, Icon } from '../owner-dashboard/controls';
 import { MenuTable } from '../owner-dashboard/menu-presentation';
 import {
@@ -133,6 +134,9 @@ export function OwnerMenuWorkspace({
   const photoPicker = useRef<HTMLInputElement>(null);
   const [jobs, setJobs] = useState<MenuJob[]>([]);
   const [drafts, setDrafts] = useState<DishDraft[]>([]);
+  // Categories the owner created in a dish form, per restaurant, so later forms offer them before
+  // any saved dish uses them. Kept for this visit only: there is no stored category list yet.
+  const [addedCategories, setAddedCategories] = useState<Record<string, string[]>>({});
   const [reviews, setReviews] = useState<Record<string, ExtractionReviewSessionResponse>>({});
   const [reviewUnavailable, setReviewUnavailable] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -1247,7 +1251,16 @@ export function OwnerMenuWorkspace({
             });
           }}
           existing={Boolean(editing.draft)}
-          categories={drafts.map((draft) => draft.category ?? '').filter(Boolean)}
+          categories={mergeCategories(
+            drafts.filter((draft) => !draft.removed_at).map((draft) => draft.category ?? ''),
+            addedCategories[venueId] ?? [],
+          )}
+          onAddCategory={(category) =>
+            setAddedCategories((all) => ({
+              ...all,
+              [venueId]: mergeCategories(all[venueId] ?? [], [category]),
+            }))
+          }
           photo={
             <>
               <div className={`s09-photo${photoUrl ? ' has' : ''}`}>

@@ -8,6 +8,23 @@ import chevron from './assets/icons/angle-small-down.svg';
 import plus from './assets/icons/plus-small.svg';
 import { Btn } from './controls';
 
+/**
+ * One Category list from several sources (saved dishes, the owner's new categories): trimmed,
+ * blanks dropped, and each name once regardless of case, keeping the first spelling and order.
+ */
+export function mergeCategories(...lists: readonly (readonly string[])[]): string[] {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const name of lists.flat()) {
+    const text = name.trim();
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(text);
+  }
+  return merged;
+}
+
 const ADD = Symbol('add-category');
 type CategoryKey = string | typeof ADD;
 
