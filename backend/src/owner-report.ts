@@ -1,5 +1,12 @@
 // Owner dish report (S3-RES-03 / S3-DATA-02).
 import { toOwnerReport } from '@peekaplate/contracts';
+import {
+  OWNER_PRODUCTION_BATCH_VERSION,
+  OWNER_PRODUCTION_DAY_VERSION,
+  type OwnerDishReport,
+  OwnerDishReportSchema,
+  PRIVACY_FLOOR_SESSIONS,
+} from '@peekaplate/contracts/owner-report';
 import type { Client } from 'pg';
 import { AuthUnavailableError } from './auth';
 import { CommandError } from './dish-command';
@@ -9,6 +16,7 @@ import {
   OWNER_BATCH_MS,
   OWNER_BATCH_SETTLE_MS,
   readBatchedOwnerReport,
+  readDailyOwnerReport,
 } from './owner-report-batches';
 import { readOwnerReportDisplayActions } from './owner-report-display-actions';
 import {
@@ -34,6 +42,8 @@ type ReportOptions = {
   validationNow?: Date;
   readTodayEvents?: (venueId: string, start: Date, end: Date) => Promise<LivePostHogOwnerEvent[]>;
   productionPublications?: { storage: PreparedStorage; origin: string };
+  productionDay?: boolean;
+  productionDishDayStart?: Date | undefined;
 };
 
 export async function readOwnerReport(
@@ -71,12 +81,24 @@ export async function readOwnerReport(
 
     const report =
       source === 'production' && options.readTodayEvents && options.productionPublications
-        ? await readBatchedOwnerReport(
-            venueId,
-            now,
-            options.productionPublications.storage,
-            (end) => measureReport(client, venueId, end, source, options, OWNER_BATCH_MS),
-          )
+        ? options.productionDay
+          ? await readDailyOwnerReport(
+              venueId,
+              now,
+              options.productionPublications.storage,
+              ({ start, end, baselineStart }, midnightReport) =>
+                midnightReport
+                  ? advanceDailyReport(client, venueId, start, end, options, midnightReport)
+                  : measureReport(client, venueId, end, source, options, 0, baselineStart),
+              options.productionDishDayStart,
+            )
+          : await readBatchedOwnerReport(
+              venueId,
+              now,
+              options.productionPublications.storage,
+              (end) => measureReport(client, venueId, end, source, options, OWNER_BATCH_MS),
+              options.productionDishDayStart,
+            )
         : await measureReport(client, venueId, now, source, options);
     await client.query('COMMIT');
     started = false;
@@ -93,6 +115,68 @@ export async function readOwnerReport(
   }
 }
 
+async function readReportEvidence(
+  client: Client,
+  venueId: string,
+  start: Date,
+  end: Date,
+  batch: boolean,
+  options: ReportOptions,
+  publicationStart = start,
+): Promise<OwnerReportLiveEvidence> {
+  if (!options.productionPublications || !options.readTodayEvents) throw new AuthUnavailableError();
+  const { storage, origin } = options.productionPublications;
+  // Earliest release time makes source selection stable across UTC midnight.
+  const today = new Date(end.getTime() + (batch ? OWNER_BATCH_SETTLE_MS : 0));
+  today.setUTCHours(0, 0, 0, 0);
+  const starts = new Date(Math.max(today.getTime(), start.getTime()));
+  const evidence = {
+    start: today,
+    events: end > starts ? await options.readTodayEvents(venueId, starts, end) : [],
+  };
+  return {
+    ...evidence,
+    publications: await readReportPublications(
+      client,
+      storage,
+      origin,
+      venueId,
+      end,
+      evidence,
+      publicationStart,
+    ),
+  };
+}
+
+async function advanceDailyReport(
+  client: Client,
+  venueId: string,
+  start: Date,
+  end: Date,
+  options: ReportOptions,
+  midnightReport: OwnerDishReport,
+) {
+  const midnight = midnightReport.summary;
+  if (!midnight) throw new AuthUnavailableError();
+  const evidence = await readReportEvidence(client, venueId, start, end, true, options);
+  const summary = await readOwnerReportSummary(
+    client,
+    venueId,
+    end,
+    'live',
+    evidence,
+    end.getTime() - start.getTime(),
+    true,
+    new Date(midnight.periods.baseline.start_time),
+    midnight.baseline,
+  );
+  return OwnerDishReportSchema.parse({
+    ...midnightReport,
+    summary,
+    report_metadata: { ...midnightReport.report_metadata, generated_at: end.toISOString() },
+  });
+}
+
 async function measureReport(
   client: Client,
   venueId: string,
@@ -100,42 +184,33 @@ async function measureReport(
   source: OwnerReportSource,
   options: ReportOptions,
   durationMs = 86_400_000,
+  dayBaselineStart?: Date,
 ) {
-  const isBatch = durationMs === OWNER_BATCH_MS;
-  // Earliest release time makes source selection stable across UTC midnight.
-  const today = new Date(now.getTime() + (isBatch ? OWNER_BATCH_SETTLE_MS : 0));
-  today.setUTCHours(0, 0, 0, 0);
-  let liveEvidence: OwnerReportLiveEvidence | undefined;
-  if (source === 'production' && options.readTodayEvents) {
-    if (!options.productionPublications) throw new AuthUnavailableError();
-    const { storage, origin } = options.productionPublications;
-    const starts = new Date(Math.max(today.getTime(), now.getTime() - durationMs));
-    const evidence = {
-      start: today,
-      events: now > starts ? await options.readTodayEvents(venueId, starts, now) : [],
-    };
-    liveEvidence = {
-      ...evidence,
-      publications: await readReportPublications(
-        client,
-        storage,
-        origin,
-        venueId,
-        now,
-        evidence,
-        durationMs,
-      ),
-    };
-  }
+  const isBatch = Boolean(dayBaselineStart) || durationMs === OWNER_BATCH_MS;
+  const productionDay = source === 'production' && dayBaselineStart !== undefined;
+  const windowStart = new Date(now.getTime() - durationMs);
+  const dishStart = dayBaselineStart ?? windowStart;
+  // Daily dish metrics measure yesterday once, when the midnight cutoff becomes eligible.
+  const liveEvidence =
+    source === 'production' && options.readTodayEvents
+      ? await readReportEvidence(
+          client,
+          venueId,
+          dishStart,
+          now,
+          isBatch,
+          options,
+          dayBaselineStart ?? new Date(now.getTime() - 2 * durationMs),
+        )
+      : undefined;
   const query = liveEvidence
     ? PRODUCTION_OWNER_REPORT_QUERY
     : options.trafficClass === 'test'
       ? TEST_OWNER_REPORT_QUERY
       : OWNER_REPORT_QUERY;
-  const windowStart = new Date(now.getTime() - durationMs);
   const result = await client.query(query, [
     venueId,
-    windowStart,
+    dishStart,
     now,
     ...(liveEvidence ? liveEvidenceParameters(liveEvidence) : []),
   ]);
@@ -148,6 +223,7 @@ async function measureReport(
         liveEvidence,
         durationMs,
         isBatch,
+        dayBaselineStart,
       )
     : undefined;
   const complete =
@@ -159,18 +235,50 @@ async function measureReport(
       anchor: now,
       validationNow: options.validationNow ?? new Date(),
     }));
-  const internal = buildInternalReport(result.rows, venueId, now, source, durationMs);
+  const rows = result.rows;
+  const exposedDishes = new Set(
+    rows
+      .filter((row) => Number(row.total_sessions) >= PRIVACY_FLOOR_SESSIONS)
+      .map((row) => String(row.dish_id)),
+  );
   const displayActions =
     isBatch && options.includeDisplayActions && liveEvidence
       ? await readOwnerReportDisplayActions(
           client,
           venueId,
-          windowStart,
+          dishStart,
           now,
           liveEvidence,
-          new Set(internal.dishes.map((dish) => String(dish.dish_id))),
+          exposedDishes,
+          productionDay,
         )
       : undefined;
+  if (productionDay && displayActions) {
+    const observedDishes = new Set(rows.map((row) => String(row.dish_id)));
+    for (const [dishId, name] of displayActions.dishNames) {
+      if (observedDishes.has(dishId)) continue;
+      // A comparison partner or a rendered portion can have no exposure or open
+      // in the reporting window. The action is still measured on that dish.
+      rows.push({
+        dish_id: dishId,
+        dish_name: name,
+        total_sessions: 0,
+        open_eligible_sessions: 0,
+        timed_sessions: 0,
+        total_openings: 0,
+        average_active_seconds: null,
+        last_event_ingested_at: null,
+      });
+    }
+  }
+  const internal = buildInternalReport(
+    rows,
+    venueId,
+    now,
+    source,
+    now.getTime() - dishStart.getTime(),
+    productionDay,
+  );
   return toOwnerReport({
     ...internal,
     ...(displayActions
@@ -195,10 +303,19 @@ async function measureReport(
           summary: displayActions
             ? {
                 ...summary,
-                current: {
-                  ...summary.current,
-                  portion_previews_shown: displayActions.portionTotal,
-                },
+                ...(dayBaselineStart
+                  ? {
+                      baseline: {
+                        ...summary.baseline,
+                        portion_previews_shown: displayActions.portionTotal,
+                      },
+                    }
+                  : {
+                      current: {
+                        ...summary.current,
+                        portion_previews_shown: displayActions.portionTotal,
+                      },
+                    }),
               }
             : summary,
         }
@@ -443,19 +560,20 @@ function rateMetric(
   denominator: number,
   belowDishFloor: boolean,
   eligibleSessions: number,
+  minimumSessions: number,
   protectSmallPartitions = false,
 ) {
   if (belowDishFloor)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (denominator === 0)
     return { value: null, status: 'NOT_MEASURABLE', eligible_sessions: eligibleSessions };
-  if (eligibleSessions < 10)
+  if (eligibleSessions < minimumSessions)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (
     protectSmallPartitions &&
     numerator > 0 &&
     numerator < denominator &&
-    Math.min(numerator, denominator - numerator) < 10
+    Math.min(numerator, denominator - numerator) < PRIVACY_FLOOR_SESSIONS
   )
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (numerator === 0)
@@ -467,12 +585,17 @@ function rateMetric(
   };
 }
 
-function averageMetric(value: number | null, eligibleSessions: number, belowDishFloor: boolean) {
+function averageMetric(
+  value: number | null,
+  eligibleSessions: number,
+  belowDishFloor: boolean,
+  minimumSessions: number,
+) {
   if (belowDishFloor)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (eligibleSessions === 0)
     return { value: null, status: 'NOT_MEASURABLE', eligible_sessions: eligibleSessions };
-  if (eligibleSessions < 10)
+  if (eligibleSessions < minimumSessions)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (value === null) throw new Error('Timed sessions have no average active time');
   if (value === 0) return { value: 0, status: 'VALID_ZERO', eligible_sessions: eligibleSessions };
@@ -492,10 +615,15 @@ function buildInternalReport(
   now: Date,
   source: OwnerReportSource = 'production',
   durationMs = 86_400_000,
+  productionDay = false,
 ) {
   const start = new Date(now.getTime() - durationMs);
-  const isBatch = durationMs === OWNER_BATCH_MS;
-  const visibleRows = isBatch ? rows.filter((row) => Number(row.total_sessions) >= 10) : rows;
+  const isBatch = productionDay || durationMs === OWNER_BATCH_MS;
+  const legacyBatch = isBatch && !productionDay;
+  const minimumSessions = productionDay ? 1 : PRIVACY_FLOOR_SESSIONS;
+  const visibleRows = legacyBatch
+    ? rows.filter((row) => Number(row.total_sessions) >= minimumSessions)
+    : rows;
   const lastEventIngestedAt = rows.reduce<string | null>((latest, row) => {
     const timestamp = timestampOrNull(row.last_event_ingested_at);
     return timestamp && (!latest || timestamp > latest) ? timestamp : latest;
@@ -506,7 +634,11 @@ function buildInternalReport(
     venue_id: venueId,
     source,
     report_metadata: {
-      calculation_version: isBatch ? 'production.batch.v1' : `${source}.v1`,
+      calculation_version: productionDay
+        ? OWNER_PRODUCTION_DAY_VERSION
+        : isBatch
+          ? OWNER_PRODUCTION_BATCH_VERSION
+          : `${source}.v1`,
       generated_at: now.toISOString(),
       date_window: {
         duration_hours: Math.floor(durationMs / 3_600_000),
@@ -515,8 +647,9 @@ function buildInternalReport(
       },
       coverage: {
         total_dishes_monitored: visibleRows.length,
-        measurable_dishes_count: visibleRows.filter((row) => Number(row.total_sessions) >= 10)
-          .length,
+        measurable_dishes_count: productionDay
+          ? visibleRows.length
+          : visibleRows.filter((row) => Number(row.total_sessions) >= minimumSessions).length,
       },
       freshness: {
         is_stale: null,
@@ -528,12 +661,12 @@ function buildInternalReport(
       const totalSessions = Number(row.total_sessions);
       const openEligibleSessions = Number(row.open_eligible_sessions);
       const timedSessions = Number(row.timed_sessions);
-      const belowDishFloor = totalSessions < 10;
+      const belowDishFloor = !productionDay && totalSessions < minimumSessions;
       const coverageHasSmallSessionGroup =
-        isBatch &&
+        legacyBatch &&
         [row.timed_opening_sessions, row.untimed_opening_sessions]
           .map(Number)
-          .some((count) => count > 0 && count < 10);
+          .some((count) => count > 0 && count < minimumSessions);
 
       return {
         dish_id: row.dish_id,
@@ -542,40 +675,45 @@ function buildInternalReport(
         metrics: {
           active_sessions: {
             value: belowDishFloor ? null : totalSessions,
-            status: belowDishFloor ? 'SUPPRESSED' : 'NORMAL',
+            status: belowDishFloor ? 'SUPPRESSED' : totalSessions === 0 ? 'VALID_ZERO' : 'NORMAL',
           },
           avg_interaction_time_seconds: averageMetric(
             numberOrNull(row.average_active_seconds),
             timedSessions,
             belowDishFloor,
+            minimumSessions,
           ),
           timing_coverage: rateMetric(
             Number(row.timed_openings),
             Number(row.total_openings),
             belowDishFloor || coverageHasSmallSessionGroup,
             openEligibleSessions,
-            isBatch,
+            minimumSessions,
+            legacyBatch,
           ),
           open_rate: rateMetric(
             Number(row.exposed_open_sessions),
             totalSessions,
             belowDishFloor,
             totalSessions,
-            isBatch,
+            minimumSessions,
+            legacyBatch,
           ),
           engagement_rate: rateMetric(
             Number(row.engaged_sessions),
             openEligibleSessions,
             belowDishFloor,
             openEligibleSessions,
-            isBatch,
+            minimumSessions,
+            legacyBatch,
           ),
           save_rate: rateMetric(
             Number(row.saved_sessions),
             totalSessions,
             belowDishFloor,
             totalSessions,
-            isBatch,
+            minimumSessions,
+            legacyBatch,
           ),
         },
       };

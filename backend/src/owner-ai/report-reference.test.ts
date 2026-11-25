@@ -1,4 +1,7 @@
-import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
+import {
+  OWNER_PRODUCTION_DAY_VERSION,
+  OwnerDishReportSchema,
+} from '@peekaplate/contracts/owner-report';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   LOCAL_AI_DISH,
@@ -7,7 +10,12 @@ import {
 } from '../../scripts/owner-ai-local-fixture';
 import { CommandError } from '../dish-command';
 import { type Bindings, createApp } from '../index';
-import { mintOwnerReportReference, OWNER_REPORT_REFERENCE_HEADER } from './report-reference';
+import {
+  mintOwnerReportReference,
+  OWNER_REPORT_REFERENCE_HEADER,
+  ownerReportSnapshot,
+  readOwnerReportReference,
+} from './report-reference';
 
 const venuePath = `/api/v1/venues/${LOCAL_AI_VENUE}`;
 const origin = 'http://127.0.0.1:5174';
@@ -17,6 +25,44 @@ const secret = 'fixture-report-reference-signing-key-for-tests-only';
 const start = Date.parse('2026-11-16T12:00:00.219Z');
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('signs the settled current cutoff while the dish evidence is from the closed day', async () => {
+  const now = new Date('2026-11-24T05:16:00.000Z');
+  const current = {
+    start_time: '2026-11-23T08:00:00.000Z',
+    end_time: '2026-11-24T05:15:00.000Z',
+  };
+  const baseline = {
+    start_time: '2026-11-22T08:00:00.000Z',
+    end_time: current.start_time,
+  };
+  const missing = { value: null, status: 'MISSING' } as const;
+  const metrics = {
+    menu_sessions: missing,
+    dish_opens: missing,
+    avg_interaction_time_seconds: missing,
+    portion_previews_shown: missing,
+    verified_orders: missing,
+  };
+  const seed = localOwnerAiReport(now);
+  const report = OwnerDishReportSchema.parse({
+    ...seed,
+    source: 'production',
+    report_metadata: {
+      ...seed.report_metadata,
+      calculation_version: OWNER_PRODUCTION_DAY_VERSION,
+      generated_at: current.end_time,
+      date_window: { ...baseline, duration_hours: 24 },
+    },
+    summary: { periods: { current, baseline }, current: metrics, baseline: metrics },
+  });
+  const scope = { actorId: owner, venueId: LOCAL_AI_VENUE };
+  const reference = await mintOwnerReportReference(report, scope, secret, now);
+  expect(await readOwnerReportReference(reference, scope, secret, now, 'production')).toEqual({
+    anchor: now,
+    snapshot: ownerReportSnapshot(report),
+  });
+});
 
 function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = false) {
   let now = start;

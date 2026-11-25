@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. Optional summary and clipped UTC daily opening buckets preserve per-cell privacy statuses; absent measurements are not zero. Food and portion evidence remain revision-bound. Serving size parses integer people counts; separate optional photo-bound plate calibration provides physical dimensions. Legacy text alone never creates measurement evidence.",
+      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. The production San Francisco day report permits positive single-session metrics under ADR 0019. Legacy scopes retain their original privacy rules. Missing denominators remain unavailable and internal cohort counts stay private. Food and portion evidence remain revision-bound. Serving size parses integer people counts; separate optional photo-bound calibration provides physical dimensions.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "cbe959641dd9c3ca90ee2bfe68a9b57df02101186d23b6ecaf78d8c278e00272"
+      "sourceFingerprint": "4843ba75c74f1dbad7beb2996149e38e02b095050eebc52febce2d9439229942"
     },
     {
       "id": "tokens",
@@ -286,7 +286,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Owners can refresh in place. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
+      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart show validated summaries and gaps. Visible San Francisco day reports retry transient refresh failures for the same source. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -473,12 +473,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "58f206fc92f9d782df0890da3271642e7cddca81cdbd036fc0f19838cfbda8f2"
+      "sourceFingerprint": "0dd4fdd3fdc728511be10b3db33c8acdcf6d79a2dbd99582c12eaf1fc106817d"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Owner AI uses checked report references and currently gates to approved synthetic reports; its diagnostic path and private portion processing remain separate. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. Hosted production binding and provider compatibility still require verification. The production extraction host supports a separate portion-only deployment with no provider credentials or Internet egress. Its container requires the source origin to match its environment. The existing menu OCR transport is separate.",
+      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Production San Francisco day dish aggregates use the first eligible event for the completed day. Owner AI uses checked report references and gates provider use on verified freshness. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. The separate production portion-only deployment requires matching source origin; menu OCR transport is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -509,6 +509,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-report-evidence.ts",
         "backend/src/owner-report-display-actions.ts",
         "backend/src/owner-report-batches.ts",
+        "backend/src/owner-report-batches.test.ts",
         "backend/src/owner-report-publications.ts",
         "backend/src/owner-report-posthog.ts",
         "backend/src/owner-report-posthog.test.ts",
@@ -749,7 +750,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4430b1b18487921f994be26e084a761524c71729819d643759344a9c4741fc16"
+      "sourceFingerprint": "c4d65e03614f9f3fa80669fd852ccacff2fe3db37f4d340968b8529c419f2956"
     },
     {
       "id": "database",
@@ -912,7 +913,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "220fd2243d5e8e0beb0e00d40c1cfdba30df0192b7adfc1d3ee804ed86e3e1c3"
+      "sourceFingerprint": "5aef001859d32fd2483fa9b9e23f0b3da0fd2913eccd30f0fb590821b14ab432"
     },
     {
       "id": "agents",
@@ -1154,29 +1155,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-17",
       "modules": [
-        "console"
-      ],
-      "summary": "Fix S13 handoff: retain preparation menu identity and load that exact snapshot in the existing PR208 MenuPreview. No screen/CSS replacement, auto-publication, or backend change.",
-      "next": "Verify direct preview and safe retry on staging; provider credentials and report completeness remain separate AI gates."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend"
-      ],
-      "summary": "Repair owner AI diagnostic loss with a bounded shared Responses transport, server-only status/code classifications and provisioning-compatible project validation. Report and draft read failures log an internal category before provider use. Public errors, evidence gates, model, request/token limits and no-retry behavior remain. All 131 focused caller and transport tests pass offline.",
-      "files": [
-        "backend/src/owner-ai/provider.ts",
-        "backend/src/owner-ai/responses.ts",
-        "backend/src/owner-ai/dish-assistance.ts",
-        "backend/src/owner-ai/routes.ts",
-        "docs/owner-ai-responses.md"
-      ],
-      "next": "Finish pinned repository checks and independent review, then obtain required human PR approval. Approved staging deployment and a captured synthetic request remain necessary to diagnose the hosted failure; no historical provider result is inferred."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
         "contracts",
         "console",
         "backend",
@@ -1210,6 +1188,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionSize.ts"
       ],
       "next": "Complete focused and repository checks, independently review the pinned correction, and update PR237. Human review and exact staging release remain required; physical-device scale acceptance is separate."
+    },
+    {
+      "date": "2026-11-17",
+      "modules": [
+        "backend",
+        "console",
+        "diner",
+        "contracts"
+      ],
+      "summary": "Sync the same reviewed main ingredient/consent commits into develop, preserving existing order/comparison/local AI work. Active extraction authority and real SQL fixture regressions are included.",
+      "next": "Wait for PR227 CI, merge main normally, then update develop without force or bypass. Deploy exact main only; credential approval and report completeness remain external AI gates."
     },
     {
       "date": "2026-11-21",
@@ -1277,6 +1266,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/production-release.md"
       ],
       "next": "Release the approved production API and console with their dashboard AI flags enabled, then verify one signed-in report question."
+    },
+    {
+      "date": "2026-11-23",
+      "modules": [
+        "backend",
+        "console",
+        "contracts"
+      ],
+      "summary": "Production Overview accumulates from San Francisco midnight and recovers after transient refresh failures. Dish Performance and CSV expose supported aggregates from the first eligible session in the previous complete local day under ADR 0019. The signed AI period stays aligned and unknown freshness still prevents provider use. The cutover withholds overlapping legacy dish reports.",
+      "files": [
+        "docs/adr/0019-production-single-session-reporting.md",
+        "backend/src/owner-production-report.integration.ts",
+        "packages/contracts/src/owner-report.ts"
+      ],
+      "next": "Review single-session disclosure and verify private snapshot retention and the approved Pacific midnight before activating the compatible production console and Worker."
     },
     {
       "date": "2026-11-25",

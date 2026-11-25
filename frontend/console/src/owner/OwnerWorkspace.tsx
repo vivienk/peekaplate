@@ -5,7 +5,11 @@ import {
   type OwnerAnalysisRequest,
   type OwnerAnalysisResult,
 } from '@peekaplate/contracts/owner-analysis';
-import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
+import {
+  OWNER_PRODUCTION_DAY_VERSION,
+  OWNER_REPORT_TIME_ZONE,
+  type OwnerDishReport,
+} from '@peekaplate/contracts/owner-report';
 import {
   type FormEvent,
   type ReactNode,
@@ -29,7 +33,7 @@ import {
 import { mergeCategories } from '../owner-dashboard/category-field';
 import { Btn } from '../owner-dashboard/controls';
 import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
-import { ReportView, useOwnerReport } from '../owner-dashboard/report-data';
+import { formatOwnerReportTime, ReportView, useOwnerReport } from '../owner-dashboard/report-data';
 import { createOwnerMenuClient, newCommandId, OwnerMenuApiError } from '../owner-menu/api';
 import { Button, Input } from '../ui';
 import { FirstDashboardAside, FirstDashboardTopbar } from './FirstDashboard';
@@ -744,6 +748,7 @@ function LiveDashboardReport({
       presentation={page === 'performance' ? 'performance' : 'data'}
     />
   );
+  const summaryDay = report?.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION;
   const live = {
     restaurantName,
     reportContent,
@@ -752,7 +757,13 @@ function LiveDashboardReport({
     summaryFreshness: report?.report_metadata.freshness.is_stale,
     summarySource: report?.source,
     summaryBatch: report?.report_metadata.calculation_version === 'production.batch.v1',
-    period: report ? reportPeriod(report.report_metadata.date_window) : undefined,
+    summaryDay,
+    period: report
+      ? reportPeriod(
+          report.summary?.periods.current ?? report.report_metadata.date_window,
+          summaryDay,
+        )
+      : undefined,
   };
   return (
     <div className="owner-dashboard-content">
@@ -872,7 +883,9 @@ const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
 });
 // Report windows are end-exclusive, so the last day shown is the millisecond before the end.
-function reportPeriod(window: { start_time: string; end_time: string }): string {
+function reportPeriod(window: { start_time: string; end_time: string }, pacific = false): string {
+  if (pacific)
+    return `${formatOwnerReportTime(window.start_time, OWNER_REPORT_TIME_ZONE)} – ${formatOwnerReportTime(window.end_time, OWNER_REPORT_TIME_ZONE)}`;
   const start = new Date(window.start_time);
   if (Date.parse(window.end_time) - start.getTime() === 300_000) {
     return `${window.start_time.slice(0, 10)} · ${window.start_time.slice(11, 16)}–${window.end_time.slice(11, 16)} UTC`;
@@ -1030,7 +1043,11 @@ function LiveAiPanel({
         <div className="owner-chips">
           <span className="owner-chip owner-chip--surface">{restaurantName}</span>
           <span className="owner-chip owner-chip--surface">
-            Displayed report period: {reportPeriod(report.report_metadata.date_window)}
+            Displayed report period:{' '}
+            {reportPeriod(
+              report.report_metadata.date_window,
+              report.report_metadata.calculation_version === OWNER_PRODUCTION_DAY_VERSION,
+            )}
           </span>
         </div>
       </div>

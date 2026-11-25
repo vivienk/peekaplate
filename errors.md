@@ -5553,6 +5553,7 @@ therefore not send the question even with the UI and API flags configured. Use t
 completed-batch calculation when signing, preserve the request anchor across the next batch
 boundary and keep unknown freshness gated. The report reference and production browser tests
 cover the signed submission and the empty-report state.
+
 ## 2026-11-16 direct-vision ingredient handoff
 
 The new ingredient tracer initially failed because V4Dish rejected ingredients as an extra field; the existing direct path always emitted null. The enhancement adds bounded same-description proposals and reconstructable description spans without changing the public DishDraft or V1 artifact envelope. Vision transcription remains unverified; AI-02 still abstains from allergen/diet classifications.
@@ -5602,3 +5603,50 @@ and `processing/tests/test_workflow.py` failed before the fixes and pass afterwa
 ## 2026-11-23 V4 alternative ingredient review
 
 The focused regression exposed that a bare alternative such as chicken or beef could retain both terms as affirmative ingredients. The projection now excludes ingredients in a clause containing an alternative, with an independent clause still retained. The regression is processing/tests/test_vision_ingredients.py::VisionIngredientTests.test_bare_alternatives_are_not_affirmative_ingredients.
+
+## Owner totals disappear after a quiet reporting interval
+
+The production owner route selected only the latest five-minute interval, so a quiet cutoff
+hid earlier activity still present in canonical storage. San Francisco day mode accumulates
+the restaurant-wide visit and open counts through settled cutoffs. Dish-level values and
+protected rollups use one sealed, completed local day so successive refreshes cannot expose a
+small intraday change. The production-report integration covers quiet cutoffs, late arrival
+at midnight, fixed dish data, the CSV period and cross-restaurant denial.
+
+The daily refresh timer stopped when a retryable error replaced the ready report. Keep its daily
+mode tied to the same authorized report source while displaying the error, and clear it on terminal
+access failures. The owner authentication browser test covers recovery on a later visible tick.
+
+The first legacy fallback after the cutover still reused protected metrics from the previous
+interval ending at the boundary. Mask both intervals in the response once the current cutoff is
+past that boundary while retaining the underlying sealed report. The first daily active-time
+summary also applied suppression from UTC buckets it did not expose. Use the completed Pacific
+day and per-dish privacy floors for that summary. The signed production-report integration checks
+the first fallback response and a ten-session cohort split across UTC midnight.
+
+## Single-session production day reports
+
+The new production day disclosure rule exposed legacy gates in the SQL reader, display-action
+aggregation, and shared report serialization. The one-session contract regression failed before
+the fix. Daily mode now accepts eligible single-session aggregates while retaining the legacy
+floor outside that mode. The internal schema still validates nonzero denominators and strips
+cohort counts from every public response. Typechecking caught generic schema indexing during the
+change, which was corrected by narrowing to the existing metric-cell shape.
+
+The local PostgreSQL fixture uses a temporary Vitest config with the embedded database adapter.
+Vitest does not accept the setup-file setting as a command-line argument.
+
+An initial daily refresh returned HTTP 503 after a completed day with one rendered portion.
+The refresh used the legacy summary validator for the sealed daily baseline. The report reader
+now validates the baseline with the production day schema, and the first settled refresh and
+CSV export are covered in the production report integration.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-24T07:21:11.647Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-25T06:21:30.913Z","exitCode":2}
+```
