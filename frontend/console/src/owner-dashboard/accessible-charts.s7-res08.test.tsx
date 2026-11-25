@@ -166,7 +166,7 @@ describe('S7-RES-08 clear, exact, and accessible dashboard charts', () => {
     const html = renderToStaticMarkup(
       <Overview
         go={noop}
-        sim={{ scn: 'full' }}
+        sim={{ scn: 'A' }}
         acts={{}}
         openDish={noop}
         openInsight={noop}
