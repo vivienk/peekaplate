@@ -149,9 +149,7 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
     expect(await pendingA).toEqual({ kind: 'error' });
     expect(activeB.kind).toBe('ready');
     if (activeB.kind === 'ready') {
-      const html = renderToStaticMarkup(
-        <ReportView state={activeB} presentation="performance" />,
-      );
+      const html = renderToStaticMarkup(<ReportView state={activeB} presentation="performance" />);
       expect(html).toContain('Venue B Saffron Rice');
       expect(html).not.toContain('Venue A Lentil Bowl');
     }
