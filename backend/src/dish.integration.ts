@@ -1773,7 +1773,10 @@ describe('real PostgreSQL menu publication commands', () => {
       await loadApprovedDishSources(admin, venue, [dishId]),
       new Map([[assetId, { manifest }]]),
     );
-    expect(produced.diagnostics).toEqual([]);
+    expect(produced.diagnostics).toContainEqual({
+      dishId,
+      code: 'allergens_unreviewed',
+    });
     expect(produced.bundle.categories[0]?.dishes[0]?.complete).toBe(true);
     expect(
       await admitMenuBundleHandoff(admin, {

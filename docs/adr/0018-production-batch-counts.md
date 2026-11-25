@@ -16,7 +16,9 @@ Supported 2.5D preview counts use only rendered, non-sample previews for the exa
 
 ## Consequences
 
-A five-minute total can reveal that a visit happened. An owner who knows who was present may infer which visit contributed. Keep intervals fixed and adjacent. Do not combine the exception with arbitrary date filters, narrower drill-downs, a mutable live counter, or AI input. Record data/product approval before setting the production reporting flag.
+A small total can reveal that a visit happened. An owner who knows who was present may infer which visit contributed. The San Francisco day report refreshes only the two approved restaurant-wide counts within the day. Exact rolling dish metrics could reveal activity from fewer than ten sessions by subtraction, even when each cumulative cohort passes the floor. Dish Performance, active time and 2.5D preview totals use the previous complete day and stay fixed between local midnight cutoffs. Do not combine the restaurant-total exception with arbitrary date filters, narrower drill-downs, a mutable intrabatch counter, or AI input. Record data/product approval before setting the production reporting flag.
+
+Legacy five-minute dish reports can overlap the first daily report. The release configuration sets the first complete Pacific day eligible for protected daily reports. Daily dish reports withhold all prior days, and five-minute fallback reports withhold protected fields for intervals ending after that same boundary. The [release checklist](../production-release.md) records how to choose and retain the cutover timestamp.
 
 ## Verification
 

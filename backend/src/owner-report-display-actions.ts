@@ -11,7 +11,13 @@ import {
 
 type DisplayAction = 'portion_previews_shown' | 'comparisons_started';
 type Count = OwnerDishReport['dishes'][number]['metrics']['active_sessions'];
-type Row = { metric: DisplayAction; dishId: string | null; actions: string; visits: string };
+type Row = {
+  metric: DisplayAction;
+  dishId: string | null;
+  dishName: string | null;
+  actions: string;
+  visits: string;
+};
 
 const query = `WITH ${TODAY_REPORT_EVIDENCE}, ${REPORT_PUBLICATIONS},
 portions AS MATERIALIZED (
@@ -34,13 +40,16 @@ portions AS MATERIALIZED (
     AND obs.event_type='dish_compared' AND obs.compare_action='start' AND obs.comparison_id IS NOT NULL
     ${PRODUCTION_REPORT_FILTER}
     ${REPORT_PUBLICATION_FILTER}
+), counts AS (
+  SELECT 'portion_previews_shown' AS metric, dish_id AS "dishId",
+    COUNT(*) AS actions, COUNT(DISTINCT session_id) AS visits
+  FROM portions GROUP BY GROUPING SETS ((dish_id), ())
+  UNION ALL
+  SELECT 'comparisons_started', dish_id, COUNT(*), COUNT(DISTINCT session_id)
+  FROM comparisons GROUP BY dish_id
 )
-SELECT 'portion_previews_shown' AS metric, dish_id AS "dishId",
-  COUNT(*) AS actions, COUNT(DISTINCT session_id) AS visits
-FROM portions GROUP BY GROUPING SETS ((dish_id), ())
-UNION ALL
-SELECT 'comparisons_started', dish_id, COUNT(*), COUNT(DISTINCT session_id)
-FROM comparisons GROUP BY dish_id`;
+SELECT counts.*, dish.name AS "dishName" FROM counts
+LEFT JOIN app_private.dish_current dish ON dish.tenant_id=$1 AND dish.dish_id=counts."dishId"`;
 
 /** The caller has checked owner membership and verified the publication manifests. */
 export async function readOwnerReportDisplayActions(
@@ -50,6 +59,7 @@ export async function readOwnerReportDisplayActions(
   end: Date,
   evidence: OwnerReportLiveEvidence,
   reportableDishes: ReadonlySet<string>,
+  allowSmallCounts = false,
 ) {
   const { rows } = await client.query<Row>(query, [
     venueId,
@@ -60,6 +70,7 @@ export async function readOwnerReportDisplayActions(
   const missing = { value: null, status: 'MISSING' } as const;
   const suppressed = { value: null, status: 'SUPPRESSED' } as const;
   const byDish = new Map<string, Partial<Record<DisplayAction, Count>>>();
+  const dishNames = new Map<string, string>();
   let portionTotal: Count = missing;
   let protectedPortionDish = false;
   for (const row of rows) {
@@ -75,7 +86,7 @@ export async function readOwnerReportDisplayActions(
     const cell: Count =
       actions === 0
         ? missing
-        : visits < PRIVACY_FLOOR_SESSIONS
+        : !allowSmallCounts && visits < PRIVACY_FLOOR_SESSIONS
           ? suppressed
           : { value: actions, status: 'NORMAL' };
     if (row.dishId === null) {
@@ -83,11 +94,13 @@ export async function readOwnerReportDisplayActions(
       continue;
     }
     if (
+      !allowSmallCounts &&
       row.metric === 'portion_previews_shown' &&
       (cell.status === 'SUPPRESSED' || !reportableDishes.has(row.dishId))
     )
       protectedPortionDish = true;
+    if (row.dishName) dishNames.set(row.dishId, row.dishName);
     byDish.set(row.dishId, { ...byDish.get(row.dishId), [row.metric]: cell });
   }
-  return { byDish, portionTotal: protectedPortionDish ? suppressed : portionTotal };
+  return { byDish, dishNames, portionTotal: protectedPortionDish ? suppressed : portionTotal };
 }

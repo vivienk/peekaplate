@@ -60,6 +60,11 @@ New bundles use separate `nuts` and `peanut` codes. A search alias may match bot
 
 `allergens` is required on a complete dish but has an explicit review state: `null` means the declaration is unavailable or has not been reviewed, `[]` means the reviewed declaration contains no values from this closed list, and a non-empty array contains the reviewed declared codes. Neither `null` nor `[]` is a guarantee that a dish is allergen-free, and the diner must not present either state as such. Dietary codes remain explicit restaurant assertions rather than inferred medical or safety claims.
 
+Bundle production reports `allergens: null` as an `allergens_unreviewed`
+diagnostic. This warning does not convert the value to `[]` or independently
+change structural completeness; it signals that the declaration remains
+unreviewed and must not be presented as allergen-free.
+
 Version 1 still contains no 2.5D field, and an unapproved spatial format is rejected as an unknown field. T0 card and detail images remain mandatory.
 
 Only the revision referenced by the current approved publication may be displayed. A content-incomplete dish carries no partial name, price, ingredient, dietary, allergen or asset claims. A withdrawn dish is omitted from the next publication bundle. Draft, rejected, reviewer and source-evidence fields never enter the public bundle. Bundle and image URLs are public, immutable HTTPS objects; changing any content requires a new revision and hashes rather than overwriting an existing URL.

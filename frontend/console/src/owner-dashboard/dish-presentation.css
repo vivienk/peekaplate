@@ -68,10 +68,12 @@
   resize: vertical;
 }
 /* Category, Price and Serving Size share one row (3124:15892): Category fills, the two short
- * fields are at most 160 wide, 16 apart. */
+ * fields are at most 160 wide, 16 apart. Top-aligned so Serving Size's hint does not stretch the
+ * Price field, whose grid would otherwise spread the extra height and push its input down. */
 .s09-row3 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, var(--s09-pending-short)));
+  align-items: start;
   gap: var(--pp-space-16);
 }
 .s09-desc,
