@@ -603,11 +603,21 @@ export function EngagementPeriodChart({
       sub={takeaway}
       head={['Period', 'Engaged visits', 'Eligible visits', 'Engagement rate']}
       rows={[
-        [baseline.label, baseline.engagedVisits ?? '—', baseline.eligibleVisits ?? '—', prev.text],
-        [current.label, current.engagedVisits ?? '—', current.eligibleVisits ?? '—', curr.text],
+        [
+          baseline.label,
+          prev.visible ? prev.engagedVisits : '—',
+          prev.visible ? prev.eligibleVisits : '—',
+          prev.text,
+        ],
+        [
+          current.label,
+          curr.visible ? curr.engagedVisits : '—',
+          curr.visible ? curr.eligibleVisits : '—',
+          curr.text,
+        ],
       ]}
     >
-      <p className="muted" role="status" style={{ marginBottom: '12px' }}>
+      <p className="muted" role="status" style={{ marginBottom: 'var(--pp-space-12)' }}>
         {takeaway}
       </p>
       <HBars

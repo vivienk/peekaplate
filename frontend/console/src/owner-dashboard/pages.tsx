@@ -31,6 +31,8 @@ import {
   Btn,
   ChartCard,
   Delta,
+  EngagementPeriodChart,
+  type EngagementPeriodPoint,
   HBars,
   Icon,
   IconTile,
@@ -61,6 +63,10 @@ export interface LiveDashboardInput {
   reportContent?: ReactNode;
   reportRefresh?: ReactNode;
   summary?: OwnerDishReport['summary'];
+  engagementComparison?: {
+    baseline: EngagementPeriodPoint;
+    current: EngagementPeriodPoint;
+  };
   summaryFreshness?: boolean | null | undefined;
   summarySource?: OwnerDishReport['source'] | undefined;
   summaryBatch?: boolean;
@@ -327,7 +333,7 @@ export function Overview({
               }
               {...(live && {
                 sub: live.summaryBatch
-                  ? 'Completed five-minute UTC batches (daily openings count). Unavailable measurements are gaps.'
+                  ? 'Completed five-minute UTC batches. Unavailable measurements are gaps.'
                   : 'UTC days clipped to each reporting period (daily openings count). Unavailable measurements are gaps, not zero.',
               })}
               head={
@@ -400,6 +406,20 @@ export function Overview({
                 />
               )}
             </ChartCard>
+          )}
+          {live?.engagementComparison ? (
+            <EngagementPeriodChart
+              baseline={live.engagementComparison.baseline}
+              current={live.engagementComparison.current}
+            />
+          ) : (
+            !live &&
+            !empty && (
+              <EngagementPeriodChart
+                baseline={{ label: 'Previous period', engagedVisits: 10, eligibleVisits: 10 }}
+                current={{ label: 'Current period', engagedVisits: 12, eligibleVisits: 20 }}
+              />
+            )
           )}
           <section className="card ov-dishes">
             <div className="card-h">

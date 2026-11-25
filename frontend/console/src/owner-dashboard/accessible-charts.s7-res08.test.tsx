@@ -1,6 +1,7 @@
 import { OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { Overview } from './pages';
 import { ReportView } from './report-data';
 import { EngagementPeriodChart, LineChart } from './ui';
 
@@ -140,6 +141,40 @@ describe('S7-RES-08 clear, exact, and accessible dashboard charts', () => {
     expect(html).toContain('tabindex="0"');
     expect(html).toContain(
       'aria-label="Daily openings count. Use Left and Right arrow keys to inspect each point."',
+    );
+  });
+
+  it('hides raw visit counts in the table when a period is below the 10-visit floor or SUPPRESSED', () => {
+    const html = renderToStaticMarkup(
+      <EngagementPeriodChart
+        baseline={{ label: 'Previous period', engagedVisits: 4, eligibleVisits: 6 }}
+        current={{
+          label: 'Current period',
+          engagedVisits: 7,
+          eligibleVisits: 30,
+          status: 'SUPPRESSED',
+        }}
+      />,
+    );
+    expect(html).toContain('Not enough visits yet');
+    expect(html).not.toContain('4 of 6 eligible visits');
+    expect(html).not.toContain('7 of 30 eligible visits');
+  });
+
+  it('renders the 10/10 -> 12/20 period engagement comparison directly on Overview', () => {
+    const noop = () => {};
+    const html = renderToStaticMarkup(
+      <Overview
+        go={noop}
+        sim={{ scn: 'normal' }}
+        acts={{}}
+        openDish={noop}
+        openInsight={noop}
+      />,
+    );
+    expect(html).toContain('Did engagement change over the period?');
+    expect(html).toContain(
+      'Engaged visits increased (10 → 12), while engagement rate fell from 100% to 60%.',
     );
   });
 });
