@@ -977,7 +977,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Vision-first source-linked needs_review drafts preserve private attempts and bounded retries. V4 grounds bounded ingredient proposals in the same printed description, requires matching printed price text for scalar prices, and leaves currency unset for owner review. Google AI Studio and OpenRouter receive the strict V4Batch schema and never downgrade rejected formats. Vision never upgrades AI-02 allergen/diet confidence. Ingredient sidecars/artwork retain provenance; FE-06.4 is read-only and upstream usage separately gated. QA-02 strict scoring binds frozen reference/export bytes and occurrence mappings. Private portion/cutout/model helpers validate hashes with request-scoped temp files; ambiguous submissions cannot auto-resubmit and generated assets stay publication-ineligible. Offline checks do not establish human reference truth, real-menu accuracy, physical scale or hosted acceptance.",
+      "summary": "Vision-first needs_review drafts preserve source links and private attempts. V4 retries one transient 429 on the active page in the same loop, with a fresh budget reservation. It grounds ingredient proposals in printed descriptions, excludes priced add-ons, requires matching printed text for scalar prices, and leaves currency for owner review. Google AI Studio and OpenRouter receive strict V4Batch without format downgrade. Vision never upgrades AI-02 allergen/diet confidence. Ingredient sidecars/artwork retain provenance; FE-06.4 is read-only and upstream usage separately gated. QA-02 strict scoring binds frozen reference/export bytes and occurrence mappings. Private portion/cutout/model helpers validate hashes with request-scoped temp files; ambiguous submissions cannot auto-resubmit and generated assets stay publication-ineligible. Offline checks do not establish human reference truth, real-menu accuracy, physical scale or hosted acceptance.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -1114,7 +1114,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "c70c57c6dd9d27b735a66a250651b95fc0693970675379357c1bfc671ac139c7"
+      "sourceFingerprint": "273cff47906c00006c15f5f6f07a7d24680f2b0bf457e9be8fe44e962490537b"
     },
     {
       "id": "assets",
@@ -1288,19 +1288,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Release the approved production API and console with their dashboard AI flags enabled, then verify one signed-in report question."
     },
     {
-      "date": "2026-11-20",
+      "date": "2026-11-25",
       "modules": [
         "processing"
       ],
-      "summary": "Pin direct-vision V4 updates cleanly onto develop: partial-page retention on later provider stops, affirmatively printed ingredient grounding, strict json_schema for Google AI Studio and OpenRouter, unset currency for owner review, matching printed price_text guard on scalar prices, and restored empty-dict extra_body default for Nara/generic clients.",
+      "summary": "Vision V4 resumes at the active page on one transient HTTP 429 per provider run. Prior drafts and private attempts survive. Daily quotas and budget denials retain their stop behavior. Explicitly priced additions are excluded from base ingredients while printed descriptions stay intact. Offline cases cover continuation, quota and budget stops, and the review export.",
       "files": [
         "processing/src/peekaplate_processing/vision_extraction.py",
         "processing/src/peekaplate_processing/_vision_projection.py",
-        "processing/src/peekaplate_processing/model_providers.py",
         "processing/src/peekaplate_processing/run_pipeline.py",
-        "docs/processing-v3.md"
+        "processing/tests/test_input_modes.py",
+        "processing/tests/test_vision_ingredients.py"
       ],
-      "next": "Open processing-only PR to develop, finish CI/human review, and handle console bulk-currency UI, S6-VIS-04 live URL/PDF/staging checks and QA-02 holdout scoring separately."
+      "next": "Complete review of the processing patch. S6-VIS-04 live URL/PDF/staging checks and QA-02 holdout scoring remain separate."
     }
   ]
 }

@@ -103,22 +103,6 @@ def saved_page_text(source, pages_json, *, recovery=False):
     )
 
 
-def _vision_with_retry(client, images, timeout, *, progress, wait_seconds=2.0, attempts=None, provider="default", budget_gate=None):
-    """Retry a transient 429 without replaying earlier pages."""
-    kwargs = dict(timeout=timeout, attempts=attempts, provider=provider, budget_gate=budget_gate, progress=progress)
-    try:
-        return extract_vision_v4(client, images, **kwargs)
-    except openai.RateLimitError as error:
-        if progress.dishes or "per day" in str(error).lower() or "perday" in str(error).lower():
-            raise
-        print(f"Rate limited; retrying once in {wait_seconds:g}s...", file=sys.stderr, flush=True)
-        time.sleep(wait_seconds)
-        for index, page in enumerate(images):
-            if page["page_number"] == progress.active_page:
-                return extract_vision_v4(client, images[index:], **kwargs)
-        return extract_vision_v4(client, images, **kwargs)
-
-
 def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image", is_table=True, target_pages=None, max_model_requests=None, provider=None, budget_gate=None, require_budget_gate=False):
     if target_pages is not None:
         target_pages=normalize_page_selection(target_pages,limit=4)
@@ -215,7 +199,11 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 try:
                     print(f"Trying V4 vision extraction with provider '{p_name}' ({getattr(p_client, 'model_name', 'unknown')})...", file=sys.stderr, flush=True)
                     with measure(timings, "llm_wall"):
-                        v4_dishes, v4_errors = _vision_with_retry(p_client, images, llm_timeout, attempts=vision_attempts, provider=p_name, budget_gate=budget_gate, progress=progress)
+                        v4_dishes, v4_errors = extract_vision_v4(
+                            p_client, images, timeout=llm_timeout, attempts=vision_attempts,
+                            provider=p_name, budget_gate=budget_gate, progress=progress,
+                            rate_limit_retry_delay=2.0,
+                        )
                 except TimeoutError:
                     print(f"Provider '{p_name}' exceeded the {llm_timeout:g}s deadline; stopping without fallback.", file=sys.stderr, flush=True)
                     failure = f"Provider '{p_name}' exceeded the {llm_timeout:g}s deadline. No fallback request was started."

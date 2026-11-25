@@ -317,7 +317,7 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
         from peekaplate_processing.vision_extraction import V4Dish
         with tempfile.TemporaryDirectory() as folder, \
              patch('peekaplate_processing.run_pipeline.create_cascading_clients', return_value=[('synthetic', object())]), \
-             patch('peekaplate_processing.run_pipeline._vision_with_retry', return_value=([V4Dish(page_number=1, name='Soup', box=[10,10,100,100])], [])):
+             patch('peekaplate_processing.run_pipeline.extract_vision_v4', return_value=([V4Dish(page_number=1, name='Soup', box=[10,10,100,100])], [])):
             path=Path(folder)/'menu.pdf'
             path.write_bytes(make_pdf([{'text':'Soup 8.50 Seasonal vegetables and herbs'}]))
             report=run_pipeline(path,Path(folder)/'run',input_mode='vision_v4')
@@ -754,46 +754,76 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
                 self.assertEqual(len(reservations), 2)
                 self.assertEqual(len(requests), 1 if failure == "budget" else 2)
 
-    def test_empty_completed_vision_page_is_not_replayed_after_rate_limit(self):
+    def test_later_vision_rate_limit_retries_only_the_unread_suffix(self):
+        import asyncio
         import httpx
         import openai
         import pymupdf
+        from peekaplate_processing.provider_budget import ProviderBudgetError
 
-        requests = []
+        for scenario, expected_requests, expected_segments in (
+            ("transient", [1, 2, 2, 3], ["ready", "ready", "ready"]),
+            ("empty", [1, 2, 2, 3], ["ready", "ready", "ready"]),
+            ("daily quota per day", [1, 2], ["ready", "failed", "skipped"]),
+            ("daily quota PerDay", [1, 2], ["ready", "failed", "skipped"]),
+            ("repeated 429", [1, 2, 2], ["ready", "failed", "skipped"]),
+            ("second page with 429", [1, 2, 2, 3], ["ready", "ready", "failed"]),
+            ("budget", [1, 2], ["ready", "skipped", "skipped"]),
+        ):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as folder:
+                requests = []
+                loops = []
+                reservations = []
 
-        class Vision:
-            model_name = "synthetic"
+                class Gate:
+                    async def areserve(self, provider):
+                        reservations.append(provider)
+                        if scenario == "budget" and len(reservations) == 3:
+                            raise ProviderBudgetError("synthetic budget exhausted")
 
-            def bind(self, **kwargs):
-                return self
+                class Vision:
+                    model_name = "synthetic"
 
-            async def ainvoke(self, messages):
-                page = messages[-1][1][0]["text"]
-                requests.append(page)
-                if "Page 1." in page:
-                    return SimpleNamespace(content='{"dishes":[]}')
-                if requests.count(page) == 1:
-                    response = httpx.Response(429, request=httpx.Request("POST", "https://example.invalid"))
-                    raise openai.RateLimitError("synthetic rate limit", response=response, body=None)
-                return SimpleNamespace(content='{"dishes":[{"name":"Soup","box":[100,100,200,300]}]}')
+                    def bind(self, **kwargs):
+                        return self
 
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            source = root / "menu.pdf"
-            with pymupdf.open() as pdf:
-                pdf.new_page()
-                pdf.new_page()
-                pdf.save(source)
-            with patch("peekaplate_processing.run_pipeline.time.sleep"):
-                report = run_pipeline(source, root / "run", llm=Vision(), provider="synthetic",
-                                      input_mode="vision_v4", llm_cache_dir=None)
-        self.assertEqual(requests, [
-            "Extract all menu items from Page 1.",
-            "Extract all menu items from Page 2.",
-            "Extract all menu items from Page 2.",
-        ])
-        self.assertEqual(report.status, "complete")
-        self.assertEqual([draft.name for draft in report.drafts], ["Soup"])
+                    async def ainvoke(self, messages):
+                        page = int(messages[-1][1][0]["text"].split()[-1][:-1])
+                        requests.append(page)
+                        loops.append(asyncio.get_running_loop())
+                        if (page == 2 and (requests.count(page) == 1 or scenario == "repeated 429")
+                                or page == 3 and scenario == "second page with 429"):
+                            response = httpx.Response(429, request=httpx.Request("POST", "https://example.invalid"))
+                            message = scenario if scenario.startswith("daily quota") else "synthetic rate limit"
+                            raise openai.RateLimitError(message, response=response, body=None)
+                        dishes = [] if page == 1 and scenario == "empty" else [
+                            {"name": f"Dish {page}", "box": [100, 100, 200, 300]}
+                        ]
+                        return SimpleNamespace(content=json.dumps({"dishes": dishes}))
+
+                root = Path(folder)
+                source = root / "menu.pdf"
+                with pymupdf.open() as pdf:
+                    for _ in expected_segments:
+                        pdf.new_page()
+                    pdf.save(source)
+                with patch("peekaplate_processing.vision_extraction.asyncio.sleep"), \
+                     patch("peekaplate_processing.run_pipeline.extract_source",
+                           side_effect=AssertionError("must not fall back")):
+                    report = run_pipeline(source, root / "run", llm=Vision(), provider="synthetic",
+                                          input_mode="vision_v4", budget_gate=Gate(), llm_cache_dir=None)
+                attempts = json.loads((root / "run" / "vision-attempts.json").read_text())["attempts"]
+                self.assertEqual(requests, expected_requests)
+                self.assertEqual(len(set(loops)), 1)
+                self.assertEqual(reservations, ["synthetic"] * (len(requests) + (scenario == "budget")))
+                self.assertEqual([attempt["page_number"] for attempt in attempts],
+                                 requests + ([2] if scenario == "budget" else []))
+                self.assertEqual(attempts[1]["failure_class"], "rate_limit")
+                self.assertEqual([segment.status for segment in report.segments], expected_segments)
+                self.assertEqual(report.status, "complete" if scenario in {"transient", "empty"} else "incomplete")
+                expected_dishes = [page for page, status in enumerate(expected_segments, 1)
+                                   if status == "ready" and (page != 1 or scenario != "empty")]
+                self.assertEqual([draft.name for draft in report.drafts], [f"Dish {page}" for page in expected_dishes])
 
 
 if __name__ == "__main__": unittest.main()

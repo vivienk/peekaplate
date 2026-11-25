@@ -127,6 +127,10 @@ _INGREDIENT_EXCLUSION = re.compile(
 _INGREDIENT_QUALIFIER = re.compile(
     r"\s*(?:[(–—-]\s*)?(?:optional|on request|upon request|available as an add-on|free)\b"
 )
+_INGREDIENT_PAID_ADD_ON = re.compile(
+    r"(?:\badd[ \t]+|\+[ \t]*)(?=\w)"
+    r"[^,;.!?\n+$€£¥₱]{1,256}(?:\+[ \t]*)?[$€£¥₱][ \t]*\d"
+)
 
 
 def _affirmative_ingredient(description: str, match: re.Match[str]) -> bool:
@@ -154,7 +158,7 @@ def grounded_ingredients(
     association. Terms from the title, another dish, an absent/truncated description or a
     substring of a longer word are dropped with a visible warning. A dish left with no
     supported term stays unknown (None) rather than exporting an empty or invented list.
-    Explicit negation or optionality cannot support a proposal. This is a
+    Explicit negation, optionality or a priced add-on cannot support a proposal. This is a
     conservative phrase check, not a semantic or allergen classifier.
     """
     proposed = dish.ingredients
@@ -177,6 +181,7 @@ def grounded_ingredients(
         if len(full_description) > len(description)
         else haystack
     )
+    paid_add_ons = [match.span() for match in _INGREDIENT_PAID_ADD_ON.finditer(full_haystack)]
     retained: list[str] = []
     for raw in proposed:
         if not isinstance(raw, str):
@@ -198,6 +203,7 @@ def grounded_ingredients(
         if not any(
             match.end() <= len(haystack) and match[0] == haystack[match.start():match.end()]
             and _affirmative_ingredient(full_haystack, match)
+            and not any(start < match.end() and match.start() < end for start, end in paid_add_ons)
             for match in _ingredient_pattern(key).finditer(full_haystack)
         ):
             warnings.append(

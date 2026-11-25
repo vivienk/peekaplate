@@ -129,6 +129,21 @@ class VisionIngredientTests(unittest.TestCase):
         candidate = prepare_review_candidates(_report([dish])).candidates[0]
         self.assertEqual(candidate.original.ingredients, ["basil"])
 
+    def test_priced_add_ons_are_excluded_from_exported_base_ingredients(self):
+        for description, ingredients, expected in (
+            ("Rice + beans, add chicken +$3", ["Rice", "beans", "chicken", "add chicken"], ["Rice", "beans"]),
+            ("Rice + chicken $3.50; herbs", ["Rice", "chicken", "herbs"], ["Rice", "herbs"]),
+            ("Chicken and herbs, add chicken +$3", ["Chicken", "herbs"], ["Chicken", "herbs"]),
+        ):
+            with self.subTest(description=description):
+                dish = V4Dish.model_validate({
+                    "page_number": 1, "name": "Plate", "description": description,
+                    "ingredients": ingredients, "box": [80, 100, 120, 400],
+                })
+                candidate = prepare_review_candidates(_report([dish])).candidates[0]
+                self.assertEqual(candidate.original.ingredients, expected)
+                self.assertEqual(candidate.original.description, description)
+
     def test_repeated_titles_keep_their_own_description_spans(self):
         dishes = [
             V4Dish.model_validate({

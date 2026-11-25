@@ -8,6 +8,7 @@ proposals and boxes are unverified proposals for human review, not OCR evidence.
 import asyncio
 import json
 import re
+import sys
 from typing import Any, Literal
 
 import openai
@@ -208,12 +209,14 @@ class VisionProgress:
 def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | None = None,
                       attempts: list[dict] | None = None, provider: str = "default",
                       budget_gate: Any | None = None,
-                      progress: VisionProgress | None = None) -> tuple[list[V4Dish], list[str]]:
+                      progress: VisionProgress | None = None,
+                      rate_limit_retry_delay: float | None = None) -> tuple[list[V4Dish], list[str]]:
     """Run direct multimodal extraction per page.
 
     Returns dishes (page numbers forced to the page that was sent) and page-level errors
     describing possible dish loss. Supplied progress retains completed results if a
-    subsequent page raises; the exception type is preserved for the caller.
+    subsequent page raises; the exception type is preserved for the caller. A configured
+    retry delay allows one transient rate-limit retry without replaying completed pages.
     """
     if progress is None:
         progress = VisionProgress()
@@ -235,9 +238,38 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
         f"{V4_VISION_PROMPT}\n\nREQUIRED JSON SCHEMA:\n{json.dumps(schema)}"
         f"\n\n{_COVERAGE_INSTRUCTION}"
     )
+
+    async def _request_page(messages, page_num):
+        record = None
+        if attempts is not None:
+            if len(attempts) >= MAX_VISION_ATTEMPTS:
+                raise VisionCaptureLimitError("Vision attempt limit exceeded.")
+            record = {"attempt": len(attempts) + 1, "provider": provider,
+                      "page_number": page_num, "outcome": "error", "response": None,
+                      "truncated": False, "failure_class": "provider_error"}
+            attempts.append(record)
+        try:
+            if budget_gate is not None:
+                await budget_gate.areserve(provider)
+            if timeout is not None and timeout > 0:
+                try:
+                    response = await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)
+                except asyncio.TimeoutError:
+                    raise TimeoutError(f"Vision request exceeded its {timeout:g}s deadline and was cancelled.") from None
+            else:
+                response = await vision_llm.ainvoke(messages)
+        except Exception as error:
+            if record is not None:
+                record["failure_class"] = ("timeout" if isinstance(error, (TimeoutError, openai.APITimeoutError)) else
+                                           "rate_limit" if isinstance(error, openai.RateLimitError) else
+                                           "provider_error")
+            raise
+        return response, record
+
     async def _extract_all() -> tuple[list[V4Dish], list[str]]:
         all_dishes = progress.dishes
         errors = progress.errors
+        retry_delay = rate_limit_retry_delay
         for page in page_images:
             page_num = page["page_number"]
             progress.active_page = page_num
@@ -246,30 +278,16 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
                 {"type": "image_url", "image_url": {"url": page["image_url"]}},
             ]
             messages = [("system", prompt), ("human", content)]
-            record = None
-            if attempts is not None:
-                if len(attempts) >= MAX_VISION_ATTEMPTS:
-                    raise VisionCaptureLimitError("Vision attempt limit exceeded.")
-                record = {"attempt": len(attempts) + 1, "provider": provider,
-                          "page_number": page_num, "outcome": "error", "response": None,
-                          "truncated": False, "failure_class": "provider_error"}
-                attempts.append(record)
             try:
-                if budget_gate is not None:
-                    await budget_gate.areserve(provider)
-                if timeout is not None and timeout > 0:
-                    try:
-                        response = await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)
-                    except asyncio.TimeoutError:
-                        raise TimeoutError(f"Vision request exceeded its {timeout:g}s deadline and was cancelled.") from None
-                else:
-                    response = await vision_llm.ainvoke(messages)
-            except Exception as error:
-                if record is not None:
-                    record["failure_class"] = ("timeout" if isinstance(error, (TimeoutError, openai.APITimeoutError)) else
-                                               "rate_limit" if isinstance(error, openai.RateLimitError) else
-                                               "provider_error")
-                raise
+                response, record = await _request_page(messages, page_num)
+            except openai.RateLimitError as error:
+                error_text = str(error).lower()
+                if retry_delay is None or "per day" in error_text or "perday" in error_text:
+                    raise
+                print(f"Rate limited; retrying once in {retry_delay:g}s...", file=sys.stderr, flush=True)
+                await asyncio.sleep(retry_delay)
+                retry_delay = None
+                response, record = await _request_page(messages, page_num)
             raw_content = getattr(response, "content", None)
             capture_content = raw_content
             structured = not isinstance(raw_content, str)
