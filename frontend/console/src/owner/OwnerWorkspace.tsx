@@ -690,6 +690,7 @@ function CreateTestRestaurant({
 }
 
 const noop = () => {};
+// Exported for S7-RES-07 in-place reload and venue isolation tests.
 export function LiveDashboardReport({
   reloadAttempt = 0,
   page,
