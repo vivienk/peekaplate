@@ -1,4 +1,8 @@
-import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
+import {
+  isOwnerProductionCalendarVersion,
+  OWNER_REPORT_TIME_ZONE,
+  type OwnerDishReport,
+} from '@peekaplate/contracts/owner-report';
 // Owner Dashboard screens: welcome, overview, report, dish performance, dish detail, actions.
 import { type ReactNode, useState } from 'react';
 import type { Chat } from './chat';
@@ -63,6 +67,8 @@ export interface LiveDashboardInput {
   summaryFreshness?: boolean | null | undefined;
   summarySource?: OwnerDishReport['source'] | undefined;
   summaryBatch?: boolean;
+  summaryDay?: boolean;
+  summaryToday?: boolean;
 }
 
 type OverviewSummary = NonNullable<OwnerDishReport['summary']>;
@@ -98,6 +104,16 @@ function overviewMetric(summary: OverviewSummary | undefined, key: OverviewMetri
 }
 const overviewWindow = (period: { start_time: string; end_time: string }) =>
   `${period.start_time.replace('T', ' ').replace(/\.000Z$|Z$/, ' UTC')} – ${period.end_time.replace('T', ' ').replace(/\.000Z$|Z$/, ' UTC')}`;
+const pacificTime = new Intl.DateTimeFormat('en-US', {
+  timeZone: OWNER_REPORT_TIME_ZONE,
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZoneName: 'short',
+});
+const pacificWindow = (period: { start_time: string; end_time: string }) =>
+  `${pacificTime.format(new Date(period.start_time))} – ${pacificTime.format(new Date(period.end_time))}`;
 export interface LiveMenuRow {
   id: string;
   name: string;
@@ -211,6 +227,22 @@ export function Overview({
     bucket.opens.value ??
     (bucket.opens.status === 'SUPPRESSED' ? 'Not enough visits yet' : 'Unavailable');
   const batches = live?.summaryBatch && daily ? [...daily.baseline, ...daily.current] : undefined;
+  const dayTotals =
+    live?.summaryDay && live.summary
+      ? [
+          {
+            ...live.summary.periods.baseline,
+            opens: live.summary.baseline.dish_opens,
+            label: 'Yesterday',
+          },
+          {
+            ...live.summary.periods.current,
+            opens: live.summary.current.dish_opens,
+            label: 'Today so far',
+          },
+        ]
+      : undefined;
+  const windowLabel = live?.summaryDay ? pacificWindow : overviewWindow;
   const batchLabels = batches?.map(
     ({ end_time }) => `${end_time.slice(5, 10)} ${end_time.slice(11, 16)} UTC`,
   );
@@ -227,16 +259,20 @@ export function Overview({
         <Note icon="info">
           {live
             ? live.summary
-              ? `Current period: ${overviewWindow(live.summary.periods.current)}. Previous period: ${overviewWindow(live.summary.periods.baseline)}. ${live.summaryFreshness === null || live.summaryFreshness === undefined ? 'Freshness not known.' : live.summaryFreshness ? 'Report is out of date.' : 'Report is up to date.'}`
+              ? `Current period: ${windowLabel(live.summary.periods.current)}. Previous period: ${windowLabel(live.summary.periods.baseline)}. ${live.summaryFreshness === null || live.summaryFreshness === undefined ? 'Freshness not known.' : live.summaryFreshness ? 'Report is out of date.' : 'Report is up to date.'}`
               : 'Summary unavailable. Your saved dishes are listed below; no measurements are inferred.'
             : 'No diner data yet. Your dishes are listed below with no numbers. Data appears once diners use the menu.'}
         </Note>
       )}
       {live?.summary && live.summarySource === 'production' && (
         <Note icon="info">
-          {live.summaryBatch
-            ? 'Refresh shows the latest completed five-minute batch. Dish-level rates need enough visits.'
-            : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
+          {live.summaryToday
+            ? 'Today’s visits and dish opens update as activity settles. Dish Performance shows verified dish metrics for the range on that page.'
+            : live.summaryDay
+              ? 'Today’s menu visits and dish opens update as activity settles. Dish performance, active time and 2.5D previews use the previous completed San Francisco day.'
+              : live.summaryBatch
+                ? 'Refresh shows the latest completed five-minute batch. Dish-level rates need enough visits.'
+                : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
         </Note>
       )}
       {(live || !empty) && (
@@ -308,7 +344,34 @@ export function Overview({
       )}
       <div className="grid g-main">
         <div className="stack">
-          {(live || !empty) && (
+          {dayTotals && (
+            <ChartCard
+              title="Dish opens by day"
+              tag={
+                <Lab k={dayTotals.some((bucket) => bucket.opens.value !== null) ? 'obs' : 'unk'} />
+              }
+              sub="San Francisco calendar days. Today includes settled activity so far."
+              head={['San Francisco period', 'Dish opens']}
+              rows={dayTotals.map((bucket) => [
+                `${bucket.label} · ${pacificWindow(bucket)}`,
+                dailyValue(bucket),
+              ])}
+            >
+              <LineChart
+                labels={dayTotals.map((bucket) => bucket.label)}
+                unit=""
+                desc="Dish opens yesterday and today so far in San Francisco time"
+                series={[
+                  {
+                    name: 'Dish opens',
+                    color: 'var(--c1)',
+                    values: dayTotals.map((bucket) => bucket.opens.value),
+                  },
+                ]}
+              />
+            </ChartCard>
+          )}
+          {!dayTotals && (live || !empty) && (
             <ChartCard
               title={live?.summaryBatch ? 'Dish opens by batch' : 'Dish opens by day'}
               tag={
@@ -1531,18 +1594,22 @@ export function LivePerf({
 }) {
   const [q, setQ] = useState('');
   const [tab, setTab] = useState('open_rate');
+  const day =
+    report.source === 'production' &&
+    isOwnerProductionCalendarVersion(report.report_metadata.calculation_version);
   const batch =
     report.source === 'production' &&
     report.report_metadata.calculation_version === 'production.batch.v1';
   type Dish = OwnerDishReport['dishes'][number];
   type Metric = keyof Dish['metrics'] | keyof NonNullable<Dish['display_actions']>;
-  const metrics: [Metric, string, 'count' | 'seconds' | 'rate'][] = batch
-    ? [
-        ...columns,
-        ['portion_previews_shown', '2.5D previews', 'count'],
-        ['comparisons_started', 'Comparisons started', 'count'],
-      ]
-    : columns;
+  const metrics: [Metric, string, 'count' | 'seconds' | 'rate'][] =
+    batch || day
+      ? [
+          ...columns,
+          ['portion_previews_shown', '2.5D previews', 'count'],
+          ['comparisons_started', 'Comparisons started', 'count'],
+        ]
+      : columns;
   const search = q.trim().toLowerCase();
   const dishes = report.dishes.filter((d) => d.name.toLowerCase().includes(search));
   const menuMatches = savedMenu.filter((dish) => dish.name.toLowerCase().includes(search));

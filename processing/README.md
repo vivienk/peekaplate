@@ -153,8 +153,9 @@ Provider selection: `--provider` (or `MENU_AI_PROVIDER`) picks a registry entry:
 The automatic vision cascade uses the Google settings above and the
 OpenRouter key with its default endpoint and distinct default models. It does
 not apply `MENU_AI_API_URL` or `MENU_AI_MODEL` to those candidates, so a generic
-endpoint cannot receive the OpenRouter key. Explicitly selected OpenRouter
-providers retain the existing `MENU_AI_*` overrides; only configure an endpoint
+endpoint cannot receive the OpenRouter key. For explicit `--provider openrouter`,
+`OPENROUTER_MODEL` and `OPENROUTER_API_URL` take precedence over the generic
+`MENU_AI_MODEL` and `MENU_AI_API_URL` settings. Only configure an endpoint
 trusted with the selected provider's key.
 
 Without an explicit provider, the graph uses `NARA_ROUTER_KEY`, `NARA_ROUTER_URL` and `NARA_ROUTER_MODEL`
@@ -169,15 +170,24 @@ The configured provider/model is retained; the research example's hard-coded
 `gpt-4o` is not used. The full chat endpoint URL is normalized to the SDK base URL.
 Each uncached nonempty batch makes one extraction request; no planner,
 synthesis or verification request is made. Automatic SDK retries are disabled.
-An unsupported name or wrong page rejects that dish. Unsupported optional
-descriptions, categories, ingredients, prices and currencies are cleared to null
-with field-specific review warnings, preserving the supported name and other
-supported fields. The generated unsupported values are not accepted as facts.
+Google AI Studio and OpenRouter V4 requests carry an API-level `response_format` of type
+`json_schema` (name `v4_batch`): the original `V4Batch.model_json_schema()`
+dictionary is sent unchanged with `strict: true`, so optional/default fields are
+not rewritten or made required. Every provider receives the same prompt and schema
+text; these two transports also receive the API-level constraint. A provider
+rejection of the format surfaces as that provider's error;
+the same client is never retried prompt-only. This constrains response syntax only, not
+menu accuracy, and the existing parser/recovery path is unchanged.
+An unsupported name or wrong page rejects that dish. In the OCR/image extraction graph,
+unsupported optional descriptions, categories, ingredients, prices and currencies are
+cleared to null with field-specific review warnings, preserving the supported name
+and other supported fields. The generated unsupported values are not accepted as facts.
 Malformed or schema-invalid output still
 rejects the batch. Prices attached to explicit `P`/`PHP` prefixes are recognized;
 a peso symbol/prefix alone does not establish a three-letter currency code.
-OpenRouter requests strict-parameter support and optional reasoning disabled;
-actual provider support must be tested live.
+OpenRouter requests strict-parameter support. Gemini 3 Flash Preview uses low
+reasoning effort on both transports. BYOK credentials are managed in OpenRouter;
+the application sends only the OpenRouter API key to the configured gateway.
 
 To diagnose the provider before another PDF run, make one small request with the
 same dish schema, without OCR or writing a run directory:
@@ -566,7 +576,11 @@ View Portion and Compare retain their original detail row. The camera portal use
 Runs attempt a separate review-only `ingredient-review.json` sidecar without new model calls.
 Inputs outside its bounds retain the original extraction and record explicit sidecar
 unavailability in `timings.json`. Vision transcriptions never become independent
-ingredient grounding. The [AI-02 guide](../docs/ingredient-intelligence.md) explains
+ingredient grounding: vision-derived candidate ingredients are optional
+`needs_review` proposals traced to the same dish's printed description, not OCR
+text, and their AI-02 classifications remain `unknown` even when candidates are
+populated. Approximate vision boxes stay metadata and never become OCR box evidence.
+The [AI-02 guide](../docs/ingredient-intelligence.md) explains
 the offline CLI, limits and remaining authenticated owner-review integration.
 
 ## Strict menu field scoring (QA-02 / VIS-04)

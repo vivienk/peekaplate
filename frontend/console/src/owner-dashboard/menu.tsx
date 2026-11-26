@@ -146,12 +146,15 @@ export function DishForm(props: {
   cancel: () => void;
   toReview: () => void;
   requireReviewBox?: boolean;
+  /** The page's Category list; the demo's fixed list when absent. */
+  categories?: readonly string[];
+  onAddCategory?: (category: string) => void;
 }) {
   const fromInsight = props.ed.from ? INSIGHTS.find((i) => i.id === props.ed.from) : undefined;
   return (
     <DishFormView
       {...props}
-      categories={CATS}
+      categories={props.categories ?? CATS}
       imageFor={imgOf}
       onSelectPhoto={(file) =>
         toDataUrl(file, (url) => {
