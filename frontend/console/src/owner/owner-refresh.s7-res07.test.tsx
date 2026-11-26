@@ -88,12 +88,21 @@ function installDomStub() {
     const node = Object.assign(new FakeElement(), {
       nodeType,
       tagName,
-      get ownerDocument() { return docRef; },
+      get ownerDocument() {
+        return docRef;
+      },
       textContent: text,
       value: '',
       childNodes: [],
       parentNode: null,
-      style: { setProperty(k: string, v: string) { (this as Record<string, unknown>)[k] = v; }, removeProperty(k: string) { delete (this as Record<string, unknown>)[k]; } } as unknown as Record<string, string>,
+      style: {
+        setProperty(k: string, v: string) {
+          (this as Record<string, unknown>)[k] = v;
+        },
+        removeProperty(k: string) {
+          delete (this as Record<string, unknown>)[k];
+        },
+      } as unknown as Record<string, string>,
       attributes: {},
       appendChild(child: MiniNode) {
         if (child.parentNode) child.parentNode.removeChild(child);
@@ -390,9 +399,7 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
     const dom = installDomStub();
     let accessFailureKind: string | null = null;
 
-    const fetchMock = vi.fn(async () =>
-      jsonRes({ error: 'forbidden' }, 403, 'ref-denied'),
-    );
+    const fetchMock = vi.fn(async () => jsonRes({ error: 'forbidden' }, 403, 'ref-denied'));
     vi.stubGlobal('fetch', fetchMock);
 
     const host = dom.container.appendChild(document.createElement('div') as unknown as MiniNode);
@@ -407,7 +414,9 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
         windowEnd: '2026-11-24T23:55:00.000Z',
       });
       await act(async () => {
-        root.render(<ReportView state={{ kind: 'ready', report: staleReport }} presentation="performance" />);
+        root.render(
+          <ReportView state={{ kind: 'ready', report: staleReport }} presentation="performance" />,
+        );
       });
       expect(dom.readText()).toContain('out of date');
 
@@ -419,7 +428,13 @@ describe('S7-RES-07 dashboard refresh, venue isolation, and cutover checks', () 
         windowEnd: '2026-11-25T00:05:00.000Z',
       });
       await act(async () => {
-        root.render(<ReportView key="cutover" state={{ kind: 'ready', report: cutoverReport }} presentation="performance" />);
+        root.render(
+          <ReportView
+            key="cutover"
+            state={{ kind: 'ready', report: cutoverReport }}
+            presentation="performance"
+          />,
+        );
       });
       expect(dom.readText()).toContain('up to date');
       expect(dom.readText()).toContain('0.7857142857142857');
