@@ -459,6 +459,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/owner-dashboard-css-isolation.test.mjs",
         "docs/screen9-portion-publish.md",
         "frontend/console/src/owner-dashboard/line-chart.test.tsx",
+        "frontend/console/src/owner-dashboard/date-range.ts",
+        "frontend/console/src/owner-dashboard/date-range-filter.tsx",
+        "frontend/console/src/owner-dashboard/date-range.test.tsx",
         "frontend/console/src/owner-menu/PortionCalibrationEditor.tsx",
         "frontend/console/src/owner-menu/portionCalibration.ts",
         "frontend/console/src/owner-menu/portionCalibration.test.ts",
@@ -475,7 +478,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "e9154dff7f7a91b0515366dca4cbc2deca9c4af061ed5befe0aeb72be4f9a852"
+      "sourceFingerprint": "192faa2d3740abf096b06529aed0bf607ba5633abd1d82dfcd2eb53bd417ebb6"
     },
     {
       "id": "backend",
