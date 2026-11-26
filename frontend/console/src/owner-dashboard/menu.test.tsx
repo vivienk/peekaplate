@@ -107,22 +107,20 @@ describe('Screen 9 (Add dish) form', () => {
     expect(html).toContain('>AI<');
   });
 
-  it('shows the Dietary field with its own Add button below Allergens', () => {
+  it('shows an optional Dietary dropdown below Allergens', () => {
     const html = render(newDraft());
-    expect(html).toContain('id="f-diet"');
+    expect(html).toMatch(/id="f-diet"[^>]*role="combobox"/);
     expect(html).toContain('>Dietary<');
-    expect(html).toContain('Add a dietary label');
-    expect(html).toContain('Up to two: Vegan, Vegetarian or Gluten-free');
-    expect(html).toMatch(/aria-label="Add dietary label"[^>]*>Add</);
+    expect(html).toContain('Select dietary info');
+    expect(html).toContain('Optional. Choose up to two.');
+    expect(html).not.toMatch(/id="f-diet"[^>]*aria-required/);
     expect(html.indexOf('id="f-alg"')).toBeLessThan(html.indexOf('id="f-diet"'));
   });
 
-  it('lists dietary labels as removable tags and stops adding after two', () => {
+  it('shows the chosen dietary labels in the field', () => {
     const html = render({ ...newDraft(), diet: ['Vegan', 'Gluten-free'] });
-    expect(html).toContain('aria-label="Dietary"');
-    expect(html).toContain('aria-label="Remove Vegan"');
-    expect(html).toContain('aria-label="Remove Gluten-free"');
-    expect(html).toMatch(/disabled=""[^>]*aria-label="Add dietary label"/);
+    expect(html).toContain('Vegan, Gluten-free');
+    expect(html).not.toContain('Select dietary info');
   });
 
   it('keeps Continue inactive while the photo is missing', () => {
