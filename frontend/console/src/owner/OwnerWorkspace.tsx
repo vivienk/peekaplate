@@ -1,4 +1,9 @@
-import type { OwnerVenue, RestaurantProfile, RestaurantSetup } from '@peekaplate/contracts';
+import {
+  canonicalJson,
+  type OwnerVenue,
+  type RestaurantProfile,
+  type RestaurantSetup,
+} from '@peekaplate/contracts';
 import {
   OWNER_REPORT_QUESTION_MAX_LENGTH,
   type OwnerReportQuestionResult,
@@ -15,6 +20,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -366,26 +372,21 @@ export function OwnerWorkspace({
     ['overview', 'report', 'performance'].includes(activePage) && shown?.scope === scope
       ? shown.report
       : null;
-  let aside = <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />;
-  if (aiEnabled && selected.permission === 'owner' && reportShown) {
+  const reportAvailability = (
+    <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />
+  );
+  let aside = reportAvailability;
+  if (aiEnabled && selected.permission === 'owner') {
     aside = (
-      <LiveAiPanel
-        key={JSON.stringify([
-          scope,
-          apiBase,
-          activePage,
-          reportShown.source,
-          reportShown.report_metadata.date_window.start_time,
-          reportShown.report_metadata.date_window.end_time,
-          reportShown.report_metadata.generated_at,
-          reportShown.summary?.periods,
-          shown?.reference,
-        ])}
+      <OwnerReportAiAside
+        key={JSON.stringify([scope, apiBase])}
         apiBase={apiBase}
         venueId={selected.venueId}
         restaurantName={selected.name}
         getAccessToken={getAccessToken}
         report={reportShown}
+        page={activePage}
+        fallback={reportAvailability}
         showOverviewPeriod={activePage !== 'performance'}
         reportReference={shown?.scope === scope ? shown.reference : undefined}
         onOpenDishPerformance={() => openPage('performance')}
@@ -1026,8 +1027,57 @@ function ReportAnswer({
   );
 }
 
-// The workspace keys the panel by the signed-in owner and displayed report. A changed report or
-// restaurant unmounts the panel and aborts its outstanding request.
+type LiveAiPanelProps = {
+  apiBase: string;
+  venueId: string;
+  restaurantName: string;
+  getAccessToken: () => Promise<string | null>;
+  report: OwnerDishReport;
+  showOverviewPeriod: boolean;
+  reportReference?: string | undefined;
+  onOpenDishPerformance: () => void;
+  onReloadReport: () => void;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+  question: string;
+  setQuestion: (question: string) => void;
+};
+
+// The draft belongs to the signed-in owner and restaurant. Responses belong to the displayed
+// snapshot. Renewing the signature for that snapshot should only update the token for the next ask.
+function OwnerReportAiAside({
+  report,
+  page,
+  fallback,
+  ...panel
+}: Omit<LiveAiPanelProps, 'question' | 'setQuestion' | 'report'> & {
+  report: OwnerDishReport | null;
+  page: OwnerPage;
+  fallback: ReactNode;
+}) {
+  const [question, setQuestion] = useState('');
+  const hasReference = Boolean(panel.reportReference);
+  const replyKey = useMemo(
+    () =>
+      report && hasReference
+        ? `${page}:${canonicalJson({
+            ...report,
+            dishes: [...report.dishes].sort((a, b) => a.dish_id.localeCompare(b.dish_id)),
+          })}`
+        : page,
+    [page, report, hasReference],
+  );
+  if (!report) return fallback;
+  return (
+    <LiveAiPanel
+      key={replyKey}
+      {...panel}
+      report={report}
+      question={question}
+      setQuestion={setQuestion}
+    />
+  );
+}
+
 function LiveAiPanel({
   apiBase,
   venueId,
@@ -1039,20 +1089,10 @@ function LiveAiPanel({
   onOpenDishPerformance,
   onReloadReport,
   onAccessFailure,
-}: {
-  apiBase: string;
-  venueId: string;
-  restaurantName: string;
-  getAccessToken: () => Promise<string | null>;
-  report: OwnerDishReport;
-  showOverviewPeriod: boolean;
-  reportReference?: string | undefined;
-  onOpenDishPerformance: () => void;
-  onReloadReport: () => void;
-  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
-}) {
+  question,
+  setQuestion,
+}: LiveAiPanelProps) {
   const inputId = useId();
-  const [question, setQuestion] = useState('');
   const [reply, setReply] = useState<Reply | null>(null);
   const pending = useRef<AbortController | null>(null);
   const askReport = useMemo(
@@ -1086,7 +1126,7 @@ function LiveAiPanel({
   }
   const busy = reply?.kind === 'loading';
 
-  useEffect(() => () => pending.current?.abort(), []);
+  useLayoutEffect(() => () => pending.current?.abort(), []);
 
   async function ask(event: FormEvent) {
     event.preventDefault();

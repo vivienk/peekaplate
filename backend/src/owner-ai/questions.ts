@@ -165,15 +165,12 @@ function interpretDishQuestion(
     return { metric, dishes: mentions, chart };
   }
   if (mentions.length) return null;
-  if (
-    (!usesVisitAlias || chart) &&
-    /^(?:compare )?@metric (?:by dish|(?:for|across|by) (?:all )?dishes)$/.test(query)
-  ) {
+  if (/^(?:compare )?@metric (?:by dish|(?:for|across|by) (?:all )?dishes)$/.test(query)) {
     return { metric, dishes: report.dishes, chart };
   }
-  // A vague request for visits could refer to the overview rather than dish active sessions.
-  if (usesVisitAlias) return null;
-  if (chart && query === '@metric') return { metric, dishes: report.dishes, chart };
+  // Visits can also refer to restaurant totals, so it needs an explicit dish scope.
+  if (chart && !usesVisitAlias && query === '@metric')
+    return { metric, dishes: report.dishes, chart };
   const singleRank = /^which dish(?:es)? (?:had|has|have) (?:the )?(highest|lowest) @metric$/.exec(
     query,
   );
@@ -181,9 +178,9 @@ function interpretDishQuestion(
     /^(?:the )?(top|bottom) (\d{1,2}|one|two|three|four|five) dishes? (?:by|for|with) @metric$/.exec(
       query,
     );
-  const metricRank = /^(?:the )?(\d{1,2}|one|two|three|four|five) (highest|lowest) @metric$/.exec(
-    query,
-  );
+  const metricRank = usesVisitAlias
+    ? null
+    : /^(?:the )?(\d{1,2}|one|two|three|four|five) (highest|lowest) @metric$/.exec(query);
   if (!singleRank && !groupRank && !metricRank) return null;
   const quantity = groupRank?.[2] ?? metricRank?.[1] ?? 'one';
   const size = ranks[quantity] ?? Number(quantity);

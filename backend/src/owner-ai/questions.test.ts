@@ -44,22 +44,31 @@ it('answers a named metric and treats a measured zero as evidence', () => {
   });
 });
 
-it('allows visits for named dishes or an explicit per-dish chart', () => {
-  expect(ask('How many visits did Avocado Toast have?')).toMatchObject({
+const visitsByName = [
+  { label: 'Avocado Toast', value: 20 },
+  { label: 'Garden Salad', value: 25 },
+];
+
+it.each([
+  { question: 'How many visits did Avocado Toast have?', points: visitsByName.slice(0, 1) },
+  { question: 'Show visits by dish', points: visitsByName },
+  { question: 'Top two dishes by visits', points: [...visitsByName].reverse() },
+  { question: 'Which dish had the highest visits?', points: visitsByName.slice(1) },
+  { question: 'Chart visits by dish', points: visitsByName, chart: true },
+  { question: 'Plot dish visits by dish.', points: visitsByName, chart: true },
+])('answers explicitly scoped dish visits: $question', ({ question, points, chart = false }) => {
+  const snapshot = report();
+  snapshot.dishes[1]!.metrics.active_sessions = { status: 'NORMAL', value: 25 };
+  expect(ask(question, snapshot)).toMatchObject({
     status: 'answered',
     metric: 'active_sessions',
-    points: [{ label: 'Avocado Toast', value: 20 }],
+    chart,
+    points,
   });
-  expect(ask('Plot dish visits by dish.')).toMatchObject({
-    status: 'answered',
-    metric: 'active_sessions',
-    chart: true,
-    points: [
-      { label: 'Avocado Toast', value: 20 },
-      { label: 'Garden Salad', value: 20 },
-    ],
-  });
-  for (const question of ['How many visits?', 'Plot visits.']) {
+});
+
+it('declines visits with ambiguous restaurant or dish scope', () => {
+  for (const question of ['How many visits?', 'Plot visits.', 'Show the two highest visits.']) {
     expect(ask(question)).toMatchObject({ status: 'abstained', reason: 'unsupported_question' });
   }
 });
@@ -148,15 +157,19 @@ it('refuses a suppressed cell, an incomplete ranking, and a missing freshness si
     reason: 'unusable_evidence',
   });
   snapshot.report_metadata.coverage.total_dishes_monitored = 3;
-  expect(ask('Plot engagement rate by dish.', snapshot)).toMatchObject({
-    status: 'abstained',
-    reason: 'unusable_evidence',
-  });
+  for (const question of ['Plot engagement rate by dish.', 'Top two dishes by visits']) {
+    expect(ask(question, snapshot)).toMatchObject({
+      status: 'abstained',
+      reason: 'unusable_evidence',
+    });
+  }
   snapshot.report_metadata.freshness.is_stale = null;
-  expect(ask('Plot open rate for Garden Salad.', snapshot)).toMatchObject({
-    status: 'abstained',
-    reason: 'unusable_evidence',
-  });
+  for (const question of ['Plot open rate for Garden Salad.', 'Show visits by dish']) {
+    expect(ask(question, snapshot)).toMatchObject({
+      status: 'abstained',
+      reason: 'unusable_evidence',
+    });
+  }
 });
 
 it('returns an evidence refusal at an empty reporting cutoff', () => {

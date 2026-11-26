@@ -476,7 +476,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "351b02b36c86545cdd7bd8a5d58e285f5d4346d03ed750fd1b763cabfda43e7a"
+      "sourceFingerprint": "6c9ae61a7cc7a8b46ec16027ba23562dcebbb3f2e17fc60ccc4523c0260c6dc6"
     },
     {
       "id": "backend",
@@ -756,7 +756,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "cbc2f17d798c792a0963143dc477eb3d80a9e2b8f73b9b05e2e3833a2177444b"
+      "sourceFingerprint": "926c9128b9e6e655567b7898fefe7dc0bc84b8688fc3a423d07af8886772b7ba"
     },
     {
       "id": "database",
@@ -1300,7 +1300,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "console"
       ],
-      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff. The owner question box reads visible dish metrics and restaurant-wide dish opens from the same signed report. Overview and Dish Performance retain separate periods and the API checks current membership before answering. Unknown freshness, missing evidence and unsupported questions abstain. The question route has no model call.",
+      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff. Owner questions read visible dish metrics, explicitly scoped dish visits and restaurant-wide dish opens from the same signed report. The console keeps the draft and result when a signature is renewed for the same snapshot, and clears the result when the snapshot changes. Overview and Dish Performance retain distinct periods. The route checks owner access and abstains on unknown freshness or unavailable evidence without calling a model.",
       "files": [
         "backend/src/owner-report.ts",
         "packages/contracts/src/owner-report.ts",
@@ -1308,9 +1308,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0020-production-today-dish-performance.md",
         "backend/src/owner-ai/questions.ts",
         "backend/src/owner-ai/report-reference.test.ts",
-        "frontend/console/src/owner/OwnerWorkspace.tsx"
+        "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "tests/e2e/owner-workspace.spec.ts"
       ],
-      "next": "Release the compatible questions API before the console. Verify one eligible event and compare signed-in Overview totals and answers for the same restaurant and cutoff on a trusted hosted report."
+      "next": "Release the compatible questions API before the console. Verify source completeness for the exact hosted report venue and window before recording successful production answers."
     }
   ]
 }

@@ -77,6 +77,8 @@ async function fixture(context: BrowserContext, reportReady = false) {
     venues: [venue],
     reportStatus: 200,
     reportRevision: 0,
+    reportHasReference: true,
+    reportFirstDishName: UNEEZA_REPORT.dishes[0]!.name,
     reportWindow: {
       start_time: UNEEZA_REPORT.report_metadata.date_window.start_time as string,
       end_time: UNEEZA_REPORT.report_metadata.date_window.end_time as string,
@@ -618,6 +620,9 @@ async function fixture(context: BrowserContext, reportReady = false) {
             ? {
                 ...UNEEZA_REPORT,
                 venue_id: url.pathname.split('/')[4],
+                dishes: UNEEZA_REPORT.dishes.map((dish, index) =>
+                  index === 0 ? { ...dish, name: state.reportFirstDishName } : dish,
+                ),
                 report_metadata: {
                   ...UNEEZA_REPORT.report_metadata,
                   date_window: state.reportWindow,
@@ -627,11 +632,13 @@ async function fixture(context: BrowserContext, reportReady = false) {
         headers: {
           'Access-Control-Allow-Origin': origin,
           'Access-Control-Expose-Headers': 'X-Owner-Report-Ref',
-          'X-Owner-Report-Ref': reportReference(
-            actor,
-            url.pathname.split('/')[4]!,
-            state.reportRevision,
-          ),
+          ...(state.reportHasReference && {
+            'X-Owner-Report-Ref': reportReference(
+              actor,
+              url.pathname.split('/')[4]!,
+              state.reportRevision,
+            ),
+          }),
         },
       });
     }
@@ -2540,7 +2547,55 @@ test('the panel identifies its matching signed report period', async ({ context,
   await expect(panel.getByText(/Answer period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
 });
 
-test('refreshing a report clears its old chart and sends the replacement reference', async ({
+test('renewing the same report reference preserves the draft, chart, and pending question', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const draft = panel.getByRole('textbox', { name: 'Ask a report question' });
+  const chart = panel.getByRole('figure', { name: 'Open rate chart' });
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+  await askReportQuestion(panel, chartQuestion);
+  await expect(chart).toBeVisible();
+
+  state.reportRevision++;
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(chart).toBeVisible();
+  await expect(draft).toHaveValue(chartQuestion);
+
+  state.delayAnalysis = true;
+  await askReportQuestion(panel);
+  await expect.poll(() => state.analyses.length).toBe(2);
+  expect(state.analyses[1]?.reference).toBe(reportReference(ownerId, venue.venueId, 1));
+  state.reportRevision++;
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(panel.getByRole('status')).toHaveText('Checking the report…');
+  await expect(draft).toHaveValue(soupQuestion);
+  state.releaseAnalysis();
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+
+  state.delayAnalysis = false;
+  await askReportQuestion(panel, chartQuestion);
+  await expect(chart).toBeVisible();
+  expect(state.analyses[2]?.reference).toBe(reportReference(ownerId, venue.venueId, 2));
+
+  state.reportHasReference = false;
+  await refresh.click();
+  await expect(
+    panel.getByText('Reload the report to ask a question about this period.'),
+  ).toBeVisible();
+  await expect(chart).toHaveCount(0);
+  await expect(page.getByRole('table')).toBeVisible();
+  await expect(draft).toHaveValue(chartQuestion);
+  await expect(draft).toBeDisabled();
+});
+
+test('refreshing a changed report clears its old chart and sends the replacement reference', async ({
   context,
   page,
 }) => {
@@ -2562,6 +2617,9 @@ test('refreshing a report clears its old chart and sends the replacement referen
   await page.getByRole('button', { name: 'Refresh report', exact: true }).click();
   await expect(panel.getByText(/Dish Performance period:.*Oct 20\s*–\s*21, 2026/)).toBeVisible();
   await expect(chart).toHaveCount(0);
+  await expect(panel.getByRole('textbox', { name: 'Ask a report question' })).toHaveValue(
+    chartQuestion,
+  );
   state.analysisStatus = 409;
   await askReportQuestion(panel, chartQuestion);
   await expect(panel.getByRole('alert')).toContainText('The report reference expired or changed');
@@ -2575,6 +2633,21 @@ test('refreshing a report clears its old chart and sends the replacement referen
     reportReference(ownerId, venue.venueId, 1),
     reportReference(ownerId, venue.venueId, 1),
   ]);
+
+  state.delayAnalysis = true;
+  await askReportQuestion(panel);
+  await expect.poll(() => state.analyses.length).toBe(4);
+  await expect(panel.getByRole('status')).toHaveText('Checking the report…');
+  state.reportRevision++;
+  state.reportFirstDishName = 'Updated report dish';
+  await page.getByRole('button', { name: 'Refresh report', exact: true }).click();
+  await expect(page.getByRole('table').getByText(state.reportFirstDishName)).toBeVisible();
+  await expect(panel.getByRole('textbox', { name: 'Ask a report question' })).toHaveValue(
+    soupQuestion,
+  );
+  await expect(panel.getByText(/Ask about this report/)).toBeVisible();
+  state.releaseAnalysis();
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toHaveCount(0);
 });
 
 test('a pending analysis cannot restore private output after sign-out and another account signs in', async ({
