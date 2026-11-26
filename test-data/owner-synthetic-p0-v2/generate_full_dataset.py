@@ -1,59 +1,99 @@
+#!/usr/bin/env python3
+"""Expand the 2-session story into 300 deterministic sessions (150 pairs) with --dry-run and --replay validation."""
 
-from pathlib import Path
+from __future__ import annotations
+
+import argparse
+import hashlib
 import json
+from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT / "events" / "two_session_story.jsonl"
 OUTPUT = ROOT / "events" / "full_dataset.jsonl"
-
+MANIFEST_FILE = ROOT / "manifest.json"
 PAIR_COUNT = 150
 
 
-def main():
+def build_expanded_lines(source_rows: list[dict[str, Any]], pair_count: int = PAIR_COUNT) -> list[str]:
+    expanded: list[str] = []
+    for pair_number in range(1, pair_count + 1):
+        suffix = f"pair-{pair_number:03d}"
+        for original in source_rows:
+            row = original.copy()
+            row["event_id"] = f"{original['event_id']}-{suffix}"
+            row["session_id"] = f"{original['session_id']}-{suffix}"
+            for field in ("opening_id", "exposure_id", "comparison_id"):
+                if row.get(field):
+                    row[field] = f"{row[field]}-{suffix}"
+            expanded.append(json.dumps(row, ensure_ascii=False, separators=(",", ":")))
+    return expanded
+
+
+def summarize_and_verify(lines: list[str], manifest: dict[str, Any]) -> dict[str, Any]:
+    unique_events: dict[str, dict[str, Any]] = {}
+    for line in lines:
+        rec = json.loads(line)
+        unique_events.setdefault(rec["event_id"], rec)
+    sessions = {rec["session_id"] for rec in unique_events.values()}
+    digest = hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+    actual_counts = {
+        "pair_count": PAIR_COUNT,
+        "delivered_lines": len(lines),
+        "unique_events": len(unique_events),
+        "distinct_sessions": len(sessions),
+    }
+
+    expected_counts = manifest.get("expected_counts")
+    if expected_counts and actual_counts != expected_counts:
+        raise SystemExit(f"Manifest count mismatch: expected {expected_counts}, got {actual_counts}")
+
+    trusted_sha256 = manifest.get("trusted_sha256")
+    if trusted_sha256 and digest != trusted_sha256:
+        raise SystemExit(f"Trusted SHA-256 mismatch: expected {trusted_sha256}, got {digest}")
+
+    return {
+        "pack_id": manifest["pack_id"],
+        **actual_counts,
+        "verified_orders_status": manifest["unavailable_metrics"]["verified_orders"]["status"],
+        "classified_field_count": len(manifest.get("dashboard_field_classification", [])),
+        "sha256": digest,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Deterministic synthetic dataset generator (S7-DATA-15)")
+    parser.add_argument("--dry-run", action="store_true", help="Compute and verify summary without writing files")
+    parser.add_argument("--replay", action="store_true", help="Replay generation and validate against trusted SHA-256 and manifest counts")
+    args = parser.parse_args()
+
+    manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
     source_rows = [
         json.loads(line)
         for line in SOURCE.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+    expanded = build_expanded_lines(source_rows, PAIR_COUNT)
+    summary = summarize_and_verify(expanded, manifest)
 
-    generated_rows = []
+    if args.dry_run:
+        print(json.dumps({"mode": "dry-run", **summary}, indent=2))
+        return
 
-    for pair_number in range(1, PAIR_COUNT + 1):
-        suffix = f"pair-{pair_number:03d}"
+    payload = "\n".join(expanded) + "\n"
+    if args.replay:
+        if not OUTPUT.exists():
+            raise SystemExit("Replay verification failed: existing full_dataset.jsonl is missing")
+        existing = OUTPUT.read_text(encoding="utf-8").replace("\r\n", "\n")
+        if existing != payload:
+            raise SystemExit("Replay determinism check failed: generated output differs from existing full_dataset.jsonl")
 
-        for original in source_rows:
-            row = original.copy()
-
-            # Give each repeated story its own event identities.
-            row["event_id"] = f"{original['event_id']}-{suffix}"
-            row["session_id"] = f"{original['session_id']}-{suffix}"
-
-            # Preserve relationships within each repeated story.
-            for field in (
-                "opening_id",
-                "exposure_id",
-                "comparison_id",
-            ):
-                if row.get(field):
-                    row[field] = f"{row[field]}-{suffix}"
-
-            generated_rows.append(row)
-
-    OUTPUT.write_text(
-        "".join(
-            json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
-            for row in generated_rows
-        ),
-        encoding="utf-8",
-    )
-
-    unique_ids = {row["event_id"] for row in generated_rows}
-    sessions = {row["session_id"] for row in generated_rows}
-
-    print(f"Delivery lines: {len(generated_rows)}")
-    print(f"Unique observations: {len(unique_ids)}")
-    print(f"Sessions: {len(sessions)}")
-    print(f"Output: {OUTPUT}")
+    with OUTPUT.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(payload)
+    mode = "replay" if args.replay else "write"
+    print(json.dumps({"mode": mode, "output": str(OUTPUT.relative_to(ROOT)), **summary}, indent=2))
 
 
 if __name__ == "__main__":

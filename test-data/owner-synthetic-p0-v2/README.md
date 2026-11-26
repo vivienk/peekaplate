@@ -403,3 +403,34 @@ Expected answers and grading criteria are reserved for the evaluator, not the mo
 Suppressed metrics must remain suppressed. The model must not infer hidden counts, Save rates, or dish rankings from suppressed values.
 
 All 20 cases remain NOT RUN against the application AI. Passing local fixture tests does not establish application-AI performance.
+
+---
+
+---
+
+## Explicit Data Scope & Reproduction Commands (S7-DATA-15)
+
+### Complete Dashboard Field Classification (`manifest.json -> dashboard_field_classification`)
+Every displayed field on the owner dashboard is classified in `manifest.json` with its **category** (`supported`, `derived`, `unavailable`, or `excluded`), **unit**, **source**, and **unavailability conditions**:
+- **Supported (6 metrics):** `active_sessions`, `open_rate`, `engagement_rate`, `save_rate`, `avg_interaction_time_seconds`, `timing_coverage`.
+- **Derived (6 metrics):** `revisit_rate`, `portion_previews_shown`, `photo_fallback_opens`, `comparison_rate`, `most_compared_pairs`, `weekly_trend_delta`.
+- **Unavailable (3 fields):** `verified_orders`, `dish_order_record_coverage`, `weekly_verified_orders` — always `UNAVAILABLE` in P0; synthetic datasets and console views never fabricate order counts.
+- **Excluded (5 fields):** `checkout_revenue`, `pos_ticket_value`, `unconsented_diner_events`, `test_traffic_events`, `realtime_ingestion_staleness`.
+
+### Step-by-Step Reproduction (Dry-Run & Deterministic Replay)
+
+#### Linux / macOS (`python3`)
+```bash
+python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --dry-run
+python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py
+python3 test-data/owner-synthetic-p0-v2/validate_full_dataset.py
+python3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --replay
+```
+
+#### Windows PowerShell / Git Bash (`py -3` or `python`)
+```powershell
+py -3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --dry-run
+py -3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py
+py -3 test-data/owner-synthetic-p0-v2/validate_full_dataset.py
+py -3 test-data/owner-synthetic-p0-v2/generate_full_dataset.py --replay
+```

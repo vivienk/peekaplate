@@ -336,9 +336,9 @@ export function Overview({
             {...(live
               ? overviewMetric(live.summary, 'verified_orders')
               : {
-                  value: T.ord,
-                  foot: `${T.withRec} of ${DISH.length} dishes have a record`,
-                  tag: <Lab k="ver" />,
+                  value: 'Unavailable',
+                  foot: 'No verified order source in P0',
+                  tag: <Lab k="unk" />,
                 })}
           />
         </div>
@@ -1033,8 +1033,8 @@ export function Perf({
       <div className="stack">
         <ChartCard
           title="Verified orders"
-          sub="Only where a restaurant order record exists. Entered by hand, so it may be incomplete."
-          tag={<Lab k="ver" />}
+          sub="Unavailable in synthetic P0 scope (no verified order source)"
+          tag={<Lab k="unk" />}
           head={['Dish', 'Verified orders']}
           rows={t.map((d) => [d.name, d.ord === null ? 'Unknown (no record)' : d.ord])}
         >
@@ -1049,8 +1049,8 @@ export function Perf({
           />
         </ChartCard>
         <Note icon="info">
-          No record means Unknown. It does not mean nobody ordered the dish, and it is never shown
-          as zero or as lost.
+          Verified orders are unavailable in the synthetic P0 scope because no verified POS or
+          checkout order source exists. Order counts are never fabricated or shown as zero.
         </Note>
       </div>
     );
@@ -1100,17 +1100,15 @@ export function Perf({
         </ChartCard>
         <ChartCard
           title="Verified orders on record per week"
-          sub="Only dishes with a record"
-          tag={<Lab k="ver" />}
-          head={['Week of', 'Orders']}
-          rows={WEEKS.map((w, i) => [w, WK_ORDERS[i]])}
+          sub="Unavailable in synthetic P0 scope (no verified order source)"
+          tag={<Lab k="unk" />}
+          head={['Week of', 'Verified orders']}
+          rows={WEEKS.map((w, i) => [w, WK_ORDERS[i] ?? 'Unknown (no record)'])}
         >
-          <LineChart
-            h={190}
-            labels={WEEKS}
-            desc="Verified orders on record per week"
-            series={[{ name: 'Verified orders', color: 'var(--c3)', values: WK_ORDERS }]}
-          />
+          <Note icon="info">
+            Verified orders are unavailable in the synthetic P0 scope because no verified POS or
+            checkout order source exists. Weekly order counts are never fabricated or shown as zero.
+          </Note>
         </ChartCard>
       </div>
     );
@@ -1313,7 +1311,7 @@ export function DishDetail({
         {d.ord === null ? (
           <Kpi
             label="Verified orders"
-            value="No record"
+            value="Unavailable"
             foot="Outcome is Unknown, not zero"
             tag={<Lab k="unk" />}
           />
@@ -1398,8 +1396,8 @@ export function DishDetail({
       <Note icon="info">
         Opens show attention, not preference.{' '}
         {d.ord === null
-          ? 'With no order record, what happened after viewing is Unknown.'
-          : 'Order counts come from a hand-entered record and may be incomplete.'}
+          ? 'Verified orders are unavailable in the synthetic P0 scope.'
+          : 'No verified POS or checkout order source exists in P0.'}
       </Note>
     </div>
   );
