@@ -2855,4 +2855,14 @@
     width: 15px;
     height: 15px;
   }
+  /* Dish performance: saved-menu rows shown before any dish is measurable. */
+  .tbl-pending td.num {
+    color: var(--pp-role-on-surface-variant);
+  }
+  .tbl-note {
+    margin: var(--pp-space-12) 0 0;
+    color: var(--pp-role-on-surface-variant);
+    font-size: var(--pp-font-size-small);
+    line-height: var(--pp-line-height-small);
+  }
 }
