@@ -98,6 +98,8 @@ describe('S7-DATA-15 synthetic dashboard scope, order cleanup, and CLI determini
     expect(dataTs).not.toContain('T.ord');
     expect(dataTs).not.toContain('T.withRec');
     expect(pagesTsx).not.toContain('T.ord');
+    expect(dataTs).not.toMatch(/WK_ORDERS[^=]*=\s*\[\s*\d/);
+    expect(pagesTsx).not.toContain('Only dishes with a record');
     expect(pagesTsx).toContain("value: 'Unavailable'");
   }, 15_000);
 

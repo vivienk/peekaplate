@@ -26,7 +26,7 @@ export const DAILY_PREV = [80, 75, 87, 90, 109, 126, 87];
 export const WEEKS = ['Sep 14', 'Sep 21', 'Sep 28', 'Oct 5'];
 export const WK_PREVIEWS = [96, 111, 124, 143];
 export const WK_TIME = [57, 59, 61, 63];
-export const WK_ORDERS = [47, 50, 52, 58];
+export const WK_ORDERS: (number | null)[] = [null, null, null, null];
 
 // open = dish opens, again = opened again, cmp = in a comparison, p25 = 2.5D previews shown,
 // fb = tapped 2.5D and saw the photo, time = avg seconds interacting per open,

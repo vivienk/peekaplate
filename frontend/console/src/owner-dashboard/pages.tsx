@@ -1100,17 +1100,16 @@ export function Perf({
         </ChartCard>
         <ChartCard
           title="Verified orders on record per week"
-          sub="Only dishes with a record"
-          tag={<Lab k="ver" />}
-          head={['Week of', 'Orders']}
-          rows={WEEKS.map((w, i) => [w, WK_ORDERS[i]])}
+          sub="Unavailable in synthetic P0 scope (no verified order source)"
+          tag={<Lab k="unk" />}
+          head={['Week of', 'Verified orders']}
+          rows={WEEKS.map((w, i) => [w, WK_ORDERS[i] ?? 'Unknown (no record)'])}
         >
-          <LineChart
-            h={190}
-            labels={WEEKS}
-            desc="Verified orders on record per week"
-            series={[{ name: 'Verified orders', color: 'var(--c3)', values: WK_ORDERS }]}
-          />
+          <Note icon="info">
+            Verified orders are unavailable in the synthetic P0 scope because no verified POS or
+            checkout order source exists. Weekly order counts are never fabricated or shown as
+            zero.
+          </Note>
         </ChartCard>
       </div>
     );
