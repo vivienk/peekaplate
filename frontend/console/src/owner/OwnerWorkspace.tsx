@@ -505,7 +505,8 @@ export function OwnerWorkspace({
       {(activePage === 'overview' || activePage === 'report' || activePage === 'performance') &&
         renderShell(
           <LiveDashboardReport
-            key={`${scope}:${reportAttempt}`}
+            key={scope}
+            reloadAttempt={reportAttempt}
             page={activePage}
             apiBase={apiBase}
             venueId={selected.venueId}
@@ -689,7 +690,9 @@ function CreateTestRestaurant({
 }
 
 const noop = () => {};
-function LiveDashboardReport({
+// Exported for S7-RES-07 in-place reload and venue isolation tests.
+export function LiveDashboardReport({
+  reloadAttempt = 0,
   page,
   apiBase,
   venueId,
@@ -700,6 +703,7 @@ function LiveDashboardReport({
   onReport,
   go,
 }: {
+  reloadAttempt?: number;
   page: 'overview' | 'report' | 'performance';
   apiBase: string;
   venueId: string;
@@ -716,6 +720,13 @@ function LiveDashboardReport({
     venueId,
     getAccessToken,
   });
+  const lastReloadRef = useRef(reloadAttempt);
+  useEffect(() => {
+    if (reloadAttempt > 0 && reloadAttempt !== lastReloadRef.current) {
+      lastReloadRef.current = reloadAttempt;
+      retry();
+    }
+  }, [reloadAttempt, retry]);
   const report = state.kind === 'ready' ? state.report : null;
   const reference = state.kind === 'ready' ? state.reference : undefined;
   useEffect(() => {
