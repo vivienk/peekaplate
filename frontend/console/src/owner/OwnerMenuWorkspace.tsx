@@ -12,6 +12,7 @@ import { menuFileKind } from '../onboarding/menu-source';
 import { OnboardingLayout } from '../onboarding/OnboardingLayout';
 import { RestaurantDetails } from '../onboarding/RestaurantDetails';
 import { type MenuUpload, UploadMenu } from '../onboarding/UploadMenu';
+import { mergeCategories } from '../owner-dashboard/category-field';
 import { Btn, Icon } from '../owner-dashboard/controls';
 import { MenuTable } from '../owner-dashboard/menu-presentation';
 import {
@@ -83,6 +84,8 @@ export function OwnerMenuWorkspace({
   apiBase,
   actorId,
   venueId,
+  addedCategories,
+  onAddCategory,
   restaurantName,
   canPublish,
   section,
@@ -103,6 +106,8 @@ export function OwnerMenuWorkspace({
   apiBase: string;
   actorId: string;
   venueId: string;
+  addedCategories: readonly string[];
+  onAddCategory: (category: string) => void;
   restaurantName: string;
   canPublish: boolean;
   section: 'overview' | 'menu';
@@ -1247,7 +1252,11 @@ export function OwnerMenuWorkspace({
             });
           }}
           existing={Boolean(editing.draft)}
-          categories={drafts.map((draft) => draft.category ?? '').filter(Boolean)}
+          categories={mergeCategories(
+            reviewDishes.map((dish) => dish.category ?? ''),
+            addedCategories,
+          )}
+          onAddCategory={onAddCategory}
           photo={
             <>
               <div className={`s09-photo${photoUrl ? ' has' : ''}`}>

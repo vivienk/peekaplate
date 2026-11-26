@@ -35,6 +35,7 @@ export type DishEditorProps = {
   onGeneratePortion?: () => void;
   existing?: boolean;
   categories?: string[];
+  onAddCategory?: (category: string) => void;
   onChange: (next: DishForm) => void;
   onSave: () => void;
   onVerify?: () => void;
@@ -65,6 +66,7 @@ export function DishEditor({
   onGeneratePortion,
   existing = false,
   categories = [],
+  onAddCategory,
   onChange,
   onSave,
   onCancel,
@@ -179,6 +181,7 @@ export function DishEditor({
         {...(suggestAllergens && { suggestAllergens })}
         {...(draftDescription && { draftDescription })}
         categories={categories}
+        {...(onAddCategory && { onAddCategory })}
         {...(portionReview ? { portionReview } : {})}
         {...(onApprovePortion ? { onApprovePortion } : {})}
         {...(onGeneratePortion ? { onGeneratePortion } : {})}

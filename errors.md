@@ -5553,3 +5553,109 @@ therefore not send the question even with the UI and API flags configured. Use t
 completed-batch calculation when signing, preserve the request anchor across the next batch
 boundary and keep unknown freshness gated. The report reference and production browser tests
 cover the signed submission and the empty-report state.
+
+## 2026-11-16 direct-vision ingredient handoff
+
+The new ingredient tracer initially failed because V4Dish rejected ingredients as an extra field; the existing direct path always emitted null. The enhancement adds bounded same-description proposals and reconstructable description spans without changing the public DishDraft or V1 artifact envelope. Vision transcription remains unverified; AI-02 still abstains from allergen/diet classifications.
+
+The first integration fixture accidentally exercised run_pipeline's OCR default rather than explicitly selecting vision_v4. After selecting the intended mode, a second assertion wrongly required an empty box_evidence key that serialization is allowed to omit. Both fixture assumptions were corrected without changing transport validators or OCR evidence semantics.
+
+Observed final verification: 11 ingredient controls, 35 input-mode/fallback controls, 17 review-export controls, 15 ingredient-intelligence controls and 14 service-artifact controls passed (92 total), with network blocked. Real-menu quality and hosted acceptance remain separate.
+
+## 2026-11-17 V4 Google structured-output constraint
+
+The frozen comparison traced every Google AI Studio V4 request with the schema only in
+the system prompt and no API-level format field; saved responses arrived fenced and
+sometimes malformed, so parsing fell back to regex salvage and could drop a dish
+without a per-dish error. The request bind now sends `response_format` type
+`json_schema` (name `v4_batch`, `strict: true`) carrying the unchanged
+`V4Batch.model_json_schema()` dictionary, and the prompt's box examples use the same
+named object. SDK schema conversion was refused because it rewrites the contract by
+requiring optional fields; the schema hash is unchanged. A provider format rejection
+is surfaced as an error and never retried prompt-only. Non-Google providers keep the
+prompt-embedded schema, and the parser, attempt capture and deadlines are unchanged.
+
+No live provider request was made by this change. Offline request-seam controls and
+the authorized structured-output benchmark remain for parent execution; no accuracy
+or acceptance claim follows.
+
+## 2026-11-20 V4 price-evidence and provider extra_body regressions
+
+Review and full-suite execution on the staged V4 changes reproduced two defects:
+(1) `single_price_amount` skipped printed-text verification when `price_text` was
+absent or blank, retaining a numeric `price_amount` without printed price text;
+(2) `ModelProviderConfig.request_options` passed `extra_body=None` for Nara/generic
+providers, failing `test_nara_settings_take_precedence_without_openrouter_parameters`
+(`None != {}`). `single_price_amount` now requires matching non-empty `price_text`,
+and `request_options` / the generic fallback pass `dict(self.extra_body or {})` / `{}`.
+Regressions in `processing/tests/test_input_modes.py`, `processing/tests/test_vision_ingredients.py`,
+and `processing/tests/test_workflow.py` failed before the fixes and pass afterward.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-20T18:00:47.405Z","exitCode":1}
+```
+
+```json
+{"kind":"observation","references":{"check":"test","timestamp":"2026-11-20T18:00:47.405Z"},"status":"open","area":"local-docs-check","cause":"scripts/verify.test.mjs:62 invokes docs:check on the local working directory, which scanned gitignored local .agents/skills/* directories and reported broken template links outside tracked repository files. Zero tracked markdown files failed docs:check; the other 121/122 script tests and all Vitest unit tests passed.","followup":"Confirm docs:check and scripts/verify.test.mjs pass on a clean CI checkout without local gitignored .agents/skills/* folders."}
+```
+
+## 2026-11-23 V4 alternative ingredient review
+
+The focused regression exposed that a bare alternative such as chicken or beef could retain both terms as affirmative ingredients. The projection now excludes ingredients in a clause containing an alternative, with an independent clause still retained. The regression is processing/tests/test_vision_ingredients.py::VisionIngredientTests.test_bare_alternatives_are_not_affirmative_ingredients.
+
+## Owner totals disappear after a quiet reporting interval
+
+The production owner route selected only the latest five-minute interval, so a quiet cutoff
+hid earlier activity still present in canonical storage. San Francisco day mode accumulates
+the restaurant-wide visit and open counts through settled cutoffs. Dish-level values and
+protected rollups use one sealed, completed local day so successive refreshes cannot expose a
+small intraday change. The production-report integration covers quiet cutoffs, late arrival
+at midnight, fixed dish data, the CSV period and cross-restaurant denial.
+
+The daily refresh timer stopped when a retryable error replaced the ready report. Keep its daily
+mode tied to the same authorized report source while displaying the error, and clear it on terminal
+access failures. The owner authentication browser test covers recovery on a later visible tick.
+
+The first legacy fallback after the cutover still reused protected metrics from the previous
+interval ending at the boundary. Mask both intervals in the response once the current cutoff is
+past that boundary while retaining the underlying sealed report. The first daily active-time
+summary also applied suppression from UTC buckets it did not expose. Use the completed Pacific
+day and per-dish privacy floors for that summary. The signed production-report integration checks
+the first fallback response and a ten-session cohort split across UTC midnight.
+
+## Single-session production day reports
+
+The new production day disclosure rule exposed legacy gates in the SQL reader, display-action
+aggregation, and shared report serialization. The one-session contract regression failed before
+the fix. Daily mode now accepts eligible single-session aggregates while retaining the legacy
+floor outside that mode. The internal schema still validates nonzero denominators and strips
+cohort counts from every public response. Typechecking caught generic schema indexing during the
+change, which was corrected by narrowing to the existing metric-cell shape.
+
+The local PostgreSQL fixture uses a temporary Vitest config with the embedded database adapter.
+Vitest does not accept the setup-file setting as a command-line argument.
+
+An initial daily refresh returned HTTP 503 after a completed day with one rendered portion.
+The refresh used the legacy summary validator for the sealed daily baseline. The report reader
+now validates the baseline with the production day schema, and the first settled refresh and
+CSV export are covered in the production report integration.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-24T07:21:11.647Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-25T06:21:30.913Z","exitCode":2}
+```
+
+## 2026-11-25 signed-in menu URL padding
+
+The released owner menu URL field rendered with 16 px horizontal padding and the pasted text overlapped both icons. The shared auth input rule loaded later with equal specificity inside the signed-in onboarding layout. The component-specific selector now keeps 44 px of padding on both sides. The signed-in URL/manual-source browser regression failed at 16 px before the fix.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-25T09:00:01.094Z","exitCode":2}
+```

@@ -4,10 +4,12 @@ import { type ReactNode, useRef, useState } from 'react';
 import { type OwnerAnalysisConnection, OwnerAnalysisPanel } from './ai-preview/OwnerAnalysisPanel';
 import { SyntheticAiPreviewDemo } from './ai-preview/SyntheticAiPreviewDemo';
 import logo from './assets/logo.png';
+import { mergeCategories } from './category-field';
 import { type Chat, ChatBox, CtxBar, type Message } from './chat';
 import {
   type ActionState,
   ANSWERS,
+  CATS,
   initialMenu,
   type MenuItem,
   newDraft,
@@ -109,6 +111,8 @@ export function App({ ownerAnalysis }: { ownerAnalysis?: OwnerAnalysisConnection
   const [sim, setSim] = useState<{ scn: Scenario }>({ scn: 'A' });
   const [acts, setActs] = useState<Acts>({});
   const [menu, setMenu] = useState<MenuItem[]>(initialMenu);
+  // Categories the owner created in any dish form stay offered for the rest of the visit.
+  const [addedCats, setAddedCats] = useState<string[]>([]);
   const [ed, setEd] = useState<EditState>({ step: 'list' });
   const [chatOpen, setChatOpen] = useState(false);
   const [threads, setThreads] = useState<Record<string, Message[]>>({ general: [], report: [] });
@@ -277,6 +281,12 @@ export function App({ ownerAnalysis }: { ownerAnalysis?: OwnerAnalysisConnection
           ed={ed}
           setEd={setEd}
           orig={orig}
+          categories={mergeCategories(
+            CATS,
+            menu.map((m) => m.cat),
+            addedCats,
+          )}
+          onAddCategory={(cat) => setAddedCats((list) => mergeCategories(list, [cat]))}
           cancel={toList}
           toReview={() => {
             setEd({ ...ed, step: 'review' });

@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { mergeCategories } from './category-field';
 import { newDraft } from './data';
 import { DishForm, priceInput, Review, Saved } from './menu';
 
@@ -186,5 +187,13 @@ describe('Screen 9 price input', () => {
     expect(priceInput('14.999')).toBe('14.99');
     expect(priceInput('1.2.3')).toBe('1.23');
     expect(priceInput('12 USD')).toBe('12');
+  });
+});
+
+describe('Screen 9 category list', () => {
+  it('keeps every category once, in first-seen order and spelling', () => {
+    expect(
+      mergeCategories(['Breakfast', 'Salads'], ['breakfast ', '', 'Soups'], ['SOUPS', 'Specials']),
+    ).toEqual(['Breakfast', 'Salads', 'Soups', 'Specials']);
   });
 });

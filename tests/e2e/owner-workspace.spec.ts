@@ -1775,7 +1775,10 @@ test('URL and manual sources share saved work and queued status is not a fake su
   await page.getByText('Paste URL', { exact: true }).click();
   await expect(page.getByRole('radio', { name: 'Paste URL' })).toBeChecked();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByLabel('Menu URL').fill('https://restaurant.example/menu.pdf');
+  const menuUrl = page.getByLabel('Menu URL');
+  await menuUrl.fill('https://restaurant.example/menu.pdf');
+  await expect(menuUrl).toHaveCSS('padding-left', '44px');
+  await expect(menuUrl).toHaveCSS('padding-right', '44px');
   await page.getByRole('button', { name: 'Import menu', exact: true }).click();
   await expect(page.getByText('Queued for processing', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'View saved dishes', exact: true }).click();
@@ -2082,6 +2085,39 @@ test('multiple restaurants require selection and a switch removes the old report
   await page.getByLabel('Restaurant', { exact: true }).selectOption(otherVenue.venueId);
   await expect(page.locator('.owner-identity__name')).toHaveText(otherVenue.name);
   await expect(page.getByRole('table')).toHaveCount(0);
+});
+
+test('created categories stay with their restaurant during a signed-in visit', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  state.venues = [venue, otherVenue];
+  await signIn(page, undefined, false);
+  const openDish = async (restaurant: typeof venue) => {
+    await openAccount(page);
+    await page.getByLabel('Restaurant', { exact: true }).selectOption(restaurant.venueId);
+    await expect(page.locator('.owner-identity__name')).toHaveText(restaurant.name);
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  };
+  const back = async () => {
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+  };
+  const category = 'Only in restaurant A';
+  const option = page.getByRole('option', { name: category, exact: true });
+  await openDish(venue);
+  await addCategory(page, category);
+  await back();
+  await openDish(otherVenue);
+  await page.getByRole('combobox', { name: 'Category' }).click();
+  await expect(option).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Category' }).press('Escape');
+  await back();
+  await openDish(venue);
+  await page.getByRole('combobox', { name: 'Category' }).click();
+  await expect(option).toHaveCount(1);
 });
 
 test('editor access does not enable owner-only reports or publication', async ({
@@ -2668,7 +2704,7 @@ test('corrected extracted fields survive review return and a full reload', async
     .click();
   await page.getByRole('button', { name: 'Review ' + item.effective.name, exact: true }).click();
   await page.getByRole('textbox', { name: /^Dish name/ }).fill('Corrected fictional soup');
-  await addCategory(page, 'Soup');
+  await addCategory(page, 'Seaweed specials');
   await page.getByRole('textbox', { name: /^Price/ }).fill('7.25');
   await expect(page.getByRole('textbox', { name: /^Price \(CAD\)/ })).toBeVisible();
   await acknowledgeDish(page);
@@ -2681,6 +2717,10 @@ test('corrected extracted fields survive review return and a full reload', async
   await expect(page.locator('.mrow:not(.mhead)')).toContainText('7.25');
   expect(state.drafts[venue.venueId][0].name).not.toBe('Corrected fictional soup');
   expect(state.review.items[0].effective.name).toBe('Corrected fictional soup');
+  expect(state.review.items[0].effective.category).toBe('Seaweed specials');
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Category' }).click();
+  await expect(page.getByRole('option', { name: 'Seaweed specials', exact: true })).toHaveCount(1);
 });
 
 test('an unready or unavailable extraction does not hide other saved work', async ({

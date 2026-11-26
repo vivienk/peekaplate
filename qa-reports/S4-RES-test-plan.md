@@ -22,6 +22,8 @@ Local evidence is synthetic; it does not establish staging readiness or stakehol
 | S4-EVID-1 | Local evidence only; no merged PR, CI run or deployed version recorded. | INCOMPLETE — requires deployment and CI |
 | AC-S6 | Stakeholder sign-offs remain outstanding; independent reviews are separate from approvals. | PENDING |
 
+The S4-IDEM-1 row records an identical repeat build. The current [CLI admission regression](../backend/src/bundle-producer/bundle-producer.integration.ts) also covers a retry with an older handoff that lacks `diagnostics`. It asserts that admission inserts one subject and one bundle and leaves the older handoff without `diagnostics`.
+
 Deployment owner must provide approved HTTPS asset/bundle hosts and diner CORS origins. DIN-03 must adopt exact-byte verification. No real restaurant data was used.
 
 ## PR #117 local QA — 2026-11-09
