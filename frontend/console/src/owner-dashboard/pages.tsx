@@ -1107,8 +1107,7 @@ export function Perf({
         >
           <Note icon="info">
             Verified orders are unavailable in the synthetic P0 scope because no verified POS or
-            checkout order source exists. Weekly order counts are never fabricated or shown as
-            zero.
+            checkout order source exists. Weekly order counts are never fabricated or shown as zero.
           </Note>
         </ChartCard>
       </div>
