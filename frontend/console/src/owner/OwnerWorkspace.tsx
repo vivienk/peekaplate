@@ -368,30 +368,17 @@ export function OwnerWorkspace({
       : null;
   let aside = <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />;
   if (aiEnabled && selected.permission === 'owner' && reportShown) {
-    const summaryPeriod = reportShown.summary?.periods.current;
-    const dishPeriod = reportShown.report_metadata.date_window;
-    const differentPagePeriod =
-      activePage !== 'performance' &&
-      summaryPeriod &&
-      !samePeriod(summaryPeriod, { start: dishPeriod.start_time, end: dishPeriod.end_time });
-    aside = differentPagePeriod ? (
-      <aside className="owner-ai" aria-label="PeekaPlate AI">
-        <div className="owner-ai__body">
-          <p>Dish Performance uses a different report period.</p>
-          <Button variant="outline" onClick={() => openPage('performance')}>
-            Open Dish Performance to ask a question
-          </Button>
-        </div>
-      </aside>
-    ) : (
+    aside = (
       <LiveAiPanel
         key={JSON.stringify([
           scope,
           apiBase,
+          activePage,
           reportShown.source,
           reportShown.report_metadata.date_window.start_time,
           reportShown.report_metadata.date_window.end_time,
           reportShown.report_metadata.generated_at,
+          reportShown.summary?.periods,
           shown?.reference,
         ])}
         apiBase={apiBase}
@@ -399,7 +386,9 @@ export function OwnerWorkspace({
         restaurantName={selected.name}
         getAccessToken={getAccessToken}
         report={reportShown}
+        showOverviewPeriod={activePage !== 'performance'}
         reportReference={shown?.scope === scope ? shown.reference : undefined}
+        onOpenDishPerformance={() => openPage('performance')}
         onReloadReport={() => {
           setShown(null);
           setReportAttempt((value) => value + 1);
@@ -941,7 +930,61 @@ const reportQuestionMetrics = {
   engagement_rate: ['Engagement rate', 'rate'],
   portion_previews_shown: ['2.5D previews shown', 'count'],
   comparisons_started: ['Comparisons started', 'count'],
+  dish_opens: ['Restaurant-wide dish opens', 'count'],
 } as const;
+
+type Period = Pick<OwnerDishReport['report_metadata']['date_window'], 'start_time' | 'end_time'>;
+type AnswerEvidence =
+  | { kind: 'verified'; window: Period; baseline?: Period }
+  | { kind: 'mismatch'; periods: ReturnType<typeof periodPair> }
+  | { kind: 'unverified' }
+  | { kind: 'unsupported' };
+
+function reportAnswerEvidence(
+  result: OwnerReportQuestionResult,
+  report: OwnerDishReport,
+  displayedWindow: Period,
+): AnswerEvidence {
+  if (result.status === 'abstained' && result.reason === 'unsupported_question') {
+    return { kind: 'unsupported' };
+  }
+  const summary = report.summary;
+  const overview = result.overview;
+  if (!overview) {
+    return samePeriod(displayedWindow, result.timeWindow)
+      ? { kind: 'verified', window: displayedWindow }
+      : { kind: 'mismatch', periods: periodPair(displayedWindow, result.timeWindow) };
+  }
+  if (!summary) return { kind: 'unverified' };
+  const period = overview.period === 'baseline' ? 'baseline' : 'current';
+  const window = summary.periods[period];
+  if (!samePeriod(window, result.timeWindow)) {
+    return { kind: 'mismatch', periods: periodPair(window, result.timeWindow) };
+  }
+  let baseline: Period | undefined;
+  if (overview.period === 'compare') {
+    baseline = summary.periods.baseline;
+    if (!samePeriod(baseline, overview.baselineWindow)) {
+      return { kind: 'mismatch', periods: periodPair(baseline, overview.baselineWindow) };
+    }
+  }
+  if (result.status === 'answered') {
+    const counts = [summary[period].dish_opens];
+    if (baseline) counts.push(summary.baseline.dish_opens);
+    if (
+      report.report_metadata.freshness.is_stale !== false ||
+      result.points.length !== counts.length ||
+      !counts.every(
+        (count, index) =>
+          (count.status === 'NORMAL' || count.status === 'VALID_ZERO') &&
+          result.points[index]?.value === count.value,
+      )
+    ) {
+      return { kind: 'unverified' };
+    }
+  }
+  return baseline ? { kind: 'verified', window, baseline } : { kind: 'verified', window };
+}
 
 function ReportAnswer({
   answer,
@@ -991,7 +1034,9 @@ function LiveAiPanel({
   restaurantName,
   getAccessToken,
   report,
+  showOverviewPeriod,
   reportReference,
+  onOpenDishPerformance,
   onReloadReport,
   onAccessFailure,
 }: {
@@ -1000,7 +1045,9 @@ function LiveAiPanel({
   restaurantName: string;
   getAccessToken: () => Promise<string | null>;
   report: OwnerDishReport;
+  showOverviewPeriod: boolean;
   reportReference?: string | undefined;
+  onOpenDishPerformance: () => void;
   onReloadReport: () => void;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
 }) {
@@ -1012,13 +1059,31 @@ function LiveAiPanel({
     () => createOwnerReportQuestionClient({ apiBase, venueId, getAccessToken }),
     [apiBase, venueId, getAccessToken],
   );
-  const window = report.report_metadata.date_window;
+  const dishWindow = report.report_metadata.date_window;
+  const summaryWindow = report.summary?.periods.current;
+  const overviewWindow = showOverviewPeriod ? summaryWindow : undefined;
+  const window = overviewWindow ?? dishWindow;
+  const periodsDiffer =
+    summaryWindow &&
+    !samePeriod(summaryWindow, {
+      start: dishWindow.start_time,
+      end: dishWindow.end_time,
+    });
+  const differentDishWindow = showOverviewPeriod && periodsDiffer;
   const timeZoneIsPacific = isOwnerProductionCalendarVersion(
     report.report_metadata.calculation_version,
   );
   const result = reply?.kind === 'result' ? reply.result : undefined;
-  const differentPeriods =
-    result && !samePeriod(window, result.timeWindow) ? periodPair(window, result.timeWindow) : null;
+  const evidence = result ? reportAnswerEvidence(result, report, window) : undefined;
+  const otherDishAnswer =
+    result && !result.overview && differentDishWindow && samePeriod(dishWindow, result.timeWindow);
+  let answerPeriodLabel = 'Answer period';
+  if (result?.overview) {
+    answerPeriodLabel =
+      result.overview.period === 'baseline'
+        ? 'Previous Overview period'
+        : 'Current Overview period';
+  }
   const busy = reply?.kind === 'loading';
 
   useEffect(() => () => pending.current?.abort(), []);
@@ -1065,11 +1130,20 @@ function LiveAiPanel({
         <div className="owner-chips">
           <span className="owner-chip owner-chip--surface">{restaurantName}</span>
           <span className="owner-chip owner-chip--surface">
-            Dish Performance period: {reportPeriod(window, timeZoneIsPacific)}
+            {overviewWindow ? 'Overview period' : 'Dish Performance period'}:{' '}
+            {reportPeriod(window, timeZoneIsPacific)}
           </span>
         </div>
       </div>
       <div className="owner-ai__body" data-ai-state={reply?.kind ?? 'empty'} aria-live="polite">
+        {differentDishWindow && (
+          <div>
+            <p>Dish Performance uses a different report period.</p>
+            <Button variant="outline" onClick={onOpenDishPerformance}>
+              Open Dish Performance to ask a question
+            </Button>
+          </div>
+        )}
         {(!reportReference || reply?.kind === 'reference_error') && (
           <div role={reply?.kind === 'reference_error' ? 'alert' : undefined}>
             <p>
@@ -1083,7 +1157,14 @@ function LiveAiPanel({
           </div>
         )}
         {reportReference && !reply && (
-          <p className="owner-muted">Ask about this report. Try “Chart the save rates by dish.”</p>
+          <p className="owner-muted">
+            {overviewWindow
+              ? 'Ask about this report. Try “How many openings?”'
+              : 'Ask about this report. Try “Chart the save rates by dish.”'}
+          </p>
+        )}
+        {reportReference && !reply && !showOverviewPeriod && periodsDiffer && (
+          <p className="owner-muted">Restaurant-wide opening totals use the Overview period.</p>
         )}
         {busy && (
           <p className="owner-muted" role="status">
@@ -1095,30 +1176,45 @@ function LiveAiPanel({
             The report question could not be answered. Check your session or try again later.
           </p>
         )}
-        {result && (
+        {result && evidence && (
           <div className="owner-ai__answer">
-            {differentPeriods ? (
+            {evidence.kind === 'mismatch' && (
               <>
                 <h3>Different report period</h3>
                 <p>
-                  The answer covers {differentPeriods.analysis}. The displayed report covers{' '}
-                  {differentPeriods.report}. Reload the report before asking again.
+                  The answer covers {evidence.periods.analysis}. The displayed report covers{' '}
+                  {evidence.periods.report}.{' '}
+                  {otherDishAnswer
+                    ? 'Ask from Dish Performance for this period.'
+                    : 'Reload the report before asking again.'}
                 </p>
               </>
-            ) : (
+            )}
+            {evidence.kind === 'unverified' && (
+              <p>There is not enough verified evidence in this report to answer that question.</p>
+            )}
+            {evidence.kind === 'unsupported' && (
+              <p>
+                This report cannot answer that question. Ask about activity shown in this report.
+              </p>
+            )}
+            {evidence.kind === 'verified' && (
               <>
                 {result.status === 'answered' ? (
                   <ReportAnswer answer={result} />
                 ) : (
                   <p>
-                    {result.reason === 'unsupported_question'
-                      ? 'This report cannot answer that question. Ask about activity shown in this report.'
-                      : 'There is not enough verified evidence in this report to answer that question.'}
+                    There is not enough verified evidence in this report to answer that question.
                   </p>
                 )}
                 <p className="owner-muted">
-                  Answer period: {reportPeriod(window, timeZoneIsPacific)}
+                  {answerPeriodLabel}: {reportPeriod(evidence.window, timeZoneIsPacific)}
                 </p>
+                {evidence.baseline && (
+                  <p className="owner-muted">
+                    Previous Overview period: {reportPeriod(evidence.baseline, timeZoneIsPacific)}
+                  </p>
+                )}
               </>
             )}
           </div>

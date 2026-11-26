@@ -11,8 +11,10 @@ import {
 type Dish = OwnerDishReport['dishes'][number];
 type Answer = Extract<OwnerReportQuestionResult, { status: 'answered' }>;
 type Refusal = Extract<OwnerReportQuestionResult, { status: 'abstained' }>;
+type DishMetric = Exclude<Answer['metric'], 'dish_opens'>;
+type OverviewPeriod = 'current' | 'baseline' | 'compare';
 
-const metricPhrases: readonly [Answer['metric'], RegExp][] = [
+const metricPhrases: readonly [DishMetric, RegExp][] = [
   ['open_rate', /\b(?:open|opening|view) rates?\b/gu],
   ['save_rate', /\b(?:save|saving|favorite|favourite) rates?\b/gu],
   ['engagement_rate', /\bengagement rates?\b/gu],
@@ -33,10 +35,20 @@ const chartSuffix =
 const readPrefix =
   /^(?:please )?(?:(?:what (?:is|are|was|were)|how many|show(?: me)?|give(?: me)?|tell(?: me)?) )?(?:the )?/;
 const windowSuffix =
-  / (?:in|for|during) (?:(?:this|the) (?:report|window)|the (?:current|displayed) (?:report|window))$/;
+  / (?:in|for|during) (?:(?:this|the) (?:report|window|period)|the (?:current|displayed) (?:report|window|period))$/;
+const openingCount =
+  /^(?:(?:total|restaurant wide|restaurant) )?(?:(?:dish )?(?:opens|openings|open(?:ing)? counts?)|times (?:(?:the )?dishes were|were (?:the )?dishes) opened)$/;
+const previousWindow =
+  / (?:in |for |during )?(?:the )?(?:previous|prior|preceding|last|baseline) (?:report|window|period)$/;
+const compareWindows =
+  / (?:between |in |for )?(?:the )?(?:current|this)(?: (?:report|window|period))? (?:and|vs|versus|with|to) (?:the )?(?:previous|prior|preceding|last|baseline) (?:reports?|windows?|periods?)$/;
+const compareOpeningPrefix =
+  /^(?:the )?(?:current|this) and (?:previous|prior|preceding|last|baseline) /;
+const openingQualifier =
+  / (?:(?:were|are) there|did we (?:have|record|see)|(?:across|for|in) (?:the|this|my|our)(?: whole)? restaurant)$/;
 const maxPoints = 20;
 const ranks: Readonly<Record<string, number>> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
-const countMetrics = new Set<Answer['metric']>([
+const countMetrics = new Set<DishMetric>([
   'active_sessions',
   'portion_previews_shown',
   'comparisons_started',
@@ -52,16 +64,45 @@ function normalize(text: string) {
 }
 
 type Selection = {
-  metric: Answer['metric'];
+  metric: DishMetric;
   dishes: readonly Dish[];
   chart: boolean;
   rank?: { order: 'high' | 'low'; size: number };
 };
 
-function interpretQuestion(question: string, report: OwnerDishReport, now: Date): Selection | null {
-  let query = normalize(question).replace(chartRequestPrefix, '').replace(windowSuffix, '');
-  const chart = chartPrefix.test(query) || chartSuffix.test(query);
-  query = query.replace(chartPrefix, '').replace(chartSuffix, '').replace(windowSuffix, '');
+function questionParts(question: string) {
+  const text = normalize(question).replace(chartRequestPrefix, '').replace(windowSuffix, '');
+  const chart = chartPrefix.test(text) || chartSuffix.test(text);
+  return {
+    query: text.replace(chartPrefix, '').replace(chartSuffix, '').replace(windowSuffix, ''),
+    chart,
+  };
+}
+
+function overviewPeriod(query: string): OverviewPeriod | null {
+  const text = query.replace(readPrefix, '');
+  if (text.startsWith('compare ')) {
+    const subject = text.slice('compare '.length).replace(/^the /, '');
+    if (compareWindows.test(subject) && openingCount.test(subject.replace(compareWindows, '')))
+      return 'compare';
+    if (
+      compareOpeningPrefix.test(subject) &&
+      openingCount.test(subject.replace(compareOpeningPrefix, ''))
+    )
+      return 'compare';
+    return null;
+  }
+  const prior = previousWindow.test(text);
+  const subject = text.replace(previousWindow, '').replace(openingQualifier, '');
+  return openingCount.test(subject) ? (prior ? 'baseline' : 'current') : null;
+}
+
+function interpretDishQuestion(
+  question: string,
+  { query, chart }: ReturnType<typeof questionParts>,
+  report: OwnerDishReport,
+  now: Date,
+): Selection | null {
   if (
     report.source === 'production' &&
     report.report_metadata.calculation_version === OWNER_PRODUCTION_TODAY_VERSION &&
@@ -88,7 +129,7 @@ function interpretQuestion(question: string, report: OwnerDishReport, now: Date)
   }
 
   const usesVisitAlias = /\bvisits?\b/u.test(query);
-  const matches = new Set<Answer['metric']>();
+  const matches = new Set<DishMetric>();
   for (const [metric, phrase] of metricPhrases) {
     query = query.replace(phrase, () => {
       matches.add(metric);
@@ -152,6 +193,67 @@ function interpretQuestion(question: string, report: OwnerDishReport, now: Date)
   return { metric, dishes: report.dishes, chart, rank: { order, size } };
 }
 
+const toTimeWindow = (period: { start_time: string; end_time: string }) => ({
+  start: period.start_time,
+  end: period.end_time,
+});
+const usablePeriod = (window: ReturnType<typeof toTimeWindow>, now: Date) =>
+  Date.parse(window.start) < Date.parse(window.end) && Date.parse(window.end) <= now.getTime();
+
+function readOverviewOpenings(
+  report: OwnerDishReport,
+  period: OverviewPeriod,
+  chart: boolean,
+  now: Date,
+  base: Pick<Refusal, 'schemaVersion' | 'venueId' | 'source' | 'reportSnapshot' | 'timeWindow'>,
+): OwnerReportQuestionResult {
+  const { summary, report_metadata: metadata } = report;
+  const fallback = { ...base, status: 'abstained', reason: 'unusable_evidence' } as const;
+  if (!summary) return OwnerReportQuestionResultSchema.parse(fallback);
+  const compared = period === 'compare';
+  const primary = compared ? 'current' : period;
+  const timeWindow = toTimeWindow(summary.periods[primary]);
+  const baselineWindow = toTimeWindow(summary.periods.baseline);
+  const scoped = {
+    ...base,
+    timeWindow,
+    overview: { period, ...(compared ? { baselineWindow } : {}) },
+  };
+  const decline = () => {
+    const result = OwnerReportQuestionResultSchema.safeParse({ ...fallback, ...scoped });
+    return result.success ? result.data : OwnerReportQuestionResultSchema.parse(fallback);
+  };
+  // Dish coverage can be empty while the summary exposes a measured restaurant-wide count.
+  if (
+    metadata.report_status === 'STALE' ||
+    metadata.report_status === 'ERROR' ||
+    metadata.freshness.is_stale !== false ||
+    Date.parse(metadata.generated_at) > now.getTime() ||
+    !usablePeriod(timeWindow, now) ||
+    (compared && !usablePeriod(baselineWindow, now))
+  )
+    return decline();
+
+  const points: Answer['points'] = [];
+  for (const key of compared ? (['current', 'baseline'] as const) : [primary]) {
+    const cell = summary[key].dish_opens;
+    if (cell.value === null || (cell.status !== 'NORMAL' && cell.status !== 'VALID_ZERO'))
+      return decline();
+    points.push({
+      label: key === 'current' ? 'Current period' : 'Previous period',
+      value: cell.value,
+    });
+  }
+  const result = OwnerReportQuestionResultSchema.safeParse({
+    ...scoped,
+    status: 'answered',
+    metric: 'dish_opens',
+    points,
+    chart,
+  });
+  return result.success ? result.data : decline();
+}
+
 export function answerOwnerReportQuestion(
   report: OwnerDishReport,
   question: string,
@@ -160,10 +262,7 @@ export function answerOwnerReportQuestion(
   displayActionsAllowed = false,
 ): OwnerReportQuestionResult {
   const metadata = report.report_metadata;
-  const timeWindow = {
-    start: metadata.date_window.start_time,
-    end: metadata.date_window.end_time,
-  };
+  const timeWindow = toTimeWindow(metadata.date_window);
   const base = {
     schemaVersion: 'owner-report-question.v1',
     venueId: report.venue_id,
@@ -173,6 +272,9 @@ export function answerOwnerReportQuestion(
   } as const;
   const abstain = (reason: Refusal['reason']) =>
     OwnerReportQuestionResultSchema.parse({ ...base, status: 'abstained', reason });
+  const parts = questionParts(question);
+  const period = overviewPeriod(parts.query);
+  if (period) return readOverviewOpenings(report, period, parts.chart, now, base);
   if (
     metadata.report_status !== 'NORMAL' ||
     metadata.freshness.is_stale !== false ||
@@ -182,7 +284,7 @@ export function answerOwnerReportQuestion(
   ) {
     return abstain('unusable_evidence');
   }
-  const selection = interpretQuestion(question, report, now);
+  const selection = interpretDishQuestion(question, parts, report, now);
   if (!selection) return abstain('unsupported_question');
   const { metric } = selection;
   const usesDisplayActions =

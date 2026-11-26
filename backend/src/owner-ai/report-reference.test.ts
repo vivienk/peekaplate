@@ -82,7 +82,18 @@ function setup(
 ) {
   let now = start;
   const reportOrigin = source === 'production' ? productionOrigin : origin;
-  const reportState = { allowed: true, fresh: true, rate: 0.5, reversed: false, actions: false };
+  const reportState = {
+    allowed: true,
+    fresh: true,
+    rate: 0.5,
+    reversed: false,
+    actions: false,
+    overviewOnly: false,
+    openings: (_cutoff: Date): { current: number | null; baseline: number | null } => ({
+      current: null,
+      baseline: null,
+    }),
+  };
   const readOwnerReport = vi.fn(async (actorId: string, venueId: string, anchor: Date) => {
     if (!reportState.allowed || actorId !== owner || venueId !== LOCAL_AI_VENUE) {
       throw new CommandError('forbidden', 403);
@@ -109,7 +120,16 @@ function setup(
         end_time: current.end_time,
         duration_hours: Math.floor((end.getTime() - Date.parse(dishStart)) / 3_600_000),
       };
-      report.summary = { periods: { current, baseline }, current: metrics, baseline: metrics };
+      const openings = reportState.openings(end);
+      const count = (value: number | null) =>
+        value === null
+          ? missing
+          : { value, status: value === 0 ? ('VALID_ZERO' as const) : ('NORMAL' as const) };
+      report.summary = {
+        periods: { current, baseline },
+        current: { ...metrics, dish_opens: count(openings.current) },
+        baseline: { ...metrics, dish_opens: count(openings.baseline) },
+      };
     } else if (sealedBatch) {
       const end = Math.floor((anchor.getTime() - 60_000) / 300_000) * 300_000;
       report.report_metadata.calculation_version = 'production.batch.v1';
@@ -136,6 +156,11 @@ function setup(
     report.report_metadata.coverage = { total_dishes_monitored: 2, measurable_dishes_count: 2 };
     if (reportState.reversed) report.dishes.reverse();
     if (!reportState.fresh) report.report_metadata.freshness.is_stale = null;
+    if (reportState.overviewOnly) {
+      report.dishes = [];
+      report.report_metadata.coverage = { total_dishes_monitored: 0, measurable_dishes_count: 0 };
+      report.report_metadata.report_status = 'EMPTY';
+    }
     return report;
   });
   const provider = vi.fn(async () =>
@@ -302,6 +327,111 @@ it('answers and charts the original authorized #272 dish window across its next 
     signedAt,
   ]);
   expect(s.limit).toHaveBeenCalledExactlyOnceWith({ key: `${LOCAL_AI_VENUE}:${owner}:questions` });
+  expect(s.provider).not.toHaveBeenCalled();
+});
+
+it('reads the signed restaurant counts for both Overview periods and pins the older cutoff', async () => {
+  const s = setup('production', 'today');
+  const signedAt = Date.parse('2026-11-25T12:00:59.000Z');
+  const nextCutoff = Date.parse('2026-11-25T12:00:00.000Z');
+  s.advance(signedAt - start);
+  s.reportState.openings = (cutoff) => ({
+    current: cutoff.getTime() < nextCutoff ? 11 : 13,
+    baseline: 10,
+  });
+  delete s.env.OWNER_AI_OPENAI_API_KEY;
+  delete s.env.OWNER_AI_OPENAI_PROJECT_ID;
+  const first = await s.get();
+  expect(first.status).toBe(200);
+  const oldRef = first.headers.get(OWNER_REPORT_REFERENCE_HEADER) ?? undefined;
+  expect(oldRef).toBeTruthy();
+  const firstReport = OwnerDishReportSchema.parse(await first.json());
+  const request = (token: string | undefined, question: string) => s.ask(token, { question });
+  const firstWindow = { start: '2026-11-25T08:00:00.000Z', end: '2026-11-25T11:55:00.000Z' };
+  const previousWindow = { start: '2026-11-24T08:00:00.000Z', end: firstWindow.start };
+  const read = async (ref: string | undefined, question: string) => {
+    const response = await request(ref, question);
+    expect(response.status).toBe(200);
+    return response.json();
+  };
+  expect(firstReport.report_metadata.date_window.start_time).toBe('2026-11-25T08:35:00.000Z');
+  expect(await read(oldRef, 'How many openings?')).toMatchObject({
+    status: 'answered',
+    metric: 'dish_opens',
+    overview: { period: 'current' },
+    timeWindow: firstWindow,
+    reportSnapshot: ownerReportSnapshot(firstReport),
+    points: [{ label: 'Current period', value: 11 }],
+  });
+  expect(await read(oldRef, 'How many openings were there in the previous period?')).toMatchObject({
+    status: 'answered',
+    metric: 'dish_opens',
+    overview: { period: 'baseline' },
+    timeWindow: previousWindow,
+    points: [{ label: 'Previous period', value: 10 }],
+  });
+  expect(
+    await read(
+      oldRef,
+      'Compare the dish openings for the current and previous periods as a bar chart.',
+    ),
+  ).toMatchObject({
+    status: 'answered',
+    metric: 'dish_opens',
+    chart: true,
+    overview: { period: 'compare', baselineWindow: previousWindow },
+    timeWindow: firstWindow,
+    points: [
+      { label: 'Current period', value: 11 },
+      { label: 'Previous period', value: 10 },
+    ],
+  });
+
+  s.advance(10_000);
+  const newRef = await s.reference();
+  expect(newRef).not.toBe(oldRef);
+  expect(await read(oldRef, 'How many openings?')).toMatchObject({
+    timeWindow: firstWindow,
+    reportSnapshot: ownerReportSnapshot(firstReport),
+    points: [{ value: 11 }],
+  });
+  expect(await read(newRef, 'How many openings?')).toMatchObject({
+    timeWindow: { start: firstWindow.start, end: new Date(nextCutoff).toISOString() },
+    points: [{ value: 13 }],
+  });
+  s.reportState.openings = () => ({ current: 14, baseline: 10 });
+  expect((await request(oldRef, 'How many openings?')).status).toBe(409);
+  expect(s.provider).not.toHaveBeenCalled();
+});
+
+it('preserves a measured restaurant zero and abstains on missing or untrusted totals', async () => {
+  const s = setup('production', 'today');
+  s.advance(Date.parse('2026-11-25T12:01:09.000Z') - start);
+  s.reportState.overviewOnly = true;
+  s.reportState.openings = () => ({ current: 0, baseline: null });
+  const zeroRef = await s.reference();
+  const ask = async (question: string, reference = zeroRef) => {
+    const response = await s.ask(reference, { question });
+    expect(response.status).toBe(200);
+    return response.json();
+  };
+  expect(await ask('How many openings?')).toMatchObject({
+    status: 'answered',
+    metric: 'dish_opens',
+    points: [{ value: 0 }],
+  });
+  const missing = await ask('Compare current and previous openings.');
+  expect(missing).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+  expect(missing).not.toHaveProperty('points');
+  s.reportState.openings = () => ({ current: null, baseline: 10 });
+  const unknownCount = await ask('How many openings?', await s.reference());
+  expect(unknownCount).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+  expect(unknownCount).not.toHaveProperty('points');
+  s.reportState.openings = () => ({ current: 11, baseline: 10 });
+  s.reportState.fresh = false;
+  const untrusted = await ask('How many openings?', await s.reference());
+  expect(untrusted).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+  expect(untrusted).not.toHaveProperty('points');
   expect(s.provider).not.toHaveBeenCalled();
 });
 

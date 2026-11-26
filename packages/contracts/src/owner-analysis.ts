@@ -42,12 +42,21 @@ export const OwnerReportQuestionRequestSchema = z.strictObject({
   question: z.string().trim().min(1).max(OWNER_REPORT_QUESTION_MAX_LENGTH),
 });
 
+const questionWindow = z.strictObject({ start: z.iso.datetime(), end: z.iso.datetime() });
+
 const questionReportScope = {
   schemaVersion: z.literal('owner-report-question.v1'),
   venueId: z.uuid(),
   source: z.enum(['synthetic', 'production']),
   reportSnapshot: z.string().regex(/^[a-f0-9]{64}$/),
-  timeWindow: z.strictObject({ start: z.iso.datetime(), end: z.iso.datetime() }),
+  timeWindow: questionWindow,
+  overview: z
+    .discriminatedUnion('period', [
+      z.strictObject({ period: z.literal('current') }),
+      z.strictObject({ period: z.literal('baseline') }),
+      z.strictObject({ period: z.literal('compare'), baselineWindow: questionWindow }),
+    ])
+    .optional(),
 };
 
 export const OwnerReportQuestionResultSchema = z
@@ -64,6 +73,7 @@ export const OwnerReportQuestionResultSchema = z
         'engagement_rate',
         'portion_previews_shown',
         'comparisons_started',
+        'dish_opens',
       ]),
       points: z
         .array(
@@ -85,12 +95,38 @@ export const OwnerReportQuestionResultSchema = z
     if (start > end || (result.status === 'answered' && start === end)) {
       context.addIssue({ code: 'custom', path: ['timeWindow'], message: 'Invalid time window' });
     }
+    if (result.overview?.period === 'compare') {
+      const baseline = result.overview.baselineWindow;
+      const baselineStart = Date.parse(baseline.start);
+      const baselineEnd = Date.parse(baseline.end);
+      if (
+        baselineStart > baselineEnd ||
+        (result.status === 'answered' && baselineStart === baselineEnd)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['overview', 'baselineWindow'],
+          message: 'Invalid baseline time window',
+        });
+      }
+    }
     if (result.status === 'answered') {
+      if (
+        (result.metric === 'dish_opens') !== Boolean(result.overview) ||
+        (result.overview && result.points.length !== (result.overview.period === 'compare' ? 2 : 1))
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['overview'],
+          message: 'Invalid Overview answer scope',
+        });
+      }
       const validValues = result.points.every(({ value }) => {
         switch (result.metric) {
           case 'active_sessions':
           case 'portion_previews_shown':
           case 'comparisons_started':
+          case 'dish_opens':
             return Number.isSafeInteger(value);
           case 'avg_interaction_time_seconds':
             return value <= 300;

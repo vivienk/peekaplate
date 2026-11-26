@@ -86,7 +86,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "eea32461377dc6807c60f48f4c8dfad9022234b78bfe7b3357d823109430fab4"
+      "sourceFingerprint": "a08acfc75471ba222564c30b27ab63e3722f442480303810198c24649074e56b"
     },
     {
       "id": "tokens",
@@ -476,7 +476,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3aa17ea9c51bd620530892cdc68fa69e0519eae1ffb06b96e7d573ef89d68d0e"
+      "sourceFingerprint": "351b02b36c86545cdd7bd8a5d58e285f5d4346d03ed750fd1b763cabfda43e7a"
     },
     {
       "id": "backend",
@@ -756,7 +756,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "011896069aa934d662fcc1db4c41cd398b683729aaff2f391e6929e2aba7853d"
+      "sourceFingerprint": "cbc2f17d798c792a0963143dc477eb3d80a9e2b8f73b9b05e2e3833a2177444b"
     },
     {
       "id": "database",
@@ -919,7 +919,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "2a4d21b766c43ffb4ef9e23e57f62560c9e4e20d679cb5c63cfc34340f17e8a8"
+      "sourceFingerprint": "8b10ed422f4e22cd106e99694c4a1b1188178ac0653c28c2fd8b30f0d12d3a85"
     },
     {
       "id": "agents",
@@ -1300,7 +1300,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "console"
       ],
-      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff. CSV and AI reuse the dish snapshot, which retains a separate prefix and a partial-first-day cutover. The owner question box replaces dish and goal selectors. The Worker returns visible cells for supported questions and bar charts without calling a provider. Unknown freshness, missing evidence and unsupported questions abstain.",
+      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff. The owner question box reads visible dish metrics and restaurant-wide dish opens from the same signed report. Overview and Dish Performance retain separate periods and the API checks current membership before answering. Unknown freshness, missing evidence and unsupported questions abstain. The question route has no model call.",
       "files": [
         "backend/src/owner-report.ts",
         "packages/contracts/src/owner-report.ts",
@@ -1310,7 +1310,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/report-reference.test.ts",
         "frontend/console/src/owner/OwnerWorkspace.tsx"
       ],
-      "next": "For the question box rollout, release the compatible API before the console. Verify one eligible dish event and a signed-in answer on a trusted hosted report separately from mock QA."
+      "next": "Release the compatible questions API before the console. Verify one eligible event and compare signed-in Overview totals and answers for the same restaurant and cutoff on a trusted hosted report."
     }
   ]
 }

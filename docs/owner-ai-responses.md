@@ -31,8 +31,11 @@ reference. It rechecks current owner access and reads the exact signed snapshot.
 It answers supported English questions about the visible Dish Performance window,
 including a named dish, comparisons, rankings and requests for a bar chart. For
 example, ask “What was the save rate for Avocado Toast?” or “Chart open rate by
-dish.” Answers and charts use the same visible report metric values. A measured
-zero is displayed as zero. Unknown freshness, missing or suppressed values, or
+dish.” For restaurant-wide totals, “How many openings?” reads the signed
+Overview dish-open count. Questions can also select the previous report period or
+compare the current and previous periods. Each result uses its own Overview window,
+which can start before the Dish Performance window. The same signed snapshot binds
+both. A measured zero is displayed as zero. Unknown freshness, missing or suppressed values, or
 incomplete whole-menu evidence produce an abstention. The route does not answer
 about other restaurants, arbitrary date ranges, orders or unsupported metrics.
 The signed reference also preserves whether display-action counts were visible

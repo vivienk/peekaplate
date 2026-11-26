@@ -172,6 +172,14 @@ it('returns an evidence refusal at an empty reporting cutoff', () => {
   });
 });
 
+it('refuses a restaurant count when the signed report has no Overview summary', () => {
+  const snapshot = report();
+  delete snapshot.summary;
+  const result = ask('How many openings?', snapshot);
+  expect(result).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+  expect(result).not.toHaveProperty('points');
+});
+
 it.each([
   'What was the opening rate for Avocado Toast last week?',
   'What was the opening rate for Avocado Toast today?',
@@ -181,6 +189,9 @@ it.each([
   'Compare open rate and save rate for Avocado Toast.',
   'What was the open rate for Toast?',
   'Which dish performed best?',
+  'How many openings last week?',
+  'How many openings at another restaurant?',
+  'How many openings for Avocado Toast?',
 ])('declines unsupported questions without returning values: %s', (question) => {
   const result = ask(question);
   expect(result).toMatchObject({ status: 'abstained', reason: 'unsupported_question' });
