@@ -90,6 +90,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
     jobs: {} as Record<string, MenuJob[]>,
     groups: new Map<string, { jobs: MenuJob[]; hashes: string[] }>(),
     photos: new Map<string, Buffer>(),
+    unavailableDraftPhoto: null as string | null,
     receipts: new Map<string, unknown>(),
     conflictSave: false,
     verificationStatus: 200,
@@ -548,12 +549,16 @@ async function fixture(context: BrowserContext, reportReady = false) {
           headers,
         });
       }
-      if (/^drafts\/[^/]+\/photos\/[^/]+$/.test(path))
+      if (/^drafts\/[^/]+\/photos\/[^/]+$/.test(path)) {
+        const photoId = path.split('/')[3]!;
+        if (photoId === state.unavailableDraftPhoto)
+          return route.fulfill({ status: 503, json: { error: 'unavailable' }, headers });
         return route.fulfill({
-          body: state.photos.get(path.split('/')[3]!)!,
+          body: state.photos.get(photoId)!,
           contentType: 'image/png',
           headers,
         });
+      }
       if (path === 'menus/url') {
         state.urlStarted = true;
         if (state.delayUrl)
@@ -1172,21 +1177,49 @@ test('saved dish photos replace the menu icon in the menu table, read as private
   page,
 }) => {
   const state = await fixture(context, true);
-  // A second saved dish with no photo keeps the menu icon.
-  const second = structuredClone(state.drafts[venue.venueId]![0]!);
-  second.id = crypto.randomUUID();
-  second.draft_id = second.id;
-  second.name = 'Fictional Salad';
-  second.manual_fields = { ...second.manual_fields!, name: second.name, photoId: null };
-  state.drafts[venue.venueId]!.push(second);
-  await signIn(page);
+  const drafts = state.drafts[venue.venueId]!;
+  const original = drafts[0]!;
+  const firstPhoto = original.manual_fields!.photoId!;
+  const lastPhoto = crypto.randomUUID();
+  state.photos.set(lastPhoto, state.photos.get(firstPhoto)!);
+  state.unavailableDraftPhoto = firstPhoto;
+  for (let index = 0; index < 20; index++) {
+    const id = crypto.randomUUID();
+    const name = index === 19 ? 'Fictional Dessert' : `Fictional Salad ${index + 1}`;
+    drafts.push({
+      ...original,
+      id,
+      draft_id: id,
+      name,
+      manual_fields: { ...original.manual_fields!, name, photoId: index === 19 ? lastPhoto : null },
+    });
+  }
+  const photoReads = () => state.apiCalls.filter((call) => call.path.includes('/photos/'));
+  await signIn(page, undefined, false);
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
+  expect(photoReads()).toHaveLength(0);
+  const failedPhoto = page.waitForResponse(
+    (response) => response.url().endsWith(`/photos/${firstPhoto}`) && response.status() === 503,
+  );
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
   const withPhoto = page.locator('.mrow').filter({ hasText: 'Fictional Lentil Soup' });
+  await failedPhoto;
+  await expect(withPhoto.locator('.thumb .ic')).toBeVisible();
+  state.unavailableDraftPhoto = null;
+  await page.getByRole('button', { name: 'Reload saved work', exact: true }).click();
   const photo = withPhoto.locator('.thumb img');
   await expect(photo).toHaveAttribute('src', /^blob:/);
   await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
-  await expect(
-    page.locator('.mrow').filter({ hasText: 'Fictional Salad' }).locator('.thumb img'),
-  ).toHaveCount(0);
+  const noPhoto = page
+    .locator('.mrow')
+    .filter({ has: page.getByRole('button', { name: 'Edit Fictional Salad 1', exact: true }) });
+  await expect(noPhoto.locator('.thumb .ic')).toBeVisible();
+  const belowFold = page.locator('.mrow').filter({ hasText: 'Fictional Dessert' });
+  await expect(belowFold).not.toBeInViewport();
+  expect(photoReads()).toHaveLength(2);
+  expect(photoReads()[0]?.actor).toBe(ownerId);
+  await belowFold.scrollIntoViewIfNeeded();
+  await expect(belowFold.locator('.thumb img')).toHaveAttribute('src', /^blob:/);
 });
 
 test('menu typography and locked-page copy keep the authored live boundary', async ({

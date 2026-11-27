@@ -79,6 +79,67 @@ function typedMenuFile(file: File): File {
   return new File([file], file.name, { type, lastModified: file.lastModified });
 }
 
+function SavedDishThumbnail({
+  draftId,
+  photoId,
+  readPhoto,
+  reloadVersion,
+}: {
+  draftId: string;
+  photoId: string | null | undefined;
+  readPhoto: (draftId: string, photoId: string) => Promise<Blob | null>;
+  reloadVersion: number;
+}) {
+  const thumbnail = useRef<HTMLSpanElement>(null);
+  const objectUrl = useRef<string | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(
+    () => () => {
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!photoId || !thumbnail.current || objectUrl.current) return;
+    let disposed = false;
+    // These are private originals. Read each one only when its menu row scrolls into view.
+    const observer = new IntersectionObserver(([entry]) => {
+      if (disposed || !entry?.isIntersecting) return;
+      observer.disconnect();
+      void readPhoto(draftId, photoId)
+        .then((blob) => {
+          if (disposed || !blob) return;
+          objectUrl.current = URL.createObjectURL(blob);
+          setUrl(objectUrl.current);
+        })
+        .catch(() => {});
+    });
+    observer.observe(thumbnail.current);
+    return () => {
+      disposed = true;
+      observer.disconnect();
+    };
+  }, [draftId, photoId, readPhoto, reloadVersion]);
+
+  return (
+    <span className="thumb" ref={thumbnail}>
+      {url ? (
+        <img
+          src={url}
+          alt=""
+          onError={() => {
+            URL.revokeObjectURL(url);
+            objectUrl.current = null;
+            setUrl(null);
+          }}
+        />
+      ) : (
+        <Icon n="menu" s={24} />
+      )}
+    </span>
+  );
+}
+
 export function OwnerMenuWorkspace({
   active = true,
   apiBase,
@@ -138,6 +199,7 @@ export function OwnerMenuWorkspace({
   const photoPicker = useRef<HTMLInputElement>(null);
   const [jobs, setJobs] = useState<MenuJob[]>([]);
   const [drafts, setDrafts] = useState<DishDraft[]>([]);
+  const [thumbnailReload, setThumbnailReload] = useState(0);
   const [reviews, setReviews] = useState<Record<string, ExtractionReviewSessionResponse>>({});
   const [reviewUnavailable, setReviewUnavailable] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -216,6 +278,15 @@ export function OwnerMenuWorkspace({
   const current = useCallback(
     (active: Active) => runtime.current === active && !active.controller.signal.aborted,
     [],
+  );
+  const readRowPhoto = useCallback(
+    async (draftId: string, photoId: string) => {
+      const active = runtime.current;
+      if (!active) return null;
+      const blob = await active.client.readDraftPhoto(venueId, draftId, photoId);
+      return current(active) ? blob : null;
+    },
+    [venueId, current],
   );
   const command = useCallback((kind: string, value: unknown) => {
     const key = JSON.stringify([kind, value]);
@@ -557,7 +628,10 @@ export function OwnerMenuWorkspace({
       if (current(active)) setBusy(false);
     }
   };
-  const reload = () => void run((active) => load(active));
+  const reload = () =>
+    void run(async (active) => {
+      if (await load(active)) setThumbnailReload((version) => version + 1);
+    });
   // Adam's staging test: waiting for the full reload after each remove made deletes take 5-7 s and
   // silently ignored the next click. The removal response already carries the saved row, so the
   // list updates at once and the rest refreshes in the background. A later command supersedes this
@@ -925,35 +999,6 @@ export function OwnerMenuWorkspace({
         throw new OwnerMenuApiError(409, 'version_conflict');
       setVerified(true);
     });
-
-  // Menu table thumbnails: each saved dish photo is read with the same authenticated byte request as
-  // the editor (never a token in an image URL). A dish without a photo, or a failed read, keeps the icon.
-  const rowPhotoKey = JSON.stringify(
-    reviewDishes.flatMap((dish) => (dish.photoId ? [[dish.id, dish.photoId]] : [])),
-  );
-  const [rowPhotos, setRowPhotos] = useState<Readonly<Record<string, string>>>({});
-  useEffect(() => {
-    const active = runtime.current;
-    const pairs = JSON.parse(rowPhotoKey) as [string, string][];
-    const urls: string[] = [];
-    let disposed = false;
-    setRowPhotos({});
-    if (active)
-      for (const [draftId, photoId] of pairs)
-        void active.client
-          .readDraftPhoto(venueId, draftId, photoId)
-          .then((blob) => {
-            if (disposed || !current(active)) return;
-            const url = URL.createObjectURL(blob);
-            urls.push(url);
-            setRowPhotos((shown) => ({ ...shown, [draftId]: url }));
-          })
-          .catch(() => {});
-    return () => {
-      disposed = true;
-      for (const url of urls) URL.revokeObjectURL(url);
-    };
-  }, [rowPhotoKey, venueId, current]);
 
   if (!active) return null;
   if (!loaded) {
@@ -1513,13 +1558,13 @@ export function OwnerMenuWorkspace({
                   const effective = reviewDishes.find((dish) => dish.id === draft.id);
                   return (
                     <div key={draft.id} className="mrow">
-                      <span className="thumb">
-                        {rowPhotos[draft.id] ? (
-                          <img src={rowPhotos[draft.id]} alt="" />
-                        ) : (
-                          <Icon n="menu" s={24} />
-                        )}
-                      </span>
+                      <SavedDishThumbnail
+                        key={effective?.photoId}
+                        draftId={draft.id}
+                        photoId={effective?.photoId}
+                        readPhoto={readRowPhoto}
+                        reloadVersion={thumbnailReload}
+                      />
                       <span className="dn">
                         {effective?.name ?? draft.name ?? 'Untitled dish'}
                         <small>
