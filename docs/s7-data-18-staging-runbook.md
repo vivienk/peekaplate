@@ -14,7 +14,7 @@ Before running any live staging command, the operator must explicitly confirm an
 | **Staging unfreeze approval** | Explicit confirmation from Sai that staging is unfrozen for DATA-18 | **No** |
 | **Staging queue status** | `peekaplate-staging-observations` active and DLQ clear | **No** |
 | **Authorized staging API origin** | `https://peekaplate-api-staging.vxkong.workers.dev` | Staging only (`api.peekaplate.app` blocked) |
-| **Real staging venue UUID** | Non-placeholder authorized staging venue UUID (`--venue-id`) | **No** (`00000000-...-0123` blocked on `--send`) |
+| **Approved test-class venue** | One of the test-class venues in `backend/src/owner-report-scope.ts`, configured in the staging Worker and approved for this run. Confirm that the signed-in owner report can read it before sending. | **No** (the legacy `…0123` venue reads live traffic and the manifest placeholder is dry-run only) |
 | **Current publication ID** | Active `menu.published` revision (`--publication-id` & `--current-publication-id`) | **No** |
 | **Eligible dish ID & revision** | Newly published, non-demo dish (`--dish-id`, `--dish-revision-id`) | **No** |
 | **Valid staging menu token** | ES256 `menuToken` for the authorized staging publication (`--menu-token`) | **No** (never commit or log) |
@@ -79,7 +79,7 @@ python3 test-data/owner-synthetic-p0-v2/generate_staging_activity.py \
   --authorized-venue-id "<REAL_STAGING_VENUE_UUID>" \
   --send --confirm-staging --menu-token "<REDACTED_MENU_TOKEN>"
 ```
-Verify all receipts return `duplicate_same_payload` (or idempotent acceptance) and re-query `GET /api/v1/venues/<REAL_STAGING_VENUE_UUID>/analytics/dishes?source=synthetic` to confirm zero metric inflation.
+Record the HTTP receipts as queue acceptance. After consumption, confirm one canonical row per replayed event ID and re-query `GET /api/v1/venues/<REAL_STAGING_VENUE_UUID>/analytics/dishes?source=synthetic` to check that replay added no metrics.
 
 ### Step 5: Independent Second-Tester Reproduction (Harshita)
 Provide Harshita with the exact `(scenario, venue_id, publication_id, dish_id, dish_revision_id, window_start, window_end, seed)` tuple so she independently reproduces the identical `input_sha256`, `output_sha256`, and `manifest_sha256`.
@@ -89,7 +89,7 @@ Provide Harshita with the exact `(scenario, venue_id, publication_id, dish_id, d
 ## 3. Cleanup & Rollback Procedure
 
 1. **Before run:** Record baseline counts in `app_private.observation_index` and `app_private.owner_observation_v1` for `<REAL_STAGING_VENUE_UUID>`.
-2. **After acceptance:** Archive the signed manifest JSONs (with `--menu-token` never written to disk) and remove run-scoped synthetic test rows from staging `app_private.observation_*` tables / R2 prefix `raw/observations/<REAL_STAGING_VENUE_UUID>/` using the authorized staging database cleanup procedure, OR leave isolated in the dedicated disposable staging test venue if Sai prefers.
+2. **After acceptance:** Archive the manifest JSONs with their recorded hashes and keep the bearer token out of the artifacts. Clean up only the run-scoped rows and objects after operator approval, or leave them isolated in the approved disposable QA venue.
 3. **Rollback on unexpected error:**
    - Stop any further `--send` calls immediately.
    - Do **not** alter production queues or R2 buckets.

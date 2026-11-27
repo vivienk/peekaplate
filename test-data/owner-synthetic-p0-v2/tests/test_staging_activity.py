@@ -3,6 +3,8 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from urllib.error import HTTPError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -12,6 +14,7 @@ from generate_staging_activity import (  # noqa: E402
     GeneratorConfig,
     GuardrailError,
     calculate_expected_metrics,
+    compute_manifest_hash,
     generate_manifest,
     load_and_verify_manifest,
     main as cli_main,
@@ -25,6 +28,7 @@ DISH_REVISION_ID = "33333333-3333-4333-8333-333333333333"
 WINDOW_START = "2026-11-23T14:00:00Z"
 WINDOW_END = "2026-11-23T14:30:00Z"
 STAGING_API = "https://peekaplate-api-staging.vxkong.workers.dev"
+TEST_REPORT_VENUE = "1ea97f31-bce5-4b8a-99f0-588afed9102e"
 
 
 def base_config(**overrides) -> GeneratorConfig:
@@ -205,7 +209,7 @@ class TestStagingActivityGenerator(unittest.TestCase):
         with self.assertRaises(GuardrailError):
             send_manifest_batches(dry_manifest, "dummy-token")
 
-        real_venue = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        real_venue = TEST_REPORT_VENUE
         real_pub = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
         real_dish = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
         real_rev = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
@@ -221,6 +225,32 @@ class TestStagingActivityGenerator(unittest.TestCase):
             )
         )
         self.assertEqual(live_manifest["authorization_status"], "AUTHORIZED_STAGING")
+        with patch("generate_staging_activity.build_opener") as build_transport:
+            transport = build_transport.return_value
+            transport.open.side_effect = HTTPError(
+                f"{STAGING_API}/observations", 302, "Found", {}, None
+            )
+            with self.assertRaises(RuntimeError):
+                send_manifest_batches(live_manifest, "test-token")
+            transport.open.assert_called_once()
+            request = transport.open.call_args.args[0]
+            self.assertEqual(request.full_url, f"{STAGING_API}/observations")
+            handler = build_transport.call_args.args[0]
+            self.assertIsNone(
+                handler.redirect_request(request, None, 302, "Found", {}, "https://invalid.example/")
+            )
+
+        live_manifest["destination"]["ingest_endpoint"] = "https://invalid.example/observations"
+        live_manifest["manifest_sha256"] = compute_manifest_hash(live_manifest)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "manifest.json"
+            path.write_text(json.dumps(live_manifest), encoding="utf-8")
+            with self.assertRaisesRegex(GuardrailError, "endpoint does not match"):
+                load_and_verify_manifest(path, frozenset({real_venue}))
+        with patch("generate_staging_activity.build_opener") as transport:
+            with self.assertRaisesRegex(GuardrailError, "endpoint does not match"):
+                send_manifest_batches(live_manifest, "test-token")
+            transport.assert_not_called()
 
 
 if __name__ == "__main__":

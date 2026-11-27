@@ -22,7 +22,7 @@ import sys
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 import uuid
 
 FIXTURE_VERSION = "p0-v2-synthetic-1.0"
@@ -38,6 +38,13 @@ PLACEHOLDER_UUIDS = frozenset(
 DEFAULT_AUTHORIZED_STAGING_VENUES = frozenset(
     {
         "00000000-0000-4000-8000-000000000123",
+    }
+)
+# Match the test-class entries in backend/src/owner-report-scope.ts.
+STAGING_TEST_REPORT_VENUES = frozenset(
+    {
+        "1ea97f31-bce5-4b8a-99f0-588afed9102e",
+        "f31ec4b4-59f3-49da-9b9d-408abebef143",
     }
 )
 DEFAULT_AUTHORIZED_STAGING_ORIGINS = frozenset(
@@ -163,6 +170,8 @@ def validate_config(config: GeneratorConfig) -> dict[str, Any]:
                 raise GuardrailError(
                     f"Placeholder {label} ({value!r}) cannot be used for live staging delivery."
                 )
+        if venue_id not in STAGING_TEST_REPORT_VENUES:
+            raise GuardrailError("Live delivery requires an approved test-class report venue.")
     if config.dish_is_demo:
         raise GuardrailError("Demo dishes are not allowed; provide a newly published non-demo dish.")
 
@@ -779,6 +788,21 @@ def generate_manifest(config: GeneratorConfig) -> dict[str, Any]:
     return manifest_body
 
 
+def _staging_ingest_endpoint(destination: dict[str, Any]) -> str:
+    origin = _normalize_origin(destination["api_base_url"])
+    if origin in PRODUCTION_ORIGINS or origin not in DEFAULT_AUTHORIZED_STAGING_ORIGINS:
+        raise GuardrailError("Unauthorized staging destination.")
+    expected = f"{origin}/observations"
+    if destination.get("ingest_endpoint") != expected:
+        raise GuardrailError("Manifest endpoint does not match the approved staging observations route.")
+    return expected
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def load_and_verify_manifest(
     manifest_path: Path,
     authorized_venues: frozenset[str] = DEFAULT_AUTHORIZED_STAGING_VENUES,
@@ -789,9 +813,7 @@ def load_and_verify_manifest(
         raise GuardrailError(
             f"Manifest checksum mismatch: expected {expected_hash}, got {manifest.get('manifest_sha256')}"
         )
-    origin = _normalize_origin(manifest["destination"]["api_base_url"])
-    if origin in PRODUCTION_ORIGINS or origin not in DEFAULT_AUTHORIZED_STAGING_ORIGINS:
-        raise GuardrailError(f"Unauthorized destination in manifest: {origin!r}")
+    _staging_ingest_endpoint(manifest["destination"])
     venue_id = _normalize_uuid(manifest["target"]["venue_id"], "venue_id")
     if venue_id not in authorized_venues:
         raise GuardrailError(f"Unauthorized venue_id in manifest: {venue_id!r}")
@@ -811,10 +833,10 @@ def send_manifest_batches(manifest: dict[str, Any], menu_token: str) -> list[dic
         raise GuardrailError(
             f"Refusing live delivery to placeholder venue_id {target_venue!r}."
         )
-    endpoint = manifest["destination"]["ingest_endpoint"]
-    origin = manifest["destination"]["api_base_url"]
-    if origin in PRODUCTION_ORIGINS or origin not in DEFAULT_AUTHORIZED_STAGING_ORIGINS:
-        raise GuardrailError(f"Refusing to send to unauthorized destination {origin!r}")
+    if target_venue not in STAGING_TEST_REPORT_VENUES:
+        raise GuardrailError("Live delivery requires an approved test-class report venue.")
+    endpoint = _staging_ingest_endpoint(manifest["destination"])
+    opener = build_opener(_NoRedirect())
 
     receipts: list[dict[str, Any]] = []
     for batch in manifest["batches"]:
@@ -828,7 +850,7 @@ def send_manifest_batches(manifest: dict[str, Any], menu_token: str) -> list[dic
             method="POST",
         )
         try:
-            with urlopen(req, timeout=15) as resp:
+            with opener.open(req, timeout=15) as resp:
                 receipts.append(json.loads(resp.read().decode("utf-8")))
         except (HTTPError, URLError) as exc:
             raise RuntimeError(f"POST /observations failed: {exc}") from exc
