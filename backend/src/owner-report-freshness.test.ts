@@ -103,25 +103,43 @@ describe('DATA-17 evaluateBatchFreshness', () => {
     });
   });
 
-  it('returns STALE (is_stale=true) on delayed ingestion when watermark lags behind batch end', () => {
-    const decision = evaluateBatchFreshness({
-      batchWindowStart: BATCH_START,
-      batchWindowEnd: BATCH_END,
-      now: new Date('2026-11-23T17:52:00.000Z'),
-      watermark: {
-        source: 'queue_watermark',
-        watermarkAt: '2026-11-23T17:48:30.000Z',
-        dlqDepth: 0,
-        pendingQueueCount: 0,
-        posthogComplete: true,
-      },
-    });
-    expect(decision).toEqual({
-      is_stale: true,
-      status: 'STALE',
-      reason: 'delayed_ingestion_watermark_behind_batch_end',
-    });
-  });
+  it.each(['2026-11-23T17:48:30.000Z', BATCH_END, '2026-11-23T17:50:59.999Z'])(
+    'returns STALE when the watermark %s does not reach the settled cutoff',
+    (watermarkAt) => {
+      const decision = evaluateBatchFreshness({
+        batchWindowStart: BATCH_START,
+        batchWindowEnd: BATCH_END,
+        now: new Date('2026-11-23T17:52:00.000Z'),
+        watermark: {
+          source: 'queue_watermark',
+          watermarkAt,
+          dlqDepth: 0,
+          pendingQueueCount: 0,
+          posthogComplete: true,
+        },
+      });
+      expect(decision).toEqual({
+        is_stale: true,
+        status: 'STALE',
+        reason: 'delayed_ingestion_watermark_behind_settle_cutoff',
+      });
+    },
+  );
+
+  it.each([{ settleDelayMs: Number.NaN }, { maxStalenessMs: Number.POSITIVE_INFINITY }])(
+    'fails closed for nonfinite policy options %j',
+    (policy) => {
+      expect(
+        evaluateBatchFreshness({
+          batchWindowStart: BATCH_START,
+          batchWindowEnd: BATCH_END,
+          now: new Date('2026-11-23T17:52:00.000Z'),
+          watermark: null,
+          ...policy,
+        }),
+      ).toEqual({ is_stale: null, status: 'UNKNOWN', reason: 'invalid_window_or_clock' });
+    },
+  );
 
   it('fails closed (UNKNOWN) on incomplete processing (DLQ > 0, pending > 0, or PostHog incomplete)', () => {
     const dlqBlocked = evaluateBatchFreshness({

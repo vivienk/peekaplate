@@ -52,6 +52,8 @@ export function evaluateBatchFreshness(input: EvaluateBatchFreshnessInput): Batc
     startMs === null ||
     endMs === null ||
     !Number.isFinite(nowMs) ||
+    !Number.isFinite(settleDelayMs) ||
+    !Number.isFinite(maxStalenessMs) ||
     endMs <= startMs ||
     settleDelayMs < 0 ||
     maxStalenessMs <= 0
@@ -114,11 +116,11 @@ export function evaluateBatchFreshness(input: EvaluateBatchFreshnessInput): Batc
     };
   }
 
-  if (watermarkMs < endMs) {
+  if (watermarkMs < endMs + settleDelayMs) {
     return {
       is_stale: true,
       status: 'STALE',
-      reason: 'delayed_ingestion_watermark_behind_batch_end',
+      reason: 'delayed_ingestion_watermark_behind_settle_cutoff',
     };
   }
 

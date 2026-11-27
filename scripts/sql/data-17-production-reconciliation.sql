@@ -1,14 +1,17 @@
--- DATA-17 Read-Only Redacted Production Aggregate Reconciliation Query
--- Usage: Run inside a read-only PostgreSQL session by an authorized database operator (Sai).
+-- DATA-17 Read-Only Redacted Canonical Aggregate Diagnostics
+-- Authorized psql operator: pass -v venue_slug=<approved-QA-diner-slug>.
 -- Returns ONLY aggregate per-dish counts (no session_id, event_id, producer_id, or diner PII).
 -- Note: Output includes small-cohort (< 10) per-dish counts for internal reconciliation only; never expose to owners.
+-- Counts include all scoped canonical rows. Publication and provenance match counts are diagnostic
+-- and do not enforce exact publication/dish revision or PostHog eligibility. Use the owner report
+-- for served metrics; this output cannot attest completeness or freshness.
 
 BEGIN READ ONLY;
 SET LOCAL statement_timeout = '5s';
 
 WITH target_venue AS (
   SELECT "venueId" AS venue_id
-  FROM app_private.resolve_restaurant_link('peekaplate_production_qa_b_nov_21')
+  FROM app_private.resolve_restaurant_link(:'venue_slug')
 ),
 windows AS (
   SELECT
@@ -86,6 +89,7 @@ per_dish_events AS (
   GROUP BY batch_label, dish_id
 )
 SELECT
+  'canonical_diagnostics_only' AS evidence_scope,
   a.batch_label,
   a.starts AS window_start_utc,
   a.ends AS window_end_utc,
