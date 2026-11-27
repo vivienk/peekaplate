@@ -513,7 +513,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)(
           liveStart?: string,
         ) =>
           app.request(
-            `/api/v1/venues/${id}/analytics/dishes${suffix}?source=production${extended ? '&displayActions=true' : ''}`,
+            `https://api.peekaplate.app/api/v1/venues/${id}/analytics/dishes${suffix}?source=production${extended ? '&displayActions=true' : ''}`,
             {
               headers: { Authorization: `Bearer ${bearer}`, Origin: 'https://peekaplate.app' },
             },
