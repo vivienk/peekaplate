@@ -164,7 +164,7 @@ export function MenuPreview({
         <div className="pp-menu-preview__body">
           <div className="pp-menu-preview__diner">
             <span className={`pp-menu-preview__label${published ? ' is-live' : ''}`}>
-              {published ? 'Live — Published' : 'Preview — Not Published'}
+              {published ? 'Live' : 'Preview — Not Published'}
             </span>
             <div className="pp-menu-preview__phone">
               {preparing ? (
@@ -192,9 +192,7 @@ export function MenuPreview({
           <section className="pp-menu-preview__panel" aria-labelledby={`${ids}-link`}>
             <div className="pp-menu-preview__panel-head">
               <h2 id={`${ids}-link`}>Your menu link</h2>
-              <span className={`pp-menu-preview__badge${published ? ' is-live' : ''}`}>
-                {published ? 'Published' : 'Draft'}
-              </span>
+              {!published && <span className="pp-menu-preview__badge">Draft</span>}
             </div>
             {published && publishedUrl ? (
               <>

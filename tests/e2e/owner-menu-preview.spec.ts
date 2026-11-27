@@ -65,7 +65,8 @@ test('publishing asks for confirmation, then shows the returned link with Copy L
   const live = page.getByRole('heading', { level: 1, name: 'Your menu is live' });
   await expect(live).toBeVisible();
   await expect(live).toBeFocused();
-  await expect(page.getByText('Live — Published')).toBeVisible();
+  await expect(page.getByText('Live', { exact: true })).toBeVisible();
+  await expect(page.getByText('Published', { exact: true })).toHaveCount(0);
   const link = page.getByRole('textbox', { name: 'Menu link' });
   await expect(link).toHaveValue('https://peekaplate.app/diner/ember-stone');
   await expect(link).toHaveAttribute('readonly', '');
