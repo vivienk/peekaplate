@@ -139,9 +139,10 @@ function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = f
     OWNER_AI_OPENAI_PROJECT_ID: 'proj_synthetic',
     OWNER_AI_REPORT_REFERENCE_SECRET: secret,
   };
+  const baseUrl = source === 'production' ? 'https://api.peekaplate.app' : '';
   const get = () =>
     worker.request(
-      `${venuePath}/analytics/dishes?source=${source}`,
+      `${baseUrl}${venuePath}/analytics/dishes?source=${source}`,
       { headers: { Authorization: `Bearer ${owner}`, Origin: reportOrigin } },
       env,
     );
@@ -154,7 +155,7 @@ function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = f
   }
   const analyze = (token?: string, actorId = owner, requestOrigin = reportOrigin) =>
     worker.request(
-      `${venuePath}/ai/analysis`,
+      `${baseUrl}${venuePath}/ai/analysis`,
       {
         method: 'POST',
         headers: {
@@ -169,7 +170,7 @@ function setup(source: 'synthetic' | 'production' = 'synthetic', sealedBatch = f
     );
   async function preflight() {
     return worker.request(
-      `${venuePath}/ai/analysis`,
+      `${baseUrl}${venuePath}/ai/analysis`,
       {
         method: 'OPTIONS',
         headers: {

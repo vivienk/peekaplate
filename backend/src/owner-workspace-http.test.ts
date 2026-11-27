@@ -47,7 +47,13 @@ describe('owner workspace HTTP boundary', () => {
     expect(await response.json()).toEqual({ actorId, venues: [] });
     expect((await app.request('/staff/venues?venueId=other', { headers }, env)).status).toBe(400);
     expect(
-      (await app.request('/staff/venues', { headers }, { APP_ENV: 'production' })).status,
+      (
+        await app.request(
+          'https://api.peekaplate.app/staff/venues',
+          { headers },
+          { APP_ENV: 'production' },
+        )
+      ).status,
     ).toBe(404);
   });
 
@@ -55,7 +61,7 @@ describe('owner workspace HTTP boundary', () => {
     const readOwnerVenues = vi.fn(async () => [venue]);
     const app = createApp({ verify: async () => actorId, execute: vi.fn(), readOwnerVenues });
     const production = { APP_ENV: 'production', OWNER_WORKFLOW_ENABLED: 'true' };
-    const path = '/staff/venues';
+    const path = 'https://api.peekaplate.app/staff/venues';
     const origin = 'https://peekaplate.app';
     const result = await app.request(path, { headers: { ...headers, Origin: origin } }, production);
     expect(result.status).toBe(200);

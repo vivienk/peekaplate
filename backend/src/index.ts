@@ -1252,16 +1252,7 @@ export async function approveDishDraftAtomic(
 const HSTS_HEADER_VALUE = 'max-age=2592000';
 
 function isHttpsRequest(request: Request): boolean {
-  const forwardedProto = request.headers
-    .get('x-forwarded-proto')
-    ?.split(',')[0]
-    ?.trim()
-    .toLowerCase();
-  if (forwardedProto === 'https') return true;
-  if (forwardedProto === 'http') return false;
-  const url = new URL(request.url);
-  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return true;
-  return url.protocol === 'https:';
+  return new URL(request.url).protocol === 'https:';
 }
 
 export function createApp(services: Dependencies = dependencies) {
@@ -1285,13 +1276,16 @@ export function createApp(services: Dependencies = dependencies) {
       });
     }
 
-    c.header('Cache-Control', 'no-store');
+    await next();
+
+    if (!c.res.headers.has('Cache-Control')) {
+      c.header('Cache-Control', 'no-store');
+    }
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('X-Request-ID', requestId);
     if (isProduction && https) {
       c.header('Strict-Transport-Security', HSTS_HEADER_VALUE);
     }
-    await next();
   });
   registerOwnerAnalysisRoutes(app, {
     verify: services.verify,

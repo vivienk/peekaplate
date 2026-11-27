@@ -311,7 +311,7 @@ describe.each(['', '/export'])('owner report HTTP boundary %s', (suffix) => {
         ['?source=synthetic', {}],
       ]) {
         const response = await app.request(
-          `/api/v1/venues/${venueId}/analytics/dishes${suffix}${query}`,
+          `https://api.peekaplate.app/api/v1/venues/${venueId}/analytics/dishes${suffix}${query}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -685,7 +685,7 @@ describe('observation.v2 HTTP boundary', () => {
       [{ APP_ENV: 'staging' }, null],
     ] as const) {
       const preflight = await app.request(
-        '/observations',
+        'https://api.peekaplate.app/observations',
         {
           method: 'OPTIONS',
           headers: {
@@ -699,7 +699,7 @@ describe('observation.v2 HTTP boundary', () => {
       expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe(expected);
       expect(preflight.headers.get('Access-Control-Allow-Credentials')).toBeNull();
       const unauthenticated = await app.request(
-        '/observations',
+        'https://api.peekaplate.app/observations',
         {
           method: 'POST',
           headers: { Origin: origin, 'Content-Type': 'application/json' },
@@ -2900,19 +2900,28 @@ describe('production HTTPS enforcement, HSTS, and API security headers', () => {
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
   });
 
-  it('respects X-Forwarded-Proto: https to avoid redirect loops', async () => {
+  it('ignores spoofed X-Forwarded-Proto: https on http:// requests and redirects with 308', async () => {
     const testApp = createApp({ verify: vi.fn(), execute: vi.fn() });
-    const response = await testApp.request(
+    const spoofedHttps = await testApp.request(
       'http://api.peekaplate.app/health',
       { headers: { 'X-Forwarded-Proto': 'https' } },
       productionEnv,
     );
+    expect(spoofedHttps.status).toBe(308);
+    expect(spoofedHttps.headers.get('Location')).toBe('https://api.peekaplate.app/health');
+    expect(spoofedHttps.headers.get('Strict-Transport-Security')).toBeNull();
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Strict-Transport-Security')).toBe('max-age=2592000');
+    const httpForwarded = await testApp.request(
+      'http://api.peekaplate.app/health',
+      { headers: { 'X-Forwarded-Proto': 'http' } },
+      productionEnv,
+    );
+    expect(httpForwarded.status).toBe(308);
+    expect(httpForwarded.headers.get('Location')).toBe('https://api.peekaplate.app/health');
+    expect(httpForwarded.headers.get('Strict-Transport-Security')).toBeNull();
   });
 
-  it('redirects when X-Forwarded-Proto is http even if request URL is https', async () => {
+  it('does not redirect https:// requests even when X-Forwarded-Proto: http is sent', async () => {
     const testApp = createApp({ verify: vi.fn(), execute: vi.fn() });
     const response = await testApp.request(
       'https://api.peekaplate.app/health',
@@ -2920,8 +2929,80 @@ describe('production HTTPS enforcement, HSTS, and API security headers', () => {
       productionEnv,
     );
 
-    expect(response.status).toBe(308);
-    expect(response.headers.get('Location')).toBe('https://api.peekaplate.app/health');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Location')).toBeNull();
+    expect(response.headers.get('Strict-Transport-Security')).toBe('max-age=2592000');
+  });
+
+  it('redirects http://localhost and http://127.0.0.1 in production without HSTS', async () => {
+    const testApp = createApp({ verify: vi.fn(), execute: vi.fn() });
+    for (const url of ['http://localhost/health', 'http://127.0.0.1/health']) {
+      const response = await testApp.request(url, { method: 'GET' }, productionEnv);
+      expect(response.status).toBe(308);
+      expect(response.headers.get('Location')).toBe(url.replace(/^http:/, 'https:'));
+      expect(response.headers.get('Strict-Transport-Security')).toBeNull();
+    }
+  });
+
+  it('applies security headers after downstream raw Response and app.onError responses without duplication', async () => {
+    const venueId = '00000000-0000-4000-8000-000000000123';
+    const reportFixture = {
+      schema_version: 'owner_report.v1',
+      venue_id: venueId,
+      source: 'production',
+      report_metadata: {
+        calculation_version: 'owner_production_day.v1',
+        generated_at: '2026-11-27T12:00:00.000Z',
+        date_window: {
+          duration_hours: 12,
+          start_time: '2026-11-27T00:00:00.000Z',
+          end_time: '2026-11-27T12:00:00.000Z',
+        },
+        coverage: { total_dishes_monitored: 0, measurable_dishes_count: 0 },
+        freshness: { is_stale: null, last_event_ingested_at: null },
+        report_status: 'EMPTY',
+      },
+      dishes: [],
+    };
+    const prodReportEnv = {
+      APP_ENV: 'production',
+      OWNER_WORKFLOW_ENABLED: 'true',
+      OWNER_PRODUCTION_REPORTS_ENABLED: 'true',
+    } as any;
+
+    // Raw new Response(...) CSV export route
+    const exportApp = createApp({
+      verify: async () => 'owner-actor-1',
+      execute: vi.fn(),
+      readOwnerReport: async () => reportFixture,
+    });
+    const exportRes = await exportApp.request(
+      `https://api.peekaplate.app/api/v1/venues/${venueId}/analytics/dishes/export?source=production`,
+      { headers: { Authorization: 'Bearer signed' } },
+      prodReportEnv,
+    );
+    expect(exportRes.status).toBe(200);
+    expect(exportRes.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
+    expect(exportRes.headers.get('Strict-Transport-Security')).toBe('max-age=2592000');
+    expect(exportRes.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(exportRes.headers.get('Cache-Control')).toBe('no-store');
+
+    // app.onError response (unhandled error -> 503)
+    const errorApp = createApp({
+      verify: async () => {
+        throw new Error('unexpected failure');
+      },
+      execute: vi.fn(),
+    });
+    const errRes = await errorApp.request(
+      'https://api.peekaplate.app/staff/venues',
+      { headers: { Authorization: 'Bearer signed' } },
+      productionEnv,
+    );
+    expect(errRes.status).toBe(503);
+    expect(errRes.headers.get('Strict-Transport-Security')).toBe('max-age=2592000');
+    expect(errRes.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(errRes.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('does not redirect or send HSTS in local/staging environments and preserves CORS', async () => {

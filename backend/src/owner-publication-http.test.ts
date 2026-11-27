@@ -20,7 +20,15 @@ describe('prepared menu HTTP boundary', () => {
     });
     expect((await app.request(path, {}, env)).status).toBe(401);
     expect(listPreparedMenus).not.toHaveBeenCalled();
-    expect((await app.request(path, { headers }, { APP_ENV: 'production' })).status).toBe(404);
+    expect(
+      (
+        await app.request(
+          `https://api.peekaplate.app${path}`,
+          { headers },
+          { APP_ENV: 'production' },
+        )
+      ).status,
+    ).toBe(404);
     expect((await app.request(`${path}?venueId=other`, { headers }, env)).status).toBe(400);
     expect((await app.request(`${path}/${actorId}/${actorId}`, { headers }, env)).status).toBe(404);
     expect(fetchPreparedMenu).not.toHaveBeenCalled();
@@ -44,13 +52,22 @@ describe('prepared menu HTTP boundary', () => {
     const production = { APP_ENV: 'production', OWNER_WORKFLOW_ENABLED: 'true' };
     const origin = 'https://peekaplate.app';
     const req = { headers: { ...headers, Origin: origin } };
-    const response = await app.request(path, req, production);
+    const response = await app.request(`https://api.peekaplate.app${path}`, req, production);
     expect(response.status).toBe(200);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin);
     expect(listPreparedMenus).toHaveBeenCalledWith(actorId, venueId, production);
-    const denied = await app.request(`${path}/prepare`, { ...req, method: 'POST' }, production);
+    const denied = await app.request(
+      `https://api.peekaplate.app${path}/prepare`,
+      { ...req, method: 'POST' },
+      production,
+    );
     expect(denied.status).toBe(403);
-    expect(prepareOwnerMenu).toHaveBeenCalledWith(actorId, venueId, 'http://localhost', production);
+    expect(prepareOwnerMenu).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      'https://api.peekaplate.app',
+      production,
+    );
   });
 
   it('uses the verified actor and exact console origin with private no-store reads', async () => {
