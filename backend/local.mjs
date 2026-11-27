@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -32,7 +33,7 @@ async function demo() {
       method: 'POST',
       headers: { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(30_000),
     },
   );
   const responseText = await response.text();
@@ -50,6 +51,20 @@ async function demo() {
     throw new Error(`Local command failed (${response.status}): ${result.error ?? responseText}`);
   }
   console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDemoInChild() {
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), 'demo'], {
+      stdio: 'inherit',
+    });
+
+    child.once('error', reject);
+    child.once('exit', (code, signal) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Local demo process exited with ${signal ?? `code ${code}`}`));
+    });
+  });
 }
 
 async function develop(smoke) {
@@ -134,7 +149,7 @@ async function develop(smoke) {
     console.log(
       'Synthetic credentials expire in one hour. Ctrl+C removes the disposable database and session file.',
     );
-    if (smoke) await demo();
+    if (smoke) await runDemoInChild();
     else await worker.waitUntilExit();
   } finally {
     await cleanup();
