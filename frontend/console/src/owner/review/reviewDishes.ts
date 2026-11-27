@@ -126,7 +126,7 @@ export function dishStatus(dish: ReviewDish): DishStatus {
   const missing = missingFields(dish);
   const [first] = missing;
   if (first === undefined) {
-    return dish.reviewed === false
+    return dish.reviewed === false || dish.allergens.status === 'proposed'
       ? { ready: false, label: 'Pending Review', tone: 'warning' }
       : { ready: true, label: 'Ready', tone: 'success' };
   }

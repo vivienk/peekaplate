@@ -311,6 +311,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/FirstDashboard.test.tsx",
         "tests/e2e/owner-first-dashboard.spec.ts",
         "tests/e2e/owner-onboarding.spec.ts",
+        "frontend/console/src/onboarding/MenuProcessing.test.tsx",
         "frontend/console/src/owner/PublishSuccessDialog.tsx",
         "frontend/console/src/owner-dashboard/report-api.ts",
         "frontend/console/src/owner-dashboard/pages.tsx",
@@ -475,7 +476,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "074beb6547bc3650c3769ae19f7213b0a797a80b380f2becbab2c3fe9165d2b3"
+      "sourceFingerprint": "5aa7cfb82e3e14e494b0e118f15682a40fa2d467a0840da3345eb7edad4671cd"
     },
     {
       "id": "backend",
@@ -542,6 +543,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/public-menu.ts",
         "backend/src/publication-command.test.ts",
         "backend/src/publication-command.ts",
+        "backend/src/s7-res-09-owner-review-gate.integration.ts",
+        "docs/s7-res-09-owner-review-gate.md",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -756,7 +759,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "1a208597fc9b515b61b369305837599f5e8e4ed63c321956a9d1fe172ef77259"
+      "sourceFingerprint": "de849f7957f34b6da2b14f45a8be8ce2ba5742f82d0bf82864e00747fd6144cf"
     },
     {
       "id": "database",
@@ -1159,17 +1162,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console",
-        "diner",
-        "contracts"
-      ],
-      "summary": "Sync the same reviewed main ingredient/consent commits into develop, preserving existing order/comparison/local AI work. Active extraction authority and real SQL fixture regressions are included.",
-      "next": "Wait for PR227 CI, merge main normally, then update develop without force or bypass. Deploy exact main only; credential approval and report completeness remain external AI gates."
-    },
-    {
       "date": "2026-11-21",
       "modules": [
         "console",
@@ -1308,6 +1300,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0020-production-today-dish-performance.md"
       ],
       "next": "Deploy the compatible owner console first and verify an eligible single dish event in the actual production window."
+    },
+    {
+      "date": "2026-11-24",
+      "modules": [
+        "backend",
+        "console"
+      ],
+      "summary": "S7-RES-09 keeps automatic checks separate from owner decisions. Manual verification and approval share required-field and proposed-fact checks. Owner-prepared menu commands verify the stored bundle and match its dish revisions to current active verified drafts.",
+      "files": [
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-prepare.ts",
+        "backend/src/publication-command.ts",
+        "backend/src/s7-res-09-owner-review-gate.integration.ts",
+        "frontend/console/src/onboarding/MenuProcessing.tsx",
+        "frontend/console/src/owner/review/reviewDishes.ts",
+        "docs/s7-res-09-owner-review-gate.md"
+      ],
+      "next": "Review exact-snapshot and concurrent draft behavior before authorized staging verification."
     }
   ]
 }
