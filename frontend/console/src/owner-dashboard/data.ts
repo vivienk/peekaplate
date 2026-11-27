@@ -26,11 +26,9 @@ export const DAILY_PREV = [80, 75, 87, 90, 109, 126, 87];
 export const WEEKS = ['Sep 14', 'Sep 21', 'Sep 28', 'Oct 5'];
 export const WK_PREVIEWS = [96, 111, 124, 143];
 export const WK_TIME = [57, 59, 61, 63];
-export const WK_ORDERS = [47, 50, 52, 58];
 
 // open = dish opens, again = opened again, cmp = in a comparison, p25 = 2.5D previews shown,
 // fb = tapped 2.5D and saw the photo, time = avg seconds interacting per open,
-// ord = verified orders on record (null = no record), weekly = opens over 4 weeks,
 // seen = menu visits that showed the dish (of SESSIONS.now). Fictional sample values.
 export type Dish = {
   id: string;
@@ -43,7 +41,6 @@ export type Dish = {
   p25: number;
   fb: number;
   time: number;
-  ord: number | null;
   weekly: number[];
   seen: number;
   has25: boolean;
@@ -64,7 +61,6 @@ export const DISH: Dish[] = [
     p25: 62,
     fb: 0,
     time: 74,
-    ord: 21,
     weekly: [112, 121, 133, 148],
     has25: true,
     desc: 'Toasted seeded bread with smashed avocado, a poached egg, cherry tomatoes, chili flakes and microgreens.',
@@ -82,7 +78,6 @@ export const DISH: Dish[] = [
     p25: 0,
     fb: 22,
     time: 52,
-    ord: 14,
     weekly: [90, 93, 97, 96],
     has25: false,
     desc: 'Poached eggs and ham on toasted English muffins, finished with warm hollandaise and chives.',
@@ -100,7 +95,6 @@ export const DISH: Dish[] = [
     p25: 0,
     fb: 14,
     time: 47,
-    ord: null,
     weekly: [60, 66, 70, 71],
     has25: false,
     desc: 'Fluffy buttermilk pancakes topped with fresh strawberries, blueberries, maple syrup, and whipped cream.',
@@ -118,7 +112,6 @@ export const DISH: Dish[] = [
     p25: 0,
     fb: 11,
     time: 44,
-    ord: null,
     weekly: [58, 61, 66, 64],
     has25: false,
     desc: 'Golden brioche French toast topped with seasonal berries, powdered sugar, and maple syrup.',
@@ -136,7 +129,6 @@ export const DISH: Dish[] = [
     p25: 57,
     fb: 0,
     time: 81,
-    ord: 17,
     weekly: [88, 97, 108, 119],
     has25: true,
     desc: 'Greens, wild rice, grilled chicken, roasted sweet potato and brussels sprouts, with a creamy lemon dressing on the side.',
@@ -165,7 +157,6 @@ export const DISH: Dish[] = [
     p25: 0,
     fb: 31,
     time: 58,
-    ord: 6,
     weekly: [118, 124, 128, 132],
     has25: false,
     desc: 'Cubed salmon over sushi rice with avocado, edamame, cucumber and pickled ginger.',
@@ -193,7 +184,6 @@ export const DISH: Dish[] = [
     p25: 24,
     fb: 0,
     time: 69,
-    ord: null,
     weekly: [44, 50, 52, 58],
     has25: true,
     desc: 'Mixed baby greens with avocado, cherry tomatoes, cucumber, radish and crumbled blue cheese, finished with pumpkin seeds and cracked pepper.',
@@ -238,8 +228,6 @@ export const T = {
   cmp: totalCmp,
   p25: totalP25,
   fb: totalFb,
-  ord: sum(DISH, (d) => d.ord || 0),
-  withRec: DISH.filter((d) => d.ord !== null).length,
   time: Math.round(sum(DISH, (d) => d.time * d.open) / totalOpen),
   comparisons: Math.round(totalCmp / 2),
   openWith,
@@ -252,13 +240,12 @@ export const T = {
 
 export const PREV = {
   open: sum(DISH, (d) => d.weekly[2] ?? 0),
-  ord: 52,
   p25: 124,
   time: 61,
   sessions: SESSIONS.prev,
 };
 export const pctChg = (a: number, b: number) => Math.round((1000 * (a - b)) / b) / 10;
-export type SortKey = 'open' | 'again' | 'time' | 'p25' | 'cmp' | 'ord' | 'name';
+export type SortKey = 'open' | 'again' | 'time' | 'p25' | 'cmp' | 'name';
 const sortValue = (d: Dish, k: SortKey): number => (k === 'name' ? 0 : (d[k] ?? -1));
 export const bySort = (k: SortKey, desc = true) =>
   [...DISH].sort((a, b) =>
@@ -309,54 +296,10 @@ export const INSIGHTS: InsightItem[] = [
     action:
       'Consider adding a 2.5D preview for the Salmon Poke Bowl first, since it had the most taps.',
   },
-  {
-    id: 'i2',
-    rank: 'Also worth considering',
-    dish: 'poke',
-    title: 'The Salmon Poke Bowl is opened often, with fewer verified orders on record',
-    happened: `It had ${p.open} opens, second only to Avocado Toast (${byId('avotoast').open}), and ${p.ord} verified orders on record. The other dishes with a record have ${byId('benedict').ord}–${byId('avotoast').ord}.`,
-    evidence: [
-      `${p.open} opens · ${p.again} opened again · in ${p.cmp} comparisons`,
-      '22 comparisons were with the Harvest Power Bowl',
-      `Order records exist for ${T.withRec} of ${DISH.length} dishes and are entered by hand`,
-    ],
-    uncertain: [
-      'A dish that was viewed but not ordered is not assumed to be rejected.',
-      `Orders may be unrecorded, so ${p.ord} may be too low.`,
-    ],
-    matters:
-      'If diners are choosing between the two bowls, how each dish is described could affect the choice.',
-    reasons: [
-      'Diners may be choosing between the Poke Bowl and the Harvest Power Bowl (22 comparisons, inferred).',
-      'Some orders may not have been recorded (possible).',
-    ],
-    action:
-      'Consider checking that Poke Bowl orders are being recorded, then review its description and ingredients for clarity.',
-  },
-  {
-    id: 'i3',
-    rank: 'Also worth considering',
-    dish: 'greek',
-    title: 'Three dishes have no order record, so their outcome is unknown',
-    happened: `Berry Pancake Stack, Brioche French Toast and Garden Avocado Salad have no verified order record this week. Together they had ${byId('berrypancakes').open + byId('frenchtoast').open + g.open} opens.`,
-    evidence: [
-      `Berry Pancake Stack ${byId('berrypancakes').open} opens · Brioche French Toast ${byId('frenchtoast').open} · Garden Avocado Salad ${g.open}`,
-      `Garden Avocado Salad: ${g.p25} 2.5D previews in ${g.open} opens (${Math.round((100 * g.p25) / g.open)}%)`,
-    ],
-    uncertain: [
-      'No record is shown as Unknown. It does not mean no one ordered them.',
-      'We cannot say whether these dishes are doing well or poorly.',
-    ],
-    matters:
-      'Without order records, a report can show attention but not outcomes for these dishes.',
-    reasons: ['Orders may not be entered by hand for these dishes (possible).'],
-    action:
-      'Consider recording verified orders for these three dishes so future reports can show them.',
-  },
 ];
 
 /* ---------- AI chat: sample answers built from the same data ---------- */
-export type SectionKind = 'obs' | 'ver' | 'unk' | 'rsn';
+export type SectionKind = 'obs' | 'unk' | 'rsn';
 export type Answer = {
   short: string;
   secs: { k: SectionKind; items: string[] }[];
@@ -366,7 +309,7 @@ export type Answer = {
 
 export const SEC: Record<SectionKind, string> = {
   obs: 'Observed',
-  ver: 'Verified order',
+
   unk: 'Unknown',
   rsn: 'Possible reasons (AI hypotheses)',
 };
@@ -400,7 +343,7 @@ const biggestRise = first(
   [...DISH].sort((a, b) => b.open - (b.weekly[2] ?? 0) - (a.open - (a.weekly[2] ?? 0))),
 );
 
-export const QUICK = ['top', 'orders', 'interact', 'improve', 'week'];
+export const QUICK = ['top', 'interact', 'improve', 'week'];
 
 export const ANSWERS: Record<string, () => Answer> = {
   top: () => {
@@ -434,41 +377,25 @@ export const ANSWERS: Record<string, () => Answer> = {
         `Period ${REST.period}, ${SESSIONS.now} menu sessions. Dishes shown in fewer than ${PRIVACY_FLOOR} visits are left out.`,
         EVT,
       ],
-      follow: ['orders', 'interact'],
+      follow: ['top', 'interact'],
     };
   },
   orders: () => ({
-    short: `The Salmon Poke Bowl is opened often (${p.open} opens, second most) and has ${p.ord} verified orders on record, the lowest of the dishes that have a record.`,
+    short:
+      'Verified orders are unavailable. No eligible verified order or checkout source is connected to this report.',
     secs: [
-      {
-        k: 'obs',
-        items: [
-          `${p.open} opens · ${p.again} opened again · in ${p.cmp} comparisons`,
-          '22 of those comparisons were with the Harvest Power Bowl',
-        ],
-      },
-      { k: 'ver', items: DISH.filter((d) => d.ord !== null).map((d) => `${d.name}: ${d.ord}`) },
       {
         k: 'unk',
         items: [
-          'Berry Pancake Stack, Brioche French Toast and Garden Avocado Salad have no order record. Their outcome is Unknown, not zero.',
-          `Order records are entered by hand and may be incomplete, so ${p.ord} may undercount.`,
-        ],
-      },
-      {
-        k: 'rsn',
-        items: [
-          'Diners may be choosing between the two bowls (inferred from comparisons, not verified).',
-          'Some Poke Bowl orders may be unrecorded (possible).',
+          'Verified orders have status MISSING because this report has no supported order or checkout source.',
+          'Opens, comparisons, previews and Saves are engagement signals; they do not establish completed orders.',
         ],
       },
     ],
     ev: [
-      `Orders: manual records for ${T.withRec} of ${DISH.length} dishes.`,
-      'I do not describe a viewed dish as rejected or lost.',
-      EVT,
+      'Verified orders: MISSING — no verified order or checkout source is present in the supported event data.',
     ],
-    follow: ['premise', 'improve'],
+    follow: ['top', 'interact'],
   }),
   interact: () => ({
     short: `Across ${SESSIONS.now} menu sessions, diners opened ${T.open} dishes, about ${(T.open / SESSIONS.now).toFixed(1)} per session.`,
@@ -499,18 +426,12 @@ export const ANSWERS: Record<string, () => Answer> = {
     secs: [
       {
         k: 'obs',
-        items: [
-          `${p.fb} taps on “View in 2.5D” for the Salmon Poke Bowl showed the photo only`,
-          '3 dishes have no order record',
-        ],
+        items: [`${p.fb} taps on “View in 2.5D” for the Salmon Poke Bowl showed the photo only`],
       },
-      { k: 'unk', items: ['We do not know how the photo fallback affected any order.'] },
+      { k: 'unk', items: ['We do not know how the photo fallback affected a completed action.'] },
       {
         k: 'rsn',
-        items: [
-          'Add a 2.5D preview for the Salmon Poke Bowl first (most taps).',
-          'Record verified orders for Berry Pancake Stack, Brioche French Toast and Garden Avocado Salad.',
-        ],
+        items: ['Add a 2.5D preview for the Salmon Poke Bowl first (most taps).'],
       },
     ],
     ev: ['Both come from the report. Nothing is sent to diners.', EVT],
@@ -528,13 +449,6 @@ export const ANSWERS: Record<string, () => Answer> = {
           `Biggest rise in opens: ${biggestRise.name} (+${biggestRise.open - (biggestRise.weekly[2] ?? 0)})`,
         ],
       },
-      {
-        k: 'ver',
-        items: [
-          `${T.ord} verified orders on record vs ${PREV.ord} last week, for ${T.withRec} of ${DISH.length} dishes only`,
-        ],
-      },
-      { k: 'unk', items: [`Orders for the other ${DISH.length - T.withRec} dishes are Unknown.`] },
     ],
     ev: [
       `Weeks compared: ${REST.period} and ${REST.prev}. A change in numbers is an association, not a cause.`,
@@ -574,7 +488,7 @@ export const ANSWERS: Record<string, () => Answer> = {
       { k: 'rsn', items: ['Diners may be choosing between similar options (inferred).'] },
     ],
     ev: ['Events: compare_started, compare_dish_replaced.'],
-    follow: ['orders', 'top'],
+    follow: ['top', 'interact'],
   }),
   premise: () => ({
     short:
@@ -586,7 +500,9 @@ export const ANSWERS: Record<string, () => Answer> = {
       },
       {
         k: 'unk',
-        items: ['With no verified order record, an outcome is Unknown, not lost and not negative.'],
+        items: [
+          'Verified orders are unavailable because no eligible order or checkout source is connected.',
+        ],
       },
       {
         k: 'rsn',
@@ -594,21 +510,21 @@ export const ANSWERS: Record<string, () => Answer> = {
       },
     ],
     ev: ['This follows the labels used across the dashboard.'],
-    follow: ['orders', 'top'],
+    follow: ['top', 'interact'],
   }),
   cant: () => ({
     short:
-      'I can’t answer that from the diner events and order records I have. I don’t want to guess.',
+      'I can answer questions about supported menu activity, but verified orders are unavailable because no eligible order or checkout source is connected.',
     secs: [
       {
         k: 'unk',
         items: [
-          'Try a question about opens, comparisons, 2.5D previews, verified orders or the weekly change.',
+          'Try a question about opens, comparisons, 2.5D previews or the weekly change. Verified orders are unavailable.',
         ],
       },
     ],
     ev: [EVT],
-    follow: ['top', 'orders', 'week'],
+    follow: ['top', 'week'],
   }),
   empty: () => ({
     short: 'There are no diner events yet, so I have nothing to analyze.',
@@ -627,12 +543,7 @@ for (const i of INSIGHTS) {
       { k: 'rsn', items: i.reasons },
     ],
     ev: [`Why it might matter: ${i.matters}`, EVT],
-    follow:
-      i.id === 'i1'
-        ? ['p25', 'improve']
-        : i.id === 'i2'
-          ? ['orders', 'compare']
-          : ['orders', 'week'],
+    follow: ['p25', 'improve'],
   });
 }
 for (const d of DISH) {
@@ -649,13 +560,16 @@ for (const d of DISH) {
             : `${d.fb} taps on “View in 2.5D” showed the photo (no preview yet)`,
         ],
       },
-      d.ord !== null
-        ? { k: 'ver', items: [`${d.ord} verified orders on record`] }
-        : { k: 'unk', items: ['No order record. Outcome is Unknown, not zero.'] },
+      {
+        k: 'unk',
+        items: [
+          'Verified orders are unavailable because no eligible order or checkout source is connected.',
+        ],
+      },
       { k: 'rsn', items: ['The data does not point to a clear reason, so I won’t offer one.'] },
     ],
     ev: [EVT],
-    follow: ['top', 'orders'],
+    follow: ['top', 'interact'],
   });
 }
 
@@ -688,7 +602,7 @@ export function route(q: string): string | null {
 
 export const QUESTIONS: Record<string, string> = {
   top: 'Which dishes are getting the most attention?',
-  orders: 'Which dishes are viewed often but have fewer verified orders?',
+  orders: 'Are verified orders available?',
   interact: 'How are customers interacting with my menu?',
   improve: 'What improvements should I consider?',
   week: 'How did my menu perform this week?',

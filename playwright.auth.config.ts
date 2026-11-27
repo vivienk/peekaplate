@@ -4,7 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: 'owner-auth-provider.spec.ts',
-  fullyParallel: true,
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   timeout: 30_000,

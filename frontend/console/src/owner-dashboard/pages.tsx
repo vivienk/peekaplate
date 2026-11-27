@@ -27,7 +27,6 @@ import {
   type SortKey,
   T,
   WEEKS,
-  WK_ORDERS,
   WK_PREVIEWS,
   WK_TIME,
 } from './data';
@@ -330,13 +329,13 @@ export function Overview({
                 })}
           />
           <Kpi
-            label="Verified orders on record"
+            label="Verified orders"
             {...(live
               ? overviewMetric(live.summary, 'verified_orders')
               : {
-                  value: T.ord,
-                  foot: `${T.withRec} of ${DISH.length} dishes have a record`,
-                  tag: <Lab k="ver" />,
+                  value: 'Unavailable',
+                  foot: 'No eligible verified order or checkout source',
+                  tag: <Lab k="unk" />,
                 })}
           />
         </div>
@@ -550,15 +549,14 @@ function EvidencePanel() {
   );
 }
 
-const RPT_ROWS: [string, number, number, number, string, number | null][] = [
-  ['Harvest Power Bowl', 412, 96, 59, '38s', 58],
-  ['Garden Avocado Salad', 356, 71, 78, '44s', 61],
-  ['Avocado Toast', 298, 52, 47, '29s', null],
-  ['Classic Eggs Benedict', 241, 38, 39, '33s', 37],
-  ['Berry Pancake Stack', 187, 22, 18, '21s', null],
+const RPT_ROWS: [string, number, number, number, string][] = [
+  ['Harvest Power Bowl', 412, 96, 59, '38s'],
+  ['Garden Avocado Salad', 356, 71, 78, '44s'],
+  ['Avocado Toast', 298, 52, 47, '29s'],
+  ['Classic Eggs Benedict', 241, 38, 39, '33s'],
+  ['Berry Pancake Stack', 187, 22, 18, '21s'],
 ];
-const RPT_ACT =
-  'Start keeping a verified order record for Avocado Toast so its ordered quantity is no longer unknown in the next report.';
+const RPT_ACT = 'No validated suggested action is available here.';
 
 function B({ children }: { children: ReactNode }) {
   return <b>{children}</b>;
@@ -609,6 +607,9 @@ export function Report({
                 : 'Report · 1–14 Sep 2025'}
             </span>
             <h1>Menu activity report</h1>
+            {!live && (
+              <p className="muted">Illustrative sample data — not live restaurant measurements.</p>
+            )}
           </div>
           <Btn
             kind="outlined"
@@ -634,12 +635,6 @@ export function Report({
       <section className="card" aria-labelledby="rs-h">
         <div className="row" style={{ gap: 10 }}>
           <h2 id="rs-h">Summary</h2>
-          {!live && (
-            <span className="lab good">
-              <span className="dot" />
-              Evidence checked
-            </span>
-          )}
         </div>
         {live ? (
           <p className="rpt-sum">
@@ -652,8 +647,8 @@ export function Report({
             During 1–14 Sep 2025, diners opened dish details <B>1,494 times</B> across{' '}
             <B>5 dishes</B> and started <B>111 comparisons</B>. Harvest Power Bowl received the most
             detail views (<B>412</B>); Garden Avocado Salad had the most comparison participations:{' '}
-            <B>78</B>. Sample order records exist for 3 of 5 dishes; Avocado Toast and Berry Pancake
-            Stack have none (unknown).
+            <B>78</B>. Verified order outcomes are unavailable because no eligible order or checkout
+            source is connected.
           </p>
         )}
       </section>
@@ -672,7 +667,6 @@ export function Report({
                     <th className="r">Repeat opens</th>
                     <th className="r">Comparison participations</th>
                     <th className="r">Avg. active time</th>
-                    <th className="r">Ordered items</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -683,17 +677,14 @@ export function Report({
                       <td className="r num">{r[2]}</td>
                       <td className="r num">{r[3]}</td>
                       <td className="r num">{r[4]}</td>
-                      <td className="r">
-                        {r[5] === null ? <Lab k="unk" /> : <span className="num">{r[5]}</span>}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <p className="rpt-note">
-              <b>Unknown outcomes:</b> Avocado Toast and Berry Pancake Stack have no sample order
-              record, so the outcome is unknown, not zero and not rejected.
+              Verified order outcomes are unavailable; views and comparisons do not establish
+              orders.
             </p>
           </>
         )}
@@ -746,9 +737,8 @@ export function Report({
           <>
             <p className="rpt-rec">{a.text}</p>
             <p className="rpt-why">
-              <b>Why:</b> Avocado Toast had 298 detail views and 47 comparison participations,
-              third-highest on both, but no sample order record. Without one, the report cannot show
-              any ordered quantity for it.
+              <b>Why:</b> Avocado Toast had 298 detail views and 47 comparison participations. These
+              are engagement signals and do not establish completed orders.
             </p>
             {a.status === 'suggested' ? (
               <div className="row">
@@ -796,7 +786,6 @@ const TABS: [string, string][] = [
   ['time', 'Interaction time'],
   ['p25', '2.5D preview'],
   ['cmp', 'Comparisons'],
-  ['ord', 'Verified orders'],
   ['trend', 'Trends'],
 ];
 
@@ -950,34 +939,6 @@ export function Perf({
       </div>
     );
   }
-  if (tab === 'ord') {
-    const t = [...DISH].sort((a, b) => (b.ord ?? -1) - (a.ord ?? -1));
-    body = (
-      <div className="stack">
-        <ChartCard
-          title="Verified orders"
-          sub="Only where a restaurant order record exists. Entered by hand, so it may be incomplete."
-          tag={<Lab k="ver" />}
-          head={['Dish', 'Verified orders']}
-          rows={t.map((d) => [d.name, d.ord === null ? 'Unknown (no record)' : d.ord])}
-        >
-          <HBars
-            segs={[{ name: 'Verified orders', color: 'var(--c3)' }]}
-            rows={t.map((d) =>
-              d.ord === null
-                ? { id: d.id, label: d.name, none: 'No record', vals: [] }
-                : { id: d.id, label: d.name, vals: [d.ord], onClick: () => openDish(d.id) },
-            )}
-            max={25}
-          />
-        </ChartCard>
-        <Note icon="info">
-          No record means Unknown. It does not mean nobody ordered the dish, and it is never shown
-          as zero or as lost.
-        </Note>
-      </div>
-    );
-  }
   if (tab === 'trend') {
     const weeklyOpens = WEEKS.map((_, i) => DISH.reduce((a, d) => a + (d.weekly[i] ?? 0), 0));
     body = (
@@ -1021,20 +982,6 @@ export function Perf({
             series={[{ name: 'Seconds', color: 'var(--c1)', values: WK_TIME }]}
           />
         </ChartCard>
-        <ChartCard
-          title="Verified orders on record per week"
-          sub="Only dishes with a record"
-          tag={<Lab k="ver" />}
-          head={['Week of', 'Orders']}
-          rows={WEEKS.map((w, i) => [w, WK_ORDERS[i]])}
-        >
-          <LineChart
-            h={190}
-            labels={WEEKS}
-            desc="Verified orders on record per week"
-            series={[{ name: 'Verified orders', color: 'var(--c3)', values: WK_ORDERS }]}
-          />
-        </ChartCard>
       </div>
     );
   }
@@ -1067,7 +1014,7 @@ export function Perf({
   return (
     <PerfFrame
       period={REST.period}
-      description="Views, time interacting and orders, labelled by how much we know. A dish that was viewed but not ordered is not assumed to be rejected."
+      description="Views, interaction time and comparisons. Verified order outcomes are unavailable without an eligible order or checkout source."
       summary={
         needle
           ? `${sorted.length} of ${DISH.length} dishes`
@@ -1085,7 +1032,6 @@ export function Perf({
                 {th('time', 'Avg time')}
                 {th('p25', '2.5D')}
                 {th('cmp', 'Compared')}
-                {th('ord', 'Verified orders')}
                 <th className="r">4 weeks</th>
               </tr>
             </thead>
@@ -1115,9 +1061,6 @@ export function Perf({
                     {d.has25 ? d.p25 : <span className="muted">{d.fb} photo</span>}
                   </td>
                   <td className="r num">{d.cmp}</td>
-                  <td className="r">
-                    {d.ord === null ? <Lab k="unk" /> : <span className="num">{d.ord}</span>}
-                  </td>
                   <td className="r">
                     <Spark values={d.weekly} />
                   </td>
@@ -1233,21 +1176,6 @@ export function DishDetail({
           foot="Times compared with another dish"
           tag={<Lab k="obs" />}
         />
-        {d.ord === null ? (
-          <Kpi
-            label="Verified orders"
-            value="No record"
-            foot="Outcome is Unknown, not zero"
-            tag={<Lab k="unk" />}
-          />
-        ) : (
-          <Kpi
-            label="Verified orders"
-            value={d.ord}
-            foot="From a hand-entered record"
-            tag={<Lab k="ver" />}
-          />
-        )}
       </div>
       <div className="grid g2">
         <ChartCard
@@ -1319,10 +1247,8 @@ export function DishDetail({
         </section>
       )}
       <Note icon="info">
-        Opens show attention, not preference.{' '}
-        {d.ord === null
-          ? 'With no order record, what happened after viewing is Unknown.'
-          : 'Order counts come from a hand-entered record and may be incomplete.'}
+        Opens show attention, not preference. Verified order outcomes are unavailable because no
+        eligible order or checkout source is connected.
       </Note>
     </div>
   );
@@ -1461,8 +1387,8 @@ export function Actions({
         </div>
         <p>
           Once an action is logged as done, later reports can show dish numbers before and after.
-          That is an observation, not proof the action caused the change. Orders with no record stay
-          Unknown.
+          That is an observation, not proof the action caused the change. Verified orders remain
+          unavailable until an eligible order or checkout source is connected.
         </p>
       </section>
     </div>
@@ -1674,7 +1600,7 @@ export function LivePerf({
   return (
     <PerfFrame
       period={period}
-      description="Review visits, open rates and engagement by dish. Verified orders need linked order records."
+      description="Review visits, open rates and engagement by dish. Verified orders are unavailable without an eligible order or checkout source."
       summary={
         <>
           {report.dishes.length
