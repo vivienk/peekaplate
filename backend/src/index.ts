@@ -1249,11 +1249,48 @@ export async function approveDishDraftAtomic(
   }
 }
 
+const HSTS_HEADER_VALUE = 'max-age=2592000';
+
+function isHttpsRequest(request: Request): boolean {
+  const forwardedProto = request.headers
+    .get('x-forwarded-proto')
+    ?.split(',')[0]
+    ?.trim()
+    .toLowerCase();
+  if (forwardedProto === 'https') return true;
+  if (forwardedProto === 'http') return false;
+  const url = new URL(request.url);
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return true;
+  return url.protocol === 'https:';
+}
+
 export function createApp(services: Dependencies = dependencies) {
   const app = new Hono<{ Bindings: Bindings }>();
   app.use('*', async (c, next) => {
+    const requestId = crypto.randomUUID();
+    const isProduction = c.env?.APP_ENV === 'production';
+    const https = isHttpsRequest(c.req.raw);
+
+    if (isProduction && !https) {
+      const target = new URL(c.req.url);
+      target.protocol = 'https:';
+      return new Response(null, {
+        status: 308,
+        headers: {
+          Location: target.toString(),
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Request-ID': requestId,
+        },
+      });
+    }
+
     c.header('Cache-Control', 'no-store');
-    c.header('X-Request-ID', crypto.randomUUID());
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header('X-Request-ID', requestId);
+    if (isProduction && https) {
+      c.header('Strict-Transport-Security', HSTS_HEADER_VALUE);
+    }
     await next();
   });
   registerOwnerAnalysisRoutes(app, {

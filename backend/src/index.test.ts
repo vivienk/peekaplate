@@ -2826,3 +2826,126 @@ describe('owner insight action HTTP boundary', () => {
     expect(await response.json()).toEqual({ error: 'forbidden' });
   });
 });
+
+describe('production HTTPS enforcement, HSTS, and API security headers', () => {
+  const productionEnv = {
+    APP_ENV: 'production',
+    OWNER_WORKFLOW_ENABLED: 'true',
+  } as any;
+
+  it('redirects HTTP /health requests with 308 preserving path and query without HSTS', async () => {
+    const testApp = createApp({ verify: vi.fn(), execute: vi.fn() });
+    const response = await testApp.request(
+      'http://api.peekaplate.app/health?probe=1&region=sin',
+      { method: 'GET' },
+      productionEnv,
+    );
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get('Location')).toBe(
+      'https://api.peekaplate.app/health?probe=1&region=sin',
+    );
+    expect(response.headers.get('Strict-Transport-Security')).toBeNull();
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('redirects HTTP API requests with 308 before authentication or route execution', async () => {
+    const verify = vi.fn().mockResolvedValue('actor-1');
+    const testApp = createApp({ verify, execute: vi.fn(), readOwnerVenues: vi.fn() });
+
+    const getRes = await testApp.request(
+      'http://api.peekaplate.app/staff/venues?foo=bar',
+      {
+        method: 'GET',
+        headers: { Authorization: 'Bearer should-not-be-verified-over-http' },
+      },
+      productionEnv,
+    );
+    expect(getRes.status).toBe(308);
+    expect(getRes.headers.get('Location')).toBe('https://api.peekaplate.app/staff/venues?foo=bar');
+
+    const postRes = await testApp.request(
+      'http://api.peekaplate.app/observations?batch=2',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events: [] }),
+      },
+      productionEnv,
+    );
+    expect(postRes.status).toBe(308);
+    expect(postRes.headers.get('Location')).toBe('https://api.peekaplate.app/observations?batch=2');
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it('does not redirect HTTPS requests and sets HSTS without includeSubDomains or preload', async () => {
+    const testApp = createApp({ verify: vi.fn(), execute: vi.fn() });
+    const response = await testApp.request(
+      'https://api.peekaplate.app/health',
+      { method: 'GET' },
+      productionEnv,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      status: 'ok',
+      service: 'peekaplate-api',
+      stage: 'foundation',
+    });
+    expect(response.headers.get('Location')).toBeNull();
+    expect(response.headers.get('Strict-Transport-Security')).toBe('max-age=2592000');
+    expect(response.headers.get('Strict-Transport-Security')).not.toContain('includeSubDomains');
+    expect(response.headers.get('Strict-Transport-Security')).not.toContain('preload');
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('respects X-Forwarded-Proto: https to avoid redirect loops', async () => {
+    const testApp = createApp({ verify: vi.fn(), execute: vi.fn() });
+    const response = await testApp.request(
+      'http://api.peekaplate.app/health',
+      { headers: { 'X-Forwarded-Proto': 'https' } },
+      productionEnv,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Strict-Transport-Security')).toBe('max-age=2592000');
+  });
+
+  it('redirects when X-Forwarded-Proto is http even if request URL is https', async () => {
+    const testApp = createApp({ verify: vi.fn(), execute: vi.fn() });
+    const response = await testApp.request(
+      'https://api.peekaplate.app/health',
+      { headers: { 'X-Forwarded-Proto': 'http' } },
+      productionEnv,
+    );
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get('Location')).toBe('https://api.peekaplate.app/health');
+  });
+
+  it('does not redirect or send HSTS in local/staging environments and preserves CORS', async () => {
+    const testApp = createApp({ verify: vi.fn(), execute: vi.fn() });
+    const localRes = await testApp.request('http://127.0.0.1:8787/health', { method: 'GET' }, {
+      APP_ENV: 'local',
+    } as any);
+    expect(localRes.status).toBe(200);
+    expect(localRes.headers.get('Strict-Transport-Security')).toBeNull();
+    expect(localRes.headers.get('X-Content-Type-Options')).toBe('nosniff');
+
+    const corsPreflight = await testApp.request(
+      'https://api.peekaplate.app/staff/venues',
+      {
+        method: 'OPTIONS',
+        headers: {
+          Origin: 'https://peekaplate.app',
+          'Access-Control-Request-Method': 'GET',
+        },
+      },
+      productionEnv,
+    );
+    expect(corsPreflight.status).toBe(204);
+    expect(corsPreflight.headers.get('Access-Control-Allow-Origin')).toBe('https://peekaplate.app');
+    expect(corsPreflight.headers.get('Strict-Transport-Security')).toBe('max-age=2592000');
+  });
+});

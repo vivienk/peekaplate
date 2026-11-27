@@ -13,6 +13,14 @@ import { OWNER_AUTH_PATH, OWNER_PAGE_PATHS, ownerPageForPath } from './src/owner
 const includeDemos = process.env.PEEKAPLATE_PREVIEW_DEMOS === 'true';
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 
+const PRODUCTION_CONSOLE_HEADERS = [
+  '/*',
+  '  X-Frame-Options: DENY',
+  "  Content-Security-Policy: frame-ancestors 'none'",
+  '  Strict-Transport-Security: max-age=2592000',
+  '',
+].join('\n');
+
 function ownerRoutes(production: boolean): Plugin {
   return {
     name: 'owner-routes',
@@ -32,6 +40,7 @@ function ownerRoutes(production: boolean): Plugin {
         ...Object.values(OWNER_PAGE_PATHS).map((path) => `${path} ${OWNER_AUTH_PATH} 200`),
       ];
       this.emitFile({ type: 'asset', fileName: '_redirects', source: `${redirects.join('\n')}\n` });
+      this.emitFile({ type: 'asset', fileName: '_headers', source: PRODUCTION_CONSOLE_HEADERS });
     },
   };
 }
