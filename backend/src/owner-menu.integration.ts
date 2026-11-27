@@ -19,7 +19,12 @@ import {
   dispatchReadyUploadGroup,
 } from './ingestion/intake';
 import { processIngestionQueueBatch } from './ingestion/orchestrator';
-import { claimIngestionJob, getIngestionJob, persistExtractedDrafts } from './ingestion/repository';
+import {
+  approveDishDraft,
+  claimIngestionJob,
+  getIngestionJob,
+  persistExtractedDrafts,
+} from './ingestion/repository';
 import {
   promoteDraftPhoto,
   rejectDraftPhoto,
@@ -43,6 +48,12 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
   const other = crypto.randomUUID();
   const actor = crypto.randomUUID();
   const viewer = crypto.randomUUID();
+  const verifiableDish = {
+    name: 'Fictional soup',
+    category: 'Soups',
+    priceAmount: '7',
+    priceCurrency: 'USD',
+  };
   beforeAll(async () => {
     await admin.connect();
     await runtime.connect();
@@ -187,7 +198,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
   });
   it('removes and restores the same private draft with separate replayable versions', async () => {
     const id = crypto.randomUUID();
-    await save(id, { name: 'Fictional soup', servingSize: '1 bowl' });
+    await save(id, { ...verifiableDish, servingSize: '1 bowl' });
     await verifyOwnerDish(runtime, actor, venue, id, crypto.randomUUID(), true, 1);
     const input = {
       commandId: crypto.randomUUID(),
@@ -224,7 +235,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(restored.removed_at).toBeNull();
     expect(restored.manual_fields).toEqual(removed.manual_fields);
     expect(restored.verification_status).toBe('verified');
-    await save(id, { name: 'Still editable', servingSize: '1 bowl' }, 1);
+    await save(id, { ...verifiableDish, name: 'Still editable', servingSize: '1 bowl' }, 1);
     const events = await admin.query(
       "SELECT version,schema_version,event_type,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_id=$2 AND stream_type='owner_draft' ORDER BY version",
       [venue, id],
@@ -656,13 +667,30 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       priceCurrency: 'USD',
       ingredients: { status: 'proposed', items: ['Unverified ingredient'] },
     });
-    const accepted = await approveDishDraftAtomic(runtime, actor, venue, id, {
+    // Recreate the accepted state from before proposed ingredients blocked approval.
+    const accepted = await createDishRevision(runtime, actor, venue, {
       commandId: crypto.randomUUID(),
-      expectedDraftVersion: 1,
-      confirmed: true,
+      dishId: crypto.randomUUID(),
+      expectedVersion: 0,
+      name: 'Fictional salad',
+      description: '',
+      facts: {
+        category: 'Salad',
+        priceAmount: '10',
+        priceCurrency: 'USD',
+        ingredients: null,
+        allergens: null,
+        photoId: null,
+      },
+    });
+    await approveDishDraft(runtime, {
+      actorId: actor,
+      tenantId: venue,
+      draftId: id,
+      publishedDishId: accepted.dishId,
     });
     const next = await createDishRevision(runtime, actor, venue, {
-      dishId: accepted.publishedRevision.dishId,
+      dishId: accepted.dishId,
       commandId: crypto.randomUUID(),
       expectedVersion: 1,
       name: 'Edited salad',
@@ -1466,7 +1494,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
 
   it('HTTP verification requires authority and reviewed version before accepting the draft', async () => {
     const id = crypto.randomUUID();
-    await save(id);
+    await save(id, verifiableDish);
     const app = createApp({ verify: async () => actor, execute: vi.fn() });
     const env = { APP_ENV: 'local', LOCAL_DATABASE_URL: runtimeUrl! };
     const request = (body: unknown, venueId = venue, authenticated = true) =>
@@ -1503,14 +1531,16 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
   it('dish verification rejects stale content and is invalidated by a later edit', async () => {
     const id = crypto.randomUUID();
     await save(id);
-    await save(id, { name: 'Updated soup' }, 1);
+    await save(id, { ...verifiableDish, name: 'Updated soup' }, 1);
     await expect(
       verifyOwnerDish(runtime, actor, venue, id, crypto.randomUUID(), true, 1),
     ).rejects.toMatchObject({ code: 'version_conflict' });
     const verified = await verifyOwnerDish(runtime, actor, venue, id, crypto.randomUUID(), true, 2);
     expect(verified.draft.draft_version).toBe(2);
     expect(verified.draft.verification_status).toBe('verified');
-    expect((await save(id, { name: 'Changed again' }, 2)).verification_status).toBe('not_verified');
+    expect(
+      (await save(id, { ...verifiableDish, name: 'Changed again' }, 2)).verification_status,
+    ).toBe('not_verified');
   });
 
   it('photo approval and rejection serialize successive commands and replay without storage effects', async () => {
@@ -1556,7 +1586,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
 
   it('promotes staged photos to menu-assets safely and decouples from dish verification', async () => {
     const draftId = crypto.randomUUID();
-    await save(draftId);
+    await save(draftId, verifiableDish);
 
     const storageObjects = new Map<string, ArrayBuffer>();
     const storage = {
