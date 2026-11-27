@@ -1167,6 +1167,28 @@ test('long restaurant names fit the dashboard and onboarding account menu', asyn
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
+test('saved dish photos replace the menu icon in the menu table, read as private blobs', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  // A second saved dish with no photo keeps the menu icon.
+  const second = structuredClone(state.drafts[venue.venueId]![0]!);
+  second.id = crypto.randomUUID();
+  second.draft_id = second.id;
+  second.name = 'Fictional Salad';
+  second.manual_fields = { ...second.manual_fields!, name: second.name, photoId: null };
+  state.drafts[venue.venueId]!.push(second);
+  await signIn(page);
+  const withPhoto = page.locator('.mrow').filter({ hasText: 'Fictional Lentil Soup' });
+  const photo = withPhoto.locator('.thumb img');
+  await expect(photo).toHaveAttribute('src', /^blob:/);
+  await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+  await expect(
+    page.locator('.mrow').filter({ hasText: 'Fictional Salad' }).locator('.thumb img'),
+  ).toHaveCount(0);
+});
+
 test('menu typography and locked-page copy keep the authored live boundary', async ({
   context,
   page,

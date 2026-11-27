@@ -926,6 +926,35 @@ export function OwnerMenuWorkspace({
       setVerified(true);
     });
 
+  // Menu table thumbnails: each saved dish photo is read with the same authenticated byte request as
+  // the editor (never a token in an image URL). A dish without a photo, or a failed read, keeps the icon.
+  const rowPhotoKey = JSON.stringify(
+    reviewDishes.flatMap((dish) => (dish.photoId ? [[dish.id, dish.photoId]] : [])),
+  );
+  const [rowPhotos, setRowPhotos] = useState<Readonly<Record<string, string>>>({});
+  useEffect(() => {
+    const active = runtime.current;
+    const pairs = JSON.parse(rowPhotoKey) as [string, string][];
+    const urls: string[] = [];
+    let disposed = false;
+    setRowPhotos({});
+    if (active)
+      for (const [draftId, photoId] of pairs)
+        void active.client
+          .readDraftPhoto(venueId, draftId, photoId)
+          .then((blob) => {
+            if (disposed || !current(active)) return;
+            const url = URL.createObjectURL(blob);
+            urls.push(url);
+            setRowPhotos((shown) => ({ ...shown, [draftId]: url }));
+          })
+          .catch(() => {});
+    return () => {
+      disposed = true;
+      for (const url of urls) URL.revokeObjectURL(url);
+    };
+  }, [rowPhotoKey, venueId, current]);
+
   if (!active) return null;
   if (!loaded) {
     const loading = (
@@ -1485,7 +1514,11 @@ export function OwnerMenuWorkspace({
                   return (
                     <div key={draft.id} className="mrow">
                       <span className="thumb">
-                        <Icon n="menu" s={24} />
+                        {rowPhotos[draft.id] ? (
+                          <img src={rowPhotos[draft.id]} alt="" />
+                        ) : (
+                          <Icon n="menu" s={24} />
+                        )}
                       </span>
                       <span className="dn">
                         {effective?.name ?? draft.name ?? 'Untitled dish'}
