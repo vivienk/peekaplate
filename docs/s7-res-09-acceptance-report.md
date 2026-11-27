@@ -3,13 +3,13 @@
 - **Date:** November 25, 2026
 - **Ticket:** S7-RES-09
 - **PR:** [#266](https://github.com/vivienk/peekaplate/pull/266) (`feat/s7-res-09-owner-review-gate`)
-- **Final Commit SHA:** `8f89bbab` (rebased cleanly onto `origin/develop` `c66b328f`, plus Playwright E2E spec)
+- **Reviewed commit:** `8f89bbab` (rebased cleanly onto `origin/develop` `c66b328f`, plus Playwright E2E spec)
 - **Existing Artifact Reused:** `docs/s7-res-09-owner-review-gate.md` (PR #266)
-- **Final Status:** **READY FOR REVIEW / HOSTED STAGING PENDING** (All unit, Playwright E2E, PostgreSQL/pgTAP integration, TypeScript, Biome, and context checks **PASS**; PR review, merge, staging deploy, and hosted verification **PENDING**)
+- **Status on November 25:** **READY FOR REVIEW / HOSTED ACCEPTANCE PENDING**. The author recorded local, Playwright and CI checks. The listed PostgreSQL/pgTAP run used the pre-rebase commit. PR approval, merge and hosted verification remain pending.
 
 ---
 
-## 1. Test Commands & Results (Verified on `8f89bbab`)
+## 1. Author's test record
 
 - `node scripts/context.mjs check`: **PASS** (`13` modules, `10` handoffs).
 - `node scripts/check-docs.mjs`: **PASS** (`104` Markdown files).
@@ -32,4 +32,4 @@
 ## 3. Remaining External Dependencies
 
 1. **PR #266** review approval and merge to `develop`.
-2. **Staging deployment** of merged `develop` and hosted staging verification (once `peekaplate-console-staging.pages.dev` auth/publication is enabled).
+2. **Hosted staging verification** remains pending while the [Meta freeze](production-release.md) is active. After the freeze is lifted and staging changes are authorized, promote the reviewed candidate to `main` and dispatch the staging Worker workflow for that exact `main` commit. Record the commit and deployment ID, then verify the owner flow with authorized staging console auth and publication under [ADR 0012](adr/0012-main-environment-promotion.md).
