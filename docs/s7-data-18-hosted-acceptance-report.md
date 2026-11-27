@@ -3,7 +3,7 @@
 - **Date:** November 25, 2026
 - **Ticket:** S7-DATA-18
 - **PR:** [#264](https://github.com/vivienk/peekaplate/pull/264) (`e00a039a`)
-- **Existing Artifacts Reused:** `docs/s7-data-18-staging-acceptance.md`, `docs/s7-data-18-staging-runbook.md` (PR #264)
+- **Existing Artifacts Reused:** The staging runbook and the checked-in A/B dry-run manifests in [PR #264](https://github.com/vivienk/peekaplate/pull/264).
 - **Status on November 25:** **HOSTED ACCEPTANCE BLOCKED**. The author recorded local test and dry-run results. Live `--send` remains pending while Meta staging is frozen and an approved test-class venue, published test menu and staging access are unavailable.
 
 ---
