@@ -119,3 +119,69 @@ Hourly export means delayed availability, not a one-hour delivery guarantee. Use
 To stop copying, pause the destination and disable the dedicated LOGIN after checking no run is active. Keep records for investigation; use a reviewed forward change for schema corrections. Before real diner data, approve retention and implement deletion across PostHog, Supabase copies and backups. The existing short-retention proposal is not an automatic deletion job.
 
 Design decision: [ADR 0013](adr/0013-posthog-export-boundary.md). Existing capture behavior: [PostHog setup](posthog.md).
+
+## DATA-19: Daily export reconciliation implementation status
+
+The existing hosted staging destination remains configured for hourly exports of
+`app_shell_viewed` events with `environment = staging`. This implementation does
+not change the hosted schedule, trigger a backfill, or verify a daily schedule.
+
+### Reconciliation contract
+
+`backend/src/posthog-export-reconciliation.ts` provides a pure reconciliation
+utility. It accepts operator-supplied PostHog run evidence and Supabase copied
+event identities for each export interval.
+
+- Group attempts by their exact interval boundaries.
+- Require all attempts for an interval to agree on the expected PostHog event IDs.
+- Aggregate copied event IDs across failed and completed attempts.
+- Require at least one completed attempt and an exact match between expected and
+  unique copied event IDs before advancing the verified cutoff.
+- Count repeated copies separately from unique event identities.
+- Block later intervals when an earlier interval is missing, incomplete, or
+  inconsistent.
+
+The utility does not fetch provider run history, query Supabase, persist a
+verified cutoff, or associate landing-table rows with a provider run ID. Those
+evidence-gathering and persistence steps still require an authorized integration
+and hosted verification.
+
+### Event time versus ingestion interval
+
+Use the PostHog batch run's interval to determine which ingestion export receives
+an event. Do not substitute the event's `timestamp` for the batch interval.
+
+For example, an event occurring Saturday at 23:59:55 UTC but ingested by PostHog
+on Sunday at 00:00:03 UTC belongs to Sunday's ingestion export. Its event
+timestamp remains Saturday. The canonical owner report must continue to use the
+independently written canonical application facts and their event-time semantics;
+the PostHog export is supplementary reconciliation evidence, not the source of
+truth for owner reporting.
+
+### Hosted acceptance evidence still required
+
+An authorized operator with PostHog and Supabase access must record:
+
+1. The approved daily schedule, destination ID, and scheduled run ID.
+2. The exact run interval boundaries and the expected event IDs from PostHog.
+3. The matching copied event IDs and raw/deduplicated totals from Supabase.
+4. A late-arriving event whose ingestion interval differs from its event time.
+5. A partially failed interval, the following completed interval, and successful
+   backfill/replay evidence for both.
+6. Proof that the verified cutoff remains before the missing interval until
+   reconciliation succeeds, then advances only after matching evidence.
+7. Rollback evidence and an independent totals check by Harshita.
+
+Do not mark daily staging acceptance complete until this evidence is attached
+and independently checked. Do not change the existing hosted hourly schedule
+without the required operator approval.
+
+### Rollback
+
+For an approved hosted change, pause the PostHog destination and disable the
+dedicated exporter LOGIN after confirming that no export run is active. Retain
+landing records and run evidence for investigation. Do not delete copied data
+or alter application roles as part of rollback.
+
+Local verification currently covers the reconciliation utility and its unit
+tests only; it is not hosted export verification.
