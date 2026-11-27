@@ -309,7 +309,7 @@ export function DietaryField({
   return (
     <div className="pp-field s09-cat">
       <span className="pp-field__label" id={`${uid}-label`}>
-        Dietary
+        Dietary Info
       </span>
       <div className="s09-cat__box" ref={boxRef}>
         <div
@@ -364,8 +364,9 @@ export function DietaryField({
           </div>
         )}
       </div>
-      <p className="pp-field__hint" id={`${uid}-hint`}>
-        Optional. Choose up to two.
+      {/* Amr's S09 handoff: the helper shows while the list is closed and hides while it is open. */}
+      <p className="pp-field__hint" id={`${uid}-hint`} hidden={open}>
+        Select up to 2 options
       </p>
     </div>
   );

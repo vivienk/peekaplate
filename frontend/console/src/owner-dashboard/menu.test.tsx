@@ -111,9 +111,9 @@ describe('Screen 9 (Add dish) form', () => {
   it('shows an optional Dietary dropdown below Allergens', () => {
     const html = render(newDraft());
     expect(html).toMatch(/id="f-diet"[^>]*role="combobox"/);
-    expect(html).toContain('>Dietary<');
+    expect(html).toContain('>Dietary Info<');
     expect(html).toContain('Select dietary info');
-    expect(html).toContain('Optional. Choose up to two.');
+    expect(html).toMatch(/class="pp-field__hint"[^>]*>Select up to 2 options</);
     expect(html).not.toMatch(/id="f-diet"[^>]*aria-required/);
     expect(html.indexOf('id="f-alg"')).toBeLessThan(html.indexOf('id="f-diet"'));
   });
