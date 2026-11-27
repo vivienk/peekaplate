@@ -431,6 +431,27 @@ describe('live Screen 9 on the authored #172 presentation', () => {
       button(render({ ...props, reviewConfirmed: true, licenseConfirmed: true })),
     ).not.toContain(' disabled=""');
   });
+  it('disables Save photo and generate 2.5D until photo rights are confirmed (S7-VIS-06)', () => {
+    const value = { ...emptyManualDish(), photoId: '00000000-0000-4000-8000-000000000111' };
+    const props = {
+      value,
+      photoUrl: 'blob:private-photo',
+      onReviewConfirmedChange: noop,
+      onLicenseConfirmedChange: noop,
+      onGeneratePortion: noop,
+    };
+    const button = (html: string) =>
+      html.match(/<button[^>]*>Save photo and generate 2\.5D<\/button>/)?.[0] ?? '';
+    expect(button(render({ ...props, reviewConfirmed: true, licenseConfirmed: false }))).toContain(
+      'disabled=""',
+    );
+    expect(
+      button(render({ ...props, reviewConfirmed: true, licenseConfirmed: true })),
+    ).not.toContain(' disabled=""');
+    expect(
+      button(render({ ...props, reviewConfirmed: true, licenseConfirmed: true, busy: true })),
+    ).toContain('disabled=""');
+  });
   it('disables editable descendants while an existing save is running', () => {
     expect(render({ busy: true })).toContain('<fieldset disabled=""');
   });

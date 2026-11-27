@@ -3159,7 +3159,14 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
   ).toBeVisible();
   await expect(page.getByRole('progressbar', { name: '2.5D preview processing' })).toBeVisible();
   expect(generations).toBe(1);
-  await page.getByRole('button', { name: 'Save photo and generate 2.5D', exact: true }).click();
+  const generateBtn = page.getByRole('button', {
+    name: 'Save photo and generate 2.5D',
+    exact: true,
+  });
+  await expect(generateBtn).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'I have the right to use this photo.' }).check();
+  await expect(generateBtn).toBeEnabled();
+  await generateBtn.click();
   await expect(
     page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup' }),
   ).toBeVisible();
@@ -3177,6 +3184,83 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
     page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup updated' }),
   ).toBeVisible();
   expect(generations).toBe(2);
+});
+
+test('gates Screen 9 photo upload and 2.5D generation on photo-rights confirmation (S7-VIS-06)', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const image = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  let generations = 0;
+  const headers = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+  await context.route(
+    `${api}/venues/${venue.venueId}/drafts/*/photos/*/portion**`,
+    async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+      const parts = new URL(route.request().url()).pathname.split('/');
+      if (parts.at(-1) === 'image') {
+        return route.fulfill({ body: image, contentType: 'image/webp', headers });
+      }
+      const draftIdx = parts.indexOf('drafts');
+      const draftId = draftIdx >= 0 ? parts[draftIdx + 1] : '';
+      const photoId = draftIdx >= 0 ? parts[draftIdx + 3] : '';
+      generations++;
+      return route.fulfill({
+        json: {
+          portionReview: {
+            status: 'needs_review',
+            dish_id: draftId,
+            draft_revision_id: photoId,
+            approved: false,
+          },
+        },
+        headers,
+      });
+    },
+  );
+
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  await page.getByRole('textbox', { name: /^Dish name/ }).fill('Fictional Herb Omelette');
+  await addCategory(page, 'Breakfast');
+  await page.getByRole('textbox', { name: /^Price/ }).fill('11.50');
+  await page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true }).fill('1');
+  await page.getByRole('textbox', { name: /^Ingredients/ }).fill('Eggs');
+  await page.getByRole('button', { name: 'Add ingredient', exact: true }).click();
+  await page
+    .getByLabel('Dish photo', { exact: true })
+    .setInputFiles({ name: 'omelette.png', mimeType: 'image/png', buffer: image });
+
+  const rights = page.getByRole('checkbox', { name: 'I have the right to use this photo.' });
+  await expect(rights).toBeVisible();
+  await expect(rights).not.toBeChecked();
+  const generateBtn = page.getByRole('button', {
+    name: 'Save photo and generate 2.5D',
+    exact: true,
+  });
+  await expect(generateBtn).toBeDisabled();
+  await generateBtn.click({ force: true });
+  expect(state.photos.size).toBe(0);
+  expect(state.apiCalls.some((call) => /\/drafts\/[^/]+\/photos$/.test(call.path))).toBe(false);
+  expect(generations).toBe(0);
+
+  await rights.check();
+  await expect(generateBtn).toBeEnabled();
+  await generateBtn.click();
+  await expect(
+    page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Herb Omelette' }),
+  ).toBeVisible();
+  expect(state.photos.size).toBe(1);
+  expect(state.apiCalls.some((call) => /\/drafts\/[^/]+\/photos$/.test(call.path))).toBe(true);
+  expect(generations).toBe(1);
 });
 
 test('Screen 9 people count stays separate from a saved 28 cm plate and clears confirmation on edits', async ({

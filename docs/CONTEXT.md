@@ -476,7 +476,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5aa7cfb82e3e14e494b0e118f15682a40fa2d467a0840da3345eb7edad4671cd"
+      "sourceFingerprint": "5497d08b029882b954249ca5767e5b800da1e46aa194d8371e1b83a5119e41cf"
     },
     {
       "id": "backend",
@@ -759,7 +759,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "de849f7957f34b6da2b14f45a8be8ce2ba5742f82d0bf82864e00747fd6144cf"
+      "sourceFingerprint": "6ca0f8002f56436c16953c43142bcc2d4b7517517596401b0726621e4b7270bc"
     },
     {
       "id": "database",
@@ -1167,27 +1167,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "date": "2026-11-21",
       "modules": [
         "console",
-        "diner",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "summary": "Production reports seal five-minute UTC batches from attested canonical facts and exact same-day PostHog matches. Dish performance uses real exposure, timing, save and engagement measures. New batches can show qualifying 2.5D renders and comparison starts from verified publication revisions. Venue visits and opens can start at one; dish metrics and display-action counts retain their floors. Verified orders lack linked evidence.",
-      "files": [
-        "docs/production-release.md",
-        "docs/adr/0017-production-owner-report-sources.md",
-        "docs/adr/0018-production-batch-counts.md",
-        "backend/src/owner-production-report.integration.ts",
-        "backend/src/owner-actions-cors.test.ts",
-        "backend/src/owner-workflow-environment.ts",
-        "backend/wrangler.production.jsonc"
-      ],
-      "next": "Keep Meta staging frozen. Provision production-only provider credentials securely and verify the two published venue flows plus freshness and disclosure before enabling reporting or paid AI."
-    },
-    {
-      "date": "2026-11-21",
-      "modules": [
-        "console",
         "backend",
         "delivery"
       ],
@@ -1322,21 +1301,25 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Review exact-snapshot and concurrent draft behavior before authorized staging verification."
     },
     {
-      "date": "2026-11-25",
+      "date": "2026-11-27",
       "modules": [
         "console",
         "backend",
         "processing"
       ],
-      "summary": "Fix S09 2.5D portion timeouts: give generateDraftPortion a per-call 240s client timeout (>220s Worker bound) with honest timeout copy, keep Worker R2 writes alive with waitUntil on client abort, and disable Numba JIT with OMP_NUM_THREADS=1 in cutout subprocesses so unused pymatting kernels are not compiled on every 0.5-vCPU run.",
+      "summary": "Rebase PR #274 onto develop and address review feedback: keep 240s per-call client timeout and NUMBA_DISABLE_JIT=1 / OMP_NUM_THREADS=1 in cutout subprocesses (~9.4s cutout), document Cloudflare's ~30s waitUntil post-disconnect cap, add 429 busy R2-recheck backoff inside processPrivateDishPhoto for uncached disconnect/retry recovery, and gate S09 Save photo and generate 2.5D on photo-rights confirmation (S7-VIS-06).",
       "files": [
         "frontend/console/src/owner-menu/api.ts",
         "frontend/console/src/owner-menu/jobs.ts",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/owner-dashboard/DishFormView.tsx",
         "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
         "backend/src/owner-menu-routes.ts",
-        "processing/src/peekaplate_processing/cutout.py"
+        "backend/src/owner-portion-preview.ts",
+        "processing/src/peekaplate_processing/cutout.py",
+        "tests/e2e/owner-workspace.spec.ts"
       ],
-      "next": "Verify hosted S09 Save photo and generate 2.5D end-to-end timing and Worker logs after deploying the updated processing container, API Worker, and console."
+      "next": "Deploy updated portion container, API Worker, and console in order, then rerun hosted S09 through Diner View Portion end-to-end QA."
     }
   ]
 }

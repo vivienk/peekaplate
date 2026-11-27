@@ -268,8 +268,18 @@ export function DishFormView({
                     kind="outlined"
                     size="md"
                     type="button"
-                    disabled={busy || !dr.upload}
-                    onClick={onGeneratePortion}
+                    disabled={busy || !dr.upload || !dr.rights}
+                    onClick={() => {
+                      if (!dr.rights) {
+                        setErrs((prev) => ({
+                          ...prev,
+                          'f-rights': 'Confirm you have the right to use this photo',
+                        }));
+                        document.getElementById('f-rights')?.focus();
+                        return;
+                      }
+                      onGeneratePortion();
+                    }}
                   >
                     Save photo and generate 2.5D
                   </Btn>

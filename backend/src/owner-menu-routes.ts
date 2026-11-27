@@ -310,7 +310,8 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
         sourceHash: scope.photo.source_hash,
         sourceSize: scope.photo.size_bytes,
       });
-      // Keep R2 persistence alive if the browser aborts/navigates away while segmentation runs.
+      // Cloudflare waitUntil covers up to ~30s after client disconnect (~9.4s cutout fits; slower
+      // cut-offs recover on retry via processPrivateDishPhoto's R2 re-check and 429 busy backoff).
       try {
         c.executionCtx.waitUntil(pending.catch(() => {}));
       } catch {

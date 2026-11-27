@@ -87,6 +87,23 @@ export async function privatePreviewImage(bucket: Bucket, key: string, record: P
   return objectBytes(image, record.foreground_size, record.foreground_sha256);
 }
 
+function waitForRetry(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return Promise.reject(signal.reason ?? new Error('portion_processing_unavailable'));
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason ?? new Error('portion_processing_unavailable'));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 /** Trusted server-to-server path; no browser-controlled URL, token, or public assets. */
 export async function processPrivateDishPhoto(input: {
   env: Bindings;
@@ -97,8 +114,19 @@ export async function processPrivateDishPhoto(input: {
   sourceKey: string;
   sourceHash: string;
   sourceSize: number;
+  busyRetryDelaysMs?: readonly number[];
 }) {
-  const { env, bucket, venueId, draftId, photoId, sourceKey, sourceHash, sourceSize } = input;
+  const {
+    env,
+    bucket,
+    venueId,
+    draftId,
+    photoId,
+    sourceKey,
+    sourceHash,
+    sourceSize,
+    busyRetryDelaysMs = [2_000, 4_000, 6_000],
+  } = input;
   const key = previewKey(venueId, draftId, photoId, sourceHash);
   const existing = await readPrivatePortion(bucket, key);
   if (existing?.status === 'needs_review') return existing;
@@ -126,34 +154,48 @@ export async function processPrivateDishPhoto(input: {
   const timeout = setTimeout(() => controller.abort(), 220_000);
   let raw: unknown;
   try {
-    const response = await fetch(new URL(`/v1/portion-uploads/${draftId}/${photoId}`, endpoint), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${serviceSecret}`,
-        'Content-Type': 'application/octet-stream',
-      },
-      body: photo,
-      redirect: 'manual',
-      signal: controller.signal,
-    });
-    if (!response.ok || !response.body) {
-      await response.body?.cancel();
-      throw new Error('portion_processing_unavailable');
-    }
-    const reader = response.body.getReader();
-    let size = 0;
-    const chunks: Uint8Array[] = [];
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.byteLength;
-        if (size > 300_000) throw new Error('processor_response_too_large');
-        chunks.push(value);
+    const endpointUrl = new URL(`/v1/portion-uploads/${draftId}/${photoId}`, endpoint);
+    for (let attempt = 0; ; attempt += 1) {
+      if (attempt > 0) {
+        // Another caller's disconnect-surviving write or in-flight run may have finished during backoff.
+        const cached = await readPrivatePortion(bucket, key);
+        if (cached?.status === 'needs_review') return cached;
       }
-      raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    } finally {
-      await reader.cancel().catch(() => {});
+      const response = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${serviceSecret}`,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: photo,
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+      if (response.status === 429 && attempt < busyRetryDelaysMs.length) {
+        await response.body?.cancel();
+        await waitForRetry(busyRetryDelaysMs[attempt]!, controller.signal);
+        continue;
+      }
+      if (!response.ok || !response.body) {
+        await response.body?.cancel();
+        throw new Error('portion_processing_unavailable');
+      }
+      const reader = response.body.getReader();
+      let size = 0;
+      const chunks: Uint8Array[] = [];
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > 300_000) throw new Error('processor_response_too_large');
+          chunks.push(value);
+        }
+        raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } finally {
+        await reader.cancel().catch(() => {});
+      }
+      break;
     }
   } finally {
     clearTimeout(timeout);

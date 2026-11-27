@@ -182,7 +182,14 @@ export function DishEditor({
         {...(onAddCategory && { onAddCategory })}
         {...(portionReview ? { portionReview } : {})}
         {...(onApprovePortion ? { onApprovePortion } : {})}
-        {...(onGeneratePortion ? { onGeneratePortion } : {})}
+        {...(onGeneratePortion
+          ? {
+              onGeneratePortion: () => {
+                if (busy || (onLicenseConfirmedChange && !licenseConfirmed)) return;
+                onGeneratePortion();
+              },
+            }
+          : {})}
         portionCalibrationControl={
           <PortionCalibrationEditor
             key={

@@ -831,6 +831,10 @@ export function OwnerMenuWorkspace({
   const saveDish = (stayOnEditor = false) =>
     void run(async (active) => {
       if (!editing) return;
+      if ((pendingPhoto || editing.form.photoId) && !licenseChecked) {
+        setError('Confirm you have the right to use this photo.');
+        return;
+      }
       if (editing.form.origin === 'manual') {
         let saved = editing.draft;
         const input = manualSaveCommand(editing.form, saved?.draft_version ?? 0, newCommandId());
@@ -1310,7 +1314,10 @@ export function OwnerMenuWorkspace({
           photoPending={Boolean(pendingPhoto)}
           calibrationPhotoUnavailable={calibrationPhotoUnavailable}
           {...(portionReview ? { portionReview } : {})}
-          onGeneratePortion={() => saveDish(true)}
+          onGeneratePortion={() => {
+            if (!licenseChecked || (!pendingPhoto && !editing.form.photoId)) return;
+            saveDish(true);
+          }}
           onApprovePortion={() => {
             const id = editing.id;
             const photoId = editing.form.photoId;
