@@ -459,7 +459,7 @@ describe('DATA-17 real PostgreSQL readOwnerReport() verification', () => {
     expect(report.dishes[0]!.metrics.engagement_rate).toEqual({ value: 0.1, status: 'NORMAL' });
   });
 
-  it('excludes nonfinal checkpoints from finalized timing while enforcing start-inclusive and end-exclusive UTC boundaries', async () => {
+  it('uses the greatest checkpoint for finalized openings within a half-open UTC window', async () => {
     const fx = await createVenueFixture('DATA-17 UTC and nonfinal');
     const start = '2035-03-09T00:00:00.000Z';
     const end = new Date('2035-03-10T00:00:00.000Z');
@@ -475,17 +475,18 @@ describe('DATA-17 real PostgreSQL readOwnerReport() verification', () => {
       const expId = await fx.addExposure(sessionId, ts);
       const openId = await fx.addOpening(sessionId, ts, { fromExposureId: expId });
       await fx.addCheckpoint(sessionId, openId, ts, 12_000, true);
+      if (i === 0) await fx.addCheckpoint(sessionId, openId, ts, 15_000, false);
     }
-    // 11th opening with a 30s nonfinal checkpoint: must NOT affect average opening time (stays 12s).
-    const nonfinalOpenId = await fx.addOpening(crypto.randomUUID(), justBeforeEnd);
-    await fx.addCheckpoint(crypto.randomUUID(), nonfinalOpenId, justBeforeEnd, 30_000, false);
+    const nonfinalSessionId = crypto.randomUUID();
+    const nonfinalOpenId = await fx.addOpening(nonfinalSessionId, justBeforeEnd);
+    await fx.addCheckpoint(nonfinalSessionId, nonfinalOpenId, justBeforeEnd, 30_000, false);
 
     const report = OwnerDishReportSchema.parse(
       await readOwnerReport(runtime, fx.ownerId, fx.venueId, end, 'synthetic'),
     );
     expect(report.dishes[0]!.metrics.active_sessions).toEqual({ value: 10, status: 'NORMAL' });
     expect(report.dishes[0]!.metrics.avg_interaction_time_seconds).toEqual({
-      value: 12,
+      value: 12.3,
       status: 'NORMAL',
     });
     expect(report.dishes[0]!.metrics.timing_coverage).toEqual({ value: 0.909, status: 'NORMAL' });
