@@ -16,10 +16,11 @@
 
 ---
 
-## 2. DATA-17 Redacted Production Aggregate SQL — **PASS (Ready for Operator Execution)**
+## 2. DATA-17 Redacted Canonical Aggregate Diagnostics
 
 - **Script:** [data-17-production-reconciliation.sql](../scripts/sql/data-17-production-reconciliation.sql)
-- **Safety:** Executes inside `BEGIN READ ONLY` with `SET LOCAL statement_timeout = '5s'`, resolves `peekaplate_production_qa_b_nov_21` via `app_private.resolve_restaurant_link(...)`, and returns only aggregate per-dish counts (`total_sessions`, `open_eligible_sessions`, `exposed_open_sessions`, `total_openings`, `authorized_publication_match_count`, `production_provenance_match_count`) for Batch A (`2026-11-23T01:45:00Z`–`01:50:00Z`) and Batch B (`2026-11-23T17:45:00Z`–`17:50:00Z`).
+- **Operator use:** Run with `psql -v venue_slug=<approved-QA-diner-slug> -f scripts/sql/data-17-production-reconciliation.sql` on an authorized connection. It runs read-only with a five-second statement timeout and returns only aggregate counts for Batch A (Nov 23, 01:45–01:50 UTC) and Batch B (Nov 23, 17:45–17:50 UTC).
+- **Interpretation:** The publication and production-provenance match columns describe the raw canonical cohort. The served production report additionally requires exact publication and dish revision eligibility and applicable PostHog event matches. The SQL cannot establish served counts or completeness.
 - **Live Execution Status:** **NOT_VERIFIABLE** (no production database read access in this session; requires Sai).
 
 ---
@@ -28,7 +29,7 @@
 
 ### Implemented Fail-Closed Evaluator — **PASS (Code-Verified)**
 - Implemented `evaluateBatchFreshness()` in [owner-report-freshness.ts](../backend/src/owner-report-freshness.ts) and wired into `measureReport()` in [owner-report.ts](../backend/src/owner-report.ts) with `watermark: null` for live production.
-- **Behavior:** Fails closed (`is_stale: null`, `UNKNOWN`) when `watermark` is `null`, invalid, within settle delay, or reports `dlqDepth > 0` / `pendingQueueCount > 0` / `posthogComplete === false`. Returns `STALE` (`is_stale: true`) when `watermarkAt < batchWindowEnd` or `now - watermarkAt > maxStalenessMs`. Returns `FRESH` (`is_stale: false`) only when all server-side checkpoints prove completeness.
+- **Behavior:** Fails closed (`is_stale: null`, `UNKNOWN`) when `watermark` is `null`, invalid, within settle delay, or reports `dlqDepth > 0` / `pendingQueueCount > 0` / `posthogComplete === false`. Returns `STALE` (`is_stale: true`) when `watermarkAt < batchWindowEnd + settleDelay` or `now - watermarkAt > maxStalenessMs`. Returns `FRESH` (`is_stale: false`) only when all server-side checkpoints prove completeness.
 - Verified across all 8 required scenarios (fresh, stale, unknown, delayed, incomplete, invalid timestamps, settle/replay, AI-03 abstention) in [owner-report-freshness.test.ts](../backend/src/owner-report-freshness.test.ts).
 
 ### Missing Infrastructure for Production `is_stale: false` — **BLOCKED**
@@ -62,7 +63,7 @@ The current production architecture **cannot** establish `is_stale: false` becau
 | Area | Verdict | Code-Verified vs Production-Verified |
 |---|---|---|
 | DATA-17 Metric Definitions & Nov 23 Consistency | **PASS** | Code-verified (`owner-report.data17.test.ts`, `owner-report.test.ts`). |
-| DATA-17 Batch A/B & Avocado Toast Actual Counts | **NOT_VERIFIABLE** | Production-unverified; awaiting Sai's execution of `data-17-production-reconciliation.sql`. |
+| DATA-17 Batch A/B & Avocado Toast Actual Counts | **NOT_VERIFIABLE** | Requires the approved venue's production report and matching canonical and PostHog event evidence. The diagnostic SQL supplies only raw canonical counts. |
 | DATA-17 Freshness Evaluator & AI-03 Abstention | **PASS** | Code-verified (`owner-report-freshness.test.ts`); production stays `is_stale: null` until watermark infra is built (**BLOCKED**). |
 | DATA-18 Fixture, Manifest Hardening & Runbook | **PASS** | Code-verified (`test_staging_activity.py`, `synthetic-staging-activity.test.ts`). |
 | DATA-18 Reference Hashes (`7d8d9534...`, `00b8683d...`) | **NOT_VERIFIABLE** | Original input tuple not in repo. |
