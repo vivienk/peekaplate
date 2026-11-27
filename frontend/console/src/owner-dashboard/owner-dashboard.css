@@ -341,9 +341,6 @@
   .g3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .g-main {
-    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  }
   .stack {
     display: flex;
     flex-direction: column;
@@ -1550,32 +1547,12 @@
     .app.has-ai .main {
       padding-inline: clamp(16px, 2.4vw, 32px);
     }
-    .app.has-ai .g-main {
-      grid-template-columns: minmax(0, 1fr);
-    }
     .app.has-ai .kpis {
       grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
       gap: 10px;
     }
     .app.has-ai .kpi {
       padding: 16px 14px;
-    }
-    .app.has-ai .g-main {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-    .app.has-ai .g-main > .stack {
-      display: contents;
-    }
-    .app.has-ai .ov-ins {
-      order: 1;
-    }
-    .app.has-ai .ov-act {
-      order: 2;
-    }
-    .app.has-ai .ov-dishes {
-      order: 3;
     }
     .app.has-ai .pctl {
       right: auto;
@@ -1668,7 +1645,6 @@
       z-index: 30;
       box-shadow: 0 8px 24px color-mix(in srgb, var(--pp-color-gray-900) 25%, transparent);
     }
-    .g-main,
     .chatpage,
     .report-grid {
       grid-template-columns: minmax(0, 1fr);

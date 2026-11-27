@@ -105,6 +105,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
     jobs: {} as Record<string, MenuJob[]>,
     groups: new Map<string, { jobs: MenuJob[]; hashes: string[] }>(),
     photos: new Map<string, Buffer>(),
+    unavailableDraftPhoto: null as string | null,
     receipts: new Map<string, unknown>(),
     conflictSave: false,
     verificationStatus: 200,
@@ -236,17 +237,16 @@ async function fixture(context: BrowserContext, reportReady = false) {
         body,
         reference: request.headers()['x-owner-report-ref'],
       });
-      if (state.analysisStatus !== 200)
-        return route.fulfill({
-          status: state.analysisStatus,
-          json: {
-            error: state.analysisStatus === 409 ? 'report_reference_unavailable' : 'denied',
-          },
-          headers: { 'Access-Control-Allow-Origin': origin },
-        });
+      const analysisStatus = state.analysisStatus;
       if (state.delayAnalysis)
         await new Promise<void>((resolve) => {
           state.releaseAnalysis = resolve;
+        });
+      if (analysisStatus !== 200)
+        return route.fulfill({
+          status: analysisStatus,
+          json: { error: analysisStatus === 409 ? 'report_reference_unavailable' : 'denied' },
+          headers: { 'Access-Control-Allow-Origin': origin },
         });
       const selectedDishes = UNEEZA_REPORT.dishes.filter((dish) =>
         body.question === chartQuestion ? true : dish.name === 'Soup',
@@ -575,12 +575,16 @@ async function fixture(context: BrowserContext, reportReady = false) {
           headers,
         });
       }
-      if (/^drafts\/[^/]+\/photos\/[^/]+$/.test(path))
+      if (/^drafts\/[^/]+\/photos\/[^/]+$/.test(path)) {
+        const photoId = path.split('/')[3]!;
+        if (photoId === state.unavailableDraftPhoto)
+          return route.fulfill({ status: 503, json: { error: 'unavailable' }, headers });
         return route.fulfill({
-          body: state.photos.get(path.split('/')[3]!)!,
+          body: state.photos.get(photoId)!,
           contentType: 'image/png',
           headers,
         });
+      }
       if (path === 'menus/url') {
         state.urlStarted = true;
         if (state.delayUrl)
@@ -1208,6 +1212,56 @@ test('long restaurant names fit the dashboard and onboarding account menu', asyn
   await page.locator('summary[aria-label="Owner account"]').click();
   await expect(page.getByLabel('Restaurant', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test('saved dish photos replace the menu icon in the menu table, read as private blobs', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  const drafts = state.drafts[venue.venueId]!;
+  const original = drafts[0]!;
+  const firstPhoto = original.manual_fields!.photoId!;
+  const lastPhoto = crypto.randomUUID();
+  state.photos.set(lastPhoto, state.photos.get(firstPhoto)!);
+  state.unavailableDraftPhoto = firstPhoto;
+  for (let index = 0; index < 20; index++) {
+    const id = crypto.randomUUID();
+    const name = index === 19 ? 'Fictional Dessert' : `Fictional Salad ${index + 1}`;
+    drafts.push({
+      ...original,
+      id,
+      draft_id: id,
+      name,
+      manual_fields: { ...original.manual_fields!, name, photoId: index === 19 ? lastPhoto : null },
+    });
+  }
+  const photoReads = () => state.apiCalls.filter((call) => call.path.includes('/photos/'));
+  await signIn(page, undefined, false);
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
+  expect(photoReads()).toHaveLength(0);
+  const failedPhoto = page.waitForResponse(
+    (response) => response.url().endsWith(`/photos/${firstPhoto}`) && response.status() === 503,
+  );
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  const withPhoto = page.locator('.mrow').filter({ hasText: 'Fictional Lentil Soup' });
+  await failedPhoto;
+  await expect(withPhoto.locator('.thumb .ic')).toBeVisible();
+  state.unavailableDraftPhoto = null;
+  await page.getByRole('button', { name: 'Reload saved work', exact: true }).click();
+  const photo = withPhoto.locator('.thumb img');
+  await expect(photo).toHaveAttribute('src', /^blob:/);
+  await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+  const noPhoto = page
+    .locator('.mrow')
+    .filter({ has: page.getByRole('button', { name: 'Edit Fictional Salad 1', exact: true }) });
+  await expect(noPhoto.locator('.thumb .ic')).toBeVisible();
+  const belowFold = page.locator('.mrow').filter({ hasText: 'Fictional Dessert' });
+  await expect(belowFold).not.toBeInViewport();
+  expect(photoReads()).toHaveLength(2);
+  expect(photoReads()[0]?.actor).toBe(ownerId);
+  await belowFold.scrollIntoViewIfNeeded();
+  await expect(belowFold.locator('.thumb img')).toHaveAttribute('src', /^blob:/);
 });
 
 test('menu typography and locked-page copy keep the authored live boundary', async ({
@@ -2593,6 +2647,67 @@ test('renewing the same report reference preserves the draft, chart, and pending
   await expect(page.getByRole('table')).toBeVisible();
   await expect(draft).toHaveValue(chartQuestion);
   await expect(draft).toBeDisabled();
+});
+
+test('renewing the same report reference clears a previous 409 warning', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const draft = panel.getByRole('textbox', { name: 'Ask a report question' });
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+
+  state.analysisStatus = 409;
+  await askReportQuestion(panel);
+  await expect(panel.getByRole('alert')).toContainText('The report reference expired or changed');
+  expect(state.analyses[0]?.reference).toBe(reportReference(ownerId, venue.venueId));
+
+  state.reportRevision++;
+  await refresh.click();
+  await expect(panel.getByText(/Ask about this report/)).toBeVisible();
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await expect(draft).toHaveValue(soupQuestion);
+
+  state.analysisStatus = 200;
+  await panel.getByRole('button', { name: 'Send question' }).click();
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+  expect(state.analyses[1]?.reference).toBe(reportReference(ownerId, venue.venueId, 1));
+});
+
+test('a late 409 cannot restore the warning after the same report reference renews', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const draft = panel.getByRole('textbox', { name: 'Ask a report question' });
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+
+  state.analysisStatus = 409;
+  state.delayAnalysis = true;
+  await askReportQuestion(panel);
+  await expect.poll(() => state.analyses.length).toBe(1);
+  expect(state.analyses[0]?.reference).toBe(reportReference(ownerId, venue.venueId));
+
+  state.reportRevision++;
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(panel.getByRole('status')).toHaveText('Checking the report…');
+  state.releaseAnalysis();
+  await expect(panel.getByText(/Ask about this report/)).toBeVisible();
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await expect(draft).toHaveValue(soupQuestion);
+
+  state.delayAnalysis = false;
+  state.analysisStatus = 200;
+  await panel.getByRole('button', { name: 'Send question' }).click();
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+  expect(state.analyses[1]?.reference).toBe(reportReference(ownerId, venue.venueId, 1));
 });
 
 test('refreshing a changed report clears its old chart and sends the replacement reference', async ({

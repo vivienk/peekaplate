@@ -1,6 +1,7 @@
 import {
   OWNER_PRODUCTION_DAY_VERSION,
   OWNER_PRODUCTION_TODAY_VERSION,
+  type OwnerDishReport,
   OwnerDishReportSchema,
 } from '@peekaplate/contracts/owner-report';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -25,6 +26,8 @@ const productionOrigin = 'https://peekaplate.app';
 const owner = 'report-fixture-owner';
 const secret = 'fixture-report-reference-signing-key-for-tests-only';
 const start = Date.parse('2026-11-16T12:00:00.219Z');
+const restaurantVisitsQuestion = 'How many restaurant visits were there this period?';
+type MenuSessionCount = NonNullable<OwnerDishReport['summary']>['current']['menu_sessions'];
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -89,6 +92,7 @@ function setup(
     reversed: false,
     actions: false,
     overviewOnly: false,
+    menuSessions: (_cutoff: Date): MenuSessionCount => ({ value: null, status: 'MISSING' }),
     openings: (_cutoff: Date): { current: number | null; baseline: number | null } => ({
       current: null,
       baseline: null,
@@ -127,7 +131,11 @@ function setup(
           : { value, status: value === 0 ? ('VALID_ZERO' as const) : ('NORMAL' as const) };
       report.summary = {
         periods: { current, baseline },
-        current: { ...metrics, dish_opens: count(openings.current) },
+        current: {
+          ...metrics,
+          dish_opens: count(openings.current),
+          menu_sessions: reportState.menuSessions(end),
+        },
         baseline: { ...metrics, dish_opens: count(openings.baseline) },
       };
     } else if (sealedBatch) {
@@ -339,6 +347,10 @@ it('reads the signed restaurant counts for both Overview periods and pins the ol
     current: cutoff.getTime() < nextCutoff ? 11 : 13,
     baseline: 10,
   });
+  s.reportState.menuSessions = (cutoff) => ({
+    value: cutoff.getTime() < nextCutoff ? 14 : 17,
+    status: 'NORMAL',
+  });
   delete s.env.OWNER_AI_OPENAI_API_KEY;
   delete s.env.OWNER_AI_OPENAI_PROJECT_ID;
   const first = await s.get();
@@ -362,6 +374,19 @@ it('reads the signed restaurant counts for both Overview periods and pins the ol
     timeWindow: firstWindow,
     reportSnapshot: ownerReportSnapshot(firstReport),
     points: [{ label: 'Current period', value: 11 }],
+  });
+  expect(await read(oldRef, restaurantVisitsQuestion)).toMatchObject({
+    status: 'answered',
+    metric: 'menu_sessions',
+    overview: { period: 'current' },
+    timeWindow: firstWindow,
+    reportSnapshot: ownerReportSnapshot(firstReport),
+    points: [{ label: 'Current period', value: 14 }],
+  });
+  expect(await read(oldRef, 'How many visits did Garden Salad have?')).toMatchObject({
+    status: 'answered',
+    metric: 'active_sessions',
+    points: [{ label: 'Garden Salad', value: 20 }],
   });
   expect(await read(oldRef, 'How many openings were there in the previous period?')).toMatchObject({
     status: 'answered',
@@ -399,6 +424,15 @@ it('reads the signed restaurant counts for both Overview periods and pins the ol
     timeWindow: { start: firstWindow.start, end: new Date(nextCutoff).toISOString() },
     points: [{ value: 13 }],
   });
+  expect(await read(oldRef, restaurantVisitsQuestion)).toMatchObject({
+    timeWindow: firstWindow,
+    points: [{ value: 14 }],
+  });
+  expect(await read(newRef, 'How many menu sessions did we have?')).toMatchObject({
+    metric: 'menu_sessions',
+    timeWindow: { start: firstWindow.start, end: new Date(nextCutoff).toISOString() },
+    points: [{ value: 17 }],
+  });
   s.reportState.openings = () => ({ current: 14, baseline: 10 });
   expect((await request(oldRef, 'How many openings?')).status).toBe(409);
   expect(s.provider).not.toHaveBeenCalled();
@@ -432,6 +466,39 @@ it('preserves a measured restaurant zero and abstains on missing or untrusted to
   const untrusted = await ask('How many openings?', await s.reference());
   expect(untrusted).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
   expect(untrusted).not.toHaveProperty('points');
+  expect(s.provider).not.toHaveBeenCalled();
+});
+
+it('preserves a measured restaurant visit zero and refuses unusable visit evidence', async () => {
+  const s = setup('production', 'today');
+  s.advance(Date.parse('2026-11-25T12:01:09.000Z') - start);
+  s.reportState.overviewOnly = true;
+  s.reportState.openings = () => ({ current: 11, baseline: 10 });
+  s.reportState.menuSessions = () => ({ value: 0, status: 'VALID_ZERO' });
+  const ask = async (question = restaurantVisitsQuestion) => {
+    const response = await s.ask(await s.reference(), { question });
+    expect(response.status).toBe(200);
+    return response.json();
+  };
+  expect(await ask()).toMatchObject({
+    status: 'answered',
+    metric: 'menu_sessions',
+    points: [{ value: 0 }],
+  });
+  for (const status of ['MISSING', 'SUPPRESSED'] as const) {
+    s.reportState.menuSessions = () => ({ value: null, status });
+    const refusal = await ask();
+    expect(refusal).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+    expect(refusal).not.toHaveProperty('points');
+  }
+  s.reportState.menuSessions = () => ({ value: 14, status: 'NORMAL' });
+  expect(await ask('How many restaurant visits were there last Christmas?')).toMatchObject({
+    status: 'abstained',
+  });
+  s.reportState.fresh = false;
+  const refusal = await ask();
+  expect(refusal).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+  expect(refusal).not.toHaveProperty('points');
   expect(s.provider).not.toHaveBeenCalled();
 });
 

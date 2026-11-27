@@ -86,7 +86,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "a08acfc75471ba222564c30b27ab63e3722f442480303810198c24649074e56b"
+      "sourceFingerprint": "d50ef5d24a6f95219e6f5bcd29502a08e40c5aacf9b0ccf5bea7070088d00c1f"
     },
     {
       "id": "tokens",
@@ -311,6 +311,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/FirstDashboard.test.tsx",
         "tests/e2e/owner-first-dashboard.spec.ts",
         "tests/e2e/owner-onboarding.spec.ts",
+        "frontend/console/src/onboarding/MenuProcessing.test.tsx",
         "frontend/console/src/owner/PublishSuccessDialog.tsx",
         "frontend/console/src/owner-dashboard/report-api.ts",
         "frontend/console/src/owner-dashboard/pages.tsx",
@@ -476,12 +477,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "6c9ae61a7cc7a8b46ec16027ba23562dcebbb3f2e17fc60ccc4523c0260c6dc6"
+      "sourceFingerprint": "001aa4c12ab0b3cc6d39130c8b93edb97e9c29e951e1d8b4277fe7b60debefa5"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Production San Francisco day dish aggregates use the first eligible event for the completed day. Owner AI uses checked report references and gates provider use on verified freshness. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. The separate production portion-only deployment requires matching source origin; menu OCR transport is separate.",
+      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Production San Francisco day dish aggregates use the first eligible event for the completed day. Production batch reports enforce a fail-closed batch freshness evaluator, keeping is_stale unknown until queue-drain watermark infra is deployed. Owner AI uses checked report references and gates provider use on verified freshness. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. The separate production portion-only deployment requires matching source origin; menu OCR transport is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -509,6 +510,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish.integration.ts",
         "backend/src/owner-report.test.ts",
         "backend/src/owner-report.ts",
+        "backend/src/owner-report-freshness.ts",
+        "backend/src/owner-report-freshness.test.ts",
+        "backend/src/owner-report.data17.test.ts",
         "backend/src/owner-report-evidence.ts",
         "backend/src/owner-report-display-actions.ts",
         "backend/src/owner-report-batches.ts",
@@ -540,6 +544,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/public-menu.ts",
         "backend/src/publication-command.test.ts",
         "backend/src/publication-command.ts",
+        "backend/src/s7-res-09-owner-review-gate.integration.ts",
+        "docs/s7-res-09-owner-review-gate.md",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -756,7 +762,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "926c9128b9e6e655567b7898fefe7dc0bc84b8688fc3a423d07af8886772b7ba"
+      "sourceFingerprint": "b4712f8007a35847634e12486c5f8752b85b034f198a951bc73f66f9960f19b5"
     },
     {
       "id": "database",
@@ -1159,17 +1165,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console",
-        "diner",
-        "contracts"
-      ],
-      "summary": "Sync the same reviewed main ingredient/consent commits into develop, preserving existing order/comparison/local AI work. Active extraction authority and real SQL fixture regressions are included.",
-      "next": "Wait for PR227 CI, merge main normally, then update develop without force or bypass. Deploy exact main only; credential approval and report completeness remain external AI gates."
-    },
-    {
       "date": "2026-11-21",
       "modules": [
         "console",
@@ -1300,7 +1295,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "console"
       ],
-      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff. Owner questions read visible dish metrics, explicitly scoped dish visits and restaurant-wide dish opens from the same signed report. The console keeps the draft and result when a signature is renewed for the same snapshot, and clears the result when the snapshot changes. Overview and Dish Performance retain distinct periods. The route checks owner access and abstains on unknown freshness or unavailable evidence without calling a model.",
+      "summary": "Production renders today-to-date dish metrics through the latest settled Pacific cutoff. A separate snapshot prefix and explicit cutover protect the partial first day. CSV and AI use the same report, with dish visits from Dish Performance and restaurant visits and dish opens from Overview. Renewing the same snapshot preserves active chat and clears warnings for the replaced reference. A changed snapshot clears the old result. The route checks current owner access and abstains on unknown freshness or missing evidence without calling a model.",
       "files": [
         "backend/src/owner-report.ts",
         "packages/contracts/src/owner-report.ts",
@@ -1309,9 +1304,28 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/questions.ts",
         "backend/src/owner-ai/report-reference.test.ts",
         "frontend/console/src/owner/OwnerWorkspace.tsx",
-        "tests/e2e/owner-workspace.spec.ts"
+        "tests/e2e/owner-workspace.spec.ts",
+        "tests/e2e/owner-auth-provider.spec.ts"
       ],
-      "next": "Release the compatible questions API before the console. Verify source completeness for the exact hosted report venue and window before recording successful production answers."
+      "next": "Release the compatible questions API before enabling its console entry. Verify an eligible single-dish event in the actual report window and confirm source completeness for the exact venue and signed window before recording successful production answers."
+    },
+    {
+      "date": "2026-11-24",
+      "modules": [
+        "backend",
+        "console"
+      ],
+      "summary": "S7-RES-09 keeps automatic checks separate from owner decisions. Manual verification and approval share required-field and proposed-fact checks. Owner-prepared menu commands verify the stored bundle and match its dish revisions to current active verified drafts.",
+      "files": [
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-prepare.ts",
+        "backend/src/publication-command.ts",
+        "backend/src/s7-res-09-owner-review-gate.integration.ts",
+        "frontend/console/src/onboarding/MenuProcessing.tsx",
+        "frontend/console/src/owner/review/reviewDishes.ts",
+        "docs/s7-res-09-owner-review-gate.md"
+      ],
+      "next": "Review exact-snapshot and concurrent draft behavior before authorized staging verification."
     }
   ]
 }

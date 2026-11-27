@@ -57,7 +57,8 @@ describe('S13 menu preview states', () => {
   it('published: the returned link, read-only, with Copy Link and Go to dashboard', () => {
     const html = render({ publishedUrl: 'https://peekaplate.app/diner/ember-stone' });
     expect(html).toContain('Your menu is live');
-    expect(html).toContain('Live — Published');
+    expect(html).toContain('>Live<');
+    expect(html).not.toContain('Published');
     expect(html).toContain('value="https://peekaplate.app/diner/ember-stone"');
     expect(html).toContain('readOnly=""');
     expect(html).toContain('Copy Link');

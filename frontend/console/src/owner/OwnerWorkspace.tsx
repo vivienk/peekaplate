@@ -919,7 +919,7 @@ export function samePeriod(
 type Reply =
   | { kind: 'loading' }
   | { kind: 'error' }
-  | { kind: 'reference_error' }
+  | { kind: 'reference_error'; reference: string }
   | { kind: 'result'; result: OwnerReportQuestionResult };
 
 const reportQuestionMetrics = {
@@ -932,6 +932,7 @@ const reportQuestionMetrics = {
   portion_previews_shown: ['2.5D previews shown', 'count'],
   comparisons_started: ['Comparisons started', 'count'],
   dish_opens: ['Restaurant-wide dish opens', 'count'],
+  menu_sessions: ['Restaurant-wide visits', 'count'],
 } as const;
 
 type Period = Pick<OwnerDishReport['report_metadata']['date_window'], 'start_time' | 'end_time'>;
@@ -970,8 +971,10 @@ function reportAnswerEvidence(
     }
   }
   if (result.status === 'answered') {
-    const counts = [summary[period].dish_opens];
-    if (baseline) counts.push(summary.baseline.dish_opens);
+    const { metric } = result;
+    if (metric !== 'dish_opens' && metric !== 'menu_sessions') return { kind: 'unverified' };
+    const counts = [summary[period][metric]];
+    if (baseline) counts.push(summary.baseline[metric]);
     if (
       report.report_metadata.freshness.is_stale !== false ||
       result.points.length !== counts.length ||
@@ -1093,7 +1096,12 @@ function LiveAiPanel({
   setQuestion,
 }: LiveAiPanelProps) {
   const inputId = useId();
-  const [reply, setReply] = useState<Reply | null>(null);
+  const [storedReply, setReply] = useState<Reply | null>(null);
+  // The report can renew its signature without replacing its snapshot or the pending question.
+  const reply =
+    storedReply?.kind === 'reference_error' && storedReply.reference !== reportReference
+      ? null
+      : storedReply;
   const pending = useRef<AbortController | null>(null);
   const askReport = useMemo(
     () => createOwnerReportQuestionClient({ apiBase, venueId, getAccessToken }),
@@ -1148,9 +1156,11 @@ function LiveAiPanel({
           setReply(null);
           onAccessFailure(error.status === 401 ? 'signed_out' : 'denied');
         } else {
-          setReply({
-            kind: error instanceof OwnerAnalysisReferenceError ? 'reference_error' : 'error',
-          });
+          setReply(
+            error instanceof OwnerAnalysisReferenceError
+              ? { kind: 'reference_error', reference: reportReference }
+              : { kind: 'error' },
+          );
         }
       }
     } finally {

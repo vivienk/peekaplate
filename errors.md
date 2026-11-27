@@ -5659,3 +5659,13 @@ The released owner menu URL field rendered with 16 px horizontal padding and the
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-25T09:00:01.094Z","exitCode":2}
 ```
+
+## 2026-11-26 owner review gate database fixtures
+
+The [database check on f50aba4e](https://github.com/vivienk/peekaplate/actions/runs/45947289663/job/140334842094)
+found five cases that used incomplete drafts to exercise successful verification
+or used a fresh approval to simulate previously accepted proposed ingredients.
+The [owner workspace integration tests](backend/src/owner-menu.integration.ts)
+now use ready drafts for those verification paths and seed the existing accepted
+state directly for the legacy facts test. The complete database check covers
+both these fixtures and the new rejection cases.

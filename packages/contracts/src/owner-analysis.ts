@@ -74,6 +74,7 @@ export const OwnerReportQuestionResultSchema = z
         'portion_previews_shown',
         'comparisons_started',
         'dish_opens',
+        'menu_sessions',
       ]),
       points: z
         .array(
@@ -111,8 +112,9 @@ export const OwnerReportQuestionResultSchema = z
       }
     }
     if (result.status === 'answered') {
+      const overviewMetric = result.metric === 'dish_opens' || result.metric === 'menu_sessions';
       if (
-        (result.metric === 'dish_opens') !== Boolean(result.overview) ||
+        overviewMetric !== Boolean(result.overview) ||
         (result.overview && result.points.length !== (result.overview.period === 'compare' ? 2 : 1))
       ) {
         context.addIssue({
@@ -127,6 +129,7 @@ export const OwnerReportQuestionResultSchema = z
           case 'portion_previews_shown':
           case 'comparisons_started':
           case 'dish_opens':
+          case 'menu_sessions':
             return Number.isSafeInteger(value);
           case 'avg_interaction_time_seconds':
             return value <= 300;

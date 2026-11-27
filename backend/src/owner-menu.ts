@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
+  CandidateCorrectedFieldsSchema,
   type OwnerDishFields,
   OwnerDishFieldsSchema,
   type SaveOwnerDishDraft,
@@ -632,6 +633,66 @@ export async function rejectDraftPhoto(
   });
 }
 
+export function assertManualDraftReady(fields: OwnerDishFields): void {
+  if (
+    fields.name === null ||
+    fields.category === null ||
+    fields.priceAmount === null ||
+    fields.priceCurrency === null ||
+    fields.ingredients.status === 'proposed' ||
+    fields.allergens.status === 'proposed'
+  ) {
+    throw new IngestionError('draft_incomplete', 409);
+  }
+}
+
+async function assertDraftReadyForVerification(
+  client: Client,
+  venueId: string,
+  draft: DishDraftRow,
+): Promise<void> {
+  if (draft.origin === 'manual') {
+    assertManualDraftReady(OwnerDishFieldsSchema.parse(draft.manual_fields ?? {}));
+    return;
+  }
+
+  let resolvedName = draft.name;
+  if (draft.job_id) {
+    const jobRes = await client.query<{ active_review_extraction_id: string | null }>(
+      'SELECT active_review_extraction_id FROM app_private.menu_ingestion_jobs WHERE tenant_id=$1 AND id=$2',
+      [venueId, draft.job_id],
+    );
+    const activeExtractionId = jobRes.rows[0]?.active_review_extraction_id;
+    if (activeExtractionId) {
+      const reviewRes = await client.query<{
+        review_status: string;
+        corrected_fields: unknown;
+        incomplete_fields: string[];
+      }>(
+        'SELECT review_status, corrected_fields, incomplete_fields FROM app_private.candidate_review_current WHERE tenant_id=$1 AND extraction_id=$2 AND candidate_id=$3',
+        [venueId, activeExtractionId, draft.candidate_id ?? draft.draft_id],
+      );
+      const review = reviewRes.rows[0];
+      if (review) {
+        if (
+          ['rejected', 'incomplete'].includes(review.review_status) ||
+          review.incomplete_fields.length > 0
+        ) {
+          throw new IngestionError('draft_incomplete', 409);
+        }
+        const corrected = CandidateCorrectedFieldsSchema.parse(review.corrected_fields);
+        if (corrected.allergens?.status === 'proposed') {
+          throw new IngestionError('draft_incomplete', 409);
+        }
+        resolvedName = corrected.name ?? resolvedName;
+      }
+    }
+  }
+  if (!resolvedName) {
+    throw new IngestionError('draft_incomplete', 409);
+  }
+}
+
 export async function verifyOwnerDish(
   client: Client,
   actorId: string,
@@ -679,6 +740,10 @@ export async function verifyOwnerDish(
       if (draft.verification_status !== receipt.rows[0].result.draft.verification_status)
         throw new CommandError('version_conflict', 409);
       return receipt.rows[0].result;
+    }
+
+    if (verified) {
+      await assertDraftReadyForVerification(client, venueId, draft);
     }
 
     const targetStatus = verified ? 'verified' : 'not_verified';

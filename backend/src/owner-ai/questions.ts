@@ -11,8 +11,9 @@ import {
 type Dish = OwnerDishReport['dishes'][number];
 type Answer = Extract<OwnerReportQuestionResult, { status: 'answered' }>;
 type Refusal = Extract<OwnerReportQuestionResult, { status: 'abstained' }>;
-type DishMetric = Exclude<Answer['metric'], 'dish_opens'>;
-type OverviewPeriod = 'current' | 'baseline' | 'compare';
+type OverviewMetric = Extract<Answer['metric'], 'dish_opens' | 'menu_sessions'>;
+type DishMetric = Exclude<Answer['metric'], OverviewMetric>;
+type OverviewSelection = { metric: OverviewMetric; period: 'current' | 'baseline' | 'compare' };
 
 const metricPhrases: readonly [DishMetric, RegExp][] = [
   ['open_rate', /\b(?:open|opening|view) rates?\b/gu],
@@ -38,6 +39,8 @@ const windowSuffix =
   / (?:in|for|during) (?:(?:this|the) (?:report|window|period)|the (?:current|displayed) (?:report|window|period))$/;
 const openingCount =
   /^(?:(?:total|restaurant wide|restaurant) )?(?:(?:dish )?(?:opens|openings|open(?:ing)? counts?)|times (?:(?:the )?dishes were|were (?:the )?dishes) opened)$/;
+const restaurantVisits =
+  /^(?:restaurant(?: wide)? visits|menu sessions)(?: (?:were there|are there|did we (?:have|record|see)))?(?: this (?:report|window|period))?$/;
 const previousWindow =
   / (?:in |for |during )?(?:the )?(?:previous|prior|preceding|last|baseline) (?:report|window|period)$/;
 const compareWindows =
@@ -79,22 +82,24 @@ function questionParts(question: string) {
   };
 }
 
-function overviewPeriod(query: string): OverviewPeriod | null {
+function overviewSelection(query: string): OverviewSelection | null {
   const text = query.replace(readPrefix, '');
+  if (restaurantVisits.test(text)) return { metric: 'menu_sessions', period: 'current' };
   if (text.startsWith('compare ')) {
     const subject = text.slice('compare '.length).replace(/^the /, '');
-    if (compareWindows.test(subject) && openingCount.test(subject.replace(compareWindows, '')))
-      return 'compare';
     if (
-      compareOpeningPrefix.test(subject) &&
-      openingCount.test(subject.replace(compareOpeningPrefix, ''))
+      (compareWindows.test(subject) && openingCount.test(subject.replace(compareWindows, ''))) ||
+      (compareOpeningPrefix.test(subject) &&
+        openingCount.test(subject.replace(compareOpeningPrefix, '')))
     )
-      return 'compare';
+      return { metric: 'dish_opens', period: 'compare' };
     return null;
   }
   const prior = previousWindow.test(text);
   const subject = text.replace(previousWindow, '').replace(openingQualifier, '');
-  return openingCount.test(subject) ? (prior ? 'baseline' : 'current') : null;
+  return openingCount.test(subject)
+    ? { metric: 'dish_opens', period: prior ? 'baseline' : 'current' }
+    : null;
 }
 
 function interpretDishQuestion(
@@ -197,9 +202,9 @@ const toTimeWindow = (period: { start_time: string; end_time: string }) => ({
 const usablePeriod = (window: ReturnType<typeof toTimeWindow>, now: Date) =>
   Date.parse(window.start) < Date.parse(window.end) && Date.parse(window.end) <= now.getTime();
 
-function readOverviewOpenings(
+function readOverviewCount(
   report: OwnerDishReport,
-  period: OverviewPeriod,
+  { metric, period }: OverviewSelection,
   chart: boolean,
   now: Date,
   base: Pick<Refusal, 'schemaVersion' | 'venueId' | 'source' | 'reportSnapshot' | 'timeWindow'>,
@@ -233,7 +238,7 @@ function readOverviewOpenings(
 
   const points: Answer['points'] = [];
   for (const key of compared ? (['current', 'baseline'] as const) : [primary]) {
-    const cell = summary[key].dish_opens;
+    const cell = summary[key][metric];
     if (cell.value === null || (cell.status !== 'NORMAL' && cell.status !== 'VALID_ZERO'))
       return decline();
     points.push({
@@ -244,7 +249,7 @@ function readOverviewOpenings(
   const result = OwnerReportQuestionResultSchema.safeParse({
     ...scoped,
     status: 'answered',
-    metric: 'dish_opens',
+    metric,
     points,
     chart,
   });
@@ -270,8 +275,8 @@ export function answerOwnerReportQuestion(
   const abstain = (reason: Refusal['reason']) =>
     OwnerReportQuestionResultSchema.parse({ ...base, status: 'abstained', reason });
   const parts = questionParts(question);
-  const period = overviewPeriod(parts.query);
-  if (period) return readOverviewOpenings(report, period, parts.chart, now, base);
+  const overview = overviewSelection(parts.query);
+  if (overview) return readOverviewCount(report, overview, parts.chart, now, base);
   if (
     metadata.report_status !== 'NORMAL' ||
     metadata.freshness.is_stale !== false ||

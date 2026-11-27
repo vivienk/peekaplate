@@ -450,12 +450,13 @@ test('signed-in mock rehearsal uses Overview counts and the active report refere
   const baselineWindow = { start: baseline.start_time, end: baseline.end_time };
   const missing = { value: null, status: 'MISSING' } as const;
   const totals = {
-    menu_sessions: missing,
     avg_interaction_time_seconds: missing,
     portion_previews_shown: missing,
     verified_orders: missing,
   };
   let fixture: 'eleven' | 'zero' | 'missing' = 'eleven';
+  const restaurantVisitsQuestion = 'How many restaurant visits were there this period?';
+  let incorrectVisitsCount = false;
   const calls: Array<{ reference: string | undefined; question: string }> = [];
   const openAI = [] as string[];
   await page.route('https://api.openai.com/**', async (route) => {
@@ -492,6 +493,9 @@ test('signed-in mock rehearsal uses Overview counts and the active report refere
     if (pathname.endsWith('/jobs')) return route.fulfill({ headers, json: { jobs: [] } });
     if (pathname.endsWith('/drafts')) return route.fulfill({ headers, json: { drafts: [] } });
     const count = fixture === 'eleven' ? 11 : 0;
+    const visits = fixture === 'eleven' ? 17 : 0;
+    const metricCell = (value: number) =>
+      fixture === 'missing' ? missing : { value, status: value === 0 ? 'VALID_ZERO' : 'NORMAL' };
     const reference = `fixture-overview-${fixture}`;
     if (pathname.endsWith('/analytics/dishes')) {
       return route.fulfill({
@@ -511,12 +515,14 @@ test('signed-in mock rehearsal uses Overview counts and the active report refere
             periods: { current, baseline },
             current: {
               ...totals,
-              dish_opens:
-                fixture === 'missing'
-                  ? missing
-                  : { value: count, status: count === 0 ? 'VALID_ZERO' : 'NORMAL' },
+              dish_opens: metricCell(count),
+              menu_sessions: metricCell(visits),
             },
-            baseline: { ...totals, dish_opens: { value: 10, status: 'NORMAL' } },
+            baseline: {
+              ...totals,
+              dish_opens: { value: 10, status: 'NORMAL' },
+              menu_sessions: { value: 16, status: 'NORMAL' },
+            },
           },
         },
       });
@@ -526,6 +532,7 @@ test('signed-in mock rehearsal uses Overview counts and the active report refere
       expect(request.postDataJSON()).toEqual({ question });
       calls.push({ question, reference: request.headers()['x-owner-report-ref'] });
       const comparison = question.startsWith('Compare');
+      const restaurantVisits = question === restaurantVisitsQuestion;
       const base = {
         schemaVersion: 'owner-report-question.v1',
         venueId: venue.venueId,
@@ -554,10 +561,13 @@ test('signed-in mock rehearsal uses Overview counts and the active report refere
             : {
                 ...base,
                 status: 'answered',
-                metric: 'dish_opens',
+                metric: restaurantVisits ? 'menu_sessions' : 'dish_opens',
                 chart: false,
                 points: [
-                  { label: 'Current period', value: count },
+                  {
+                    label: 'Current period',
+                    value: restaurantVisits && !incorrectVisitsCount ? visits : count,
+                  },
                   ...(comparison ? [{ label: 'Previous period', value: 10 }] : []),
                 ],
               },
@@ -590,14 +600,26 @@ test('signed-in mock rehearsal uses Overview counts and the active report refere
   await expect(panel.getByText('10', { exact: true })).toBeVisible();
   await expect(panel.getByText(/^Current Overview period:/)).toBeVisible();
   await expect(panel.getByText(/^Previous Overview period:/)).toBeVisible();
+  await ask(restaurantVisitsQuestion);
+  await expect(panel.getByRole('heading', { name: 'Restaurant-wide visits' })).toBeVisible();
+  await expect(panel.getByText('17', { exact: true })).toBeVisible();
+  await expect(panel.getByText(/^Current Overview period:/)).toBeVisible();
+  incorrectVisitsCount = true;
+  await ask(restaurantVisitsQuestion);
+  await expect(panel.getByText(/not enough verified evidence/)).toBeVisible();
+  await expect(panel.getByText('11', { exact: true })).toHaveCount(0);
+  incorrectVisitsCount = false;
 
   async function refresh(next: 'zero' | 'missing') {
     fixture = next;
     await page.getByRole('button', { name: 'Refresh report', exact: true }).click();
-    await expect(panel.getByRole('heading', { name: 'Restaurant-wide dish opens' })).toHaveCount(0);
+    await expect(panel.getByText(/Ask about this report/)).toBeVisible();
     await ask('How many openings?');
   }
   await refresh('zero');
+  await expect(panel.getByText('0', { exact: true })).toBeVisible();
+  await ask(restaurantVisitsQuestion);
+  await expect(panel.getByRole('heading', { name: 'Restaurant-wide visits' })).toBeVisible();
   await expect(panel.getByText('0', { exact: true })).toBeVisible();
   await refresh('missing');
   await expect(panel.getByText(/not enough verified evidence/)).toBeVisible();
@@ -613,7 +635,10 @@ test('signed-in mock rehearsal uses Overview counts and the active report refere
       reference: 'fixture-overview-eleven',
       question: 'Compare dish opens for the current and previous periods',
     },
+    { reference: 'fixture-overview-eleven', question: restaurantVisitsQuestion },
+    { reference: 'fixture-overview-eleven', question: restaurantVisitsQuestion },
     { reference: 'fixture-overview-zero', question: 'How many openings?' },
+    { reference: 'fixture-overview-zero', question: restaurantVisitsQuestion },
     { reference: 'fixture-overview-missing', question: 'How many openings?' },
   ]);
   expect(openAI).toEqual([]);

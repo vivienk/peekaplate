@@ -42,6 +42,7 @@ export type DishEditorProps = {
   onCancel: () => void;
   busy?: boolean;
   error?: string | null;
+  /** No longer shown: the raw OCR excerpt was removed from the editor. Kept so callers still compile. */
   evidence?: readonly EvidenceExcerpt[];
   saveLabel?: string;
   cancelLabel?: string;
@@ -72,7 +73,6 @@ export function DishEditor({
   onCancel,
   busy = false,
   error,
-  evidence = [],
   reviewConfirmed = false,
   onReviewConfirmedChange,
   licenseConfirmed = false,
@@ -216,23 +216,6 @@ export function DishEditor({
               Diners will see: {allergy.label}. {STAFF_ALLERGY_LINE}
             </p>
           </>
-        }
-        evidence={
-          value.origin === 'extracted' && (
-            <aside aria-label="From the menu" className="pp-dish-editor__evidence">
-              <h2>From the menu</h2>
-              {evidence.length ? (
-                evidence.map((excerpt) => (
-                  <figure key={excerpt.segmentId}>
-                    <figcaption>Page {excerpt.page ?? '?'}</figcaption>
-                    <pre>{excerpt.text}</pre>
-                  </figure>
-                ))
-              ) : (
-                <p>No source text was kept for this dish.</p>
-              )}
-            </aside>
-          )
         }
         cancel={onCancel}
         toReview={() => {

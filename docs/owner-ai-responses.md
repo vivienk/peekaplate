@@ -17,8 +17,9 @@ the synthetic demo dependency path.
 The signed-in owner shell mounts the question panel beside the displayed report
 pages only when `VITE_OWNER_AI_ENABLED=true`. The panel is available to owners.
 The draft stays with the signed-in owner and restaurant. Reissuing a reference
-for the same snapshot preserves the draft, result and in-flight request. The next
-question uses the renewed reference. Changing the displayed snapshot cancels
+for the same snapshot preserves the draft, result and in-flight request. Any
+expired-reference warning applies only to the failed reference. The next question
+uses the renewed reference. Changing the displayed snapshot cancels
 pending work and clears the result while keeping the same owner's draft. Session
 or restaurant changes clear both. A 401 returns to sign-in. A 403 removes private
 report output and refreshes restaurant access.
@@ -35,10 +36,10 @@ It answers supported English questions about the visible Dish Performance window
 including a named dish, comparisons, rankings and requests for a bar chart. For
 example, ask “What was the save rate for Avocado Toast?” or “Chart open rate by
 dish.” “Show visits by dish” and “Top two dishes by visits” read dish active
-sessions. A Visits question needs an explicit dish scope. For restaurant-wide
-totals, “How many openings?” reads the signed
-Overview dish-open count. Questions can also select the previous report period or
-compare the current and previous periods. Each result uses its own Overview window,
+sessions. “How many restaurant visits were there this period?” reads the current
+signed Overview menu-session count. “How many openings?” reads the separate dish-open
+count. Dish-opening questions can also select the previous report period or compare
+the current and previous periods. Each result uses its own Overview window,
 which can start before the Dish Performance window. The same signed snapshot binds
 both. A measured zero is displayed as zero. Unknown freshness, missing or suppressed values, or
 incomplete whole-menu evidence produce an abstention. The route does not answer
