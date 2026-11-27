@@ -27,7 +27,13 @@ import {
   readPreparedPreviewAsset,
 } from './owner-prepare';
 import { fetchPreparedMenu, listPreparedMenus } from './owner-publication';
-import { approveMenuRevision, publishMenu, withdrawMenu } from './publication-command';
+import {
+  type ApproveMenuRevisionInput,
+  approveMenuRevision,
+  type PublishMenuInput,
+  publishMenu,
+  withdrawMenu,
+} from './publication-command';
 import { readRestaurantProfile, readRestaurantSetup } from './restaurant-profile';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -88,6 +94,10 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
     },
     delete: async (key: string) => objects.delete(key),
   };
+  const approvePrepared = (actor: string, venue: string, input: ApproveMenuRevisionInput) =>
+    approveMenuRevision(runtime, actor, venue, input, storage);
+  const publishPrepared = (actor: string, venue: string, input: PublishMenuInput) =>
+    publishMenu(runtime, actor, venue, input, storage);
   const owner = crypto.randomUUID();
   const editor = crypto.randomUUID();
   const approve: ApproveDraft = (client, actor, venue, draft, options) =>
@@ -361,7 +371,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
         await readPreparedAsset(runtime, storage, venue, photo.id, foreground.sha256),
       ).toBeNull();
       const [menu] = await listPreparedMenus(runtime, owner, venue);
-      const approval = await approveMenuRevision(runtime, owner, venue, {
+      const approval = await approvePrepared(owner, venue, {
         commandId: crypto.randomUUID(),
         expectedVersion: 0,
         menuId: menu!.menuId,
@@ -369,7 +379,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
         contentApprovalId: menu!.contentApprovalId,
         assetApprovalId: menu!.assetApprovalId,
       });
-      await publishMenu(runtime, owner, venue, {
+      await publishPrepared(owner, venue, {
         commandId: crypto.randomUUID(),
         expectedVersion: 0,
         menuId: menu!.menuId,
@@ -603,7 +613,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
           .rowCount,
       ).toBe(0);
     const [menu] = await listPreparedMenus(runtime, owner, venue);
-    const approval = await approveMenuRevision(runtime, owner, venue, {
+    const approval = await approvePrepared(owner, venue, {
       commandId: crypto.randomUUID(),
       expectedVersion: 0,
       menuId: menu!.menuId,
@@ -611,7 +621,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
       contentApprovalId: menu!.contentApprovalId,
       assetApprovalId: menu!.assetApprovalId,
     });
-    await publishMenu(runtime, owner, venue, {
+    await publishPrepared(owner, venue, {
       commandId: crypto.randomUUID(),
       expectedVersion: 0,
       menuId: menu!.menuId,

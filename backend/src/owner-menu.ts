@@ -633,16 +633,26 @@ export async function rejectDraftPhoto(
   });
 }
 
+export function assertManualDraftReady(fields: OwnerDishFields): void {
+  if (
+    fields.name === null ||
+    fields.category === null ||
+    fields.priceAmount === null ||
+    fields.priceCurrency === null ||
+    fields.ingredients.status === 'proposed' ||
+    fields.allergens.status === 'proposed'
+  ) {
+    throw new IngestionError('draft_incomplete', 409);
+  }
+}
+
 async function assertDraftReadyForVerification(
   client: Client,
   venueId: string,
   draft: DishDraftRow,
 ): Promise<void> {
   if (draft.origin === 'manual') {
-    const manual = OwnerDishFieldsSchema.parse(draft.manual_fields ?? {});
-    if (manual.allergens.status === 'proposed') {
-      throw new IngestionError('draft_incomplete', 409);
-    }
+    assertManualDraftReady(OwnerDishFieldsSchema.parse(draft.manual_fields ?? {}));
     return;
   }
 

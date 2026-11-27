@@ -80,7 +80,7 @@ Historical reference: [PR #161](https://github.com/vivienk/peekaplate/pull/161) 
 1. **`backend/src/owner-menu.ts` (`verifyOwnerDish`)**: When `verified === true`, `assertDraftReadyForVerification` rejects with `409 draft_incomplete` if required fields (`name`, `category`, `priceAmount`, `priceCurrency` for manual; `name` for extracted) are missing, if `candidate_review_current` has `review_status IN ('rejected', 'incomplete')` or non-empty `incomplete_fields`, or if `allergens.status === 'proposed'` or manual `ingredients.status === 'proposed'`.
 2. **`backend/src/index.ts` (`approveDishDraftAtomic`)**: Rejects `409 draft_incomplete` if `manual.allergens.status === 'proposed'`, `manual.ingredients.status === 'proposed'`, or extracted `corrected.allergens?.status === 'proposed'`.
 3. **`backend/src/owner-prepare.ts` (`prepareOwnerMenu`)**: Removed the `draft_incomplete` catch-and-skip path so any incomplete active dish aborts preparation with `409 draft_incomplete`.
-4. **`backend/src/publication-command.ts` (`approveMenuRevision`, `publishMenu`)**: Added `assertActiveOwnerDraftsApproved(client, venueId)` which rejects with `409 menu_not_verified` if any active `dish_drafts` row (`removed_at IS NULL AND review_status NOT IN ('rejected', 'superseded')`) is not `verification_status = 'verified' AND review_status = 'accepted' AND published_dish_id IS NOT NULL`, or has `incomplete_fields` / `incomplete` review status.
+4. **`backend/src/publication-command.ts` (`approveMenuRevision`, `publishMenu`)**: Owner-prepared menu commands verify the exact stored bundle against its recorded content hash and compare its dish/revision identities against the current active, verified and accepted drafts. Missing or different bundle contents, incomplete candidate review, and stale snapshots reject with `409 menu_not_verified`. Identity-only placeholders remain part of the snapshot comparison.
 
 ---
 
@@ -90,13 +90,13 @@ Historical reference: [PR #161](https://github.com/vivienk/peekaplate/pull/161) 
 
 - **Scenario A (Complete, high-confidence dish)**: Extraction persists `needs_review` / `pending` / `not_verified`. Preparation and publication are rejected (`409 menu_not_verified`) until explicit owner verification, preparation, approval, and publication; published bundle contains the approved dish.
 - **Scenario B (Incomplete dish)**: Missing required fields reject `verifyOwnerDish` (`409 draft_incomplete`) and block `prepareOwnerMenu` (`409 menu_not_verified`) even when a complete dish exists alongside it. After correction and explicit approval, publication succeeds.
-- **Scenario C (Unresolved allergen information)**: `allergens: { status: 'proposed', items: [...] }` keeps frontend `dishStatus` as `Pending Review` (`isMenuReady === false`) and rejects backend `verifyOwnerDish` and `approveDishDraftAtomic` (`409 draft_incomplete`). After owner resolution (`confirmed` or `unknown`) and approval, publication succeeds.
+- **Scenario C (Unresolved ingredients or allergens)**: Proposed manual ingredients and proposed allergens reject backend `verifyOwnerDish` and `approveDishDraftAtomic` (`409 draft_incomplete`). Proposed allergens keep frontend `dishStatus` as `Pending Review` (`isMenuReady === false`). After owner resolution and approval, publication succeeds.
 
 ### Additional Security & Regression Tests
 
 - Direct HTTP `PUT /drafts/:draftId` with `verification_status: 'verified'` rejected (`400`).
 - Direct HTTP `POST /prepared-menus/prepare` without owner verification rejected (`409`).
-- Post-approval dish edit reopens draft (`pending`, `not_verified`) and blocks `publishMenu` on stale `approvalId` (`409 menu_not_verified`).
+- Post-approval edits and removals block new approval/publication of a stale snapshot, including after an edited dish is verified and prepared again. Existing published snapshots remain readable.
 - Cross-restaurant authorization (`403`) enforced for foreign owners.
 
 ---
@@ -104,4 +104,5 @@ Historical reference: [PR #161](https://github.com/vivienk/peekaplate/pull/161) 
 ## 7. Remaining Limitations & Staging Boundary
 
 - All verification in this change was performed locally against unit tests, TypeScript checks, and disposable Docker PostgreSQL integration tests (`scripts/test-db.mjs`).
+- The gate uses one current-state query and locks the active draft rows it reads. New concurrent drafts are outside those row locks.
 - Live staging acceptance requires deploying to the staging environment and executing an authorized staging verification pass; local test results do not constitute live staging acceptance.

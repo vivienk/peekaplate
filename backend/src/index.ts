@@ -119,6 +119,7 @@ import {
   OwnerInsightActionError,
   updateOwnerInsightAction,
 } from './owner-insight-actions';
+import { assertManualDraftReady } from './owner-menu';
 import { registerOwnerMenuRoutes } from './owner-menu-routes';
 import {
   PREPARED_ASSET_PATH,
@@ -727,7 +728,8 @@ const dependencies: Dependencies = {
     const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await client.connect();
-      return await approveMenuRevision(client, actorId, venueId, input);
+      const storage = env.INGESTION_REPORTS_BUCKET?.get ? preparedStorage(env) : undefined;
+      return await approveMenuRevision(client, actorId, venueId, input, storage);
     } finally {
       await client.end();
     }
@@ -739,7 +741,8 @@ const dependencies: Dependencies = {
     const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await client.connect();
-      return await publishMenu(client, actorId, venueId, input);
+      const storage = env.INGESTION_REPORTS_BUCKET?.get ? preparedStorage(env) : undefined;
+      return await publishMenu(client, actorId, venueId, input, storage);
     } finally {
       await client.end();
     }
@@ -1115,15 +1118,8 @@ export async function approveDishDraftAtomic(
     ) {
       throw new IngestionError('draft_confirmation_required', 409);
     }
-    if (
-      !draft.name ||
-      (manual &&
-        (!manual.category ||
-          manual.priceAmount === null ||
-          manual.priceCurrency === null ||
-          manual.allergens.status === 'proposed')) ||
-      (!manual && corrected.allergens?.status === 'proposed')
-    ) {
+    if (manual) assertManualDraftReady(manual);
+    if (!draft.name || corrected.allergens?.status === 'proposed') {
       throw new IngestionError('draft_incomplete', 409);
     }
     const approvedPhotoId = manual?.photoId ?? corrected.photo_id ?? null;

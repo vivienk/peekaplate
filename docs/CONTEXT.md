@@ -756,7 +756,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "b0dc723a7c997424ffbc040e23bc1f7926e858b664cd0389fb317366b10b51ab"
+      "sourceFingerprint": "1df078e210ebe96310c27a9674332a1651b592eb48ffcfa29a4a9a8e17f76b06"
     },
     {
       "id": "database",
@@ -1304,7 +1304,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "console"
       ],
-      "summary": "Enforce S7-RES-09 owner review gate across verifyOwnerDish, approveDishDraftAtomic, prepareOwnerMenu, approveMenuRevision, publishMenu, reviewDishes, and Step 1 MenuProcessing wording so automatic checks, incomplete dishes, and unresolved proposed allergens cannot bypass owner approval or publish.",
+      "summary": "S7-RES-09 keeps automatic checks separate from owner decisions. Manual verification and approval share required-field and proposed-fact checks. Owner-prepared menu commands verify the stored bundle and match its dish revisions to current active verified drafts.",
       "files": [
         "backend/src/owner-menu.ts",
         "backend/src/owner-prepare.ts",
@@ -1314,7 +1314,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/review/reviewDishes.ts",
         "docs/s7-res-09-owner-review-gate.md"
       ],
-      "next": "Review PR targeting develop and run authorized staging verification."
+      "next": "Review exact-snapshot and concurrent draft behavior before authorized staging verification."
     }
   ]
 }

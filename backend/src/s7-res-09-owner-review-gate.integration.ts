@@ -8,6 +8,7 @@ import { persistExtractedDrafts } from './ingestion/repository';
 import {
   promoteDraftPhoto,
   saveOwnerDishDraft,
+  setDraftRemoval,
   storeDraftPhoto,
   verifyOwnerDish,
 } from './owner-menu';
@@ -18,7 +19,12 @@ import {
   readPreparedBundle,
 } from './owner-prepare';
 import { fetchPreparedMenu, listPreparedMenus } from './owner-publication';
-import { approveMenuRevision, publishMenu } from './publication-command';
+import {
+  type ApproveMenuRevisionInput,
+  approveMenuRevision,
+  type PublishMenuInput,
+  publishMenu,
+} from './publication-command';
 import { readRestaurantSetup } from './restaurant-profile';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -79,6 +85,10 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
     delete: async (key: string) => objects.delete(key),
   };
 
+  const approvePrepared = (actor: string, venue: string, input: ApproveMenuRevisionInput) =>
+    approveMenuRevision(runtime, actor, venue, input, storage);
+  const publishPrepared = (actor: string, venue: string, input: PublishMenuInput) =>
+    publishMenu(runtime, actor, venue, input, storage);
   const owner = crypto.randomUUID();
   const foreignOwner = crypto.randomUUID();
   const approve: ApproveDraft = (client, actor, venue, draft, options) =>
@@ -267,7 +277,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
     const menu = (await listPreparedMenus(runtime, owner, venue)).find(
       (item) => item.menuRevisionId === prepared.menuRevisionId,
     )!;
-    const approval = await approveMenuRevision(runtime, owner, venue, {
+    const approval = await approvePrepared(owner, venue, {
       commandId: crypto.randomUUID(),
       menuId: menu.menuId,
       expectedVersion: menu.reviewVersion,
@@ -275,7 +285,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
       contentApprovalId: menu.contentApprovalId,
       assetApprovalId: menu.assetApprovalId,
     });
-    const pub = await publishMenu(runtime, owner, venue, {
+    const pub = await publishPrepared(owner, venue, {
       commandId: crypto.randomUUID(),
       menuId: menu.menuId,
       expectedVersion: menu.publicationVersion,
@@ -324,9 +334,10 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
       }),
     });
 
-    // Even if verified directly via API, an incomplete dish blocks preparation (no silent skip).
-    await verifyOwnerDish(runtime, owner, venue, incompleteDraft, crypto.randomUUID(), true, 1);
-    await expect(prepare(venue)).rejects.toMatchObject({ code: 'draft_incomplete', status: 409 });
+    await expect(
+      verifyOwnerDish(runtime, owner, venue, incompleteDraft, crypto.randomUUID(), true, 1),
+    ).rejects.toMatchObject({ code: 'draft_incomplete', status: 409 });
+    await expect(prepare(venue)).rejects.toMatchObject({ code: 'menu_not_verified', status: 409 });
 
     // Owner corrects the missing fields, verifies, prepares, approves, and publishes.
     await saveOwnerDishDraft(runtime, owner, venue, incompleteDraft, {
@@ -346,7 +357,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
     const menu = (await listPreparedMenus(runtime, owner, venue)).find(
       (item) => item.menuRevisionId === prepared.menuRevisionId,
     )!;
-    const approval = await approveMenuRevision(runtime, owner, venue, {
+    const approval = await approvePrepared(owner, venue, {
       commandId: crypto.randomUUID(),
       menuId: menu.menuId,
       expectedVersion: menu.reviewVersion,
@@ -354,7 +365,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
       contentApprovalId: menu.contentApprovalId,
       assetApprovalId: menu.assetApprovalId,
     });
-    const pub = await publishMenu(runtime, owner, venue, {
+    const pub = await publishPrepared(owner, venue, {
       commandId: crypto.randomUUID(),
       menuId: menu.menuId,
       expectedVersion: menu.publicationVersion,
@@ -363,7 +374,10 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
     expect(pub.status).toBe('published');
   });
 
-  it('Scenario C: unresolved/proposed allergen information blocks verification, approval, and publication until resolved', async () => {
+  it.each([
+    { field: 'allergens', items: ['peanut'] },
+    { field: 'ingredients', items: ['peanuts'] },
+  ])('Scenario C: blocks proposed $field', async ({ field, items }) => {
     const venue = await newVenue('Scenario C Cafe');
     const draftId = crypto.randomUUID();
     await saveOwnerDishDraft(runtime, owner, venue, draftId, {
@@ -372,7 +386,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
       fields: OwnerDishFieldsSchema.parse({
         ...fullManual,
         name: 'Fictional Peanut Curry',
-        allergens: { status: 'proposed', items: ['peanut'] },
+        [field]: { status: 'proposed', items },
       }),
     });
 
@@ -387,9 +401,12 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
         confirmed: true,
       }),
     ).rejects.toMatchObject({ code: 'draft_incomplete', status: 409 });
-    await expect(prepare(venue)).rejects.toMatchObject({ code: 'menu_not_verified', status: 409 });
+    await expect(prepare(venue)).rejects.toMatchObject({
+      code: 'menu_not_verified',
+      status: 409,
+    });
 
-    // Owner explicitly confirms the allergen, then verifies and publishes.
+    // The owner resolves the proposed facts, then verifies and publishes.
     await saveOwnerDishDraft(runtime, owner, venue, draftId, {
       commandId: crypto.randomUUID(),
       expectedVersion: 1,
@@ -404,7 +421,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
     const menu = (await listPreparedMenus(runtime, owner, venue)).find(
       (item) => item.menuRevisionId === prepared.menuRevisionId,
     )!;
-    const approval = await approveMenuRevision(runtime, owner, venue, {
+    const approval = await approvePrepared(owner, venue, {
       commandId: crypto.randomUUID(),
       menuId: menu.menuId,
       expectedVersion: menu.reviewVersion,
@@ -412,7 +429,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
       contentApprovalId: menu.contentApprovalId,
       assetApprovalId: menu.assetApprovalId,
     });
-    await publishMenu(runtime, owner, venue, {
+    await publishPrepared(owner, venue, {
       commandId: crypto.randomUUID(),
       menuId: menu.menuId,
       expectedVersion: menu.publicationVersion,
@@ -448,8 +465,8 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
       },
       prepareOwnerMenu: async (actorId, v) =>
         prepareOwnerMenu(runtime, actorId, v, origin, storage, approve),
-      approve: async (actorId, v, input) => approveMenuRevision(runtime, actorId, v, input),
-      publish: async (actorId, v, input) => publishMenu(runtime, actorId, v, input),
+      approve: approvePrepared,
+      publish: publishPrepared,
     });
     const env = { APP_ENV: 'local', LOCAL_DATABASE_URL: runtimeUrl! } as never;
 
@@ -482,14 +499,25 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
     const menu = (await listPreparedMenus(runtime, owner, venue)).find(
       (item) => item.menuRevisionId === prepared.menuRevisionId,
     )!;
-    const approval = await approveMenuRevision(runtime, owner, venue, {
+    const approveInput = {
       commandId: crypto.randomUUID(),
       menuId: menu.menuId,
       expectedVersion: menu.reviewVersion,
       menuRevisionId: menu.menuRevisionId,
       contentApprovalId: menu.contentApprovalId,
       assetApprovalId: menu.assetApprovalId,
+    };
+    await expect(approveMenuRevision(runtime, owner, venue, approveInput)).rejects.toMatchObject({
+      code: 'menu_not_verified',
+      status: 409,
     });
+    await expect(
+      approveMenuRevision(runtime, owner, venue, approveInput, {
+        ...storage,
+        get: async () => ({ arrayBuffer: async () => new ArrayBuffer(8) }),
+      }),
+    ).rejects.toMatchObject({ code: 'menu_not_verified', status: 409 });
+    const approval = await approveMenuRevision(runtime, owner, venue, approveInput, storage);
 
     // Editing a dish AFTER prepare/approval reopens it and blocks publishMenu on the stale approval!
     await saveOwnerDishDraft(runtime, owner, venue, draftId, {
@@ -503,7 +531,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
       published: false,
     });
     await expect(
-      publishMenu(runtime, owner, venue, {
+      publishPrepared(owner, venue, {
         commandId: crypto.randomUUID(),
         menuId: menu.menuId,
         expectedVersion: menu.publicationVersion,
@@ -513,7 +541,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
 
     // Cross-restaurant authorization: foreignOwner cannot publish or verify venue's menu.
     await expect(
-      publishMenu(runtime, foreignOwner, venue, {
+      publishPrepared(foreignOwner, venue, {
         commandId: crypto.randomUUID(),
         menuId: menu.menuId,
         expectedVersion: menu.publicationVersion,
@@ -527,7 +555,15 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
     const menu2 = (await listPreparedMenus(runtime, owner, venue)).find(
       (item) => item.menuRevisionId === prepared2.menuRevisionId,
     )!;
-    const approval2 = await approveMenuRevision(runtime, owner, venue, {
+    await expect(
+      publishPrepared(owner, venue, {
+        commandId: crypto.randomUUID(),
+        menuId: menu.menuId,
+        expectedVersion: menu2.publicationVersion,
+        approvalId: approval.approvalId,
+      }),
+    ).rejects.toMatchObject({ code: 'menu_not_verified', status: 409 });
+    const approval2 = await approvePrepared(owner, venue, {
       commandId: crypto.randomUUID(),
       menuId: menu2.menuId,
       expectedVersion: menu2.reviewVersion,
@@ -535,12 +571,42 @@ describe.skipIf(!runtimeUrl || !adminUrl)('S7-RES-09 owner review gate (real dat
       contentApprovalId: menu2.contentApprovalId,
       assetApprovalId: menu2.assetApprovalId,
     });
-    const pub2 = await publishMenu(runtime, owner, venue, {
+    const publishInput = {
       commandId: crypto.randomUUID(),
       menuId: menu2.menuId,
       expectedVersion: menu2.publicationVersion,
       approvalId: approval2.approvalId,
-    });
+    };
+    const pub2 = await publishPrepared(owner, venue, publishInput);
     expect(pub2.status).toBe('published');
+
+    await setDraftRemoval(runtime, owner, venue, draftId, {
+      commandId: crypto.randomUUID(),
+      expectedDraftVersion: 2,
+      expectedRemovalVersion: 0,
+      removed: true,
+    });
+    await expect(
+      approvePrepared(owner, venue, {
+        commandId: crypto.randomUUID(),
+        menuId: menu2.menuId,
+        expectedVersion: approval2.version,
+        menuRevisionId: menu2.menuRevisionId,
+        contentApprovalId: menu2.contentApprovalId,
+        assetApprovalId: menu2.assetApprovalId,
+      }),
+    ).rejects.toMatchObject({ code: 'menu_not_verified', status: 409 });
+    await expect(
+      publishPrepared(owner, venue, {
+        commandId: crypto.randomUUID(),
+        menuId: menu2.menuId,
+        expectedVersion: pub2.version,
+        approvalId: approval2.approvalId,
+      }),
+    ).rejects.toMatchObject({ code: 'menu_not_verified', status: 409 });
+    expect(await publishMenu(runtime, owner, venue, publishInput)).toEqual(pub2);
+    expect(
+      await readPreparedBundle(runtime, storage, venue, menu2.menuId, menu2.menuRevisionId),
+    ).not.toBeNull();
   });
 });
