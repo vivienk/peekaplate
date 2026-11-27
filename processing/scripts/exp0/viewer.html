@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exp0 dish viewer</title>
+<style>
+  :root { --bg: #d9d6d0; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  canvas { display: block; }
+  #hud { position: fixed; left: 8px; bottom: 8px; font: 12px system-ui; color: #333; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "./_three/build/three.module.js",
+  "three/addons/": "./_three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+// Exp0 (2026-11-24) private R&D viewer. publication_eligible: false.
+// Query: glb=<url>&mode=unlit|lit|clay|coat&az=<deg>&el=<deg>&size=<px>&orbit=1
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+const q = new URLSearchParams(location.search);
+const mode = q.get('mode') || 'lit';
+const az = THREE.MathUtils.degToRad(Number(q.get('az') ?? 0));
+const el = THREE.MathUtils.degToRad(Number(q.get('el') ?? 35));
+const size = Number(q.get('size') || 0);
+const W = size || innerWidth, H = size || innerHeight;
+
+const transparent = q.get('bg') === 'none';
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: transparent });
+renderer.setPixelRatio(size ? 1 : devicePixelRatio);
+renderer.setSize(W, H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = mode === 'unlit' ? THREE.NoToneMapping : THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 0.85;
+renderer.shadowMap.enabled = mode !== 'unlit';
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = transparent ? null : new THREE.Color(0xd9d6d0);
+if (transparent) document.documentElement.style.setProperty('--bg', 'transparent');
+if (mode !== 'unlit') {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.55;
+  const key = new THREE.DirectionalLight(0xfff1e0, 2.6);
+  key.position.set(2.5, 4, 2);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.radius = 6;
+  key.shadow.bias = -0.0005;
+  scene.add(key);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({ opacity: 0.4 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+  scene.userData.key = key;
+  scene.userData.ground = ground;
+}
+
+const camera = new THREE.PerspectiveCamera(30, W / H, 0.01, 100);
+const hud = document.getElementById('hud');
+
+function restyle(root) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = o.receiveShadow = mode !== 'unlit';
+    const m = o.material;
+    if (mode === 'unlit') {
+      o.material = new THREE.MeshBasicMaterial({ map: m.map, color: m.color });
+    } else if (mode === 'clay') {
+      o.material = new THREE.MeshStandardMaterial({ color: 0x9a968f, roughness: 0.9, metalness: 0 });
+    } else if (mode === 'coat') {
+      const p = new THREE.MeshPhysicalMaterial({
+        map: m.map, color: m.color, roughnessMap: m.roughnessMap, roughness: m.roughness,
+        normalMap: m.normalMap, normalScale: m.normalScale, side: m.side,
+      });
+      p.metalness = 0;
+      p.clearcoat = 0.6;
+      p.clearcoatRoughness = 0.12;
+      p.sheen = 0.15;
+      p.sheenRoughness = 0.6;
+      o.material = p;
+    }
+  });
+}
+
+new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(q.get('glb'), (gltf) => {
+  const root = gltf.scene;
+  restyle(root);
+  // normalise: centre on xz, rest on y=0, fit radius 1
+  const box = new THREE.Box3().setFromObject(root);
+  const c = box.getCenter(new THREE.Vector3());
+  const s = 1 / Math.max(box.getSize(new THREE.Vector3()).length() / 2, 1e-6);
+  root.scale.setScalar(s);
+  root.position.set(-c.x * s, -box.min.y * s, -c.z * s);
+  scene.add(root);
+  const h = (box.max.y - box.min.y) * s;
+  const target = new THREE.Vector3(0, h * 0.35, 0);
+  const dist = 2.85;
+  const pose = (a, e) => {
+    camera.position.set(dist * Math.cos(e) * Math.sin(a), target.y + dist * Math.sin(e), dist * Math.cos(e) * Math.cos(a));
+    camera.lookAt(target);
+  };
+  pose(az, el);
+  // fidelity search: re-pose without reloading the GLB
+  window.__pose = (azDeg, elDeg) => {
+    pose(THREE.MathUtils.degToRad(azDeg), THREE.MathUtils.degToRad(elDeg));
+    renderer.render(scene, camera);
+    return true;
+  };
+  if (scene.userData.key) {
+    const k = scene.userData.key;
+    const sc = k.shadow.camera; sc.left = sc.bottom = -1.5; sc.right = sc.top = 1.5; sc.updateProjectionMatrix();
+  }
+  let tris = 0;
+  root.traverse((o) => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+  hud.textContent = `${mode} · ${Math.round(tris / 1000)}k tris`;
+  if (q.get('orbit') === '1') {
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(target);
+    controls.update();
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  } else {
+    hud.textContent = '';
+    renderer.render(scene, camera);
+    requestAnimationFrame(() => { renderer.render(scene, camera); window.__ready = { tris }; });
+  }
+}, undefined, (err) => { window.__ready = { error: String(err) }; });
+</script>
+</body>
+</html>

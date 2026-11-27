@@ -253,3 +253,110 @@ and assert template parity between `dish_3d_studio.py` and Cell 19 in unit tests
 Related: `processing/src/peekaplate_processing/dish_3d_studio.py`,
 `processing/tests/test_dish_3d_studio.py`, `notebooks/dish-3d-openrouter.ipynb`.
 Pattern: assets.dual-interactive-3d-studio; first occurrence, no policy promotion.
+
+## LRN-20261121-TRELLIS2-CUTOUT-DUALGPU · Require plate-preserving alpha cutouts, remeshing, lazy checkpoint loading, and cache-clean dual-GPU sharding for TRELLIS.2-4B
+
+**Logged**: 2026-11-21 (verified live 2026-11-22 on Kaggle V31) · **Status**: resolved · **Area**: processing
+**Category**: runtime_compatibility
+
+Kaggle Version 20's live TRELLIS.2-4B run produced flat table slabs, dark metallic corners, and perforated surfaces (`04_gimbap` reached `3.78×` UV vertex split and `7,076` open / `9,740` non-manifold edges; `02_tteokbokki` had negative signed volume `-0.00738`) because Cell 15 passed raw unmasked `input_image.png` into `trellis_prepare_full_plate.py` with `preprocess_image=False`, skipped alpha bounding-box cropping, baked `1024` textures with `remesh=False`, and ran on a single T4 (`5.16 GiB` peak). Fail closed with `--require-alpha` + `--crop-to-alpha` on `cutout_path` (`cutout_rgba.png`), pass `encoder([image])` as a single-element list to `DinoV3FeatureExtractor`, load and release each TRELLIS checkpoint stage-by-stage (`run_pipeline_staged` + `_release_model`, keeping T4 peak CPU RSS at `<= 6.14 GiB` instead of V26's ~32 GiB `SIGKILL`), enable `remesh=True` + `texture_size=2048` + UV-preserving `mobile_decimation_target=34000`, default Kaggle T4 FP32 to `pipeline_type='512'` (`timeout=1200`, since `1024_cascade` FP32 took 97 min for 3 dishes in V26), and when sharding TRELLIS flow models across `2× Tesla T4` (`cuda:0 + cuda:1`, `peak 2.780 / 2.711 GiB`) via `DualGpuShardedFlowModel` + `cuda:1` `tex_slat_decoder`, always construct fresh `SparseTensor` / `VarLenTensor` instances across device boundaries via `move_to_device` rather than calling `.to()` with stale `_spatial_cache` / `_cache` tensors. Verified live in Kaggle Version 31 (`0` open boundary edges and positive signed volume across all `8` raw+mobile TRELLIS GLBs; tabletop slabs eliminated).
+
+Related: `notebooks/dish-3d-openrouter.ipynb`, `processing/tests/test_dish_3d_notebook.py`,
+`docs/research/dish-3d-delivery.md`, `errors.md`.
+Pattern: processing.trellis2-cutout-remesh-dual-t4; resolved and live-verified.
+
+## LRN-20261122-KAGGLE-OPS · Grade Kaggle trees by measurement, and never let a harness env or a bare status line decide the verdict
+
+**Logged**: 2026-11-22 (live evidence from `trellislast-version/32`, `benchmark-a/3`, `hero-batch-b/3` and `/5`) · **Status**: resolved · **Area**: assets
+**Category**: observability
+
+Four traps cost a full audit cycle on the private dish-3D jobs, and each one is
+now a regression test rather than a note:
+
+1. **A child process inherits the caller's Python harness.** Every scheduled
+   status check reported `query=FAILED error=Traceback (most recent call last):`
+   while the same `kaggle` commands worked in a plain shell: `PYTHONPATH` pointed
+   at `processing/tests`, whose `sitecustomize.py` blocks sockets, so the CLI venv
+   died on HTTPS. Sanitise the environment for an external binary
+   (`PYTHONPATH`/`PYTHONHOME`/`PYTHONSTARTUP`) and never report a traceback header
+   as the cause — report its last line plus any guard marker.
+2. **`QUEUED` is not a diagnosis, and not automatically a stale entry.** An empty
+   `kernels logs`, `kernels files` = 0 and flat `kaggle quota` used-hours only prove
+   that no worker has started yet. `hero-batch-b/5` sat `QUEUED` for ~2 h 50 min and
+   then ran to `COMPLETE` on its own — it was waiting for a free 2×T4 host while
+   `benchmark-a/3` held the other slot — so a queued version keeps its uploaded
+   snapshot and must not be re-pushed, cancelled or "fixed" on the strength of the
+   status word alone. Collect `kernels logs`, `kernels files`, two `quota` samples and
+   the sibling versions' timelines before any conclusion; only re-push when the
+   version's own source is wrong.
+3. **Verify the claim against the artifact's own bytes, and read the status.**
+   A dish whose every declared run is `skipped` owes no GLB (warning, not error);
+   a re-encoded `input_image.png` must be graded against `input_image_sha256`, not
+   the declared upload `source_sha256`; a merge must measure the bytes it copies
+   instead of inheriting another tree's digest.
+4. **Match the vendor's cast and probe a dependency before the shard runs.**
+   `TripoSGPipeline.from_pretrained(dir)` then `.to('cuda', torch.float16)` mirrors
+   upstream `inference_triposg.py`; passing `torch_dtype=` alone leaves the DINOv2
+   encoder in float32 and every dish dies with `mat1 and mat2 must have the same
+   dtype`. `spconv-cu126` has no cu128 build, so importing it on the Kaggle image
+   triggers a `cumm` rebuild that fails on missing `tensorview` headers: probe
+   `import spconv.pytorch` in a child process, uninstall the wheel, and record the
+   shard as `skipped (spconv_unavailable:…)` so one measured line replaces 19
+   opaque failures.
+
+Related: `processing/scripts/kaggle_job_status.py`,
+`processing/scripts/verify_kaggle_outputs.py`,
+`processing/scripts/merge_multi_model_results.py`,
+`processing/scripts/build_multi_model_notebooks.py`,
+`docs/research/dish-3d-delivery.md`, `errors.md` (`ERR-20261122-006/007/008`).
+Pattern: assets.kaggle-ops-measured-verdicts; first occurrence, no policy promotion.
+
+5. **Live logs need `-f`. Called without it, a RUNNING Kaggle version returns
+   zero lines, and an hour of silence was misread as a stalled session twice on
+   2026-11-23 while `kaggle quota` kept ticking. `kaggle kernels logs -f <ref>`
+   streamed the running notebook immediately, including the decisive
+   `TRELLIS.2 HF token source: dataset:…` and `DINOv3 preflight: ok=True` lines.
+   Before declaring a session stuck, stream it with `-f` and compare two quota
+   samples.
+
+---
+
+## LRN-20261123-KAGGLE-SECRETS · A COMPLETE Kaggle run with zero meshes can be a credential-delivery failure, not a model failure
+
+**Logged**: 2026-11-23 (live evidence from `trellislast-version/31` vs `/32`, the
+CPU probe `peekaplate-kaggle-secret-probe`, and the private
+`yacine105/peekaplate-hf-token` dataset) · **Status**: resolved · **Area**: assets
+**Category**: observability
+
+On 2026-11-23 `trellislast-version/32` finished `COMPLETE` with 4/4 TRELLIS.2-4B
+entries `skipped (missing_or_unauthorized_hf_token)` and zero GLBs, while `/31` had
+printed `DINOv3 preflight: ok=True` the day before on the same notebook. The cause was
+delivery, not gating: inside the kernel `UserSecretsClient().get_secret('HF_TOKEN')`
+raised `ConnectionError`, so no secret was attached to the API-pushed version at all,
+and the preflight reported an absent token with the same note as a 401/403.
+
+Three durable rules:
+
+1. **Resolve credentials through one helper that reports its source** (Kaggle Secret,
+then an attached private dataset file, then environment) and log the source name, never
+the value. Distinct notes matter: `missing_hf_token` is an operator error,
+`missing_or_unauthorized_hf_token` is a permission error, and they demand different
+responses.
+2. **Kaggle exposes no API for notebook secrets.** A token the operator hands over
+cannot be attached programmatically. A private dataset attached as a `dataset_sources`
+entry is the only fully automatable delivery path, so scheduled reruns must not depend
+on a UI toggle. Verify delivery with a CPU-only probe kernel that prints only
+`hf_user` and per-repo HTTP results before spending GPU hours.
+3. **Grade the outputs, not the status word.** `COMPLETE` plus a manifest whose every
+run is `skipped` is a failed objective even though the harness succeeded; read
+`runs_3d`, count GLBs, and compare them against the number of dishes before reporting
+delivery.
+
+Business outcome: a Hugging Face token with gated read access to
+`microsoft/TRELLIS.2-4B` and `facebook/dinov3-vitl16-pretrain-lvd1689m` is the only
+prerequisite for TRELLIS output, and it now travels with the kernels.
+
+Related: `notebooks/trellislast-version.ipynb` (`secret_source`),
+`processing/tests/test_trellislast_notebook.py`, `errors.md` (`ERR-20261123-001`),
+`docs/research/dish-3d-delivery.md`. Pattern: assets.kaggle-credential-delivery;
+first occurrence.

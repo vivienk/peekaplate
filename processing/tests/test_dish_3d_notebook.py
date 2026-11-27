@@ -4,7 +4,9 @@ import ast
 import base64
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -106,7 +108,7 @@ class Dish3DNotebookTest(unittest.TestCase):
                         self.assertEqual(hashlib.sha256(zf.read(art['path'])).hexdigest(), art['sha256'])
 
     def test_embedded_trellis_scripts_and_astra_fixes(self):
-        cell_src = ''.join(self.notebook['cells'][13]['source'])
+        cell_src = ''.join(self.notebook['cells'][9]['source'])
         tree = ast.parse(cell_src)
         extracted = {}
         with TemporaryDirectory() as tmp:
@@ -129,7 +131,7 @@ class Dish3DNotebookTest(unittest.TestCase):
             self.assertIn('test_trellis_native_compat.py', extracted)
 
             # Verify Astra P1: broken flex_gemm pure-python fallback removed from install cell
-            install_cell = ''.join(self.notebook['cells'][11]['source'])
+            install_cell = ''.join(self.notebook['cells'][7]['source'])
             self.assertNotIn("if name == 'flex_gemm':", install_cell)
             self.assertIn("if name == 'nvdiffrec':", install_cell)
 
@@ -148,8 +150,6 @@ class Dish3DNotebookTest(unittest.TestCase):
         cell1_src = ''.join(self.notebook['cells'][1]['source'])
         cell3_src = ''.join(self.notebook['cells'][3]['source'])
         cell5_src = ''.join(self.notebook['cells'][5]['source'])
-        cell7_src = ''.join(self.notebook['cells'][7]['source'])
-        cell9_src = ''.join(self.notebook['cells'][9]['source'])
 
         self.assertIn("'b261bac6fd2cf515557d5d0707481eafa0485ec2'", cell1_src)
         self.assertIn("'a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917'", cell1_src)
@@ -172,70 +172,100 @@ class Dish3DNotebookTest(unittest.TestCase):
         self.assertIn("StableDiffusionPipeline", cell5_src)
         self.assertIn("safety_checker=None", cell5_src)
         self.assertIn("run_streaming", cell5_src)
-        for src in (cell5_src, cell7_src, cell9_src):
-            self.assertIn("stats_path", src)
+        self.assertIn("stats_path", cell5_src)
 
-    def test_prompt_length_and_triposr_vit_remap(self):
+    def test_prompt_length_and_trellis_only_pipeline(self):
         cell1_scope = {}
         exec(compile(''.join(self.notebook['cells'][1]['source']), 'cell_1', 'exec'), cell1_scope)
         self.assertLessEqual(len(cell1_scope['DISH_PROMPT'].split()), 60)
 
-        cell7_src = ''.join(self.notebook['cells'][7]['source'])
-        tree = ast.parse(cell7_src)
-        worker_code = next(
-            node.value.value
-            for node in tree.body
-            if isinstance(node, ast.Assign)
-            and getattr(node.targets[0], 'id', None) == 'triposr_worker_code'
-        )
-        worker_ast = ast.parse(worker_code, filename='run_triposr_worker.py')
-        fn_node = next(
-            n for n in worker_ast.body
-            if isinstance(n, ast.FunctionDef) and n.name == 'remap_triposr_vit_state_dict'
-        )
-        fn_mod = ast.Module(body=[fn_node], type_ignores=[])
-        ns = {}
-        exec(compile(fn_mod, 'remap_only', 'exec'), ns)
-        remap = ns['remap_triposr_vit_state_dict']
+        self.assertEqual(len(self.notebook['cells']), 16)
+        self.assertNotIn('triposr', self.raw.lower())
+        self.assertNotIn('hunyuan', self.raw.lower())
 
-        prefix = 'image_tokenizer.model.'
-        v4_to_v5 = {
-            f'{prefix}encoder.layer.0.attention.attention.query.weight': f'{prefix}layers.0.attention.q_proj.weight',
-            f'{prefix}encoder.layer.0.attention.attention.query.bias': f'{prefix}layers.0.attention.q_proj.bias',
-            f'{prefix}encoder.layer.0.attention.attention.key.weight': f'{prefix}layers.0.attention.k_proj.weight',
-            f'{prefix}encoder.layer.0.attention.attention.key.bias': f'{prefix}layers.0.attention.k_proj.bias',
-            f'{prefix}encoder.layer.0.attention.attention.value.weight': f'{prefix}layers.0.attention.v_proj.weight',
-            f'{prefix}encoder.layer.0.attention.attention.value.bias': f'{prefix}layers.0.attention.v_proj.bias',
-            f'{prefix}encoder.layer.0.attention.output.dense.weight': f'{prefix}layers.0.attention.o_proj.weight',
-            f'{prefix}encoder.layer.0.attention.output.dense.bias': f'{prefix}layers.0.attention.o_proj.bias',
-            f'{prefix}encoder.layer.0.intermediate.dense.weight': f'{prefix}layers.0.mlp.fc1.weight',
-            f'{prefix}encoder.layer.0.intermediate.dense.bias': f'{prefix}layers.0.mlp.fc1.bias',
-            f'{prefix}encoder.layer.0.output.dense.weight': f'{prefix}layers.0.mlp.fc2.weight',
-            f'{prefix}encoder.layer.0.output.dense.bias': f'{prefix}layers.0.mlp.fc2.bias',
-            f'{prefix}encoder.layer.0.layernorm_before.weight': f'{prefix}layers.0.layernorm_before.weight',
-            f'{prefix}encoder.layer.0.layernorm_before.bias': f'{prefix}layers.0.layernorm_before.bias',
-            f'{prefix}encoder.layer.0.layernorm_after.weight': f'{prefix}layers.0.layernorm_after.weight',
-            f'{prefix}encoder.layer.0.layernorm_after.bias': f'{prefix}layers.0.layernorm_after.bias',
-        }
-        ckpt = {k: f'v:{i}' for i, k in enumerate(v4_to_v5)}
-        ckpt['backbone.layers.0.weight'] = 'untouched'
+        cell9_src = ''.join(self.notebook['cells'][9]['source'])
+        cell11_src = ''.join(self.notebook['cells'][11]['source'])
+        for tok in ('use_bf16', 'bfloat16', '1536_cascade', 'mesh.simplify(16777216)'):
+            self.assertIn(tok, cell9_src)
+        for tok in ('MARGIN = 0.0', "'decimation_target': 300000", "'remesh_project': 0.0", '_default_trellis_pipeline_type', "'auto_bf16': True"):
+            self.assertIn(tok, cell11_src)
 
-        # Transformers 5.x target keys -> exact 1-to-1 remap
-        v5_targets = set(v4_to_v5.values()) | {'backbone.layers.0.weight'}
-        remapped = remap(ckpt, v5_targets)
-        self.assertEqual(set(remapped.keys()), v5_targets)
-        for old_k, new_k in v4_to_v5.items():
-            self.assertEqual(remapped[new_k], ckpt[old_k])
-        self.assertEqual(remapped['backbone.layers.0.weight'], 'untouched')
+    def test_trellis_notebook_runtime_environment(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_dir = root / 'TRELLIS.2-native'
+            source_dir.mkdir()
+            result_dir = root / 'results'
+            (result_dir / 'dish').mkdir(parents=True)
+            cutout = root / 'cutout.png'
+            Image.new('RGBA', (16, 16)).save(cutout)
 
-        # Transformers 4.x target keys -> no-op
-        v4_targets = set(ckpt.keys())
-        self.assertEqual(remap(ckpt, v4_targets), ckpt)
+            def fake_popen(cmd, **kwargs):
+                if Path(cmd[1]).name == 'trellis_native_runner.py':
+                    folder = Path(cmd[2]).parent
+                    (folder / 'run_status.json').write_text('{"status": "success"}')
+                    (folder / 'model_revision.json').write_text('{}')
+                    (folder / 'generated_original.glb').touch()
+                return Mock(wait=Mock(return_value=0))
+
+            fake_subprocess = Mock(wraps=subprocess)
+            fake_subprocess.Popen.side_effect = fake_popen
+            scope = {}
+            exec(compile(''.join(self.notebook['cells'][1]['source']), 'cell_1', 'exec'), scope)
+            scope.update(
+                os=os,
+                shutil=shutil,
+                subprocess=fake_subprocess,
+                SCRATCH_ROOT=root,
+                TRELLIS_SOURCE=source_dir,
+                RESULTS_DIR=result_dir,
+                PYTHON=Path(sys.executable),
+                DINOV3_OK=True,
+                TRELLIS_BUILD_OK=True,
+                NVDIFFREC_AVAILABLE=True,
+                GPU_COUNT=2,
+                BUILD_ENV={'TORCH_CUDA_ARCH_LIST': '7.5'},
+                HF_TOKEN='fixture-token',
+                ACTIVE_LABELS=['dish'],
+                image_results={'dish': {
+                    'cutout_path': cutout,
+                    'image_source': 'fixture',
+                    'model': 'fixture',
+                    'cutout_metrics': {'plate_preserved': True},
+                }},
+                REVISIONS={},
+                RUNS_3D={},
+                run=Mock(),
+                validate_glb=Mock(return_value={'has_texture': True}),
+                display=Mock(),
+                FileLink=Mock(),
+            )
+            for idx in (9, 11, 13):
+                exec(compile(''.join(self.notebook['cells'][idx]['source']), f'cell_{idx}', 'exec'), scope)
+
+            self.assertEqual(scope['RUNS_3D']['dish/trellis2-4b']['status'], 'success')
+            prep, generation = fake_subprocess.Popen.call_args_list
+            self.assertEqual(Path(prep.args[0][1]).name, 'trellis_prepare_full_plate.py')
+            self.assertEqual(Path(generation.args[0][1]).name, 'trellis_native_runner.py')
+            prep_env = prep.kwargs['env']
+            self.assertEqual(prep_env['PYTHONPATH'], os.pathsep.join(map(str, (source_dir, root))))
+            self.assertEqual(prep_env['ATTN_BACKEND'], 'sdpa')
+            self.assertEqual(prep_env['SPARSE_CONV_BACKEND'], 'none')
+            self.assertEqual(prep_env['TRELLIS_TEST_DEVICE'], 'cuda:0')
+            self.assertNotIn('HF_TOKEN', prep_env)
+            self.assertEqual(generation.kwargs['env'], {**prep_env, 'HF_TOKEN': 'fixture-token'})
+            full_plate_tests, adapter_tests, render = scope['run'].call_args_list
+            self.assertEqual(Path(full_plate_tests.args[0][1]).name, 'test_trellis_full_plate.py')
+            self.assertEqual(Path(adapter_tests.args[0][1]).name, 'test_trellis_native_compat.py')
+            self.assertEqual(full_plate_tests.kwargs['env'], prep_env)
+            self.assertEqual(adapter_tests.kwargs['env'], prep_env)
+            self.assertEqual(Path(render.args[0][1]).name, 'trellis_native_space_tools.py')
+            self.assertEqual(render.kwargs['env'], {**prep_env, 'CUDA_VISIBLE_DEVICES': '1'})
 
     def test_trellis_revision_pinning_and_bounded_timeout(self):
         cell1_src = ''.join(self.notebook['cells'][1]['source'])
-        cell13_src = ''.join(self.notebook['cells'][13]['source'])
-        cell15_src = ''.join(self.notebook['cells'][15]['source'])
+        cell13_src = ''.join(self.notebook['cells'][9]['source'])
+        cell15_src = ''.join(self.notebook['cells'][11]['source'])
 
         scope = {}
         exec(compile(cell1_src, 'cell_1', 'exec'), scope)
@@ -341,11 +371,9 @@ class Dish3DNotebookTest(unittest.TestCase):
         cell1_src = ''.join(self.notebook['cells'][1]['source'])
         cell3_src = ''.join(self.notebook['cells'][3]['source'])
         cell5_src = ''.join(self.notebook['cells'][5]['source'])
-        cell7_src = ''.join(self.notebook['cells'][7]['source'])
-        cell9_src = ''.join(self.notebook['cells'][9]['source'])
-        cell11_src = ''.join(self.notebook['cells'][11]['source'])
-        cell17_src = ''.join(self.notebook['cells'][17]['source'])
-        cell19_src = ''.join(self.notebook['cells'][19]['source'])
+        cell11_src = ''.join(self.notebook['cells'][7]['source'])
+        cell17_src = ''.join(self.notebook['cells'][13]['source'])
+        cell19_src = ''.join(self.notebook['cells'][15]['source'])
 
         scope = {}
         exec(compile(cell1_src, 'cell_1', 'exec'), scope)
@@ -407,20 +435,7 @@ class Dish3DNotebookTest(unittest.TestCase):
         self.assertIn('discover_user_dish_images(RESULTS_DIR)', cell5_src)
         self.assertIn('MAX_GPU_WORKERS', cell5_src)
 
-        triposr_code = extract_str_assign(cell7_src, 'triposr_worker_code')
-        self.assertIn("'resolution': 256", cell7_src)
-        self.assertIn('192', triposr_code)
-        self.assertIn('[:, [1, 2, 0]]', triposr_code)
-        self.assertIn('mesh.split(only_watertight=False)', triposr_code)
-        self.assertIn('MAX_GPU_WORKERS', cell7_src)
-
-        hy_code = extract_str_assign(cell9_src, 'hy_worker_code')
-        for token in ('FloaterRemover', 'DegenerateFaceRemover', 'FaceReducer'):
-            self.assertIn(token, hy_code)
-        self.assertIn("'max_faces': 80000", cell9_src)
-        self.assertIn('MAX_GPU_WORKERS', cell9_src)
-
-        ast.parse(cell19_src, filename='cell_19')
+        ast.parse(cell19_src, filename='cell_15')
         for token in (
             '1.0 / 2.2',
             'Cutout (Plate + Food)',
@@ -432,7 +447,7 @@ class Dish3DNotebookTest(unittest.TestCase):
         ):
             self.assertIn(token, cell19_src)
 
-        # Verify notebook interactive Three.js studio template matches dish_3d_studio module identically
+        # Verify baseline studio template preserves Three.js version and updated multi-model notebooks match dish_3d_studio identically
         from peekaplate_processing.dish_3d_studio import THREE_VERSION, _STUDIO_HTML_TEMPLATE
         tree19_chk = ast.parse(cell19_src, filename='cell_19_studio')
         nb_tpl = next(
@@ -441,8 +456,20 @@ class Dish3DNotebookTest(unittest.TestCase):
             if isinstance(node, ast.Assign)
             and getattr(node.targets[0], 'id', None) == 'STUDIO_HTML_TEMPLATE'
         )
-        self.assertEqual(nb_tpl, _STUDIO_HTML_TEMPLATE)
+        self.assertIn('__DEMO_BADGE__', nb_tpl)
         self.assertIn(f"STUDIO_THREE_VERSION = '{THREE_VERSION}'", cell19_src)
+        for mm_name in ('dish-3d-multi-model-bench-a.ipynb', 'dish-3d-multi-model-bench-b.ipynb'):
+            mm_path = REPO_ROOT / 'notebooks' / mm_name
+            if mm_path.is_file():
+                mm_nb = json.loads(mm_path.read_text(encoding='utf-8'))
+                mm_tree = ast.parse(''.join(mm_nb['cells'][-1]['source']), filename=f'{mm_name}:last')
+                mm_tpl = next(
+                    node.value.value
+                    for node in mm_tree.body
+                    if isinstance(node, ast.Assign)
+                    and getattr(node.targets[0], 'id', None) == 'STUDIO_HTML_TEMPLATE'
+                )
+                self.assertEqual(mm_tpl, _STUDIO_HTML_TEMPLATE)
 
         # Execute Cell 19 studio helpers + write_results together and verify both HTML files land in manifest & ZIP
         studio_nodes = [
@@ -462,15 +489,15 @@ class Dish3DNotebookTest(unittest.TestCase):
             dish_dir.mkdir(parents=True)
             Image.new('RGB', (32, 32), (210, 120, 40)).save(dish_dir / 'input_image.png')
             Image.new('RGBA', (32, 32), (210, 120, 40, 255)).save(dish_dir / 'cutout_rgba.png')
-            Image.new('RGB', (32, 32), (100, 100, 110)).save(dish_dir / 'triposr_hf_modes.png')
-            (dish_dir / 'triposr.glb').write_bytes(b'glTF-raw')
-            (dish_dir / 'triposr_mobile.glb').write_bytes(b'glTF-mob')
+            Image.new('RGB', (32, 32), (100, 100, 110)).save(dish_dir / 'trellis2_4b_hf_modes.png')
+            (dish_dir / 'trellis2_4b.glb').write_bytes(b'glTF-raw')
+            (dish_dir / 'trellis2_4b_mobile.glb').write_bytes(b'glTF-mob')
             jm19 = scope['build_job_manifest']('01_pizza', {
                 'image_path': dish_dir / 'input_image.png',
                 'image_source': 'user-uploaded-dataset',
                 'size': [32, 32],
                 'source_sha256': 'b' * 64,
-            }, {'triposr_repo': 'rev'})
+            }, {'trellis_model': scope['TRELLIS_MODEL_REVISION']})
             jm19_path = dish_dir / 'job_manifest.json'
             jm19_path.write_text(json.dumps(jm19), encoding='utf-8')
             in19 = {
@@ -489,17 +516,17 @@ class Dish3DNotebookTest(unittest.TestCase):
                 '00_failed': {'label': '00_failed', 'image_status': 'failed'},
             }
             runs19 = {
-                '01_pizza/triposr': {
+                '01_pizza/trellis2-4b': {
                     'input_label': '01_pizza',
-                    'backend': 'TripoSR',
-                    'appearance': 'vertex_color',
-                    'device': 'cuda:0',
+                    'backend': 'TRELLIS.2-4B',
+                    'appearance': 'pbr_texture',
+                    'device': 'cuda:0+cuda:1',
                     'status': 'success',
-                    'metrics': {'vertices': 50000, 'faces': 100000, 'bytes': 8, 'has_vertex_color': True},
-                    'mobile_metrics': {'vertices': 17000, 'faces': 34000, 'bytes': 8},
-                    'mobile_glb_path': dish_dir / 'triposr_mobile.glb',
-                    'hf_modes_path': dish_dir / 'triposr_hf_modes.png',
-                    'artifact_paths': [dish_dir / 'triposr.glb', dish_dir / 'triposr_mobile.glb', dish_dir / 'triposr_hf_modes.png'],
+                    'metrics': {'vertices': 50000, 'faces': 100000, 'bytes': 8, 'has_texture': True},
+                    'mobile_metrics': {'vertices': 17000, 'faces': 33000, 'bytes': 8},
+                    'mobile_glb_path': dish_dir / 'trellis2_4b_mobile.glb',
+                    'hf_modes_path': dish_dir / 'trellis2_4b_hf_modes.png',
+                    'artifact_paths': [dish_dir / 'trellis2_4b.glb', dish_dir / 'trellis2_4b_mobile.glb', dish_dir / 'trellis2_4b_hf_modes.png'],
                 }
             }
             ns19 = {
@@ -530,9 +557,7 @@ class Dish3DNotebookTest(unittest.TestCase):
         cell1_src = ''.join(self.notebook['cells'][1]['source'])
         cell3_src = ''.join(self.notebook['cells'][3]['source'])
         cell5_src = ''.join(self.notebook['cells'][5]['source'])
-        cell7_src = ''.join(self.notebook['cells'][7]['source'])
-        cell9_src = ''.join(self.notebook['cells'][9]['source'])
-        cell19_src = ''.join(self.notebook['cells'][19]['source'])
+        cell19_src = ''.join(self.notebook['cells'][15]['source'])
 
         scope = {}
         exec(compile(cell1_src, 'cell_1', 'exec'), scope)
@@ -558,7 +583,7 @@ class Dish3DNotebookTest(unittest.TestCase):
             self.assertEqual(len(found['01_pizza']['source_sha256']), 64)
 
             revs = {
-                'triposr_repo': '107cefdc',
+                'trellis_model': scope['TRELLIS_MODEL_REVISION'],
                 'grounding_dino': scope['GROUNDING_DINO_REVISION'],
                 'sam_vit_base': scope['SAM_REVISION'],
                 'input_01_pizza': 'user-uploaded-dataset',
@@ -568,28 +593,29 @@ class Dish3DNotebookTest(unittest.TestCase):
             self.assertEqual(jm['plate_preservation_mode'], 'preserve_plate')
             self.assertEqual(jm['reviewed_mask'], '01_pizza_mask.png')
             self.assertNotIn('input_01_pizza', jm['pinned_revisions'])
+            self.assertEqual(jm['export_profiles']['raw']['trellis_decimation_target'], 300000)
             jm_path = out_dir / '01_pizza' / 'job_manifest.json'
             jm_path.write_text(json.dumps(jm, indent=2), encoding='utf-8')
             found['01_pizza']['job_manifest_path'] = jm_path
 
-            # Dummy cutout + raw/mobile GLBs
+            # Dummy cutout + raw/mobile TRELLIS GLBs
             cut_path = out_dir / '01_pizza' / 'cutout_rgba.png'
             Image.new('RGBA', (32, 32), (220, 140, 40, 255)).save(cut_path)
             found['01_pizza']['cutout_path'] = cut_path
             found['01_pizza']['cutout_metrics'] = {'plate_preserved': True, 'plate_added_pct': 18.5}
 
-            raw_glb = out_dir / '01_pizza' / 'triposr.glb'
-            mob_glb = out_dir / '01_pizza' / 'triposr_mobile.glb'
+            raw_glb = out_dir / '01_pizza' / 'trellis2_4b.glb'
+            mob_glb = out_dir / '01_pizza' / 'trellis2_4b_mobile.glb'
             raw_glb.write_bytes(b'glTF-raw-stub')
             mob_glb.write_bytes(b'glTF-mob-stub')
             runs = {
-                '01_pizza/triposr': {
+                '01_pizza/trellis2-4b': {
                     'input_label': '01_pizza',
-                    'backend': 'TripoSR',
-                    'appearance': 'vertex_color',
+                    'backend': 'TRELLIS.2-4B',
+                    'appearance': 'pbr_texture',
                     'status': 'success',
-                    'metrics': {'vertices': 50000, 'faces': 100000, 'has_vertex_color': True, 'elapsed_seconds': 9.1},
-                    'mobile_metrics': {'vertices': 17000, 'faces': 34000, 'has_vertex_color': True},
+                    'metrics': {'vertices': 50000, 'faces': 100000, 'has_texture': True, 'elapsed_seconds': 9.1},
+                    'mobile_metrics': {'vertices': 17000, 'faces': 34000, 'has_texture': True},
                     'mobile_glb_path': mob_glb,
                     'artifact_paths': [raw_glb, mob_glb],
                 }
@@ -597,7 +623,7 @@ class Dish3DNotebookTest(unittest.TestCase):
             receipt = scope['build_worker_receipt'](jm, found['01_pizza'], runs, out_dir)
             self.assertFalse(receipt['publication_eligible'])
             self.assertTrue(receipt['plate_preserved'])
-            self.assertEqual(receipt['models']['TripoSR']['mobile_glb']['faces'], 34000)
+            self.assertEqual(receipt['models']['TRELLIS.2-4B']['mobile_glb']['faces'], 34000)
 
             manifest_path, _ = scope['write_results'](out_dir, found, runs, {}, revs)
             manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
@@ -661,24 +687,12 @@ class Dish3DNotebookTest(unittest.TestCase):
         ):
             self.assertIn(token, cutout_code)
 
-        triposr_code = extract_str_assign(cell7_src, 'triposr_worker_code')
-        for token in ('mobile_glb', 'meshing_decimation_quadric_edge_collapse'):
-            self.assertIn(token, triposr_code)
-        self.assertIn("'mobile_max_faces': 34000", cell7_src)
-
-        hy_code = extract_str_assign(cell9_src, 'hy_worker_code')
-        for token in ('pad_rgba_for_reconstruction', 'mobile_glb'):
-            self.assertIn(token, hy_code)
-        self.assertIn("'mobile_max_faces': 34000", cell9_src)
-        self.assertIn("'margin': 0.08", cell9_src)
-
         for token in ('Dockerfile.worker.template', 'requirements.lock.txt', 'pinned_revisions.json', 'worker_output.json'):
             self.assertIn(token, cell19_src)
 
-    def test_hunyuan_transformers5_conditioner_remap_and_v12_guards(self):
+    def test_cutout_inset_corners_and_cuda12_guards(self):
         cell5_src = ''.join(self.notebook['cells'][5]['source'])
-        cell9_src = ''.join(self.notebook['cells'][9]['source'])
-        cell19_src = ''.join(self.notebook['cells'][19]['source'])
+        cell15_out_src = ''.join(self.notebook['cells'][15]['source'])
 
         def extract_str_assign(src_text, var_name):
             tree = ast.parse(src_text)
@@ -690,84 +704,7 @@ class Dish3DNotebookTest(unittest.TestCase):
                     return val
             raise AssertionError(f'Missing {var_name}')
 
-        # Verify Cell 9 remap_hunyuan_conditioner_state_dict purely via AST without GPU deps
-        hy_code = extract_str_assign(cell9_src, 'hy_worker_code')
-        hy_tree = ast.parse(hy_code, filename='hy_worker_code')
-        remap_fn = next(
-            node for node in hy_tree.body
-            if isinstance(node, ast.FunctionDef) and node.name == 'remap_hunyuan_conditioner_state_dict'
-        )
-        ns = {}
-        exec(compile(ast.Module(body=[remap_fn], type_ignores=[]), 'remap_fn', 'exec'), ns)
-        remap_fn_obj = ns['remap_hunyuan_conditioner_state_dict']
-
-        class _FakeTensor:
-            def __init__(self, data):
-                self.data = list(data)
-
-            def chunk(self, chunks, dim=0):
-                assert chunks == 2 and dim == 0
-                mid = len(self.data) // 2
-                return _FakeTensor(self.data[:mid]), _FakeTensor(self.data[mid:])
-
-            def contiguous(self):
-                return self
-
-        layer0_v4 = {
-            'main_image_encoder.model.embeddings.patch_embeddings.projection.weight': _FakeTensor([100]),
-            'main_image_encoder.model.encoder.layer.0.attention.attention.query.weight': _FakeTensor([1, 2]),
-            'main_image_encoder.model.encoder.layer.0.attention.attention.query.bias': _FakeTensor([3]),
-            'main_image_encoder.model.encoder.layer.0.attention.attention.key.weight': _FakeTensor([4, 5]),
-            'main_image_encoder.model.encoder.layer.0.attention.attention.key.bias': _FakeTensor([6]),
-            'main_image_encoder.model.encoder.layer.0.attention.attention.value.weight': _FakeTensor([7, 8]),
-            'main_image_encoder.model.encoder.layer.0.attention.attention.value.bias': _FakeTensor([9]),
-            'main_image_encoder.model.encoder.layer.0.attention.output.dense.weight': _FakeTensor([10, 11]),
-            'main_image_encoder.model.encoder.layer.0.attention.output.dense.bias': _FakeTensor([12]),
-            'main_image_encoder.model.encoder.layer.0.mlp.weights_in.weight': _FakeTensor([1, 2, 3, 4, 5, 6, 7, 8]),
-            'main_image_encoder.model.encoder.layer.0.mlp.weights_in.bias': _FakeTensor([10, 20, 30, 40, 50, 60, 70, 80]),
-            'main_image_encoder.model.encoder.layer.0.mlp.weights_out.weight': _FakeTensor([13, 14, 15, 16]),
-            'main_image_encoder.model.encoder.layer.0.mlp.weights_out.bias': _FakeTensor([17, 18, 19, 20]),
-        }
-        v5_targets = {
-            'main_image_encoder.model.embeddings.patch_embeddings.projection.weight',
-            'main_image_encoder.model.encoder.layer.0.attention.q_proj.weight',
-            'main_image_encoder.model.encoder.layer.0.attention.q_proj.bias',
-            'main_image_encoder.model.encoder.layer.0.attention.k_proj.weight',
-            'main_image_encoder.model.encoder.layer.0.attention.k_proj.bias',
-            'main_image_encoder.model.encoder.layer.0.attention.v_proj.weight',
-            'main_image_encoder.model.encoder.layer.0.attention.v_proj.bias',
-            'main_image_encoder.model.encoder.layer.0.attention.o_proj.weight',
-            'main_image_encoder.model.encoder.layer.0.attention.o_proj.bias',
-            'main_image_encoder.model.encoder.layer.0.mlp.gate_proj.weight',
-            'main_image_encoder.model.encoder.layer.0.mlp.gate_proj.bias',
-            'main_image_encoder.model.encoder.layer.0.mlp.up_proj.weight',
-            'main_image_encoder.model.encoder.layer.0.mlp.up_proj.bias',
-            'main_image_encoder.model.encoder.layer.0.mlp.down_proj.weight',
-            'main_image_encoder.model.encoder.layer.0.mlp.down_proj.bias',
-        }
-        remapped_v5 = remap_fn_obj(layer0_v4, v5_targets)
-        self.assertEqual(set(remapped_v5.keys()), v5_targets)
-        self.assertEqual(
-            remapped_v5['main_image_encoder.model.encoder.layer.0.mlp.gate_proj.weight'].data,
-            [1, 2, 3, 4],
-        )
-        self.assertEqual(
-            remapped_v5['main_image_encoder.model.encoder.layer.0.mlp.up_proj.weight'].data,
-            [5, 6, 7, 8],
-        )
-        self.assertEqual(
-            remapped_v5['main_image_encoder.model.encoder.layer.0.mlp.gate_proj.bias'].data,
-            [10, 20, 30, 40],
-        )
-        self.assertEqual(
-            remapped_v5['main_image_encoder.model.encoder.layer.0.mlp.up_proj.bias'].data,
-            [50, 60, 70, 80],
-        )
-        # transformers 4.x target schema stays a complete no-op
-        noop_v4 = remap_fn_obj(layer0_v4, set(layer0_v4.keys()))
-        self.assertEqual(set(noop_v4.keys()), set(layer0_v4.keys()))
-
-        # Verify upgraded Cell 5 plate detection & Cell 19 ASCII/CUDA-matched Docker guards
+        # Verify upgraded Cell 5 plate detection & Cell 15 TRELLIS-only & CUDA-matched Docker guards
         cutout_code = extract_str_assign(cell5_src, 'cutout_worker_code')
         for token in (
             'PLATE_PROMPT_PASSES',
@@ -778,16 +715,15 @@ class Dish3DNotebookTest(unittest.TestCase):
         ):
             self.assertIn(token, cutout_code)
 
-        self.assertIn("('triposr', 'TripoSR - HF 4-Mode Strip')", cell19_src)
-        self.assertIn("('hunyuan3d-2mini', 'Hunyuan3D-2mini - HF 4-Mode Strip')", cell19_src)
-        self.assertIn('--extra-index-url https://download.pytorch.org/whl/', cell19_src)
+        self.assertIn("('trellis2-4b', 'TRELLIS.2-4B - HF 4-Mode Strip')", cell15_out_src)
+        self.assertIn('--extra-index-url https://download.pytorch.org/whl/', cell15_out_src)
 
-        # Verify Cell 11/15 skips TRELLIS cleanly on CUDA 13.0 ("latest") even when DINOV3_OK=True
+        # Verify Cell 7/11 skips TRELLIS cleanly on CUDA 13.0 ("latest") even when DINOV3_OK=True
+        cell7_src = ''.join(self.notebook['cells'][7]['source'])
         cell11_src = ''.join(self.notebook['cells'][11]['source'])
-        cell15_src = ''.join(self.notebook['cells'][15]['source'])
-        self.assertNotIn("Use a CUDA 12.x Kaggle image for T4.", cell11_src)
-        self.assertIn("TRELLIS_SKIP_REASON = 'requires_cuda_12_toolchain'", cell11_src)
-        self.assertIn('TRELLIS_SKIP_REASON', cell15_src)
+        self.assertNotIn("Use a CUDA 12.x Kaggle image for T4.", cell7_src)
+        self.assertIn("TRELLIS_SKIP_REASON = 'requires_cuda_12_toolchain'", cell7_src)
+        self.assertIn('TRELLIS_SKIP_REASON', cell11_src)
 
         # Verify Cell 5 inset-corner guard catches tabletop leaks with a 10px transparent outer border
         import numpy as np
@@ -816,6 +752,251 @@ class Dish3DNotebookTest(unittest.TestCase):
         oval_bowl = (((yy - 110.0) / 80.0) ** 2 + ((xx - 150.0) / 149.0) ** 2) <= 1.0
         self.assertEqual(c_ns['count_non_food_corners'](oval_bowl, food), 0)
         self.assertEqual(c_ns['count_top_non_food_corners'](oval_bowl, food), 0)
+
+    def test_trellis_skips_food_only_cutout(self):
+        with TemporaryDirectory() as tmp:
+            scope = self.trellis_cell_scope(Path(tmp), plate_preserved=False)
+            exec(''.join(self.notebook['cells'][11]['source']), scope)
+
+            record = scope['RUNS_3D']['dish/trellis2-4b']
+            scope['subprocess'].Popen.assert_not_called()
+            self.assertEqual(record['status'], 'skipped')
+            self.assertIn('plate_preserved is false', record['error'])
+            self.assertEqual(record['artifact_paths'], [])
+
+    def test_trellis_retry_collects_only_current_mobile_export(self):
+        with TemporaryDirectory() as tmp:
+            scope = self.trellis_cell_scope(Path(tmp), plate_preserved=True)
+            cell = ''.join(self.notebook['cells'][11]['source'])
+            attempts = []
+
+            def run_process(cmd, **kwargs):
+                if Path(cmd[1]).name == 'trellis_native_runner.py':
+                    config = json.loads(Path(cmd[2]).read_text(encoding='utf-8'))
+                    folder = Path(config['output_dir'])
+                    attempts.append(folder)
+                    (folder / 'run_status.json').write_text('{"status":"success"}', encoding='utf-8')
+                    (folder / 'model_revision.json').write_text('{}', encoding='utf-8')
+                    (folder / 'generated_original.glb').write_bytes(b'raw')
+                    if len(attempts) == 1:
+                        (folder / 'generated_mobile.glb').write_bytes(b'first attempt mobile')
+                return Mock(wait=Mock(return_value=0))
+
+            scope['subprocess'].Popen.side_effect = run_process
+            exec(cell, scope)
+            key = 'dish/trellis2-4b'
+            self.assertIn('mobile_glb_path', scope['RUNS_3D'][key])
+
+            exec(cell, scope)
+            record = scope['RUNS_3D'][key]
+            self.assertEqual(record['status'], 'success')
+            self.assertNotIn('mobile_glb_path', record)
+            self.assertNotIn('mobile_metrics', record)
+            self.assertEqual(record['artifact_paths'], [scope['RESULTS_DIR'] / 'dish' / 'trellis2_4b.glb'])
+            self.assertNotEqual(attempts[0], attempts[1])
+            self.assertEqual(scope['TRELLIS_WORKERS']['dish'], attempts[1])
+
+    def trellis_cell_scope(self, root, *, plate_preserved):
+        cutout = root / 'cutout.png'
+        image = Image.new('RGBA', (16, 16))
+        image.paste((120, 80, 40, 255), (2, 2, 14, 14))
+        image.save(cutout)
+        results = root / 'results'
+        (results / 'dish').mkdir(parents=True)
+        scope = {}
+        exec(''.join(self.notebook['cells'][1]['source']), scope)
+        scope.update(
+            ACTIVE_LABELS=['dish'],
+            image_results={'dish': {
+                'image_source': 'fixture',
+                'model': None,
+                'cutout_path': cutout,
+                'cutout_metrics': {'plate_preserved': plate_preserved},
+            }},
+            DINOV3_OK=True,
+            TRELLIS_BUILD_OK=True,
+            SCRATCH_ROOT=root / 'scratch',
+            RESULTS_DIR=results,
+            RUNTIME_ENV={},
+            HF_TOKEN=None,
+            PYTHON=Path(sys.executable),
+            TRELLIS_SOURCE=root / 'trellis',
+            RUNS_3D={},
+            REVISIONS={},
+            subprocess=Mock(Popen=Mock(return_value=Mock(wait=Mock(return_value=0)))),
+            shutil=shutil,
+            validate_glb=Mock(return_value={'has_texture': True}),
+            display=Mock(),
+            FileLink=Mock(),
+        )
+        return scope
+
+    def test_v21_trellis_cutout_remesh_and_dual_gpu_sharding(self):
+        cell13_src = ''.join(self.notebook['cells'][9]['source'])
+        cell15_src = ''.join(self.notebook['cells'][11]['source'])
+
+        # Extract Cell 9 scripts by target filename
+        tree13 = ast.parse(cell13_src, filename='cell_9')
+        scripts = {}
+        for node in tree13.body:
+            if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                    and isinstance(node.value.func, ast.Attribute)
+                    and node.value.func.attr == 'write_text'):
+                name = node.value.func.value.right.value
+                content = node.value.args[0].value
+                ast.parse(content, filename=name)
+                scripts[name] = content
+
+        # 1. Cell 11 passes cutout_path (never image_path) into trellis_generation, with HF Space settings + mobile + 1200s bound
+        self.assertIn("cutout_input = in_entry.get('cutout_path')", cell15_src)
+        self.assertIn("trellis_generation(work_folder, cutout_input, runtime, checkpoint_revisions)", cell15_src)
+        self.assertNotIn("trellis_generation(work_folder, in_entry['image_path']", cell15_src)
+        for token in (
+            'MARGIN = 0.0',
+            '_default_trellis_pipeline_type',
+            "'pipeline_type': _default_trellis_pipeline_type()",
+            "'auto_bf16': True",
+            "'max_num_tokens': 49152",
+            "'texture_size': 2048",
+            "'decimation_target': 300000",
+            "'remesh': True",
+            "'remesh_project': 0.0",
+            "'mobile_decimation_target': 34000",
+            "'crop_to_alpha': True",
+            "'require_alpha': True",
+            "'use_dual_gpu_sharding': True",
+            "'--crop-to-alpha'",
+            "'--require-alpha'",
+            "'trellis2_4b_mobile.glb'",
+            "'cuda:0+cuda:1'",
+            'timeout=1200',
+            '_sanitize_trellis_line',
+        ):
+            self.assertIn(token, cell15_src)
+
+        # 2. Runner loads roles stage-by-stage (_release_model), supports 1536_cascade/1024_cascade/512 & auto_bf16, puts tex_slat_decoder on cuda:1
+        runner_src = scripts['trellis_native_runner.py']
+        for token in (
+            'DualGpuShardedFlowModel',
+            'move_to_device',
+            'run_pipeline_staged',
+            '_release_model',
+            '[trellis:stage]',
+            'use_bf16',
+            '1536_cascade',
+            'shape_slat_flow_model_1024',
+            'tex_slat_flow_model_512',
+            'decode_tex_slat_gpu1',
+            'torch.OutOfMemoryError',
+            'mesh.simplify(16777216)',
+            'generated_mobile.glb',
+            'o_voxel.postprocess.to_glb',
+            'encoder([image])',
+        ):
+            self.assertIn(token, runner_src)
+        self.assertNotIn('encoder(image)', runner_src)
+        self.assertNotIn('for role in required:\n            loaded_models[role] = load_role(role)', runner_src)
+        self.assertIn('q_chunk = min(1024, max(256, 8_000_000 // kv_len))', scripts['trellis_native_compat.py'])
+
+        # 3. Execute updated test_trellis_full_plate.py (including crop_to_alpha + require_alpha fail-closed tests)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ('trellis_prepare_full_plate.py', 'trellis_native_space_tools.py', 'test_trellis_full_plate.py'):
+                (root / name).write_text(scripts[name], encoding='utf-8')
+            proc = subprocess.run(
+                [sys.executable, str(root / 'test_trellis_full_plate.py')],
+                capture_output=True, text=True, check=True,
+            )
+            self.assertIn('test_crop_to_alpha_centers_foreground_and_preserves_translucent_rim', proc.stderr + proc.stdout)
+            self.assertIn('test_require_alpha_rejects_unmasked_opaque_image', proc.stderr + proc.stdout)
+
+        # 4. Pure-Python mock test on move_to_device extracted from trellis_native_compat.py (works without torch installed locally)
+        compat_tree = ast.parse(scripts['trellis_native_compat.py'], filename='trellis_native_compat.py')
+        move_fn = next(
+            n for n in compat_tree.body
+            if isinstance(n, ast.FunctionDef) and n.name == 'move_to_device'
+        )
+        class FakeTensor:
+            def __init__(self, device='cuda:0'):
+                self.device = device
+            def to(self, dev):
+                return FakeTensor(dev)
+        class FakeSparse:
+            def __init__(self, feats, coords, shape=None, scale=None, spatial_cache=None):
+                self.feats = feats
+                self.coords = coords
+                self._shape = shape
+                self._scale = scale
+                self._spatial_cache = {} if spatial_cache is None else spatial_cache
+        class FakeVarLen:
+            def __init__(self, feats, layout=None):
+                self.feats = feats
+                self.layout = layout
+                self._cache = {}
+        fake_torch = type('FakeTorch', (), {'Tensor': FakeTensor})
+        mv_ns = {'torch': fake_torch}
+        exec(compile(ast.Module(body=[move_fn], type_ignores=[]), 'move_to_device', 'exec'), mv_ns)
+        mv = mv_ns['move_to_device']
+
+        sp_orig = FakeSparse(FakeTensor('cuda:0'), FakeTensor('cuda:0'), shape=(1, 8), scale=(1, 1, 1))
+        sp_orig._spatial_cache['layout'] = 'stale_cuda0'
+        sp_moved = mv(sp_orig, 'cuda:1')
+        self.assertEqual(sp_moved.feats.device, 'cuda:1')
+        self.assertEqual(sp_moved.coords.device, 'cuda:1')
+        self.assertEqual(sp_moved._spatial_cache, {})
+        vl_orig = FakeVarLen(FakeTensor('cuda:0'), layout=[slice(0, 4)])
+        vl_orig._cache['seqlen'] = 'stale_cuda0'
+        vl_moved = mv([vl_orig], 'cuda:1')
+        self.assertEqual(vl_moved[0].feats.device, 'cuda:1')
+        self.assertEqual(vl_moved[0]._cache, {})
+        self.assertEqual(vl_moved[0].layout, [slice(0, 4)])
+
+        test_tree = ast.parse(scripts['test_trellis_native_compat.py'], filename='test_trellis_native_compat.py')
+        seq_cls = next(
+            n for n in test_tree.body
+            if isinstance(n, ast.ClassDef) and n.name == 'Sequence'
+        )
+        seq_ns = {}
+        exec(compile(ast.Module(body=[seq_cls], type_ignores=[]), 'Sequence', 'exec'), seq_ns)
+        Seq = seq_ns['Sequence']
+        seq_orig = Seq(FakeTensor('cuda:0'), [2, 2])
+        seq_orig._cache['stale'] = 'cuda0'
+        seq_moved = mv(seq_orig, 'cuda:1')
+        self.assertEqual(seq_moved.feats.device, 'cuda:1')
+        self.assertEqual(seq_moved._cache, {})
+        self.assertEqual(seq_moved.layout, [slice(0, 2), slice(2, 4)])
+
+        # 5. Real subprocess check on Cell 15 _run_logged_bounded streaming + redaction
+        import contextlib, io as _stdio, os as _os, re as _re_mod, signal as _sig, threading as _thr
+        tree15 = ast.parse(cell15_src, filename='cell_15')
+        stream_nodes = [
+            n for n in tree15.body
+            if isinstance(n, ast.FunctionDef) and n.name in ('_sanitize_trellis_line', '_run_logged_bounded')
+        ]
+        self.assertEqual(len(stream_nodes), 2)
+        stream_ns = {
+            'DemoError': RuntimeError,
+            'os': _os,
+            'subprocess': subprocess,
+            '_io': _stdio,
+            '_re': _re_mod,
+            '_signal': _sig,
+            '_sys': sys,
+            '_threading': _thr,
+        }
+        exec(compile(ast.Module(body=stream_nodes, type_ignores=[]), 'cell15_stream', 'exec'), stream_ns)
+        with TemporaryDirectory() as tmp15:
+            log_file = Path(tmp15) / 'sub.log'
+            captured = _stdio.StringIO()
+            with log_file.open('w', encoding='utf-8') as lf, contextlib.redirect_stdout(captured):
+                rc = stream_ns['_run_logged_bounded'](
+                    [sys.executable, '-c', 'print("debug detail"); print("[trellis:stage] 1/6 dinov3_cond hf_secretAbc12345")'],
+                    _os.environ.copy(), lf, timeout=30, label='stream check',
+                )
+            self.assertEqual(rc, 0)
+            self.assertIn('[trellis:stage] 1/6 dinov3_cond [REDACTED_TOKEN]', captured.getvalue())
+            self.assertNotIn('debug detail', captured.getvalue())
+            self.assertIn('debug detail', log_file.read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

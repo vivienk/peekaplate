@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PeekaPlate Food3D V1 Studio Viewer</title>
+<style>
+  :root {
+    --bg: #e6e3dd;
+    --panel: rgba(20, 20, 22, 0.78);
+    --panel-border: rgba(255, 255, 255, 0.14);
+    --text: #f3f1ec;
+    --muted: #b8b3aa;
+    --accent: #f0b35a;
+  }
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    overflow: hidden;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  #hud {
+    position: fixed;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--text);
+    font-size: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+    z-index: 10;
+    max-width: calc(100vw - 24px);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #hud.visible {
+    display: flex;
+  }
+  .mode-group {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .mode-btn {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    padding: 5px 9px;
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  }
+  .mode-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+  .mode-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #1a1610;
+    font-weight: 600;
+  }
+  .slider-group {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    white-space: nowrap;
+  }
+  .slider-group input[type="range"] {
+    width: 110px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .meta-badge {
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./_three/build/three.module.js",
+    "three/addons/": "./_three/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="hud" aria-label="Food3D Studio Controls">
+  <div class="mode-group" id="mode-buttons">
+    <button class="mode-btn" data-mode="lit">Lit PBR</button>
+    <button class="mode-btn" data-mode="relit">Relit +120&deg;</button>
+    <button class="mode-btn" data-mode="clay">Clay</button>
+    <button class="mode-btn" data-mode="albedo">Albedo</button>
+    <button class="mode-btn" data-mode="roughness">Roughness</button>
+    <button class="mode-btn" data-mode="clearcoat">Clearcoat</button>
+    <button class="mode-btn" data-mode="normal">Normal</button>
+  </div>
+  <div class="slider-group">
+    <label for="light-slider">Light</label>
+    <input id="light-slider" type="range" min="0" max="360" step="1" value="0">
+    <span id="light-val">0&deg;</span>
+  </div>
+  <div class="meta-badge" id="meta-info">loading&hellip; &middot; publication_eligible: false</div>
+</div>
+
+<script type="module">
+/**
+ * PeekaPlate Food3D V1 AAA Studio PBR Viewer.
+ * Private R&D viewer; every output remains publication_eligible: false (ADR 0004).
+ *
+ * Query parameters:
+ *   glb=<url>&mode=lit|relit|unlit|clay|albedo|roughness|clearcoat|normal
+ *   &az=<deg>&el=<deg>&lightAz=<deg>&size=<px>&orbit=1&hud=0&autoRotate=1
+ *   &bg=studio|none|transparent&shadows=0&lighting=studio|legacy&exposure=<num>
+ */
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+const params = new URLSearchParams(location.search);
+const shadowsDisabled = params.get('shadows') === '0';
+const lightingPreset = (params.get('lighting') || 'studio').toLowerCase();
+const useLegacyLighting = lightingPreset === 'legacy';
+const exposureParam = Number(params.get('exposure'));
+const defaultExposure = useLegacyLighting ? 0.96 : 1.04;
+const targetExposure = Number.isFinite(exposureParam) && exposureParam > 0 ? exposureParam : defaultExposure;
+let currentMode = (params.get('mode') || 'lit').toLowerCase();
+const initAzDeg = Number(params.get('az') ?? 0);
+const initElDeg = Number(params.get('el') ?? 35);
+const hasExplicitLightAz = params.has('lightAz') && params.get('lightAz') !== '';
+let currentLightAzDeg = hasExplicitLightAz
+  ? Number(params.get('lightAz'))
+  : (currentMode === 'relit' ? 120 : 0);
+const fixedSize = Number(params.get('size') || 0);
+const isOrbit = params.get('orbit') === '1';
+const showHud = isOrbit && params.get('hud') !== '0';
+let isAutoRotate = isOrbit && params.get('autoRotate') === '1';
+const bgParam = (params.get('bg') || 'studio').toLowerCase();
+const transparentBg = bgParam === 'none' || bgParam === 'transparent';
+
+const W = fixedSize || window.innerWidth;
+const H = fixedSize || window.innerHeight;
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  preserveDrawingBuffer: true,
+  alpha: transparentBg,
+});
+renderer.setPixelRatio(fixedSize ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(W, H, false);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = targetExposure;
+renderer.shadowMap.enabled = !shadowsDisabled && !transparentBg;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+if (transparentBg) {
+  document.documentElement.style.setProperty('--bg', 'transparent');
+}
+
+const scene = new THREE.Scene();
+const STUDIO_BG_COLOR = new THREE.Color(0xe6e3dd);
+scene.background = transparentBg ? null : STUDIO_BG_COLOR;
+
+/**
+ * Build a procedural food-photography studio environment processed via PMREMGenerator.
+ * Default ('studio'): neutral D65 surround + wrap bounce cards + bright tabletop bounce
+ * so 3D food sides retain natural color without warm cast or crushed shadows.
+ * 'legacy': preserves the pre-v9 warm/dark softbox rig.
+ */
+function createStudioEnvironment(webglRenderer, legacy = false) {
+  const envScene = new THREE.Scene();
+  envScene.background = new THREE.Color(legacy ? 0x1b1a18 : 0xc8c7c4);
+
+  const addPanel = (colorHex, intensity, w, h, pos, target) => {
+    const color = new THREE.Color(colorHex).multiplyScalar(intensity);
+    const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    mesh.position.set(pos[0], pos[1], pos[2]);
+    mesh.lookAt(target[0], target[1], target[2]);
+    envScene.add(mesh);
+  };
+
+  if (legacy) {
+    addPanel(0xffe1be, 3.2, 5.2, 3.8, [1.4, 4.6, 2.4], [0, 0, 0]);
+    addPanel(0xfff1e0, 1.3, 6.5, 6.5, [0.0, 5.5, 0.0], [0, 0, 0]);
+    addPanel(0xd4e8ff, 1.55, 5.0, 3.6, [-4.8, 2.1, 1.2], [0, 0, 0]);
+    addPanel(0xffd7a8, 2.6, 3.6, 2.2, [-2.2, 2.5, -4.4], [0, 0.2, 0]);
+    addPanel(0xf0e4d6, 0.75, 4.0, 2.5, [2.6, 1.8, -4.2], [0, 0, 0]);
+  } else {
+    // Neutral daylight overhead softbox + diffuser
+    addPanel(0xfffcf7, 1.85, 5.5, 4.2, [1.4, 4.6, 2.4], [0, 0, 0]);
+    addPanel(0xffffff, 1.15, 7.0, 7.0, [0.0, 5.5, 0.0], [0, 0, 0]);
+    // 360-degree studio bounce cards for realistic wrap fill on dish sides
+    addPanel(0xf2f6ff, 1.45, 5.5, 4.2, [-4.8, 1.8, 1.2], [0, 0, 0]);
+    addPanel(0xfff7ec, 1.45, 4.8, 3.4, [-2.2, 2.2, -4.4], [0, 0.2, 0]);
+    addPanel(0xfaf8f5, 1.35, 5.2, 3.8, [2.8, 1.8, -4.0], [0, 0, 0]);
+    addPanel(0xf7f7f7, 1.35, 5.2, 3.8, [4.6, 1.6, 1.6], [0, 0, 0]);
+  }
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(18, 18),
+    new THREE.MeshBasicMaterial({ color: legacy ? 0x242220 : 0xa6a5a2, side: THREE.DoubleSide }),
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -2.4;
+  envScene.add(floor);
+
+  const pmrem = new THREE.PMREMGenerator(webglRenderer);
+  pmrem.compileEquirectangularShader();
+  const envTex = pmrem.fromScene(envScene, legacy ? 0.035 : 0.04).texture;
+  pmrem.dispose();
+  return envTex;
+}
+
+const studioEnvTex = createStudioEnvironment(renderer, useLegacyLighting);
+scene.environment = studioEnvTex;
+scene.environmentIntensity = useLegacyLighting ? 0.78 : 0.82;
+if (!scene.environmentRotation) {
+  scene.environmentRotation = new THREE.Euler();
+}
+
+// Primary directional key light with soft wide-frustum contact shadow
+const keyLight = new THREE.DirectionalLight(
+  useLegacyLighting ? 0xfff0dc : 0xfffaf2,
+  useLegacyLighting ? 2.55 : 1.48,
+);
+keyLight.castShadow = renderer.shadowMap.enabled;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.radius = 8;
+keyLight.shadow.bias = -0.0004;
+keyLight.shadow.normalBias = 0.014;
+keyLight.shadow.camera.left = -2.2;
+keyLight.shadow.camera.right = 2.2;
+keyLight.shadow.camera.top = 2.2;
+keyLight.shadow.camera.bottom = -2.2;
+keyLight.shadow.camera.near = 0.5;
+keyLight.shadow.camera.far = 16;
+keyLight.shadow.camera.updateProjectionMatrix();
+scene.add(keyLight);
+
+// Subtle cool-neutral fill light opposite key (rotates with key)
+const fillLight = new THREE.DirectionalLight(
+  useLegacyLighting ? 0xd8eaff : 0xf2f6ff,
+  useLegacyLighting ? 0.42 : 0.38,
+);
+scene.add(fillLight);
+
+// Subtle neutral-warm rim light
+const rimLight = new THREE.DirectionalLight(
+  useLegacyLighting ? 0xffdfb8 : 0xfff6ea,
+  useLegacyLighting ? 0.65 : 0.45,
+);
+scene.add(rimLight);
+
+// Soft grounded contact shadow plane
+const shadowPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(24, 24),
+  new THREE.ShadowMaterial({ opacity: 0.28 }),
+);
+shadowPlane.rotation.x = -Math.PI / 2;
+shadowPlane.position.y = 0.0004;
+shadowPlane.receiveShadow = renderer.shadowMap.enabled;
+shadowPlane.visible = renderer.shadowMap.enabled;
+scene.add(shadowPlane);
+
+// Subtle neutral studio floor vignette when bg !== 'none'
+const studioFloorMat = new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  uniforms: {
+    uCenterColor: { value: new THREE.Color(0xefece6) },
+    uEdgeColor: { value: new THREE.Color(0xdcd8d0) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 uCenterColor;
+    uniform vec3 uEdgeColor;
+    varying vec2 vUv;
+    void main() {
+      float d = length((vUv - 0.5) * 2.0);
+      float grad = smoothstep(0.0, 0.95, d);
+      float alpha = 1.0 - smoothstep(0.65, 1.0, d);
+      vec3 col = mix(uCenterColor, uEdgeColor, grad);
+      gl_FragColor = vec4(col, alpha * 0.85);
+    }
+  `,
+});
+const studioFloor = new THREE.Mesh(new THREE.CircleGeometry(5.5, 64), studioFloorMat);
+studioFloor.rotation.x = -Math.PI / 2;
+studioFloor.position.y = -0.001;
+studioFloor.visible = !transparentBg;
+scene.add(studioFloor);
+
+const KEY_RADIUS = 3.8;
+const KEY_HEIGHT = 4.1;
+const KEY_BASE_OFFSET_RAD = 0.52; // ~30 deg classic 3/4 key at lightAz=0
+
+function applyLightRotation(lightAzDeg) {
+  currentLightAzDeg = ((Number(lightAzDeg) % 360) + 360) % 360;
+  const rad = THREE.MathUtils.degToRad(currentLightAzDeg);
+  const keyAngle = rad + KEY_BASE_OFFSET_RAD;
+  keyLight.position.set(
+    KEY_RADIUS * Math.sin(keyAngle),
+    KEY_HEIGHT,
+    KEY_RADIUS * Math.cos(keyAngle),
+  );
+  const fillAngle = keyAngle - Math.PI * 0.62;
+  fillLight.position.set(
+    3.6 * Math.sin(fillAngle),
+    2.2,
+    3.6 * Math.cos(fillAngle),
+  );
+  const rimAngle = keyAngle + Math.PI * 0.92;
+  rimLight.position.set(
+    3.4 * Math.sin(rimAngle),
+    2.6,
+    3.4 * Math.cos(rimAngle),
+  );
+  scene.environmentRotation.y = rad;
+}
+
+applyLightRotation(currentLightAzDeg);
+
+const camera = new THREE.PerspectiveCamera(30, W / H, 0.01, 100);
+const originalMaterials = new WeakMap();
+const diagnosticMaterials = new WeakMap();
+let loadedRoot = null;
+let targetPoint = new THREE.Vector3(0, 0.25, 0);
+let controls = null;
+let triCount = 0;
+
+function makeRoughnessVizMaterial(orig) {
+  const hasMap = Boolean(orig.roughnessMap);
+  const factor = typeof orig.roughness === 'number' ? orig.roughness : 1.0;
+  return new THREE.ShaderMaterial({
+    side: orig.side,
+    uniforms: {
+      uMap: { value: orig.roughnessMap || null },
+      uHasMap: { value: hasMap ? 1.0 : 0.0 },
+      uFactor: { value: factor },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uMap;
+      uniform float uHasMap;
+      uniform float uFactor;
+      varying vec2 vUv;
+      void main() {
+        float g = uHasMap > 0.5 ? texture2D(uMap, vUv).g : 1.0;
+        float r = clamp(g * uFactor, 0.0, 1.0);
+        gl_FragColor = vec4(vec3(r), 1.0);
+      }
+    `,
+  });
+}
+
+function makeClearcoatVizMaterial(orig) {
+  const hasMap = Boolean(orig.clearcoatMap);
+  const factor = typeof orig.clearcoat === 'number' ? orig.clearcoat : 0.0;
+  return new THREE.ShaderMaterial({
+    side: orig.side,
+    uniforms: {
+      uMap: { value: orig.clearcoatMap || null },
+      uHasMap: { value: hasMap ? 1.0 : 0.0 },
+      uFactor: { value: factor },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uMap;
+      uniform float uHasMap;
+      uniform float uFactor;
+      varying vec2 vUv;
+      void main() {
+        float cTex = uHasMap > 0.5 ? texture2D(uMap, vUv).r : 1.0;
+        float c = clamp(cTex * uFactor, 0.0, 1.0);
+        vec3 matte = vec3(0.05, 0.07, 0.10);
+        vec3 mid = vec3(0.05, 0.52, 0.72);
+        vec3 glow = vec3(0.22, 0.98, 1.0);
+        vec3 col = c < 0.5 ? mix(matte, mid, c * 2.0) : mix(mid, glow, (c - 0.5) * 2.0);
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `,
+  });
+}
+
+function getMaterialForMode(mesh, mode) {
+  const orig = originalMaterials.get(mesh);
+  if (!orig) return mesh.material;
+  if (mode === 'lit' || mode === 'relit') return orig;
+
+  let cache = diagnosticMaterials.get(mesh);
+  if (!cache) {
+    cache = {};
+    diagnosticMaterials.set(mesh, cache);
+  }
+  if (cache[mode]) return cache[mode];
+
+  let mat;
+  if (mode === 'clay') {
+    mat = new THREE.MeshStandardMaterial({
+      color: 0x9c9891,
+      roughness: 0.88,
+      metalness: 0.0,
+      side: orig.side,
+    });
+  } else if (mode === 'albedo') {
+    mat = new THREE.MeshBasicMaterial({
+      map: orig.map || null,
+      color: orig.map ? 0xffffff : (orig.color ? orig.color.clone() : new THREE.Color(0xffffff)),
+      side: orig.side,
+    });
+  } else if (mode === 'roughness') {
+    mat = makeRoughnessVizMaterial(orig);
+  } else if (mode === 'clearcoat') {
+    mat = makeClearcoatVizMaterial(orig);
+  } else if (mode === 'normal') {
+    mat = new THREE.MeshNormalMaterial({
+      normalMap: orig.normalMap || null,
+      normalScale: orig.normalScale ? orig.normalScale.clone() : new THREE.Vector2(1, 1),
+      side: orig.side,
+    });
+  } else if (mode === 'unlit') {
+    mat = new THREE.MeshBasicMaterial({
+      map: orig.map || null,
+      color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
+      side: orig.side,
+    });
+  } else {
+    mat = orig;
+  }
+
+  cache[mode] = mat;
+  return mat;
+}
+
+function applyMode(mode) {
+  currentMode = (mode || 'lit').toLowerCase();
+  const isShaded = currentMode === 'lit' || currentMode === 'relit' || currentMode === 'clay';
+  renderer.toneMapping = isShaded ? THREE.NeutralToneMapping : THREE.NoToneMapping;
+  renderer.toneMappingExposure = targetExposure;
+  const useShadows = isShaded && !transparentBg && !shadowsDisabled;
+  renderer.shadowMap.enabled = useShadows;
+  keyLight.castShadow = useShadows;
+  shadowPlane.visible = useShadows;
+  shadowPlane.receiveShadow = useShadows;
+  studioFloor.visible = !shadowsDisabled && !transparentBg && isShaded;
+  scene.environment = isShaded ? studioEnvTex : null;
+
+  if (loadedRoot) {
+    loadedRoot.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material = getMaterialForMode(o, currentMode);
+      o.castShadow = useShadows;
+      o.receiveShadow = useShadows;
+    });
+  }
+  syncHud();
+}
+
+const DIST = 2.85;
+function setCameraPose(azDeg, elDeg) {
+  const az = THREE.MathUtils.degToRad(azDeg);
+  const el = THREE.MathUtils.degToRad(elDeg);
+  camera.position.set(
+    DIST * Math.cos(el) * Math.sin(az),
+    targetPoint.y + DIST * Math.sin(el),
+    DIST * Math.cos(el) * Math.cos(az),
+  );
+  camera.lookAt(targetPoint);
+  if (controls) {
+    controls.target.copy(targetPoint);
+    controls.update();
+  }
+}
+
+// HUD wiring for interactive orbit=1 mode
+const hudEl = document.getElementById('hud');
+const modeButtons = Array.from(document.querySelectorAll('.mode-btn'));
+const lightSlider = document.getElementById('light-slider');
+const lightVal = document.getElementById('light-val');
+const metaInfo = document.getElementById('meta-info');
+
+function syncHud() {
+  for (const btn of modeButtons) {
+    btn.classList.toggle('active', btn.dataset.mode === currentMode);
+  }
+  const degRounded = Math.round(currentLightAzDeg);
+  lightSlider.value = String(degRounded);
+  lightVal.textContent = `${degRounded}°`;
+  if (triCount > 0) {
+    metaInfo.textContent = `${Math.round(triCount / 1000)}k tris · publication_eligible: false`;
+  }
+}
+
+if (isOrbit) {
+  if (showHud) {
+    hudEl.classList.add('visible');
+    for (const btn of modeButtons) {
+      btn.addEventListener('click', () => {
+        const m = btn.dataset.mode;
+        setMode(m, m === 'lit' && currentMode === 'relit' ? 0 : undefined);
+      });
+    }
+    lightSlider.addEventListener('input', () => {
+      applyLightRotation(Number(lightSlider.value));
+      syncHud();
+    });
+  }
+  window.addEventListener('resize', () => {
+    if (fixedSize) return;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+  });
+}
+
+// Allow parent studio.html to drive mode & light rotation via postMessage without reload
+window.addEventListener('message', (ev) => {
+  const data = ev.data;
+  if (!data || typeof data !== 'object') return;
+  if (data.type === 'food3d:setMode' && typeof data.mode === 'string') {
+    setMode(data.mode, data.lightAz);
+  } else if (data.type === 'food3d:setLightAz' && Number.isFinite(data.lightAz)) {
+    applyLightRotation(data.lightAz);
+    syncHud();
+    if (!isOrbit) renderer.render(scene, camera);
+  } else if (data.type === 'food3d:pose') {
+    window.__pose(data.az ?? 0, data.el ?? 35, data.lightAz);
+  } else if (data.type === 'food3d:setAutoRotate') {
+    isAutoRotate = Boolean(data.enabled);
+    if (controls) {
+      controls.autoRotate = Boolean(data.enabled);
+      controls.autoRotateSpeed = 1.6;
+    }
+  } else if (data.type === 'food3d:resetCamera') {
+    setCameraPose(initAzDeg, initElDeg);
+    if (controls) controls.update();
+    renderer.render(scene, camera);
+  }
+});
+
+// Expose instant multi-pose & relighting API for headless renderer
+window.__pose = (azDeg, elDeg, lightAzDeg) => {
+  if (typeof lightAzDeg === 'number' && Number.isFinite(lightAzDeg)) {
+    applyLightRotation(lightAzDeg);
+  }
+  setCameraPose(azDeg, elDeg);
+  renderer.render(scene, camera);
+  return true;
+};
+
+function setMode(mode, lightAzDeg) {
+  if (Number.isFinite(lightAzDeg)) {
+    applyLightRotation(lightAzDeg);
+  } else if (mode?.toLowerCase() === 'relit') {
+    applyLightRotation(120);
+  }
+  applyMode(mode);
+  renderer.render(scene, camera);
+  return true;
+}
+window.__setMode = setMode;
+window.food3d = { setMode };
+
+const glbUrl = params.get('glb');
+if (!glbUrl) {
+  window.__ready = { error: 'Missing ?glb=<url> query parameter', publication_eligible: false };
+} else {
+  const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  loader.load(
+    glbUrl,
+    (gltf) => {
+      loadedRoot = gltf.scene;
+      triCount = 0;
+      loadedRoot.traverse((o) => {
+        if (!o.isMesh) return;
+        originalMaterials.set(o, o.material);
+        const geom = o.geometry;
+        triCount += (geom.index ? geom.index.count : geom.attributes.position.count) / 3;
+      });
+
+      // Normalise: center on XZ, rest on Y=0, fit bounding sphere radius = 1
+      const box = new THREE.Box3().setFromObject(loadedRoot);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const scale = 1.0 / Math.max(size.length() / 2.0, 1e-6);
+      loadedRoot.scale.setScalar(scale);
+      loadedRoot.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+      scene.add(loadedRoot);
+
+      const normHeight = size.y * scale;
+      targetPoint.set(0, Math.max(normHeight * 0.36, 0.14), 0);
+
+      applyMode(currentMode);
+      setCameraPose(initAzDeg, initElDeg);
+      syncHud();
+
+      if (isOrbit) {
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.autoRotate = isAutoRotate;
+        controls.autoRotateSpeed = 1.6;
+        controls.target.copy(targetPoint);
+        controls.update();
+        renderer.setAnimationLoop(() => {
+          controls.update();
+          renderer.render(scene, camera);
+        });
+        window.__ready = { tris: Math.round(triCount), publication_eligible: false };
+      } else {
+        renderer.render(scene, camera);
+        requestAnimationFrame(() => {
+          renderer.render(scene, camera);
+          window.__ready = { tris: Math.round(triCount), publication_eligible: false };
+        });
+      }
+    },
+    undefined,
+    (err) => {
+      window.__ready = { error: String(err), publication_eligible: false };
+    },
+  );
+}
+</script>
+</body>
+</html>

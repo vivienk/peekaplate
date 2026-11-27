@@ -10,11 +10,13 @@ For captured 3D, start with one authorized multi-view capture and prove an appro
 
 ## Your Kaggle pipeline
 
-I inspected the public notebook source on November 20, 2026. Cells 7 and 9 pass **one** full-plate photo through margin padding (8%, with an optional reviewed plate-and-food mask) to the 512-resolution Microsoft TRELLIS.2-4B runner. The runner targets one plate-and-food mesh. Cells 11 and 13 render the resulting mesh in six lighting/material modes at eight angles and re-export GLB variants from saved mesh and material data. Those 48 images come **after** generation. There is no novel-view image generator feeding the mesh. The default export targets 100,000 faces and a 1024-pixel texture. [Public notebook](https://www.kaggle.com/code/yacine105/notebooke3207ed4f5) · [Kaggle source export](https://api.kaggle.com/v1/kernels/pull/yacine105/notebooke3207ed4f5)
+**Notebook references (2026-11-22).** The kernel previously published as `yacine105/notebooke3207ed4f5` was renamed to `yacine105/trellislast-version`, and Kaggle preserved its version numbers, so the historical `/20`, `/31` and `/32` references in this page resolve against the renamed kernel (`/31` re-checked `KernelWorkerStatus.COMPLETE` on 2026-11-22). The multi-model benchmarks are separate private kernels: `yacine105/peekaplate-dish-3d-multi-model-benchmark-a` (MoGe-2, TripoSG, Hunyuan3D-2, Hi3DGen) and `yacine105/peekaplate-dish-3d-trellis2-hero-batch-b` (TRELLIS.2-4B hero batch).
 
-**Port the input and export contract first.** Keep the full rim, optional reviewed alpha, explicit seed/settings, raw GLB and separate optimized exports. Compare the raw and optimized model side by side against the source. Extract a worker taking one immutable input manifest and returning output sizes and hashes. Prebuild native dependencies and pin weight revisions. Start the serverless pilot on a supported single-GPU configuration and measure the complete export. The notebook's experimental two-T4 setup puts generation/export on GPU 0 and feature extraction on GPU 1, with CPU offloading and compatibility kernels. Keep that implementation only if it wins a measured comparison. An upstream single-GPU worker needs an explicit decision about masking and dependency loading. [Notebook](https://www.kaggle.com/code/yacine105/notebooke3207ed4f5) · [Pinned upstream source used by the notebook](https://github.com/microsoft/TRELLIS.2/tree/75fbf0183001ed9876c8dbb35de6b68552ee08bd)
+I inspected the public notebook source on November 20, 2026. Cells 7 and 9 pass **one** full-plate photo through margin padding (8%, with an optional reviewed plate-and-food mask) to the 512-resolution Microsoft TRELLIS.2-4B runner. The runner targets one plate-and-food mesh. Cells 11 and 13 render the resulting mesh in six lighting/material modes at eight angles and re-export GLB variants from saved mesh and material data. Those 48 images come **after** generation. There is no novel-view image generator feeding the mesh. The default export targets 100,000 faces and a 1024-pixel texture. [Public notebook](https://www.kaggle.com/code/yacine105/trellislast-version) · [Kaggle source export](https://api.kaggle.com/v1/kernels/pull/yacine105/trellislast-version)
 
-The retrieved notebook contains no saved cell outputs. Its verification notes report CPU checks and leave full GPU inference, peak VRAM, GLB export and preview rendering unverified. A reproducible first milestone is one rights-cleared full-plate input, a successful run record, the source and GLB hashes, a mesh that loads on a phone, and an explicit private-experiment label. [Notebook verification notes](https://www.kaggle.com/code/yacine105/notebooke3207ed4f5)
+**Port the input and export contract first.** Keep the full rim, optional reviewed alpha, explicit seed/settings, raw GLB and separate optimized exports. Compare the raw and optimized model side by side against the source. Extract a worker taking one immutable input manifest and returning output sizes and hashes. Prebuild native dependencies and pin weight revisions. Start the serverless pilot on a supported single-GPU configuration and measure the complete export. The notebook's experimental two-T4 setup puts generation/export on GPU 0 and feature extraction on GPU 1, with CPU offloading and compatibility kernels. Keep that implementation only if it wins a measured comparison. An upstream single-GPU worker needs an explicit decision about masking and dependency loading. [Notebook](https://www.kaggle.com/code/yacine105/trellislast-version) · [Pinned upstream source used by the notebook](https://github.com/microsoft/TRELLIS.2/tree/75fbf0183001ed9876c8dbb35de6b68552ee08bd)
+
+The retrieved notebook contains no saved cell outputs. Its verification notes report CPU checks and leave full GPU inference, peak VRAM, GLB export and preview rendering unverified. A reproducible first milestone is one rights-cleared full-plate input, a successful run record, the source and GLB hashes, a mesh that loads on a phone, and an explicit private-experiment label. [Notebook verification notes](https://www.kaggle.com/code/yacine105/trellislast-version)
 
 ## What exists at the pinned commit
 
@@ -96,7 +98,7 @@ Use a paired pilot of 12 rights-cleared capture sets, including shiny, low-textu
 
 ## Live Kaggle T4 ×2 Multi-Model Comparison (2026-11-21)
 
-Updated private experiment artifact: [`dish-3d-openrouter.ipynb`](../../notebooks/dish-3d-openrouter.ipynb) with offline verification suite [`test_dish_3d_notebook.py`](../../processing/tests/test_dish_3d_notebook.py) on [Public notebook `yacine105/notebooke3207ed4f5`](https://www.kaggle.com/code/yacine105/notebooke3207ed4f5).
+Updated private experiment artifact: [`dish-3d-openrouter.ipynb`](../../notebooks/dish-3d-openrouter.ipynb) with offline verification suite [`test_dish_3d_notebook.py`](../../processing/tests/test_dish_3d_notebook.py) on [Public notebook `yacine105/trellislast-version`](https://www.kaggle.com/code/yacine105/trellislast-version).
 
 ### Architecture & Provenance Design
 - **Image stage (2 distinct models per run):**
@@ -127,7 +129,7 @@ Environment: `2× Tesla T4 (14.56 GiB, cc=[7, 5])`, Python `3.13.15`, PyTorch `2
 
 ## 4-Dish Real-Photo Benchmark & Notebook Upgrades (2026-11-21)
 
-Upgraded [`dish-3d-openrouter.ipynb`](../../notebooks/dish-3d-openrouter.ipynb) and [`test_dish_3d_notebook.py`](../../processing/tests/test_dish_3d_notebook.py) to benchmark 4 user-supplied dish photos end-to-end in a private Kaggle run ([`yacine105/notebooke3207ed4f5`](https://www.kaggle.com/code/yacine105/notebooke3207ed4f5), `is_private: true`) backed by a private dataset (`yacine105/peekaplate-dish-test-photos`). Neither the photos nor any benchmark GLBs are committed to this repository.
+Upgraded [`dish-3d-openrouter.ipynb`](../../notebooks/dish-3d-openrouter.ipynb) and [`test_dish_3d_notebook.py`](../../processing/tests/test_dish_3d_notebook.py) to benchmark 4 user-supplied dish photos end-to-end in a private Kaggle run ([`yacine105/trellislast-version`](https://www.kaggle.com/code/yacine105/trellislast-version), `is_private: true`) backed by a private dataset (`yacine105/peekaplate-dish-test-photos`). Neither the photos nor any benchmark GLBs are committed to this repository.
 
 ### Kaggle Queue Resolution & Pipeline Upgrades
 - **Queue resolution:** Cancelled stalled Version 7 and queued Version 8 (`NvidiaTeslaT4` queue), removed the hardcoded BYOD `docker_image` SHA pin from submission metadata, and pushed private Version 9 with `"machine_shape": "NvidiaTeslaP100"`. Kaggle emitted `'NvidiaTeslaP100' is retired. Sessions run on the default GPU (NvidiaTeslaT4) instead.` and scheduled Version 9 (`GPU T4 ×2`) immediately (`RUNNING` -> `COMPLETE` in `442.8s` runtime log).
@@ -167,9 +169,9 @@ Upgraded [`dish-3d-openrouter.ipynb`](../../notebooks/dish-3d-openrouter.ipynb) 
 
 ## Research checks
 
-- **PASS (Kaggle Version 9 live 4-dish `T4 ×2` run + local 8-GLB/ZIP/visual audit)** — Executed end-to-end on private `yacine105/notebooke3207ed4f5` (`COMPLETE`, `442.8s` log) with private `yacine105/peekaplate-dish-test-photos` (`4` photos); verified `birefnet-general-lite` cutouts, `8/8` valid GLBs (positive signed volume, `has_vertex_color=True` on all `4` `TripoSR` meshes, `80,000` decimated faces on all `4` `Hunyuan3D-2mini` meshes), exact SHA-256 + ZIP integrity across `26` archived files + `manifest.json` (`publication_eligible: false`), zero leaked secrets, and direct visual inspection of all 4 cutouts and `comparison_sheet.png`.
+- **PASS (Kaggle Version 9 live 4-dish `T4 ×2` run + local 8-GLB/ZIP/visual audit)** — Executed end-to-end on private `yacine105/trellislast-version` (`COMPLETE`, `442.8s` log) with private `yacine105/peekaplate-dish-test-photos` (`4` photos); verified `birefnet-general-lite` cutouts, `8/8` valid GLBs (positive signed volume, `has_vertex_color=True` on all `4` `TripoSR` meshes, `80,000` decimated faces on all `4` `Hunyuan3D-2mini` meshes), exact SHA-256 + ZIP integrity across `26` archived files + `manifest.json` (`publication_eligible: false`), zero leaked secrets, and direct visual inspection of all 4 cutouts and `comparison_sheet.png`.
 
-- **PASS (Kaggle Version 6 live `T4 ×2` run + local byte/GLB audit)** — Executed end-to-end on `yacine105/notebooke3207ed4f5` (`COMPLETE`, 355.7s notebook execution); downloaded `dish-3d-comparison.zip` and `manifest.json`, verified exact SHA-256 + byte matches across all 14 packaged artifacts, passed `validate_glb()` on all 4 `.glb` files, verified 6/6 `FullPlateTest` + 12/12 `NativeAdaptersTest`/`SpaceToolsMeshContractTest` CUDA checks in the Kaggle log, visually inspected generated PNGs and `comparison_sheet.png`, and confirmed zero leaked secrets or CLIP truncation warnings.
+- **PASS (Kaggle Version 6 live `T4 ×2` run + local byte/GLB audit)** — Executed end-to-end on `yacine105/trellislast-version` (`COMPLETE`, 355.7s notebook execution); downloaded `dish-3d-comparison.zip` and `manifest.json`, verified exact SHA-256 + byte matches across all 14 packaged artifacts, passed `validate_glb()` on all 4 `.glb` files, verified 6/6 `FullPlateTest` + 12/12 `NativeAdaptersTest`/`SpaceToolsMeshContractTest` CUDA checks in the Kaggle log, visually inspected generated PNGs and `comparison_sheet.png`, and confirmed zero leaked secrets or CLIP truncation warnings.
 - **PASS** — `PYTHONPATH=processing/src:processing/tests processing/.venv/bin/python -m unittest -v test_dish_3d_notebook test_model_service test_generate_model test_portion_service`.
 - **PASS** — `PATH="$HOME/.local/bin:$PATH" corepack pnpm context:show -- diner`.
 - **PASS** — `PATH="$HOME/.local/bin:$PATH" corepack pnpm exec vitest run backend/src/owner-portion-preview.test.ts backend/src/owner-prepare.test.ts backend/src/bundle-producer/approved-portions.test.ts frontend/diner/src/menu/portionAssets.test.ts frontend/diner/src/menu/portionMotion.test.ts packages/contracts/src/serving-size.test.ts` (78 tests).
@@ -251,7 +253,9 @@ docker run --rm --gpus all -v "$PWD/dish_dir:/work" peekaplate-dish3d-worker:dem
 Added [dish_3d_studio.py](../../processing/src/peekaplate_processing/dish_3d_studio.py) and [test_dish_3d_studio.py](../../processing/tests/test_dish_3d_studio.py), and updated Cell 19 of [notebooks/dish-3d-openrouter.ipynb](../../notebooks/dish-3d-openrouter.ipynb) (`STUDIO_HTML_TEMPLATE`, synced byte-for-byte via `test_dish_3d_notebook.py`) so **every future notebook version** must emit, bundle into `dish-3d-comparison.zip`, test, and verify BOTH interactive WebGL studios:
 
 1. **`comparison_viewer.html`:** Multi-file interactive Three.js `0.182.0` studio supporting `Raw Full` and `Mobile <=35k` GLBs across `TripoSR (Color)`, `Hunyuan3D-2mini (Mesh)`, and synced **Side-by-Side Compare**, live shading modes (`Studio PBR`, `Base Color`, `Clay`, `Normal`, `Wireframe`), camera presets (`Front 3/4`, `Top`, `Side`, `Low Rim`), auto-rotate, exposure, studio backgrounds (`Dark`/`Slate`/`Light`), plate-preserving Source vs. Cutout reference, GLB downloads, and graceful no-WebGL static fallbacks (`publication_eligible=false` banner).
-2. **`interactive_3d_studio.html`:** Self-contained single-file HTML embedding the `Mobile <=35k` GLBs (`base64` decoded via `GLTFLoader.parse` — zero `file://` CORS failures in Firefox/Chrome) and resized `512px` source/cutout/fallback thumbnails (~`10.4 MiB` for Version 15).
+2. **`interactive_3d_studio.html` *(superseded 2026-11-23: legacy single-file default replaced by split studio below; retained only behind `--legacy-single-file`)*:** Self-contained single-file HTML embedding the `Mobile <=35k` GLBs (`base64` decoded via `GLTFLoader.parse` — zero `file://` CORS failures in Firefox/Chrome) and resized `512px` source/cutout/fallback thumbnails (~`10.4 MiB` for Version 15).
+
+**Split Studio Standard (2026-11-23, supersedes single-file default above):** When scaling beyond small 4-dish runs to the 19-dish and 41-dish sweeps, the monolithic single file grew to 123 MB (and would reach ~260 MB for 41 dishes). Both `dish_3d_studio.py` and `merge_multi_model_results.py` now default to `build_split_studio(...)`. This writes a lightweight index (`index.html`, ~68 KB, no Three.js or embedded GLBs) linking to individual per-dish pages (`dishes/<label>.html`) that embed only that dish's mobile GLBs (median ~6.0 MB, max ~7.2 MB) for zero-CORS `file://` inspection. Full-resolution raw GLBs remain downloadable via relative disk links. Built pages pin the jsDelivr `three@0.182.0` CDN import map, and `--serve` swaps in the vendored `/vendor/three` copy dynamically when running the loopback server. An optional `--menu-manifest` lists all canonical dishes (marking unrun models as pending), and `--legacy-single-file` gates the monolithic `interactive_3d_studio.html` behind an explicit flag.
 3. **Local Build & Loopback Server CLI:**
 
 ```bash
@@ -263,3 +267,278 @@ PYTHONPATH=processing/src processing/.venv/bin/python -m peekaplate_processing.d
   - **PASS** — `51` unit tests (`test_dish_3d_studio`, `test_dish_3d_notebook`, `test_model_service`, `test_generate_model`, `test_portion_service`), including `STUDIO_HTML_TEMPLATE == _STUDIO_HTML_TEMPLATE` parity, `</script>` XSS escaping, and traversal rejection.
   - **PASS (Live Browser WebGL)** — Generated and served Version 15 studios via local `/vendor/three/` (`three@0.182.0`) on `127.0.0.1:8765`, verified live `WebGL2` rendering in Chromium (`comparison_viewer.html`) for `01_pizza` and `02_tteokbokki` (`Side-by-Side Sync` + `Clay`/`Studio PBR`, `0` console errors, `0` failed requests).
   - **NOT RUN** — A new Kaggle Version 16 run pushing the embedded Cell 19 `three@0.182.0` studio template to Kaggle (the template is verified offline in `test_dish_3d_notebook.py` and rendered live locally against Version 15 artifacts).
+
+---
+
+## Kaggle Version 20 TRELLIS.2-4B Forensic Audit & Version 21 Dual-T4 Fixes (2026-11-21)
+
+### Observed V20 TRELLIS.2-4B Root Causes (Live Run `yacine105/trellislast-version/20`)
+
+Live Kaggle Version 20 executed genuine textured **TRELLIS.2-4B** (`COMPLETE`, 4/4 valid WebP PBR `.glb` binaries on `T4 ×2` using CUDA `12.8`, `5.16 GiB` peak `cuda:0` VRAM, `169–218s` generation per dish). Forensic inspection of the downloaded `.glb` meshes, PBR textures, and Cell 13/15 code established why visual quality was poor:
+
+1. **Unmasked background passed as conditioning input:** Cell 15 passed raw opaque `in_entry['image_path']` (`input_image.png`) into `trellis_prepare_full_plate.py` while `trellis_native_runner.py` ran `pipeline.run(..., preprocess_image=False)`. Because TRELLIS.2 expects a background-removed black-premultiplied subject, all 4 meshes baked the tabletop/slate/concrete background into thin flat slabs (`01_pizza` thickness `Y=0.051` with `p95` metallic `0.85`; `03_kimchi` tablet `0.669×0.119×1.000`; `02_tteokbokki` bowl welded onto a brown wood rectangle). Furthermore, `trellis_prepare_full_plate.py` did not crop to the alpha bounding box, wasting conditioning resolution on wide photos (`03_kimchi` foreground was `43.91%`).
+2. **Shattered mesh topology & UVs (`remesh=False`, `texture_size=1024`):** Skipping Dual Contouring remeshing left `8,722` (`01_pizza`), `13,127` (`02_tteokbokki`, negative signed volume `-0.0074`), `23,026` (`03_kimchi`), and `9,746` non-manifold / `133,967` unwelded seam+boundary edges (`04_gimbap`, `144,717` glTF verts vs. `38,235` spatial verts = `3.78×` split ratio), producing perforated surfaces and speckled `1024` UV atlases.
+3. **Coarse `512` resolution & photo-angle limits:** Running only `pipeline_type='512'` omitted `1024_cascade` detail refinement, and the 90° top-down (`01_pizza`, `03_kimchi`), rim-clipped (`02_tteokbokki`, `04_gimbap`), and blurred (`04_gimbap`) inputs remain hard single-view geometry limits.
+4. **No image generator inside V20 or TRELLIS.2:** Stage 0 discovered the 4 user photos so OpenRouter (`google/gemini-3.1-flash-lite-image`, `google/gemini-3.1-flash-image`) and local `fp16` fallbacks (`stabilityai/sd-turbo`, `Lykon/dreamshaper-8`) did not execute; TRELLIS.2 itself uses `facebook/dinov3-vitl16-pretrain-lvd1689m` conditioning plus flow-matching 3D diffusion directly (`publication_eligible: false` per [ADR 0004](../adr/0004-visual-tiers.md)).
+
+### Implemented Fixes & Verified Live Kaggle Version 31 Results (2026-11-22)
+
+- **Plate-preserving alpha conditioning + fail-closed guard (`Cell 13` & `Cell 15`):** Switched Cell 15 from `in_entry['image_path']` to `in_entry['cutout_path']` (`cutout_rgba.png`), added `--crop-to-alpha` (using `alpha > 0` so translucent rims survive) and `--require-alpha` (rejecting opaque RGB inputs) to `trellis_prepare_full_plate.py`, and fixed Stage 1 `DinoV3FeatureExtractor` invocation (`encoder([image])`, `ERR-20261122-003`).
+- **Stage-by-stage lazy checkpoint loading + dual-T4 sharding (`Cell 13` & `Cell 15`):** Rewrote `trellis_native_runner.py` (`run_pipeline_staged` + `_release_model`) to load and release each TRELLIS checkpoint on demand, preventing V26's `~32 GiB` CPU RAM `SIGKILL` (`-9`) on `01_pizza` and keeping peak CPU RSS at **`6.14 GiB`** across all 4 dishes (`4.71 / 6.14 / 4.20 / 4.27 GiB`). `DualGpuShardedFlowModel` + cache-clean `move_to_device` shard flow transformer blocks 50/50 across `cuda:0 + cuda:1`, with `tex_slat_decoder` on `cuda:1` and adaptive `sparse_attention` query chunking (`256..1024`). Because `1024_cascade` in FP32 on T4 exceeded per-dish latency (`97m` across 3 dishes in V26), Kaggle T4 defaults to `pipeline_type='512'` (`timeout=1200`) with `1024_cascade` -> `512` OOM fallback retained for faster GPUs (`A100`/`L40S`).
+- **Watertight boundary closure, 2048px PBR baking & `<=35k` mobile GLBs:** Enabled `remesh=True` (`remesh_band=1`, `remesh_project=0.9`), `decimation_target=150000`, `texture_size=2048` (`0` fallbacks), and `mobile_decimation_target=34000` (`trellis2_4b_mobile.glb`, `1024px`) embedded alongside `TripoSR` and `Hunyuan3D-2mini` in [`interactive_3d_studio.html`](../../notebooks/dish-3d-openrouter.ipynb) (`21,201,142` B, `publication_eligible: false`).
+
+| Dish (`V31`, `512` Dual-T4) | Total Time | Raw Verts / Faces (`Split`) | Boundary / NonMan Edges | Signed Vol (`V20 -> V31`) | Extent `[X, Y, Z]` | PBR Tex | Mobile Faces / Bytes (`SHA-12`) | Raw `SHA-12` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `01_pizza` | `362.70s` | `117,913` / `149,052` (`1.60×`) | `0` (was `8,721`) / `1,068` | `+0.01165 -> +0.00151` | `[0.999, 0.088, 0.997]` | `2048×2048` | `32,488` / `1,707,332` (`57b16f797bb2`) | `73859d2d1f6e` |
+| `02_tteokbokki` | `323.08s` | `154,309` / `144,504` (`2.31×`) | `0` (was `13,127`) / `5,211` | `-0.00738 -> +0.00246` | `[0.997, 0.301, 0.879]` | `2048×2048` | `33,092` / `2,214,828` (`fde435a21f27`) | `4770e2dc4a7b` |
+| `03_kimchi` | `369.79s` | `196,969` / `149,525` (`3.01×`) | `0` (was `23,024`) / `11,059` | `+0.01066 -> +0.00462` | `[0.999, 0.316, 0.873]` | `2048×2048` | `32,597` / `2,314,564` (`67eb06a320dc`) | `f5b573ecb462` |
+| `04_gimbap` | `277.47s` | `104,243` / `147,427` (`1.42×`) | `0` (was `7,076`) / `143` (was `9,740`) | `+0.00969 -> +0.00044` | `[1.000, 0.149, 0.597]` | `2048×2048` | `31,941` / `1,382,012` (`7cf775638f7c`) | `dbb85d743fad` |
+
+- **Observed Visual & Topology Audit (`V20` vs `V31`):**
+  - All 4 tabletop slabs and perforated surfaces are eliminated; `8/8` raw and mobile GLBs have `0` open boundary edges and positive signed volume (`peak_gpu0_gib=2.780`, `peak_gpu1_gib=2.711`, `dual_gpu_sharded=True`, `remesh_used=True`). `02_tteokbokki` gained a closed ceramic bowl (`-0.00738 -> +0.00246`), `03_kimchi` closed into a solid white plate (`23,024 -> 0` open edges), and `04_gimbap` dropped non-manifold edges from `9,740` to `143` (`split=3.78× -> 1.42×`).
+### Remaining Limits, HF Space Settings Alignment & TRELLIS-Only Simplification (2026-11-22)
+
+- **Why `03_kimchi` (and single-photo undersides) degraded between V31 and HF Space `1536` (`app.py`):**
+  1. **`pipeline_type='512'` vs `1536_cascade` + `bf16`:** Kaggle `2× Tesla T4` (`sm_75`) lacks hardware `bfloat16` Tensor Cores, so V31 ran FP32 at `pipeline_type='512'` (`3,755` latent tokens on `03_kimchi`) rather than the HF ZeroGPU H200/A100 Space's native `bfloat16` `1536_cascade` (`~30k–49k` sparse tokens + `1024px` DINOv3 conditioning).
+  2. **Post-processing & crop mismatch (`remesh_project=0.9`, `MARGIN=0.08`, `decimation_target=150000`):** In `app.py` (`microsoft/TRELLIS.2` Space), export runs `mesh.simplify(16777216)` followed by `o_voxel.postprocess.to_glb(..., decimation_target=300000, texture_size=2048, remesh=True, remesh_band=1, remesh_project=0)` after a tight `margin=0` alpha crop (`size * 1`). V31's `remesh_project=0.9` + `150000` decimation snapped Dual Contouring vertices onto thin curled cabbage folds and caused `11,059` non-manifold pinch edges on `03_kimchi` (`5,211` on `02_tteokbokki`).
+- **Notebook & Studio Simplification Applied Offline:** Removed `TripoSR` and `Hunyuan3D-2mini` from [dish-3d-openrouter.ipynb](../../notebooks/dish-3d-openrouter.ipynb) (compacted to 16 cells `0..15`) and [dish_3d_studio.py](../../processing/src/peekaplate_processing/dish_3d_studio.py) (excluding legacy non-TRELLIS runs when rebuilding historical manifests), aligned `MARGIN = 0.0`, `decimation_target = 300000`, `remesh_project = 0.0`, and `mesh.simplify(16777216)` with `app.py`, and added `use_bf16` + `_default_trellis_pipeline_type()` (`1536_cascade` on `sm_80+` with `1536_cascade -> 1024_cascade -> 512` OOM fallback, retaining `float32` + `512` on T4 `sm_75`).
+- **HF Space `1536` Reproduction & Intrinsic Single-View Paradigm Limit (2026-11-22):** Repeating `03_kimchi` on the official `microsoft/TRELLIS.2` Hugging Face Space (`1536_cascade`, `bfloat16`, `remesh_project=0`, `decimation_target=300000`) reproduced the same degraded geometry limitation observed on Kaggle—confirming the bottleneck is intrinsic to single-image overhead 3D diffusion (`90°` vertical depth underdetermination, `16×` VAE + `xatlas` loss across curled chili cabbage, and specular highlight entanglement) rather than T4 FP32/`512` settings alone. See [Dish 3D model alternatives](../../reports/Dish%203D%20model%20alternatives.md) for the full 5-paradigm comparison (`MoGe-2` MIT projective 2.5D relief + parametric plate, commercial `Tripo3D v3.1` / `Rodin Gen-2`, `Hi3DGen` + `MV-Adapter`/`TEXGen` vs `Hunyuan3D-2.1` EU/UK/KR territorial exclusions, non-commercial 3DGS blockers, and 4-photo `VGGT`/`MASt3R` + `2DGS` production capture under [ADR 0004](../adr/0004-visual-tiers.md)).
+- **Readiness Boundary:**
+  - **PASS (Live Kaggle V31 + Offline Post-Simplification Checks)** — Kaggle Version 31 (`yacine105/trellislast-version/31`, `COMPLETE`, `CUDA 12.8`, `2× Tesla T4`), `test_trellis_full_plate.py` (`8/8 OK`), `test_trellis_native_compat.py` (`14/14 OK`), `4/4` TRELLIS PBR raw/mobile GLBs, and local `test_dish_3d_notebook` + `test_dish_3d_studio` (`16` tests) + rebuilt TRELLIS-only V31 `interactive_3d_studio.html` (`13,957,908` B) + `pnpm context:check`.
+  - **NOT RUN** — Re-running the updated 16-cell TRELLIS-only notebook on Kaggle T4 (with `MARGIN=0.0`, `remesh_project=0.0`, `decimation_target=300000`) or running native `bf16` `1536_cascade` on an `sm_80+` GPU (`L4`/`RTX 4090`/`A100`/`H100`), `MoGe-2` 2.5D relief export, live `Tripo3D v3.1` / `Rodin Gen-2` / `Hi3DGen` comparisons, 4-photo multi-view capture, Docker GPU execution, and production diner publication (`publication_eligible` stays `false`).
+
+### Operating the private Kaggle jobs (2026-11-22)
+
+Credentials and CLI: `~/.kaggle/access_token` (mode `600`) holds the API token used by the Kaggle CLI 2.2.5 venv at `/tmp/dish-kaggle-cli`. That venv lives under `/tmp`; recreate it with `python3 -m venv /tmp/dish-kaggle-cli && /tmp/dish-kaggle-cli/bin/pip install kaggle` after a reboot. Unauthenticated `curl` of `kaggle.com` pages returns `404` even for public notebooks, so a `404` is never evidence that a kernel is missing — use `kaggle kernels status`.
+
+```bash
+K=/tmp/dish-kaggle-cli/bin/kaggle
+$K quota >/dev/null && echo auth-ok   # any authenticated call works; `auth print-access-token` answers "You must log in" for a stored token file and is not an auth signal
+$K quota                                                   # GPU/TPU hours remaining
+$K kernels list --user yacine105 --page-size 30
+$K kernels status yacine105/trellislast-version/32
+$K kernels logs   yacine105/trellislast-version/32           # empty output for cancelled versions
+$K kernels output yacine105/trellislast-version/32 -p /tmp/pull-t32
+# push: stage the notebook + kernel-metadata.json in one directory, then
+$K kernels push -p /tmp/push-t
+```
+
+Kaggle allows at most **two concurrent batch GPU sessions**: a third push fails with `Maximum batch GPU session count of 2 reached` and the job is not queued — push it again once a session finishes.
+
+Observed on 2026-11-22: `benchmark-a/1`, `benchmark-a/2`, `hero-batch-b/4` and `trellislast-version/5` ended `CANCEL_ACKNOWLEDGED` with no outputs and empty logs, i.e. queued sessions were cancelled rather than failing in code; `hero-batch-b/3` and `trellislast-version/4` are `COMPLETE`. The current local notebook sources had never run at that point, so completed outputs from `/3` and `/4` are evidence for the previous revisions only.
+
+---
+
+## Kaggle Job Audit, Output Verification & Four Repairs (2026-11-22, second pass)
+
+### Job state measured across 18:21Z–21:24Z
+
+| Kernel / version | Status | Evidence |
+| --- | --- | --- |
+| `trellislast-version/32` | `COMPLETE` | 26 output files, 4/4 dishes with `TRELLIS.2-4B` = `skipped (missing_or_unauthorized_hf_token)`, zero GLBs |
+| `peekaplate-dish-3d-multi-model-benchmark-a/3` | `COMPLETE` | 19 dishes, 76/76 GLBs valid, `MoGe-2` + `Hunyuan3D-2` = `success`, `TripoSG` + `Hi3DGen` = `failed` (19/19 each) |
+| `peekaplate-dish-3d-multi-model-benchmark-a/4` | `COMPLETE` (19:43Z–22:02Z) | 19 dishes: `MoGe-2` + `Hunyuan3D-2` + `TripoSG` `success` ×19, `Hi3DGen` `skipped` ×19; 22/114 GLBs exceed the 50 MB cap (all TripoSG) |
+| `peekaplate-dish-3d-multi-model-benchmark-a/5` | `COMPLETE` (23:33Z–01:27Z) | **PASS**: 19 dishes, 114/114 GLBs valid and digest-exact, 19/19 cutout pairs, 0 errors, 103 warnings; TripoSG raw `<=299,508` faces and mobile `<=34,960` faces |
+| `peekaplate-dish-3d-trellis2-hero-batch-b/5` | `COMPLETE` (started after ~2 h `QUEUED`) | 15 dishes, 30/30 GLBs valid, 0 errors, 26 warnings; `TRELLIS.2-4B` skipped ×15 (HF token) |
+| `peekaplate-dish-3d-trellis2-hero-batch-b/3` | `COMPLETE` | **150 verifier errors**: 15 dishes shipped NaN/`inf` POSITION + NORMAL GLBs — the live evidence for `ERR-20261122-005` (`/5` carries the fix) |
+
+### Verified output trees
+
+Local trees pulled with `kaggle kernels output` and graded by `processing/scripts/verify_kaggle_outputs.py` (read-only):
+
+| Tree | Dishes | GLBs | Digest | Image pairs | Errors | Warnings | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `/tmp/pull-t32` (`trellislast-version/32`) | 4 | 0 | 0 missing / 0 mismatch | 4/4 | 0 | 8 (4 skipped runs + 4 absent GLBs) | PASS — no mesh owed, token blocked |
+| `/tmp/pull-ba3` (`benchmark-a/3`) | 19 | 76/76 structural pass, 76/76 digest match | 0 missing / 0 mismatch | 19/19 | 38 (`run_status_failed` ×2 models ×19) | 46 (`27` non-watertight, `8` degenerate faces, `11` bbox-claim deltas) | FAIL — two model runtimes |
+| `/tmp/pull-hb3` (`hero-batch-b/3`) | 15 | 30 | declared for the successful runs only | 15 | 150 | 26 | FAIL — pre-`ERR-20261122-005` NaN geometry |
+| `/tmp/pull-hb5` (`hero-batch-b/5`) | 15 | 30/30 structural pass, 30/30 digest match | 0 missing / 0 mismatch | 15/15 | 0 | 26 (15 skipped runs + 11 bbox-claim deltas) | PASS — `ERR-20261122-005` fix proven live |
+| `/home/yacine105/kaggle-evals/pull-ba4` (`benchmark-a/4`) | 19 | 92/114 structural pass | 0 missing / 0 mismatch | 19/19 | 23 (22 `glb_oversized` + 1 dropped download) | 81 (`19` skipped runs, `43` non-watertight, `8` degenerate faces, `11` bbox-claim deltas) | FAIL — TripoSG density (fixed in `/5`) |
+| `/home/yacine105/kaggle-evals/pull-ba5` (`benchmark-a/5`) | 19 | 114/114 structural pass, 114/114 digest match | 0 missing / 0 mismatch | 19/19 | 0 | 103 (`19` skipped runs, `65` non-watertight, `8` degenerate faces, `11` bbox-claim deltas) | PASS |
+| `/tmp/peekaplate-all-models-studio/results` (merged) | 19 | 114/114 structural pass, 114/114 digest match | 0 missing / 0 mismatch | 19/19 | 0 | 118 | PASS — 5 model slugs, `publication_eligible: false` |
+
+`benchmark-a/5` measured detail per backend (19 dishes): `moge2_relief` 19 raw (`53,108,072` B, watertight 19/19) + 19 mobile (`12,933,660` B, `<=34,088` faces, watertight 19/19); `hunyuan3d2` 19 raw (`254,831,000` B, watertight 11/19, `<=800,134` faces) + 19 mobile (`15,976,172` B, `<=34,646` faces); `triposg` 19 raw (`313,297,388` B, `<=299,508` faces after the `MAX_RAW_FACES` cap, watertight 0/19 as expected for dense marching cubes) + 19 mobile (`29,870,496` B, `<=34,960` faces); every one of the 114 GLBs embeds a valid PNG atlas and holds `0` non-finite POSITION values. `Hi3DGen` `skipped` ×19 and `TRELLIS.2-4B` absent from this shard.
+
+Merged five-model studio: `merged_source_count: 2` (`hero-batch-b/5` then `benchmark-a/5`), `19` dishes, model slugs `moge2-relief` / `triposg` / `hunyuan3d2` / `trellis2-4b` / `hi3dgen`, `MoGe-2` 19 `success`, `TripoSG` 19 `success`, `Hunyuan3D-2` 19 `success`, `TRELLIS.2-4B` 15 `skipped`, `Hi3DGen` 19 `skipped`, `publication_eligible: false`, `input_image_sha256` measured for all 19 inputs, `interactive_3d_studio.html` `93,941,631` B, `comparison_viewer.html` `122,827` B, tree `802,436,923` B.
+
+`hero-batch-b/5` measured detail (15 GMn9C8 Hero dishes, `05`…`19`): `MoGe-2 Relief + Ceramic Plate` `success` ×15 with `mobile_status=available` ×15, `15/15` textured PNG atlases, `15/15` watertight raw and mobile, `0` non-finite POSITION values, mobile face ceiling `26,100`, raw bytes `39,699,272` + mobile `9,862,112`. This is the live proof for `ERR-20261122-005`: the same shard on `/3` shipped NaN/`inf` geometry (150 errors) and `/5` ships none.
+
+`benchmark-a/3` measured detail (per backend, 19 dishes): `moge2_relief` 19 raw + 19 mobile, `19/19` textured PNG atlas and watertight; `hunyuan3d2` 19 raw + 19 mobile, `19/19` textured, `11/19` watertight raw and `0/19` watertight mobile; mobile face ceiling `34,916 <= 35,000` across all `38` mobile GLBs; `0` non-finite POSITION values; total `336,704,520` B.
+
+**Provenance measured (pre-staging-fix trees):** `benchmark-a/3` and `trellislast-version/32` declare `source_sha256` = the **re-encoded** stage bytes (`01_pizza` `116694fe…` vs the dataset photo `8cdf837f…`; `07_pikachu_burger` `f758d192…` vs `e4596b1e…`) and carry no `input_image_sha256`. Those trees therefore prove the re-encode defect the staging fix removes; `/4` and later declare both digests.
+
+### Two live model failures and their fixes
+
+1. **`TripoSG + Photo PBR` — 19/19 `RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Half`.** The cell built the pipeline with `TripoSGPipeline.from_pretrained(weights, torch_dtype=torch.float16).to('cuda')`, which leaves the DINOv2 image encoder in float32 so its features hit FP16 DiT linears. Upstream `scripts/inference_triposg.py` casts the whole pipeline (`.to(device, dtype)`); the generated cells now do the same and assert the resulting parameter dtype before running.
+2. **`Hi3DGen Normal-Bridge` — 19/19 `CalledProcessError: ['ninja'] exit 1`.** `spconv-cu126` installs, but on the cu128 Kaggle image importing it triggers a `cumm` C++ rebuild that dies on missing vendored `tensorview` headers (`fatal error: tensorview/pybind_utils.h`). No `spconv` build matches cu128, so the cell now probes `import spconv.pytorch` in a child process, uninstalls the unusable wheel, and records `hi3dgen` as `skipped (spconv_unavailable:…)` for the whole shard instead of 19 opaque failures. A genuine Hi3DGen error still reports `failed`.
+
+### Repairs to the verification/monitoring tooling (all with regressions)
+
+1. `processing/scripts/kaggle_job_status.py` (**ERR-20261122-006**): the CLI child process inherited `PYTHONPATH`, so `processing/tests/sitecustomize.py`'s socket guard aborted every HTTPS call and the report showed only `Traceback (most recent call last):`. The child env now drops `PYTHONPATH`/`PYTHONHOME`/`PYTHONSTARTUP`, and a traceback reports its last line plus an explicit socket-guard hint.
+2. `processing/scripts/verify_kaggle_outputs.py` (**ERR-20261122-007**): a dish whose every declared run is `skipped` owes no mesh, so the empty directory is now `glb_artifact_absent_for_skipped_runs` (warning) instead of `glb_artifact_missing` (error); a failed or undeclared run stays an error.
+3. `verify_kaggle_outputs.py` (**ERR-20261122-008**): `input_image.png` is verified against `input_image_sha256` (the staged bytes) with `source_sha256` only as the legacy fallback, so an honest re-encode is not a digest conflict.
+4. `processing/scripts/merge_multi_model_results.py` (**ERR-20261122-008**): the merged studio now measures `input_image_sha256` from the copied `input_image.png` and never inherits a per-source digest that describes another tree.
+
+### Blocker and user action items
+
+- **`HF_TOKEN` is still not available to the Kaggle kernels**, so `TRELLIS.2-4B` cannot run in either notebook (`trellislast-version/32` skipped 4/4; `benchmark-a` prints `DINOv3 preflight ok=False`; `benchmark-b` needs it for its primary model). Action: Kaggle notebook UI → **Add-ons → Secrets → attach `HF_TOKEN`** to `trellislast-version`, `peekaplate-dish-3d-multi-model-benchmark-a` and `peekaplate-dish-3d-trellis2-hero-batch-b` (a re-push is not a substitute).
+- **`benchmark-a/4` proved the two model fixes and exposed a third defect.** Live log: `[triposg] Setup failed: TypeError: 'dict' object is not callable` — the new component dtype probe raised after the casts had already succeeded, and because the pipeline had been assigned before the probe, **all 19 TripoSG dishes still generated** (`success` ×19, 1.36M–7.12M faces). `[hi3dgen] spconv-cu126 unusable on this CUDA image; last line: ninja: build stopped: subcommand failed.` followed by `skipped` ×19 — the fail-closed preflight worked exactly as designed.
+- **TripoSG's decoder is unsimplified and the mobile fallback lied (`ERR-20261122-009/010`).** Raw GLBs were 107–354 MB (7.1M faces on `02_tteokbokki`), above the 50 MB production cap, and three "mobile" GLBs (`01_pizza`, `02_tteokbokki`, `04_gimbap`) were byte-for-byte the raw mesh (5,445,228 / 7,120,832 / 4,704,304 faces) because `_decimate_vertex_cluster` fell through to `return vertices, faces` while the record still said `mobile_status=available`. The fix returns the smallest reachable mesh, has the baker omit a mobile GLB it cannot ceiling (`mobile_error`), caps the raw TripoSG mesh at `MAX_RAW_FACES=300000`, and keeps every dtype diagnostic non-fatal (`torch.nn.Module.parameters(module).__next__().dtype`, pipeline assigned only after the checks).
+
+### Queue behaviour measured (corrects the earlier "stale entry" reading)
+
+`hero-batch-b/5` was `QUEUED` from 18:22Z and **started on its own at ~20:1xZ without any re-push**, completing at ~21:20Z while `benchmark-a/4` was running. The 2 h 50 min wait was Kaggle host capacity for the 2×T4 shape, not a dead queue entry: `benchmark-a/3` was granted the slot that `trellislast-version/32` released at 18:25Z, the GPU-hours meter stayed flat only while nothing was scheduled, and the queued version still ran with its uploaded source snapshot intact. A queued version is therefore not evidence of a defect and must not be cancelled or re-pushed without measuring `kernels logs`, `kernels files` and two `quota` samples first — the pattern that *is* actionable is a version stuck with `log=empty`, `outputs=0` and a *moving* quota belonging to another session.
+
+### Operating notes added to this pass
+
+- Run the status tool without the offline harness path: `PYTHONPATH=processing/src processing/.venv/bin/python processing/scripts/kaggle_job_status.py --log-tail 6` (including `processing/tests` used to break the CLI child process — fixed, but the path is still unnecessary).
+- `kernels status` alone cannot distinguish "queued waiting for a host" from "stale entry": also check `kernels logs` (empty ⇒ no worker ever started), `kernels files` (count `0`), and two `kaggle quota` samples minutes apart (a flat used-hours total with a queued version means nothing is consuming the GPU).
+
+---
+
+## Independent Re-pull and Verification Pass (2026-11-23, 01:46Z–04:20Z)
+
+No version changed and nothing was running: `kaggle kernels status` reported `COMPLETE` for `peekaplate-dish-3d-multi-model-benchmark-a` v5 (333 output files), `peekaplate-dish-3d-trellis2-hero-batch-b` v5 (130) and `trellislast-version` v32 (26), each with `log=present` in `kaggle_job_status.py`. `kaggle quota` read `12.11h used / 32.89h remaining of 45.00h` both before and after the pass, so this pass consumed **0 GPU-hours**, pushed no notebook and queued no session. `kaggle auth print-access-token` answers "You must log in to Kaggle" for the stored `~/.kaggle/access_token` while `kernels status/files/logs/output` and `quota` all authenticate: that probe is not an auth signal (operating note above corrected).
+
+### Fresh pulls and verifier verdicts
+
+Every tree was re-downloaded with `kaggle kernels output <ref>/<version>` into `/home/yacine105/kaggle-evals/repull-20261123/{ba5,hb5,t32}` and graded read-only by `processing/scripts/verify_kaggle_outputs.py` (exit code captured without a pipe):
+
+| Tree | Dishes | GLB pass/total | Digest missing/mismatch | Image pairs | Errors | Warnings | Verdict | `rc` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `t32` = `trellislast-version/32` | 4 | 0/0 | 0 / 0 | 4/4 | 0 | 8 | PASS | 0 |
+| `hb5` = `hero-batch-b/5` | 15 | 30/30 | 0 / 0 | 15/15 | 0 | 26 | PASS | 0 |
+| `ba5` = `benchmark-a/5` | 19 | 114/114 | 0 / 0 | 19/19 | 0 | 103 | PASS | 0 |
+
+Warning composition is the documented benign set: `ba5` = 65 `glb_mesh_not_watertight` + 19 `run_status_skipped` + 11 `image_bbox_claim_mismatch` + 8 `glb_degenerate_faces`; `hb5` = 15 `run_status_skipped` + 11 `image_bbox_claim_mismatch`; `t32` = 4 `run_status_skipped` + 4 `glb_artifact_absent_for_skipped_runs` (a dish whose every declared run is skipped owes no mesh). No `error`-severity finding was recorded anywhere, and no failed or undeclared run exists in any tree.
+
+### Reproducibility against the 2026-11-22 trees
+
+`sha256` of every GLB and PNG in the fresh pulls is **identical** to the trees graded on 2026-11-22 — 114 GLB + 154 PNG on `ba5`, 92 artifacts on `hb5`, 10 artifacts on `t32`. The fresh `ba5` tree holds 20 files the earlier pull did not fetch (19 `hunyuan3d2_mesh.npz` Hunyuan3D intermediates plus `dish-3d-comparison.zip`), which is why it measures 1,351,043,060 B against the earlier 808,997,625 B; no graded artifact changed.
+
+### Provenance, textures and geometry measured
+
+- **Input provenance is exact for all 19 benchmark inputs**: `input_image_sha256 == source_sha256` 19/19, `input_byte_identical: true` 19/19, `input_transformation: "none"` — the cutout/`input_image.png` comparison in the verifier therefore runs against the dataset photo bytes, not a re-encode.
+- **Cutout evidence**: every dish's measured `alpha>=128` coverage equals its declared claim (no invented pixel, `maxRGB delta = 0`, `invented px = 0`); the only image finding is the known `image_bbox_claim_mismatch` warning on 11 reviewed-mask dishes (`5–23 px`), unchanged.
+- **Textures**: all 57 successful benchmark runs and all 15 successful hero runs declare `has_texture: true` with an embedded PNG atlas that the verifier decoded; `0` non-finite POSITION/NORMAL/TEXCOORD_0 values in all 144 GLBs across the three trees.
+- **Per-backend geometry (19 dishes each, from the re-merged manifest)**: MoGe-2 relief `53,108,072` B raw, `<=117,256` faces, watertight 19/19, mobile `12,933,660` B `<=34,088` faces; Hunyuan3D-2 `254,831,000` B raw, `<=800,134` faces, watertight 11/19, mobile `15,976,172` B `<=34,646` faces; TripoSG `313,297,388` B raw, `<=299,508` faces (the `MAX_RAW_FACES` cap held), watertight 0/19 as expected for dense marching cubes, mobile `29,870,496` B `<=34,960` faces. Every mobile GLB stays under the `35,000`-face ceiling and the `50 MB` byte cap.
+
+### Re-merged five-model studio
+
+`merge_multi_model_results.py --source hb5/results --source ba5/results --output-dir /home/yacine105/kaggle-evals/studio-20261123/results` (earliest-first) rebuilt the studio deterministically: tree `802,436,923` B, `interactive_3d_studio.html` `93,941,631` B, `comparison_viewer.html` `122,827` B — byte-identical to the 2026-11-22 merge. `verify_kaggle_outputs.py` on the merged tree returns **PASS**, 19 dishes, 114/114 GLBs, digest 0 missing / 0 mismatch, 19/19 image pairs, `0` errors, 118 warnings, `publication_eligible: false`, `merged_source_count: 2`, five slugs: `moge2-relief` 19 `success`, `hunyuan3d2` 19 `success`, `triposg` 19 `success`, `trellis2-4b` 15 `skipped`, `hi3dgen` 19 `skipped`, and `input_image_sha256` measured for all 19 inputs.
+
+### Tooling checks run in this pass
+
+- **PASS** — `PYTHONPATH=processing/src:processing/tests processing/.venv/bin/python -m unittest -q test_verify_kaggle_outputs test_kaggle_job_status test_merge_multi_model_results` (`Ran 45 tests`, `OK`, `rc=0`).
+- **NOT RUN** — `pnpm check` (repository-wide gate); this pass changed documentation only.
+- **NOT RUN** — any Kaggle push, rerun or provider API call; no code defect was found, so nothing needed a fix, a regression test or a rerun.
+
+### Blocker unchanged
+
+`TRELLIS.2-4B` still cannot run: `trellislast-version/32` skipped 4/4 and `hero-batch-b/5` skipped 15/15 with `missing_or_unauthorized_hf_token`, and `Hi3DGen` remains `skipped` because no `spconv` build matches cu128. Neither is a running job and a re-push is not a substitute for the secret. **User action:** Kaggle notebook UI → *Add-ons → Secrets → attach `HF_TOKEN`* to `trellislast-version`, `peekaplate-dish-3d-multi-model-benchmark-a` and `peekaplate-dish-3d-trellis2-hero-batch-b`, then re-run those kernels once.
+
+## First live TRELLIS.2-4B meshes and the 41-dish sweep (2026-11-23, 08:36Z–10:52Z)
+
+The token blocker above is resolved (`ERR-20261123-001`): kernels attach the private `yacine105/peekaplate-hf-token` dataset, and `hero-batch-b/6` printed `TRELLIS.2 HF token source: dataset:peekaplate-hf-token/hf_token.txt` and `TRELLIS.2 DINOv3 preflight: ok=True (ok)`. `sweep-trellis-a/1` (dishes `0:21`) printed the same two lines when it started.
+
+### Kaggle state at 10:52Z
+
+| Kernel / version | Status | Notes |
+| --- | --- | --- |
+| `peekaplate-dish-3d-trellis2-hero-batch-b/6` | `COMPLETE` (≈08:36Z–10:40Z) | `TRELLIS.2-4B` 14 `success` + 1 `skipped`, `MoGe-2` 15 `success` |
+| `peekaplate-dish-3d-sweep-trellis-a/1` | `RUNNING` (pushed ≈10:41Z) | `ENABLED_MODELS=['trellis2-4b','moge2-relief']`, 21 dishes `01_pizza`…`21_corn_ribs` |
+| `trellislast-version/33` | `QUEUED` since ≈08:29Z | holds the second batch-GPU slot; its 4 dishes (`01`–`04`) are also covered by `sweep-trellis-a` |
+| `sweep-trellis-b`, `sweep-fast-41` | not pushed | blocked by the two-session cap |
+
+GPU quota at 10:20Z: `13.87h` used of `45.00h` (refresh 2026-11-28).
+
+### `hero-batch-b/6` verified (`/tmp/out-hb-6`)
+
+`verify_kaggle_outputs.py`: **PASS**, 15 dishes, 58/58 GLBs structurally valid and digest-exact, 15/15 image pairs, 0 errors, 40 warnings (`glb_mesh_not_watertight` ×28, `image_bbox_claim_mismatch` ×11, `run_status_skipped` ×1). The single TRELLIS skip is `18_choco_cake_ice_cream`, which records `Skipped (plate_preserved is false or missing).`: its cutout fell back to `food_only_fallback`, so no plate-preserving input existed. This is a cutout gate, not a model failure.
+
+TRELLIS settings recorded in the manifest: `pipeline_type 512`, `seed 42`, 12 sampling steps per stage, `decimation_target 300000`, `remesh true`, `texture_size 2048`, `mobile_decimation_target 34000`, `mobile_texture_size 1024`. Each dish took about 4–5 min of TRELLIS time on 2×T4 (sparse structure ≈128 s, shape ≈46 s, texture ≈36 s, decode ≈15 s, export 46–78 s).
+
+Measured TRELLIS mesh quality (14 raw GLBs, 150,490,848 B; 14 mobile GLBs, 21,501,604 B):
+
+| Metric | min | median | max |
+| --- | --- | --- | --- |
+| raw faces | 279,296 | 293,010.5 | 298,493 |
+| mobile faces | 31,680 | 32,969 | 33,994 |
+| index boundary edges (unwelded) | 40,032 | 104,130.5 | 151,909 |
+| **welded** boundary edges | 0 | 2 | 27 |
+| **welded** non-manifold edges | 52 | 337.5 | 4,704 |
+| shells (welded components) | 5 | 11.5 | 109 |
+| largest shell, % of faces | 53.84 | 98.59 | 99.91 |
+| shells holding ≥ 1 % of faces | 1 | 1 | 3 |
+
+Every raw GLB has two 2048×2048 textures and every mobile GLB has two 1024×1024 textures. Raw GLBs hold at most 5 degenerate triangles; the median is 37.08 B/face raw and 46.51 B/face mobile. The mesh is welded-watertight in 0 of 14 dishes, because each has at least 52 non-manifold edges.
+
+**Plate and food as one object (measured):** in 11/14 dishes the largest welded shell holds ≥ 88 % of the faces, so the plate and food are one fused surface. Three dishes split into two large shells:
+
+- `11_loco_moco`: shells of 155,620 and 133,214 faces.
+- `12_tempura_ramen`: shells of 208,437 and 85,864 faces.
+- `16_mafia_bento_box`: shells of 204,304 and 89,822 faces.
+
+For `11_loco_moco` and `12_tempura_ramen` the second shell is a closed **square ground slab**:
+
+- It is 1.003 × 0.004 × 1.003 and 0.995 × 0.003 × 0.995 respectively, filling the whole normalised footprint.
+- Its projected area divided by its bounding-box area is 2.0 (a closed square; a closed disc would give 1.57), and 20 % of its vertices lie outside the inscribed circle.
+- It sits under the food shell, with a 0.004 gap in `11_loco_moco`.
+
+It is a reconstructed background plane, not the plate. In `16_mafia_bento_box` the second shell is 0.54 × 0.28 × 0.53, consistent with a second container in the bento.
+
+### Verifier repair: welded topology
+
+Index topology overstated TRELLIS open edges by about 50,000× (median 104,130.5 unwelded vs 2 welded). UV-atlased exports split every seam into separate glTF vertices, so the page showed TRELLIS as `0/14 watertight` with ~100k open edges, which read as a thin sheet. `verify_kaggle_outputs._mesh_quality` now also reports:
+
+- `welded_vertices`, `welded_boundary_edges`, `welded_nonmanifold_edges` and `welded_watertight`, computed after exact position welding (−0.0 folds into 0.0; null for non-finite positions);
+- `shell_count`, `main_shell_triangle_pct`, `shells_ge_1pct` and `shell_triangle_sizes_top5`.
+
+The original index fields are unchanged. `build_dish_model_report.py` renders the new fields per GLB and adds four summary columns. Regressions: `test_seam_split_closed_cube_is_open_by_index_but_watertight_once_welded`, `test_two_disjoint_cubes_are_two_shells_of_equal_size`, `test_negative_zero_welds_with_positive_zero`, `test_non_finite_positions_leave_welded_topology_unmeasured`, plus summary and page assertions. **PASS:** `processing/.venv/bin/python -m unittest discover -s tests`, 778 tests, `OK`.
+
+### Rebuilt page and merged studio
+
+The merge used `--source /tmp/out-t32/results --source /tmp/out-b5/results --source ~/kaggle-evals/pull-ba5/results --source /tmp/out-hb-6/results`, earliest first. Use `pull-ba5`, not `/tmp/out-a3`: that tree is `benchmark-a/3`, with 19/19 TripoSG and Hi3DGen failures. Merging it by mistake turned the studio verify into `FAIL` (38 missing digests, 152 errors).
+
+- `/tmp/peekaplate-all-models-studio/results`: **PASS**, 19 dishes, 142/142 GLBs, 0 missing / 0 mismatched digests, 19/19 image pairs, 0 errors, 136 warnings. `interactive_3d_studio.html` is 123,141,543 B; the tree is 1,005,049,592 B.
+- `/tmp/report/dish-3d-model-report.html`: 77,698 B, 4 sources, 19 dishes, 5 models, `publication_eligible: false`.
+
+| Model | success | skipped | failed | median welded boundary | median shells |
+| --- | --- | --- | --- | --- | --- |
+| MoGe-2 relief | 19 | 0 | 0 | 0 | 1 |
+| TRELLIS.2-4B | 14 | 5 (4 old token skips from `trellislast-version/32` for `01`–`04`, 1 `plate_preserved` gate) | 0 | 2 | 11.5 |
+| TripoSG | 19 | 0 | 0 | 0 | 8 |
+| Hunyuan3D-2 | 19 | 0 | 0 | 0 | 14 |
+| Hi3DGen | 0 | 19 (`spconv_unavailable`, cu128) | 0 | – | – |
+
+The page still covers the 19-dish GMn9C8 set, not 41. Dishes `20`–`41` arrive with `sweep-trellis-a`, `sweep-trellis-b` and `sweep-fast-41`.
+
+### Next quality lever (measured)
+
+The largest remaining defect is the detached square ground slab, which takes 29–46 % of the faces in 2 of 14 dishes. Next to it are the 52–4,704 non-manifold edges that keep every TRELLIS mesh from welded watertightness. Two options:
+
+- Drop welded shells that are flat (thickness/footprint < 0.01) and span the full footprint, then re-run the measurement.
+- Or tighten the cutout so no background margin reaches TRELLIS.
+
+Both are measurable with the new `shells_ge_1pct` and `main_shell_triangle_pct` fields.
+
+### Sweep results (2026-11-23, 10:41Z–13:18Z)
+
+- **`sweep-trellis-a/1`: COMPLETE, PASS.** Pulled to `/tmp/out-peekaplate-dish-3d-sweep-trellis-a-1`. 21 dishes (`01`–`21`), 82/82 GLBs valid and digest-exact, 0 errors, 54 warnings.
+  - `TRELLIS.2-4B`: 20 `success` and 1 `skipped` (`18_choco_cake_ice_cream`, the `plate_preserved` gate). `MoGe-2`: 21 `success`.
+  - Raw TRELLIS: 279,346–298,084 faces (median 292,594.5), two 2048 px textures each, at most 5 degenerate triangles; 220,371,444 B in total.
+  - Mobile TRELLIS: 31,446–33,983 faces, two 1024 px textures each; 31,281,644 B in total.
+  - Welded boundary edges 0 / 0 / 24 (min / median / max); welded non-manifold edges 53 / 413 / 4,653; welded-watertight 0/20.
+  - The largest shell holds 53.82–99.97 % of faces (median 99.43). Five dishes have their largest shell below 90 % with two or more shells at ≥ 1 % of faces: `03_kimchi`, `11_loco_moco`, `12_tempura_ramen`, `16_mafia_bento_box`, `17_green_tea_tiramisu`.
+  - The `seed 42` reruns of `05`–`19` reproduce the `hero-batch-b/6` shell split within ±1 % (`11_loco_moco` 156,106 / 133,696 faces vs 155,620 / 133,214).
+- **`sweep-trellis-b/1`: COMPLETE, but TRELLIS did not run (blocker).** Pulled to `/tmp/out-peekaplate-dish-3d-sweep-trellis-b-1`; 20 dishes (`22`–`41`), 40/40 MoGe-2 GLBs, verifier PASS. The kernel printed `TRELLIS.2 HF token source: missing` and `DINOv3 preflight: ok=False (missing_hf_token)`, so all 20 TRELLIS runs are `skipped`.
+  - Pulled `kernel-metadata.json` lists the same `dataset_sources` as `trellis-a`, and the notebook code differs only in the dish slice.
+  - The token dataset still holds `hf_token.txt` (37 B, created 08:25Z).
+  - `secret_source()` globs `/kaggle/input/*/*hf_token*` at a fixed depth, while dish discovery uses `rglob`. A deeper mount, or a dataset mount that failed for that session, therefore yields `missing`. The log prints no mount path, so the cause is unconfirmed (see `ERR-20261123-004`).
+- **Page `/tmp/report/dish-3d-model-report.html`:** 131,602 B, 6 sources, **41 dishes**, `publication_eligible: false`.
+  - `MoGe-2`: 41 `success`.
+  - `TRELLIS.2-4B`: 20 `success`, 21 `skipped` (1 `plate_preserved` gate, 20 `missing_hf_token` for `22`–`41`).
+  - `TripoSG` and `Hunyuan3D-2`: 19 `success` and 22 `not_run` each.
+  - `Hi3DGen`: 19 `skipped` (cu128 spconv) and 22 `not_run`.
+  - A sixth column, `hunyuan3d21`, shows 41 `not_run`; it was added to the builder by another concurrent writer.
+- **Merged studio:** PASS, 41 dishes, 198/198 GLBs, 0 errors. `interactive_3d_studio.html` was not rewritten by this merge and still has its 10:40Z timestamp, so it predates the 41-dish data.
+- **Not pushed:** `sweep-fast-41`. Its notebook was regenerated at 12:10Z by another writer outside this thread, so it was left for that writer.

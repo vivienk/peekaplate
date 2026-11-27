@@ -1094,7 +1094,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "assets",
       "status": "foundation",
-      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Private Kaggle demo supports Stage 0 photos (up to 4), GroundingDINO+SAM plate preservation, TripoSR+Hunyuan3D-2mini raw/<=35k mobile GLBs, HF 4-mode renders, Three.js interactive/standalone 3D studios, Docker blueprint and publication_eligible=false manifests. Real-device, Docker-host builds and fidelity checks remain separate.",
+      "summary": "Offline T0 variants preserve refs and reduced motion. Private R&D runs Kaggle TRELLIS/TripoSG/Hunyuan3D notebooks over 41 dishes in Three.js@0.182.0. Food3D V1: local Stages 0-5 PBR/WebP+meshopt GLBs and 5-check QA. Track 2B video-to-GLB: video_to_dataset.py, 2DGS+TSDF, Blender bake, best-view texturing; shared v7 defaults in t2b_v7_recipe.sh; opt-in flags (pose refine, mask carve, trim drips, repair pits, colour field, inpainting, fine detail, bright-concave, wet food) and studio viewer lighting. T2B_RECON_DIR resumes after reconstruction. colab_track2b.sh uploads only the train split, runs high-res 2DGS+TSDF on a Colab GPU under a compute-unit cap enforced as a wall-clock limit, always stops the runtime, logs spend, then resumes local stages. Offline food3d tests cover these paths; publication_eligible=false.",
       "paths": [
         "processing/src/peekaplate_processing/assets.py",
         "processing/src/peekaplate_processing/harness.py",
@@ -1114,9 +1114,60 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/review-preview/review-preview.spec.ts",
         "docs/research/dish-3d-delivery.md",
         "notebooks/dish-3d-openrouter.ipynb",
+        "notebooks/trellislast-version.ipynb",
+        "notebooks/dish-3d-multi-model-bench-a.ipynb",
+        "notebooks/dish-3d-multi-model-bench-b.ipynb",
+        "processing/scripts/extract_gmn9c8_dishes.py",
+        "processing/scripts/build_multi_model_notebooks.py",
+        "processing/scripts/merge_multi_model_results.py",
+        "processing/tests/test_extract_gmn9c8_dishes.py",
         "processing/tests/test_dish_3d_notebook.py",
+        "processing/tests/test_trellislast_notebook.py",
+        "processing/tests/test_merge_multi_model_results.py",
+        "processing/src/peekaplate_processing/multi_model_3d.py",
+        "processing/tests/test_multi_model_3d.py",
         "processing/src/peekaplate_processing/dish_3d_studio.py",
-        "processing/tests/test_dish_3d_studio.py"
+        "processing/tests/test_dish_3d_studio.py",
+        "processing/scripts/verify_kaggle_outputs.py",
+        "processing/scripts/kaggle_job_status.py",
+        "processing/tests/test_verify_kaggle_outputs.py",
+        "processing/tests/test_kaggle_job_status.py",
+        "processing/scripts/build_dish_model_report.py",
+        "processing/tests/test_build_dish_model_report.py",
+        "processing/scripts/food3d/__init__.py",
+        "processing/scripts/food3d/input_qa.py",
+        "processing/scripts/food3d/cutout_clean.py",
+        "processing/scripts/food3d/multiview_prep.py",
+        "processing/scripts/food3d/blender_bake.py",
+        "processing/scripts/food3d/pbr_author.py",
+        "processing/scripts/food3d/pack_pbr_glb.mjs",
+        "processing/scripts/food3d/viewer.html",
+        "processing/scripts/food3d/render_ab.mjs",
+        "processing/scripts/food3d/qa_gate.py",
+        "processing/scripts/food3d/build_studio.py",
+        "processing/scripts/food3d/run_pipeline.sh",
+        "processing/scripts/food3d/co3d_to_colmap.py",
+        "processing/scripts/food3d/build_track2_report.py",
+        "processing/scripts/food3d/track2b_mesh.py",
+        "processing/scripts/food3d/render_track2b_eval.mjs",
+        "processing/scripts/food3d/run_track2b.sh",
+        "processing/scripts/food3d/food3d_demo.sh",
+        "processing/scripts/food3d/video_to_dataset.py",
+        "processing/tests/test_food3d_input_qa.py",
+        "processing/tests/test_food3d_pbr.py",
+        "processing/tests/test_food3d_qa.py",
+        "processing/tests/test_food3d_track2.py",
+        "processing/tests/test_food3d_track2b.py",
+        "processing/tests/test_food3d_video.py",
+        "processing/tests/test_food3d_recon_resume.py",
+        "processing/scripts/food3d/t2b_v7_recipe.sh",
+        "processing/scripts/food3d/colab_track2b.sh",
+        "processing/scripts/food3d/colab_budget.py",
+        "processing/scripts/food3d/colab_job.py",
+        "processing/scripts/food3d/colab_remote_recon.py",
+        "processing/tests/test_food3d_colab.py",
+        "processing/scripts/food3d/build_track2b_studio.py",
+        "processing/tests/test_food3d_track2b_studio.py"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md",
@@ -1125,156 +1176,202 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "8d7e78c07c6d31be9d1015d62593ddc0a45b889f201bb857ce1cb9c3c1eadf03"
+      "sourceFingerprint": "200de96a84b1c5d1ccd5b52ad51ae65e744258b4755dac82f606054cdd112ba9"
     }
   ],
   "handoffs": [
     {
-      "date": "2026-11-17",
-      "modules": [
-        "backend"
-      ],
-      "summary": "PR222 creates pending structured website dishes and server-built evidence-bound review sessions without providers or publication. Review fixes reject competing offers and reuse the first fetched source for file fallback. Reconciled merged PR219 through documentation/ledger conflicts only; owner routes merge without manual runtime changes.",
-      "files": [
-        "backend/src/ingestion/html-menu.ts",
-        "backend/src/ingestion/intake.ts",
-        "backend/src/retrieval/parser.ts",
-        "backend/src/owner-menu-routes.ts"
-      ],
-      "next": "Require reconciled-head CI and review before merge; hosted Screen 8 to Screen 9 acceptance remains unverified."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console",
-        "processing",
-        "database",
-        "delivery"
-      ],
-      "summary": "Focused owner retest release reuses merged screens, main-only performance/camera/error fixes and existing portion producer. Corrects USD default, S10 wrapping, verified-menu navigation, real report/action wiring, same-window AI reference and private CPU portion generation through publication. Synthetic report facts remain isolated; unknown freshness still abstains.",
-      "files": [
-        "docs/owner-flow-retest.md",
-        "docs/screen9-portion-publish.md",
-        "backend/src/owner-prepare.ts",
-        "backend/src/extraction-host.ts",
-        "frontend/console/src/owner/OwnerWorkspace.tsx"
-      ],
-      "next": "PR223 is merged and deployed; hosted portion testing exposed unsupported Worker redirect:error. The narrow correction uses manual redirect handling with unchanged non-OK rejection and actual-function workerd regression evidence. Deploy the corrected exact-main release and finish authenticated portion/publication screenshots. AI secret provisioning still awaits the protected environment reviewer; unknown freshness abstains. Preserve Poulet drafts and accounts; no new OCR/provider call or physical-scale claim."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console",
-        "diner",
-        "contracts",
-        "delivery"
-      ],
-      "summary": "Reconcile main release fixes with develop without removing comparison, order-ingestion, ingredient-intelligence or QA tooling. Preserve deployed S09/performance/portion fixes and both regression suites.",
-      "files": [
-        "docs/owner-flow-retest.md",
-        "frontend/console/src/owner-dashboard/DishFormView.tsx",
-        "frontend/diner/src/menu/portionAssets.ts"
-      ],
-      "next": "Finish source-backed ingredient proposals, consent visibility and legitimate AI configuration; test before promoting only the intended staging changes."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "console",
-        "contracts"
-      ],
-      "summary": "Reconcile main release fixes into develop without dropping comparison/order/local-AI work. Reuse the existing dish-assistance route for saved ingredient proposals and existing portion state to hide repeated consent copy.",
-      "next": "Run pinned CI and hosted signed-out S1/ingredient/portion checks. Protected staging credential deployment and authoritative report completeness remain separate AI activation gates."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console",
-        "diner",
-        "contracts"
-      ],
-      "summary": "Sync the same reviewed main ingredient/consent commits into develop, preserving existing order/comparison/local AI work. Active extraction authority and real SQL fixture regressions are included.",
-      "next": "Wait for PR227 CI, merge main normally, then update develop without force or bypass. Deploy exact main only; credential approval and report completeness remain external AI gates."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "console"
-      ],
-      "summary": "Fix S13 handoff: retain preparation menu identity and load that exact snapshot in the existing PR208 MenuPreview. No screen/CSS replacement, auto-publication, or backend change.",
-      "next": "Verify direct preview and safe retry on staging; provider credentials and report completeness remain separate AI gates."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend"
-      ],
-      "summary": "Repair owner AI diagnostic loss with a bounded shared Responses transport, server-only status/code classifications and provisioning-compatible project validation. Report and draft read failures log an internal category before provider use. Public errors, evidence gates, model, request/token limits and no-retry behavior remain. All 131 focused caller and transport tests pass offline.",
-      "files": [
-        "backend/src/owner-ai/provider.ts",
-        "backend/src/owner-ai/responses.ts",
-        "backend/src/owner-ai/dish-assistance.ts",
-        "backend/src/owner-ai/routes.ts",
-        "docs/owner-ai-responses.md"
-      ],
-      "next": "Finish pinned repository checks and independent review, then obtain required human PR approval. Approved staging deployment and a captured synthetic request remain necessary to diagnose the hosted failure; no historical provider result is inferred."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "contracts",
-        "console",
-        "backend",
-        "diner"
-      ],
-      "summary": "Connect S09 Serving Size in cm to confirmed saved-photo boundaries, approved dish facts and published physical_size. People served remains optional. Exact photo/foreground checks and immutable snapshot asset reads preserve the existing approval and publication boundaries; size edits do not call the processor.",
-      "files": [
-        "docs/screen9-portion-publish.md",
-        "packages/contracts/src/portion.ts",
-        "frontend/console/src/owner-menu/PortionCalibrationEditor.tsx",
-        "backend/src/owner-prepare.ts",
-        "frontend/diner/src/menu/portionSize.ts"
-      ],
-      "next": "Complete pinned checks and independent review, then human review and exact staging release. Verify round/rectangular inputs through save, review, publish and supported-device table AR; ordinary camera and 2.5D remain approximate."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "contracts",
-        "console",
-        "backend",
-        "diner"
-      ],
-      "summary": "Correct the earlier interpretation: Serving size means people served. One count field replaces the duplicate People served input, while optional plate measurements independently authorize measured AR. Preserve canonical null/absent semantics, legacy notes, saved-photo evidence and immutable publication. Clearing old calibration preserves unknown people counts. Count changes require renewed confirmation and never multiply dimensions.",
-      "files": [
-        "docs/screen9-portion-publish.md",
-        "packages/contracts/src/portion.ts",
-        "frontend/console/src/owner-menu/DishEditor.tsx",
-        "frontend/console/src/owner-menu/PortionCalibrationEditor.tsx",
-        "backend/src/owner-menu.ts",
-        "frontend/diner/src/menu/portionSize.ts"
-      ],
-      "next": "Complete focused and repository checks, independently review the pinned correction, and update PR237. Human review and exact staging release remain required; physical-device scale acceptance is separate."
-    },
-    {
-      "date": "2026-11-21",
+      "date": "2026-11-22",
       "modules": [
         "assets",
-        "processing",
-        "diner"
+        "processing"
       ],
-      "summary": "Upgraded the Kaggle dish-to-3D pipeline (Version 15 verified live, plus permanent interactive Three.js 3D Studio standard for every future notebook version): added dish_3d_studio.py and Cell 19 generation of HTTP comparison_viewer.html + self-contained interactive_3d_studio.html (orbit/zoom/pan, PBR/Base Color/Clay/Normal/Wireframe, synced compare, static fallback, publication_eligible=false), verified live in browser against V15's 16 GLBs.",
+      "summary": "Audited the three private Kaggle jobs and graded every pulled tree with verify_kaggle_outputs.py. trellislast-version/32 COMPLETE with 4/4 TRELLIS skipped for the missing HF_TOKEN (no mesh owed), hero-batch-b/5 COMPLETE after ~2 h QUEUED (Kaggle 2xT4 capacity, not a stale entry) with 30/30 valid MoGe-2 GLBs and 0 errors, benchmark-a/4 COMPLETE with MoGe-2/Hunyuan3D/TripoSG success and Hi3DGen skipped. Fixed five defects with regressions: the status CLI no longer inherits the offline-harness PYTHONPATH/socket guard, skipped-only dishes no longer fail verification, staged input digests are verified and merged by measurement, TripoSG casts the whole pipeline (Float/Half) with capped raw density and a non-fatal dtype probe, Hi3DGen probes spconv in a child process and skips the shard, and mobile decimation returns the smallest reachable mesh or omits the artifact. An independent 2026-11-23 re-pull of the same three versions (benchmark-a/5, hero-batch-b/5, trellislast-version/32) reproduced every GLB/PNG digest, passed verify_kaggle_outputs.py with 0 errors (114/114, 30/30, 0/0 GLBs) and re-merged the five-model studio byte-identically, while `kaggle quota` stayed flat at 12.11h used. Later on 2026-11-23 the operator supplied a Hugging Face token and the run performed the missing-and-gated check itself: inside Kaggle, UserSecretsClient raised ConnectionError for API-pushed kernels (no API exists to attach a notebook secret), so the token now travels as the private yacine105/peekaplate-hf-token dataset resolved by secret_source() in the notebook baseline, which reports the credential source and distinguishes missing_hf_token from a 401/403 denial. A CPU probe kernel proved the mounted token authenticates as hf_user moosalah with repo_ok for microsoft/TRELLIS.2-4B and the DINOv3 repo, after which trellislast-version/33 and hero-batch-b/6 were re-pushed with that dataset attached. On 2026-11-23 the full-menu sweep was staged: extract_gmn9c8_dishes.py re-extracted 41 dishes (41 photos + 33 masks) into private dataset yacine105/peekaplate-dish-menu-41, build_multi_model_notebooks.py gained --filename/--title/--models/--start/--end (canonical pair and its generator-equality tests unchanged) and generated three staged sweep kernels (4-model x 41 dishes, TRELLIS shards 0-20 and 21-40) that wait on Kaggle's two-session cap, and build_dish_model_report.py now renders one self-contained 41 KB results page from merged trees (12 tests pass, byte-identical rebuild, all 57 GLB links relative and resolving, absolute/traversal paths rejected).",
       "files": [
+        "processing/scripts/kaggle_job_status.py",
+        "processing/scripts/verify_kaggle_outputs.py",
+        "processing/scripts/merge_multi_model_results.py",
+        "processing/scripts/build_multi_model_notebooks.py",
+        "processing/tests/test_kaggle_job_status.py",
+        "processing/tests/test_verify_kaggle_outputs.py",
+        "processing/tests/test_merge_multi_model_results.py",
+        "processing/tests/test_extract_gmn9c8_dishes.py",
+        "notebooks/dish-3d-multi-model-bench-a.ipynb",
+        "notebooks/dish-3d-multi-model-bench-b.ipynb",
         "docs/research/dish-3d-delivery.md",
-        "notebooks/dish-3d-openrouter.ipynb",
-        "processing/src/peekaplate_processing/dish_3d_studio.py",
-        "processing/tests/test_dish_3d_studio.py",
-        "processing/tests/test_dish_3d_notebook.py"
+        "errors.md",
+        "processing/src/peekaplate_processing/multi_model_3d.py",
+        "processing/tests/test_multi_model_3d.py",
+        ".learnings/LEARNINGS.md",
+        "notebooks/trellislast-version.ipynb",
+        "processing/tests/test_trellislast_notebook.py",
+        "processing/scripts/build_dish_model_report.py",
+        "processing/tests/test_build_dish_model_report.py",
+        "processing/scripts/extract_gmn9c8_dishes.py"
       ],
-      "next": "Run `docker build` + GPU integration wiring in a container-capable CI/worker host using `results/docker_blueprint/`, keep single-photo demo outputs marked publication_eligible=false per ADR 0004, and validate any multi-view/AR staging flow separately."
+      "next": "Push the three staged sweep kernels from /tmp/push-peekaplate-dish-3d-sweep-* as GPU slots free, pull and grade each, then regenerate /tmp/report/dish-3d-model-report.html across all 41 dishes and merge the interactive studio. Follow-up defect handed over: merge_results_directories drops source_revisions and any generated_at, so the report must scrape raw trees to show pinned revisions and cannot show a generation date; carry both through the merge with a regression in test_merge_multi_model_results.py."
+    },
+    {
+      "date": "2026-11-23",
+      "modules": [
+        "assets",
+        "processing"
+      ],
+      "summary": "First live TRELLIS.2-4B meshes: hero-batch-b/6 COMPLETE with the token dataset (DINOv3 preflight ok), 14/15 success plus one plate_preserved cutout skip, verifier PASS 58/58 GLBs. Raw meshes have about 293k faces with 2048 px textures, mobile about 33k faces with 1024 px textures. With welded topology the median is 2 boundary and 337.5 non-manifold edges and the largest shell holds 98.59% of faces; 11_loco_moco and 12_tempura_ramen carry a detached square ground slab. The verifier and report now measure welded topology and shells (ERR-20261123-003). The merged 19-dish studio passes 142/142 GLBs and the report is 77,698 B. sweep-trellis-a/1 is RUNNING; trellislast-version/33 has been QUEUED since 08:29Z and holds the second slot. Later: sweep-trellis-a/1 PASS with 20/21 TRELLIS (dishes 01-21); sweep-trellis-b/1 resolved no HF token and skipped TRELLIS for 22-41 (ERR-20261123-004, open). The page now covers 41 dishes with TRELLIS status stated for every dish.",
+      "files": [
+        "processing/scripts/verify_kaggle_outputs.py",
+        "processing/scripts/build_dish_model_report.py",
+        "processing/tests/test_verify_kaggle_outputs.py",
+        "processing/tests/test_build_dish_model_report.py",
+        "docs/research/dish-3d-delivery.md",
+        "errors.md"
+      ],
+      "next": "Fix the token lookup (recursive search, printed mount layout, fail fast before GPU stages), then re-push sweep-trellis-b for TRELLIS on dishes 22-41. Push sweep-fast-41 only after confirming with the writer that regenerated it at 12:10Z. Rebuild interactive_3d_studio.html, whose 10:40Z copy predates the 41-dish data. The highest-value quality fix is to drop flat, full-footprint ground-slab shells and repair non-manifold edges before export."
+    },
+    {
+      "date": "2026-11-24",
+      "modules": [
+        "assets",
+        "processing"
+      ],
+      "summary": "Built and verified the Food3D V1 local PBR post-processing, viewer, and automated QA pipeline under processing/scripts/food3d/ (Stages 0-5) with 28/28 offline unit tests passing and zero circular Cycles dependencies across an 8-dish evaluation in /home/yacine105/kaggle-evals/food3d-v1-20261124/. All 8 packed 150k/35k WebP+meshopt-high GLBs meet the <=5.0 MiB budget (1.77-4.95 MiB), pass gltf-transform validate, embed asset.extras.publication_eligible=false, pass welded geometry and strict metallic=0.0 PBR audits, and pass dish-only transparent foreground relighting (p95 39.0-80.0); single-photo fidelity scored 5 WARN (12, 05, 09, 20, 10) and 3 FAIL (08 fused outer tray, 18 plate-only vs uncut glass stand cutout, 03 cabbage shift). Codex review P1-P3 findings were fixed across Lanes A/B/C and documented in research_notes/wiki/food3d-v1-pbr-qa-pipeline-2026-11-24.md.",
+      "files": [
+        "processing/scripts/food3d/__init__.py",
+        "processing/scripts/food3d/input_qa.py",
+        "processing/scripts/food3d/cutout_clean.py",
+        "processing/scripts/food3d/multiview_prep.py",
+        "processing/scripts/food3d/blender_bake.py",
+        "processing/scripts/food3d/pbr_author.py",
+        "processing/scripts/food3d/pack_pbr_glb.mjs",
+        "processing/scripts/food3d/viewer.html",
+        "processing/scripts/food3d/render_ab.mjs",
+        "processing/scripts/food3d/qa_gate.py",
+        "processing/scripts/food3d/build_studio.py",
+        "processing/scripts/food3d/run_pipeline.sh",
+        "processing/tests/test_food3d_input_qa.py",
+        "processing/tests/test_food3d_pbr.py",
+        "processing/tests/test_food3d_qa.py",
+        "research_notes/wiki/food3d-v1-pbr-qa-pipeline-2026-11-24.md",
+        "research_notes/wiki/index.md",
+        "research_notes/wiki/goal-photoreal-food-3d-pipeline.md"
+      ],
+      "next": "Await user review and 1-5 quality ratings in studio.html, 2-4 real dish photos or a 15s orbit video for free local Track 2 multi-view reconstruction (multiview_prep.py / E1), and explicit approval before any paid cloud GPU/API runs or git commit/push."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "assets",
+        "processing"
+      ],
+      "summary": "Completed Track 2 local multi-view evaluation at $0 spend using RTX 3060 Vulkan + Brush v0.3.0 over 3 real CO3D phone-orbit food dishes (co3d_pizza, co3d_sandwich, co3d_hotdog) under /home/yacine105/kaggle-evals/track2-multiview-20261125/. Fixed FFmpeg n9.1 -vsync 0 failure in multiview_prep.py (-fps_mode passthrough + legacy fallback) and verified 4-frame video BiRefNet cutout prep on all 3 orbit MP4s. Added co3d_to_colmap.py (zero-leakage pre-QA split freeze, Brush-native transforms_train/val.json, eval_masks isolation avoiding ignore-mask streaks, premultiplied RGBA resize, visual-hull PLY) and build_track2_report.py (verified eval_<step>, black bg, masked fg_ssim, symlink containment, zero-CDN track2_studio.html). Held-out means: Full PSNR 37.46-37.98 dB, FG PSNR 29.99-32.73 dB, masked FG SSIM 0.914-0.948, FG dE 2.26-3.74; 137-143s GPU/dish; publication_eligible=false.",
+      "files": [
+        "processing/scripts/food3d/multiview_prep.py",
+        "processing/scripts/food3d/co3d_to_colmap.py",
+        "processing/scripts/food3d/build_track2_report.py",
+        "processing/tests/test_food3d_track2.py",
+        "research_notes/wiki/track2-multiview-e1-brush-results-2026-11-25.md",
+        "research_notes/wiki/index.md",
+        "research_notes/wiki/goal-photoreal-food-3d-pipeline.md"
+      ],
+      "next": "Await morning user review of studio.html (Track 1) and track2_studio.html (Track 2), optional 20s phone orbit capture of the user's own dish, and explicit approval before paid AI FL2V video API spend, cloud 2DGS mesh extraction, or git commit/push."
+    },
+    {
+      "date": "2026-11-26",
+      "modules": [
+        "assets",
+        "processing"
+      ],
+      "summary": "Track 2B v6 defect cleanup over co3d_pizza, co3d_sandwich, and co3d_hotdog under /home/yacine105/kaggle-evals/track2b-mesh-v6-20261126/ (publication_eligible=false, $0 local GPU/CPU). Added opt-in --mask-carve (tol=2.0, mof=0.38 after tol=1.0 clipped sandwich top bun), --trim-drips (support-plane + hanging stalactite neck removal), --repair-pits (post-NM boundary hole closure + targeted pit smoothing), --color-field (12-param spatial+chroma IRLS), and --inpaint-unprojected in track2b_mesh.py & run_track2b.sh; 91/91 food3d unit tests pass. Verified visually: sandwich az=0 drip gone & top-bun pits smoothed (SSIM 0.828->0.849, seam dE 0.93->0.50); pizza skirt wisps trimmed & warm balance slightly improved (az=180 shadow/bump in source photo frame_000048 remains); hotdog clay smoother but az=180 inner bun lip shows brown bleed at tol=2.0.",
+      "files": [
+        "processing/scripts/food3d/track2b_mesh.py",
+        "processing/scripts/food3d/run_track2b.sh",
+        "processing/tests/test_food3d_track2b.py",
+        "research_notes/wiki/track2b-mesh-pbr-2026-11-25.md"
+      ],
+      "next": "Review v6 turntables & crop_*_v5_vs_v6.png comparisons; optionally tune per-dish mask tolerance or hotdog inner-lip projection without committing/pushing."
+    },
+    {
+      "date": "2026-11-26",
+      "modules": [
+        "assets",
+        "processing"
+      ],
+      "summary": "Track 2B v8 opt-in fine-detail normal & cavity pass over co3d_pizza, co3d_sandwich, and co3d_hotdog under /home/yacine105/kaggle-evals/track2b-mesh-v8-20261126/ (publication_eligible=false, $0 local CPU/WebGL, reusing v7 meshes & projected maps via T2B_REUSE_DIR). Evaluated TSDF/2DGS normal baking (both already macro-smooth; 2DGS depth normals quantized) vs frequency-split perceptual-luminance Scharr detail normals + valley/trough cavity AO + 1024px ORM packing. Added T2B_FINE_DETAIL=1 (detail_normal_strength=18.0, cavity_strength=0.75, occlusion_strength=0.70, micro_normal_strength=0.0, orm_max_size=1024, normal_webp_quality=90) in run_track2b.sh, pbr_author.py, and pack_pbr_glb.mjs; 94/94 food3d unit tests pass. All 6 GLBs stay 1.41-3.53 MiB (<=5 MiB), pass gltf-transform validate, preserve held-out albedo scores identically, keep held-out lit PSNR within 0.15-0.30 dB of v7, and visibly sharpen topping/crust relief without embossed halos.",
+      "files": [
+        "processing/scripts/food3d/pbr_author.py",
+        "processing/scripts/food3d/pack_pbr_glb.mjs",
+        "processing/scripts/food3d/run_track2b.sh",
+        "processing/tests/test_food3d_track2b.py",
+        "research_notes/wiki/track2b-mesh-pbr-2026-11-25.md"
+      ],
+      "next": "Review v8 turntables & comparison_*_v7_vs_v8_vs_train.png sheets; keep T2B_FINE_DETAIL opt-in or promote to v8/demo defaults once approved without committing/pushing."
+    },
+    {
+      "date": "2026-11-26",
+      "modules": [
+        "assets",
+        "processing"
+      ],
+      "summary": "Track 2B v10 opt-in bright-concave texturing over co3d_pizza, co3d_sandwich and co3d_hotdog under /home/yacine105/kaggle-evals/track2b-mesh-v10-20261126/ (publication_eligible=false, $0 local CPU/WebGL, reusing v7 geometry/baked maps via T2B_REUSE_DIR + new T2B_REPROJECT=1 which re-runs only stage 3). Diagnosed the grey co3d_hotdog inner bun crumb as best-view picking self-shadowed views (trough texel L*61.0 vs real frame_000088 L*80.6; levelling/de-lighting/AO/inpainting ruled out). Added --bright-concave in track2b_mesh.py: per-texel weighted q60-q92 luminance band with a chroma gate, blended for ao<0.95 or inter-view shadow spread>0.35; settings chosen on train views only. Held-out: hotdog albedo 20.98->21.14 and lit 18.91->19.05, sandwich albedo 22.96->23.11 and lit 19.67->19.78, pizza albedo 21.98->22.04 but lit 21.50->21.17 (-0.33 dB); a flag-off ablation reproduced v9 exactly. Demo default stays OFF; flag is opt-in. 100/100 food3d tests pass.",
+      "files": [
+        "processing/scripts/food3d/track2b_mesh.py",
+        "processing/scripts/food3d/run_track2b.sh",
+        "processing/scripts/food3d/food3d_demo.sh",
+        "processing/tests/test_food3d_track2b.py",
+        "research_notes/wiki/track2b-mesh-pbr-2026-11-25.md"
+      ],
+      "next": "Review v10 turntables & comparison_*_v9_vs_v10_vs_train.png sheets; keep T2B_BRIGHT_CONCAVE opt-in (pizza lit regresses 0.33 dB) and prefer it for deep-concavity dishes; do not commit/push."
+    },
+    {
+      "date": "2026-11-26",
+      "modules": [
+        "assets",
+        "processing"
+      ],
+      "summary": "Track 2B v11 opt-in wet/oily film pass over co3d_pizza, co3d_sandwich and co3d_hotdog under /home/yacine105/kaggle-evals/track2b-mesh-v11-20261126/ (publication_eligible=false, $0 local CPU/WebGL, reusing v7 meshes/UV atlases via T2B_REUSE_DIR). Added T2B_WET_FOOD=1 to run_track2b.sh: compute_wet_oil_mask (pale mozzarella / orange grease / baked specular evidence, gated to top-facing non-vessel food, capped at 0.35) lowers roughness to 0.25-0.40 and adds a 0.15-peak clearcoat at coat roughness 0.12, and oil_albedo_removal=0.18 removes a mask-scaled share of linear albedo luminance so the baked photo highlight is not double-counted (without it pizza held-out lit PSNR fell 0.26 dB; with it, rose 0.16 dB). Added project-uv --specular-gloss-out, a per-texel brightest-view luminance-excursion cue, after the relative-variance form measured anti-correlated with pale cheese (corr -0.10 vs +0.28 for the excursion form). Held-out lit: pizza 21.50->21.66 (+0.16 dB, -0.22 dE), sandwich 19.67->19.92 (+0.25 dB, -0.26 dE), hotdog 18.91->18.80 (-0.11 dB, +0.36 dE); held-out albedo drifts -0.05/-0.28/-0.38 dB. Moving-light specular variation up 1.25x/1.31x/1.14x. Hero GLBs 2.35-2.81 MiB, mobile 1.00-1.11 MiB (<=5 MiB), all 6 pass gltf-transform validate, QA 150k WARN (pizza ssim 0.170), PASS, WARN (hotdog dE 25.73) and 35k PASS on all three, same verdicts as v9. 111/111 food3d tests pass.",
+      "files": [
+        "processing/scripts/food3d/pbr_author.py",
+        "processing/scripts/food3d/track2b_mesh.py",
+        "processing/scripts/food3d/pack_pbr_glb.mjs",
+        "processing/scripts/food3d/render_track2b_eval.mjs",
+        "processing/scripts/food3d/run_track2b.sh",
+        "processing/tests/test_food3d_pbr.py",
+        "processing/tests/test_food3d_track2b.py",
+        "research_notes/wiki/track2b-mesh-pbr-2026-11-25.md"
+      ],
+      "next": "A human or vision-capable reviewer must confirm comparison_*_v9_vs_v11_vs_train.png and moving_light_*_v9_vs_v11.png before T2B_WET_FOOD is promoted past opt-in; the hotdog pale-crumb misclassification and the unfixed pizza sat_p90 topping gap are open. Do not commit/push."
+    },
+    {
+      "date": "2026-11-26",
+      "modules": [
+        "assets",
+        "processing"
+      ],
+      "summary": "Built build_track2b_studio.py and extended viewer.html (?hud=0, ?autoRotate=1, food3d:setAutoRotate, food3d:resetCamera) to generate the zero-CDN interactive Track 2B studio page (/home/yacine105/kaggle-evals/menu-dishes-20261126/recon/studio.html) displaying all 6 GLBs across refined_burrito_bowl, refined_super_burrito, and refined_veggie_burrito in Gallery (All 3), Focus Studio (with modal Lightbox and localStorage 1-5 ratings export), and 150k vs 35k Compare modes. Enforces symlink/containment checks, publication_eligible=false (ADR 0004), exact QA/held-out metrics (all 3 150k models failed photo-fidelity QA; 35k models passed budget/geometry/PBR), and Flow-footage disclosure. Live Playwright Chromium check confirmed 0 console/page/HTTP>=400 errors and non-blank WebGL renders for all 6 GLBs (verified via antigravity_2 and antigravity_pro_3 gemini-4-hydrogen subagents).",
+      "files": [
+        "processing/scripts/food3d/build_track2b_studio.py",
+        "processing/scripts/food3d/viewer.html",
+        "processing/tests/test_food3d_track2b_studio.py"
+      ],
+      "next": "Await user review of /home/yacine105/kaggle-evals/menu-dishes-20261126/recon/studio.html (served via python3 -m http.server -d /home/yacine105/kaggle-evals/menu-dishes-20261126/recon 8767) and approval before any commit/push."
+    },
+    {
+      "date": "2026-11-27",
+      "modules": [
+        "assets",
+        "processing"
+      ],
+      "summary": "Fixed GPU dataset rebuilds (cutout_clean.py CUDA ORT + video_to_dataset.py rank_sfm_candidate_pass radius_penalty cap restoring refined_veggie_burrito from 20/80 to 51/80), Track 2B solid-mesh topology (_complete_component_direct_loft + _build_hierarchical_base_cap + island-isolated inpaint_unprojected_texels in track2b_mesh.py), and completed all 3 recon_v2 Colab L4 + local Track 2B bakes and studio.html (publication_eligible=false). recon_v2 held-out results: refined_burrito_bowl (solid complete-mesh, 80/80) albedo 18.01 full / 16.80 fg dB, lit 15.95 fg dB, 40.7%/45.3% UV projection, 35k QA PASS (1,561,524 B); refined_super_burrito (80/80) albedo 17.76 fg dB / 0.634 fg SSIM / 10.09 fg ΔE, lit 16.62 fg dB (beating ORIG 17.42 / 16.48 dB), 90.2% UV projection, 35k QA PASS (1,835,952 B); refined_veggie_burrito (51/80) albedo 18.72 fg dB / 0.692 fg SSIM / 9.89 fg ΔE, lit 18.07 fg dB (beating ORIG 17.75 / 17.18 dB), 91.2% UV projection (seam excess 0.325 ΔE), 35k QA PASS (1,384,792 B). Colab balance 172.27 units (Active assignments: 0).",
+      "files": [
+        "processing/scripts/food3d/cutout_clean.py",
+        "processing/scripts/food3d/video_to_dataset.py",
+        "processing/scripts/food3d/blender_bake.py",
+        "processing/scripts/food3d/track2b_mesh.py",
+        "processing/tests/test_food3d_input_qa.py",
+        "processing/tests/test_food3d_video.py",
+        "processing/tests/test_food3d_track2b.py"
+      ],
+      "next": "Await user review of /home/yacine105/kaggle-evals/menu-dishes-20261126/recon_v2/studio.html and next-step direction toward photoreal food goal (e.g., PBR wet-food/fine-detail tuning, additional menu clips, or real multi-view capture); do not commit/push without approval."
     }
   ]
 }
