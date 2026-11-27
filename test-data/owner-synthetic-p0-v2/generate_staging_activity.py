@@ -13,6 +13,7 @@ and --confirm-staging flags.
 from __future__ import annotations
 
 import argparse
+from base64 import urlsafe_b64decode
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -820,6 +821,42 @@ def load_and_verify_manifest(
     return manifest
 
 
+def _validate_live_replay(manifest: dict[str, Any], menu_token: str) -> None:
+    try:
+        target = manifest["target"]
+        expected = generate_manifest(GeneratorConfig(
+            scenario=manifest["scenario"],
+            venue_id=target["venue_id"],
+            publication_id=target["publication_revision_id"],
+            current_publication_id=None,
+            dish_id=target["dish_id"],
+            dish_revision_id=target["dish_revision_id"],
+            dish_is_demo=target["dish_is_demo"],
+            seed=manifest["seed"],
+            window_start=manifest["window_utc"]["start"],
+            window_end=manifest["window_utc"]["end"],
+            event_cap=manifest["event_cap"],
+            api_base_url=manifest["destination"]["api_base_url"],
+            authorized_venues=STAGING_TEST_REPORT_VENUES,
+            dry_run=False,
+        ))
+        if compute_manifest_hash(manifest) != expected["manifest_sha256"]:
+            raise GuardrailError("Live manifest does not match the deterministic scenario.")
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise GuardrailError("Invalid live manifest scope.") from exc
+
+    # Check local scope consistency. The staging Worker authenticates the signature and expiry.
+    try:
+        _, payload, _ = menu_token.split(".")
+        claims = json.loads(urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    except (ValueError, UnicodeError) as exc:
+        raise GuardrailError("Invalid staging menu token format.") from exc
+    if not isinstance(claims, dict) or (
+        claims.get("venue"), claims.get("publication"), claims.get("scope")
+    ) != (target["venue_id"], target["publication_revision_id"], "observations"):
+        raise GuardrailError("Staging menu token scope does not match the manifest.")
+
+
 def send_manifest_batches(manifest: dict[str, Any], menu_token: str) -> list[dict[str, Any]]:
     """Send batches to POST /observations using the normal tracking endpoint."""
     if not menu_token or not menu_token.strip():
@@ -836,6 +873,7 @@ def send_manifest_batches(manifest: dict[str, Any], menu_token: str) -> list[dic
     if target_venue not in STAGING_TEST_REPORT_VENUES:
         raise GuardrailError("Live delivery requires an approved test-class report venue.")
     endpoint = _staging_ingest_endpoint(manifest["destination"])
+    _validate_live_replay(manifest, menu_token.strip())
     opener = build_opener(_NoRedirect())
 
     receipts: list[dict[str, Any]] = []

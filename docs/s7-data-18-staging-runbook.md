@@ -79,7 +79,7 @@ python3 test-data/owner-synthetic-p0-v2/generate_staging_activity.py \
   --authorized-venue-id "<REAL_STAGING_VENUE_UUID>" \
   --send --confirm-staging --menu-token "<REDACTED_MENU_TOKEN>"
 ```
-Record the HTTP receipts as queue acceptance. After consumption, confirm one canonical row per replayed event ID and re-query `GET /api/v1/venues/<REAL_STAGING_VENUE_UUID>/analytics/dishes?source=synthetic` to check that replay added no metrics.
+The sender regenerates the deterministic manifest before delivery and checks that the token claims match its venue and publication. The Worker verifies the signed token. Record the HTTP receipts as queue acceptance. After consumption, confirm one canonical row per replayed event ID and re-query `GET /api/v1/venues/<REAL_STAGING_VENUE_UUID>/analytics/dishes?source=synthetic` to check that replay added no metrics.
 
 ### Step 5: Independent Second-Tester Reproduction (Harshita)
 Provide Harshita with the exact `(scenario, venue_id, publication_id, dish_id, dish_revision_id, window_start, window_end, seed)` tuple so she independently reproduces the identical `input_sha256`, `output_sha256`, and `manifest_sha256`.

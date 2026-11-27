@@ -1,4 +1,5 @@
 import json
+from base64 import urlsafe_b64encode
 from pathlib import Path
 import sys
 import tempfile
@@ -225,13 +226,28 @@ class TestStagingActivityGenerator(unittest.TestCase):
             )
         )
         self.assertEqual(live_manifest["authorization_status"], "AUTHORIZED_STAGING")
+        claims = urlsafe_b64encode(json.dumps({
+            "venue": real_venue, "publication": real_pub, "scope": "observations"
+        }).encode()).decode().rstrip("=")
+        menu_token = f"test-header.{claims}.test-signature"
+        changed_batch = {
+            **live_manifest,
+            "batches": live_manifest["batches"] + live_manifest["batches"],
+        }
+        changed_batch["manifest_sha256"] = compute_manifest_hash(changed_batch)
+        with patch("generate_staging_activity.build_opener") as transport:
+            with self.assertRaisesRegex(GuardrailError, "deterministic scenario"):
+                send_manifest_batches(changed_batch, menu_token)
+            with self.assertRaisesRegex(GuardrailError, "token format"):
+                send_manifest_batches(live_manifest, "invalid-token")
+            transport.assert_not_called()
         with patch("generate_staging_activity.build_opener") as build_transport:
             transport = build_transport.return_value
             transport.open.side_effect = HTTPError(
                 f"{STAGING_API}/observations", 302, "Found", {}, None
             )
             with self.assertRaises(RuntimeError):
-                send_manifest_batches(live_manifest, "test-token")
+                send_manifest_batches(live_manifest, menu_token)
             transport.open.assert_called_once()
             request = transport.open.call_args.args[0]
             self.assertEqual(request.full_url, f"{STAGING_API}/observations")
