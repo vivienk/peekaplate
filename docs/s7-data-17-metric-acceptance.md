@@ -158,7 +158,7 @@ Executed in real PostgreSQL via `backend/src/owner-report.integration.ts` (`comp
 ## 6. Remaining Gaps
 
 1. **Harshita's independent confirmation:** Pending review/sign-off.
-2. **Verified orders & portion previews:** Remain unavailable / not measurable in `owner_report.v1` until an eligible, linked source is approved and wired.
+2. **Metric coverage:** Verified orders still require an eligible linked source. Eligible production portion previews use the display-action path, outside this legacy acceptance case.
 3. **Python `jsonschema` environment dependency:** `test-data/owner-synthetic-p0-v2/tests/test_validator_integration.py` requires `jsonschema==4.26.0` in `python3` to execute schema-validator subprocess checks.
 4. **Console authentication and rollout:** The signed-in owner workspace supplies the session token. The null token getter belongs to the standalone dashboard demo. Production rollout flags and live report eligibility are outside this synthetic acceptance check.
 
