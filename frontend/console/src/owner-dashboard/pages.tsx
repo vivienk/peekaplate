@@ -1,4 +1,8 @@
-import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
+import {
+  isOwnerProductionCalendarVersion,
+  OWNER_REPORT_TIME_ZONE,
+  type OwnerDishReport,
+} from '@peekaplate/contracts/owner-report';
 // Owner Dashboard screens: welcome, overview, report, dish performance, dish detail, actions.
 import { type ReactNode, useState } from 'react';
 import type { Chat } from './chat';
@@ -64,6 +68,8 @@ export interface LiveDashboardInput {
   summaryFreshness?: boolean | null | undefined;
   summarySource?: OwnerDishReport['source'] | undefined;
   summaryBatch?: boolean;
+  summaryDay?: boolean;
+  summaryToday?: boolean;
 }
 
 type OverviewSummary = NonNullable<OwnerDishReport['summary']>;
@@ -99,6 +105,16 @@ function overviewMetric(summary: OverviewSummary | undefined, key: OverviewMetri
 }
 const overviewWindow = (period: { start_time: string; end_time: string }) =>
   `${period.start_time.replace('T', ' ').replace(/\.000Z$|Z$/, ' UTC')} – ${period.end_time.replace('T', ' ').replace(/\.000Z$|Z$/, ' UTC')}`;
+const pacificTime = new Intl.DateTimeFormat('en-US', {
+  timeZone: OWNER_REPORT_TIME_ZONE,
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZoneName: 'short',
+});
+const pacificWindow = (period: { start_time: string; end_time: string }) =>
+  `${pacificTime.format(new Date(period.start_time))} – ${pacificTime.format(new Date(period.end_time))}`;
 export interface LiveMenuRow {
   id: string;
   name: string;
@@ -191,16 +207,15 @@ function ReportVersionBadge({ scn }: { scn: Scenario }) {
 export function Overview({
   go,
   sim,
-  acts,
   openDish,
-  openInsight,
   live,
 }: {
   go: (p: Page) => void;
   sim: { scn: Scenario };
-  acts: Acts;
+  /** Kept for callers; Overview no longer shows the Insights or Your actions cards. */
+  acts?: Acts;
   openDish: (id: string) => void;
-  openInsight: (id: string) => void;
+  openInsight?: (id: string) => void;
   live?: LiveDashboardInput & { menu: readonly LiveMenuRow[] };
 }) {
   const empty = !!live || sim.scn === 'empty';
@@ -212,11 +227,26 @@ export function Overview({
     bucket.opens.value ??
     (bucket.opens.status === 'SUPPRESSED' ? 'Not enough visits yet' : 'Unavailable');
   const batches = live?.summaryBatch && daily ? [...daily.baseline, ...daily.current] : undefined;
+  const dayTotals =
+    live?.summaryDay && live.summary
+      ? [
+          {
+            ...live.summary.periods.baseline,
+            opens: live.summary.baseline.dish_opens,
+            label: 'Yesterday',
+          },
+          {
+            ...live.summary.periods.current,
+            opens: live.summary.current.dish_opens,
+            label: 'Today so far',
+          },
+        ]
+      : undefined;
+  const windowLabel = live?.summaryDay ? pacificWindow : overviewWindow;
   const batchLabels = batches?.map(
     ({ end_time }) => `${end_time.slice(5, 10)} ${end_time.slice(11, 16)} UTC`,
   );
   const sorted = bySort('open');
-  const planned = INSIGHTS.filter((i) => acts[i.id]?.status === 'planned').length;
   return (
     <div className="stack">
       <div className="pagehead">
@@ -228,16 +258,20 @@ export function Overview({
         <Note icon="info">
           {live
             ? live.summary
-              ? `Current period: ${overviewWindow(live.summary.periods.current)}. Previous period: ${overviewWindow(live.summary.periods.baseline)}. ${live.summaryFreshness === null || live.summaryFreshness === undefined ? 'Freshness not known.' : live.summaryFreshness ? 'Report is out of date.' : 'Report is up to date.'}`
+              ? `Current period: ${windowLabel(live.summary.periods.current)}. Previous period: ${windowLabel(live.summary.periods.baseline)}. ${live.summaryFreshness === null || live.summaryFreshness === undefined ? 'Freshness not known.' : live.summaryFreshness ? 'Report is out of date.' : 'Report is up to date.'}`
               : 'Summary unavailable. Your saved dishes are listed below; no measurements are inferred.'
             : 'No diner data yet. Your dishes are listed below with no numbers. Data appears once diners use the menu.'}
         </Note>
       )}
       {live?.summary && live.summarySource === 'production' && (
         <Note icon="info">
-          {live.summaryBatch
-            ? 'Refresh shows the latest completed five-minute batch. Dish-level rates need enough visits.'
-            : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
+          {live.summaryToday
+            ? 'Today’s visits and dish opens update as activity settles. Dish Performance shows verified dish metrics for the range on that page.'
+            : live.summaryDay
+              ? 'Today’s menu visits and dish opens update as activity settles. Dish performance, active time and 2.5D previews use the previous completed San Francisco day.'
+              : live.summaryBatch
+                ? 'Refresh shows the latest completed five-minute batch. Dish-level rates need enough visits.'
+                : 'Today counts PostHog events matched to our records. Earlier UTC days use Supabase. Allow for delivery delays when comparing periods.'}
         </Note>
       )}
       {(live || !empty) && (
@@ -307,237 +341,189 @@ export function Overview({
           />
         </div>
       )}
-      <div className="grid g-main">
-        <div className="stack">
-          {(live || !empty) && (
-            <ChartCard
-              title={live?.summaryBatch ? 'Dish opens by batch' : 'Dish opens by day'}
-              tag={
-                <Lab
-                  k={
-                    !live ||
-                    (daily &&
-                      [...daily.current, ...daily.baseline].some(
-                        (bucket) => bucket.opens.value !== null,
-                      ))
-                      ? 'obs'
-                      : 'unk'
-                  }
-                />
-              }
-              {...(live && {
-                sub: live.summaryBatch
-                  ? 'Completed five-minute UTC batches. Unavailable measurements are gaps.'
-                  : 'UTC days clipped to each reporting period. Unavailable measurements are gaps, not zero.',
-              })}
-              head={
-                live?.summaryBatch
-                  ? ['UTC batch', 'Dish opens']
-                  : live
-                    ? ['UTC bucket', 'Current period', 'Previous period']
-                    : ['Day', 'This week', 'Last week']
-              }
-              rows={
-                batches
-                  ? batches.map((bucket) => [overviewWindow(bucket), dailyValue(bucket)])
-                  : live
-                    ? (daily?.current.map((bucket, i) => [
-                        dailyLabels![i],
-                        dailyValue(bucket),
-                        daily.baseline[i] ? dailyValue(daily.baseline[i]!) : 'Unavailable',
-                      ]) ?? [])
-                    : DAYS.map((d, i) => [d, DAILY_NOW[i], DAILY_PREV[i]])
-              }
-            >
-              {live && !daily ? (
-                <div className="empty">Daily openings unavailable.</div>
-              ) : (
-                <LineChart
-                  labels={batchLabels ?? (live ? (dailyLabels ?? []) : DAYS)}
-                  unit=""
-                  desc={
-                    batches
-                      ? 'Dish opens for the previous and latest completed UTC batches'
-                      : live
-                        ? 'Dish opens by clipped UTC day, current period compared with previous period'
-                        : 'Dish opens by day, this week compared with last week'
-                  }
-                  series={
-                    batches
+      <div className="stack">
+        {dayTotals && (
+          <ChartCard
+            title="Dish opens by day"
+            tag={
+              <Lab k={dayTotals.some((bucket) => bucket.opens.value !== null) ? 'obs' : 'unk'} />
+            }
+            sub="San Francisco calendar days. Today includes settled activity so far."
+            head={['San Francisco period', 'Dish opens']}
+            rows={dayTotals.map((bucket) => [
+              `${bucket.label} · ${pacificWindow(bucket)}`,
+              dailyValue(bucket),
+            ])}
+          >
+            <LineChart
+              labels={dayTotals.map((bucket) => bucket.label)}
+              unit=""
+              desc="Dish opens yesterday and today so far in San Francisco time"
+              series={[
+                {
+                  name: 'Dish opens',
+                  color: 'var(--c1)',
+                  values: dayTotals.map((bucket) => bucket.opens.value),
+                },
+              ]}
+            />
+          </ChartCard>
+        )}
+        {!dayTotals && (live || !empty) && (
+          <ChartCard
+            title={live?.summaryBatch ? 'Dish opens by batch' : 'Dish opens by day'}
+            tag={
+              <Lab
+                k={
+                  !live ||
+                  (daily &&
+                    [...daily.current, ...daily.baseline].some(
+                      (bucket) => bucket.opens.value !== null,
+                    ))
+                    ? 'obs'
+                    : 'unk'
+                }
+              />
+            }
+            {...(live && {
+              sub: live.summaryBatch
+                ? 'Completed five-minute UTC batches. Unavailable measurements are gaps.'
+                : 'UTC days clipped to each reporting period. Unavailable measurements are gaps, not zero.',
+            })}
+            head={
+              live?.summaryBatch
+                ? ['UTC batch', 'Dish opens']
+                : live
+                  ? ['UTC bucket', 'Current period', 'Previous period']
+                  : ['Day', 'This week', 'Last week']
+            }
+            rows={
+              batches
+                ? batches.map((bucket) => [overviewWindow(bucket), dailyValue(bucket)])
+                : live
+                  ? (daily?.current.map((bucket, i) => [
+                      dailyLabels![i],
+                      dailyValue(bucket),
+                      daily.baseline[i] ? dailyValue(daily.baseline[i]!) : 'Unavailable',
+                    ]) ?? [])
+                  : DAYS.map((d, i) => [d, DAILY_NOW[i], DAILY_PREV[i]])
+            }
+          >
+            {live && !daily ? (
+              <div className="empty">Daily openings unavailable.</div>
+            ) : (
+              <LineChart
+                labels={batchLabels ?? (live ? (dailyLabels ?? []) : DAYS)}
+                unit=""
+                desc={
+                  batches
+                    ? 'Dish opens for the previous and latest completed UTC batches'
+                    : live
+                      ? 'Dish opens by clipped UTC day, current period compared with previous period'
+                      : 'Dish opens by day, this week compared with last week'
+                }
+                series={
+                  batches
+                    ? [
+                        {
+                          name: 'Dish opens',
+                          color: 'var(--c1)',
+                          values: batches.map((bucket) => bucket.opens.value),
+                        },
+                      ]
+                    : live && daily
                       ? [
                           {
-                            name: 'Dish opens',
+                            name: 'Current period',
                             color: 'var(--c1)',
-                            values: batches.map((bucket) => bucket.opens.value),
+                            values: daily.current.map((bucket) => bucket.opens.value),
+                          },
+                          {
+                            name: 'Previous period',
+                            color: 'var(--cg)',
+                            values: daily.baseline.map((bucket) => bucket.opens.value),
+                            dash: '5 4',
+                            label: false,
                           },
                         ]
-                      : live && daily
-                        ? [
-                            {
-                              name: 'Current period',
-                              color: 'var(--c1)',
-                              values: daily.current.map((bucket) => bucket.opens.value),
-                            },
-                            {
-                              name: 'Previous period',
-                              color: 'var(--cg)',
-                              values: daily.baseline.map((bucket) => bucket.opens.value),
-                              dash: '5 4',
-                              label: false,
-                            },
-                          ]
-                        : [
-                            { name: 'This week', color: 'var(--c1)', values: DAILY_NOW },
-                            {
-                              name: 'Last week',
-                              color: 'var(--cg)',
-                              values: DAILY_PREV,
-                              dash: '5 4',
-                              label: false,
-                            },
-                          ]
-                  }
-                />
-              )}
-            </ChartCard>
-          )}
-          <section className="card ov-dishes">
-            <div className="card-h">
-              <div>
-                <h3>Your dishes</h3>
-              </div>
-              <Btn kind="outlined" size="md" type="button" onClick={() => go('perf')}>
-                Dish performance
-              </Btn>
+                      : [
+                          { name: 'This week', color: 'var(--c1)', values: DAILY_NOW },
+                          {
+                            name: 'Last week',
+                            color: 'var(--cg)',
+                            values: DAILY_PREV,
+                            dash: '5 4',
+                            label: false,
+                          },
+                        ]
+                }
+              />
+            )}
+          </ChartCard>
+        )}
+        <section className="card ov-dishes">
+          <div className="card-h">
+            <div>
+              <h3>Your dishes</h3>
             </div>
-            <div className="dlist">
-              {live && live.menu.length === 0 && (
-                <div className="empty">No saved dishes available.</div>
-              )}
-              {live
-                ? live.menu.map((d) => (
-                    <button
-                      type="button"
-                      key={d.id}
-                      className="drow"
-                      onClick={() => openDish(d.id)}
-                      aria-label={d.name}
-                    >
-                      <span className="thumb">
-                        {d.imageUrl ? <img src={d.imageUrl} alt="" /> : <Icon n="menu" />}
-                      </span>
-                      <span className="dn">
-                        {d.name}
-                        <small>
-                          {d.category} · {d.priceLabel}
-                        </small>
-                      </span>
-                      <span className="hidem muted">Open saved dishes</span>
-                    </button>
-                  ))
-                : (empty ? DISH : sorted).map((d) => (
-                    <button
-                      type="button"
-                      key={d.id}
-                      className="drow"
-                      onClick={() => openDish(d.id)}
-                      aria-label={d.name + (empty ? '' : `, ${d.open} opens`)}
-                    >
-                      <Thumb id={d.id} />
-                      <span className="dn">
-                        {d.name}
-                        <small>
-                          {d.cat} · {money(d.price)}
-                        </small>
-                      </span>
-                      <span className="hidem">
-                        {empty ? (
-                          <span className="muted">No data yet</span>
-                        ) : (
-                          <Spark values={d.weekly} />
-                        )}
-                      </span>
-                      <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
-                        {empty ? '' : `${d.open} opens`}
-                      </span>
-                    </button>
-                  ))}
-            </div>
-          </section>
-        </div>
-        <div className="stack">
-          <section className="card ov-ins">
-            <div className="card-h">
-              <div>
-                <h3>Insights</h3>
-              </div>
-              {!empty && <ReportVersionBadge scn={sim.scn} />}
-            </div>
-            {empty ? (
-              <div className="empty">
-                {live
-                  ? 'No validated insights are available here. Open the report to check its availability.'
-                  : 'The first report appears after diners use the menu.'}
-              </div>
-            ) : sim.scn === 'B' ? (
-              <p>
-                There is not enough data this week for a full report. Counts only, no suggestion.
-              </p>
-            ) : (
-              <div className="stack" style={{ gap: 12 }}>
-                {INSIGHTS.map((i) => (
-                  <div key={i.id} className="prev">
-                    <div className="row" style={{ gap: 6 }}>
-                      {i.rank === 'Top suggestion' && sim.scn === 'A' && (
-                        <span className="lab rsn">Top suggestion</span>
+            <Btn kind="outlined" size="md" type="button" onClick={() => go('perf')}>
+              Dish performance
+            </Btn>
+          </div>
+          <div className="dlist">
+            {live && live.menu.length === 0 && (
+              <div className="empty">No saved dishes available.</div>
+            )}
+            {live
+              ? live.menu.map((d) => (
+                  <button
+                    type="button"
+                    key={d.id}
+                    className="drow"
+                    onClick={() => openDish(d.id)}
+                    aria-label={d.name}
+                  >
+                    <span className="thumb">
+                      {d.imageUrl ? <img src={d.imageUrl} alt="" /> : <Icon n="menu" />}
+                    </span>
+                    <span className="dn">
+                      {d.name}
+                      <small>
+                        {d.category} · {d.priceLabel}
+                      </small>
+                    </span>
+                    <span className="hidem muted">Open saved dishes</span>
+                  </button>
+                ))
+              : (empty ? DISH : sorted).map((d) => (
+                  <button
+                    type="button"
+                    key={d.id}
+                    className="drow"
+                    onClick={() => openDish(d.id)}
+                    aria-label={d.name + (empty ? '' : `, ${d.open} opens`)}
+                  >
+                    <Thumb id={d.id} />
+                    <span className="dn">
+                      {d.name}
+                      <small>
+                        {d.cat} · {money(d.price)}
+                      </small>
+                    </span>
+                    <span className="hidem">
+                      {empty ? (
+                        <span className="muted">No data yet</span>
+                      ) : (
+                        <Spark values={d.weekly} />
                       )}
-                      {acts[i.id] && acts[i.id]?.status !== 'suggested' && (
-                        <span className="lab st">{acts[i.id]?.status}</span>
-                      )}
-                    </div>
-                    <b style={{ fontWeight: 700 }}>{i.title}</b>
-                    <div className="row" style={{ gap: 8 }}>
-                      <Btn
-                        kind="outlined"
-                        size="md"
-                        type="button"
-                        onClick={() => openInsight(i.id)}
-                      >
-                        Read insight
-                      </Btn>
-                    </div>
-                  </div>
+                    </span>
+                    <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {empty ? '' : `${d.open} opens`}
+                    </span>
+                  </button>
                 ))}
-                {sim.scn === 'C' && (
-                  <Note kind="warn" icon="warn">
-                    Suggestion held back. The evidence check did not pass, so only the evidence is
-                    shown.
-                  </Note>
-                )}
-              </div>
-            )}
-            {(!empty || live) && (
-              <div className="row" style={{ marginTop: 16 }}>
-                <Btn kind="primary" size="lg" type="button" onClick={() => go('report')}>
-                  Open the AI Insight Report
-                </Btn>
-              </div>
-            )}
-          </section>
-          <section className="card ov-act">
-            <div className="card-h">
-              <div>
-                <h3>Your actions</h3>
-              </div>
-            </div>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span>{live ? 'See saved actions' : `${planned} planned`}</span>
-              <Btn kind="outlined" size="md" type="button" onClick={() => go('actions')}>
-                View actions
-              </Btn>
-            </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -1605,18 +1591,22 @@ export function LivePerf({
 }) {
   const [q, setQ] = useState('');
   const [tab, setTab] = useState('open_rate');
+  const day =
+    report.source === 'production' &&
+    isOwnerProductionCalendarVersion(report.report_metadata.calculation_version);
   const batch =
     report.source === 'production' &&
     report.report_metadata.calculation_version === 'production.batch.v1';
   type Dish = OwnerDishReport['dishes'][number];
   type Metric = keyof Dish['metrics'] | keyof NonNullable<Dish['display_actions']>;
-  const metrics: [Metric, string, 'count' | 'seconds' | 'rate'][] = batch
-    ? [
-        ...columns,
-        ['portion_previews_shown', '2.5D previews', 'count'],
-        ['comparisons_started', 'Comparisons started', 'count'],
-      ]
-    : columns;
+  const metrics: [Metric, string, 'count' | 'seconds' | 'rate'][] =
+    batch || day
+      ? [
+          ...columns,
+          ['portion_previews_shown', '2.5D previews', 'count'],
+          ['comparisons_started', 'Comparisons started', 'count'],
+        ]
+      : columns;
   const search = q.trim().toLowerCase();
   const dishes = report.dishes.filter((d) => d.name.toLowerCase().includes(search));
   const menuMatches = savedMenu.filter((dish) => dish.name.toLowerCase().includes(search));

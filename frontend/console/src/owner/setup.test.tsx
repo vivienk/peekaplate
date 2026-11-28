@@ -101,7 +101,7 @@ describe('owner onboarding setup rules', () => {
     };
     const steps = setupSteps(setup);
     expect(setupProgress(setup)).toMatchObject({ done: 3, next: null });
-    expect(steps[2]?.status).toEqual({ text: 'Published', tone: 'success' });
+    expect(steps[2]?.status).toBeNull();
     expect(steps.map((s) => s.action?.label ?? null)).toEqual(['Edit', 'Edit', null]);
     expect(isFirstTimeArrival(setup)).toBe(false);
     expect(canPublish(setup)).toBe(false);

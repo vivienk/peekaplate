@@ -2,6 +2,7 @@ import {
   type OwnerReportSummary,
   OwnerReportSummarySchema,
   ProductionBatchSummarySchema,
+  ProductionDaySummarySchema,
 } from '@peekaplate/contracts/owner-report';
 import type { Client } from 'pg';
 import {
@@ -13,11 +14,13 @@ import {
   TODAY_REPORT_EVIDENCE,
 } from './owner-report-evidence';
 
+const baselineStartExpression = '$2::timestamptz - ($3::timestamptz-$2::timestamptz)';
+const baselineInterval = `UNION ALL SELECT 'baseline', ${baselineStartExpression}, $2::timestamptz`;
 // The same authorized read-only snapshot and canonical traffic class as the dish report.
 const query = `/* owner_summary.v1 */
 WITH periods AS (
   SELECT 'current' AS period, $2::timestamptz AS starts, $3::timestamptz AS ends
-  UNION ALL SELECT 'baseline', $2::timestamptz - ($3::timestamptz-$2::timestamptz), $2::timestamptz
+  ${baselineInterval}
 ), scoped AS MATERIALIZED (
   SELECT p.period, obs.* FROM periods p
   JOIN app_private.owner_observation_v1 obs ON obs.tenant_id=$1
@@ -102,7 +105,11 @@ function dailyRows(row: Row | undefined): DailyRow[] | undefined {
     };
   });
 }
-function metrics(row: Row | undefined, productionBatch: boolean): OwnerReportSummary['current'] {
+function metrics(
+  row: Row | undefined,
+  productionBatch: boolean,
+  includeUtcBuckets: boolean,
+): OwnerReportSummary['current'] {
   const missing = { value: null, status: 'MISSING' } as const;
   if (!row)
     return {
@@ -124,13 +131,14 @@ function metrics(row: Row | undefined, productionBatch: boolean): OwnerReportSum
   if (typeof row.has_small_dish !== 'boolean' || typeof row.has_small_timed_dish !== 'boolean')
     throw new Error('Invalid summary cohort evidence');
   const protectedSubset =
-    row.has_small_dish ||
-    row.has_small_timed_dish ||
-    dailyRows(row)?.some((bucket) => bucket.sessions > 0 && bucket.sessions < 10);
+    includeUtcBuckets &&
+    (row.has_small_dish ||
+      row.has_small_timed_dish ||
+      dailyRows(row)?.some((bucket) => bucket.sessions > 0 && bucket.sessions < 10));
   const value = (number: number | null, cohort: number) => {
     if (protectedSubset) return { value: null, status: 'SUPPRESSED' } as const;
     if (cohort === 0) return { value: null, status: 'NOT_MEASURABLE' } as const;
-    if (cohort < 10) return { value: null, status: 'SUPPRESSED' } as const;
+    if (includeUtcBuckets && cohort < 10) return { value: null, status: 'SUPPRESSED' } as const;
     if (number === null || !Number.isFinite(number))
       throw new Error('Missing measured summary value');
     return { value: number, status: number === 0 ? 'VALID_ZERO' : 'NORMAL' } as const;
@@ -159,20 +167,40 @@ export async function readOwnerReportSummary(
   liveEvidence?: OwnerReportLiveEvidence,
   durationMs = 86_400_000,
   productionBatch = false,
+  dayBaselineStart?: Date,
+  settledBaseline?: OwnerReportSummary['baseline'],
 ): Promise<OwnerReportSummary> {
   const start = new Date(now.getTime() - durationMs);
   const result = await client.query(
-    liveEvidence
-      ? productionQuery
-      : trafficClass === 'test'
-        ? query.replace('app_private.owner_observation_v1', 'app_private.owner_test_observation_v1')
-        : query,
-    [venueId, start, now, ...(liveEvidence ? liveEvidenceParameters(liveEvidence) : [])],
+    settledBaseline
+      ? productionQuery.replace(baselineInterval, '')
+      : dayBaselineStart
+        ? productionQuery.replace(baselineStartExpression, '$7::timestamptz')
+        : liveEvidence
+          ? productionQuery
+          : trafficClass === 'test'
+            ? query.replace(
+                'app_private.owner_observation_v1',
+                'app_private.owner_test_observation_v1',
+              )
+            : query,
+    [
+      venueId,
+      start,
+      now,
+      ...(liveEvidence ? liveEvidenceParameters(liveEvidence) : []),
+      ...(dayBaselineStart && !settledBaseline ? [dayBaselineStart] : []),
+    ],
   );
   const currentRow = result.rows.find((row) => row.period === 'current');
   const baselineRow = result.rows.find((row) => row.period === 'baseline');
-  const current = metrics(currentRow, productionBatch);
-  const baseline = metrics(baselineRow, productionBatch);
+  // The Pacific-day report displays whole-day cohorts without UTC buckets.
+  const includeUtcBuckets = !dayBaselineStart;
+  const current = metrics(currentRow, productionBatch, includeUtcBuckets);
+  if (dayBaselineStart) {
+    current.avg_interaction_time_seconds = { value: null, status: 'MISSING' };
+  }
+  const baseline = settledBaseline ?? metrics(baselineRow, productionBatch, includeUtcBuckets);
   const daily = (row: Row | undefined, totals: OwnerReportSummary['current']) =>
     dailyRows(row)?.map((bucket) => ({
       start_time: bucket.start_time,
@@ -184,14 +212,18 @@ export async function readOwnerReportSummary(
             ? { value: null, status: 'NOT_MEASURABLE' as const }
             : { value: bucket.opens, status: 'NORMAL' as const },
     }));
-  const currentDaily = daily(currentRow, current);
-  const baselineDaily = daily(baselineRow, baseline);
-  const schema = productionBatch ? ProductionBatchSummarySchema : OwnerReportSummarySchema;
+  const currentDaily = includeUtcBuckets ? daily(currentRow, current) : undefined;
+  const baselineDaily = includeUtcBuckets ? daily(baselineRow, baseline) : undefined;
+  const schema = dayBaselineStart
+    ? ProductionDaySummarySchema
+    : productionBatch
+      ? ProductionBatchSummarySchema
+      : OwnerReportSummarySchema;
   return schema.parse({
     periods: {
       current: { start_time: start.toISOString(), end_time: now.toISOString() },
       baseline: {
-        start_time: new Date(start.getTime() - durationMs).toISOString(),
+        start_time: (dayBaselineStart ?? new Date(start.getTime() - durationMs)).toISOString(),
         end_time: start.toISOString(),
       },
     },

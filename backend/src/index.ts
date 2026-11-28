@@ -119,6 +119,7 @@ import {
   OwnerInsightActionError,
   updateOwnerInsightAction,
 } from './owner-insight-actions';
+import { assertManualDraftReady } from './owner-menu';
 import { registerOwnerMenuRoutes } from './owner-menu-routes';
 import {
   PREPARED_ASSET_PATH,
@@ -132,6 +133,7 @@ import {
 } from './owner-prepare';
 import { fetchPreparedMenu, listPreparedMenus, type OwnHost } from './owner-publication';
 import { type OwnerReportSource, readOwnerReport as queryOwnerReport } from './owner-report';
+import { ownerReportDishDayStart, ownerReportDishLiveStart } from './owner-report-batches';
 import {
   buildOwnerReportExportFilename,
   type ExportableOwnerReport,
@@ -195,6 +197,9 @@ export type Bindings = {
   APP_ENV?: string;
   OWNER_WORKFLOW_ENABLED?: string;
   OWNER_PRODUCTION_REPORTS_ENABLED?: string;
+  OWNER_PRODUCTION_REPORT_WINDOW?: string;
+  OWNER_PRODUCTION_REPORT_DISH_DAY_START?: string;
+  OWNER_PRODUCTION_REPORT_DISH_LIVE_START?: string;
   OWNER_REPORT_DISPLAY_ACTIONS_ENABLED?: string;
   PRODUCTION_OBSERVATION_PROVENANCE_ENABLED?: string;
   DINER_PUBLIC_ORIGIN?: string;
@@ -723,7 +728,8 @@ const dependencies: Dependencies = {
     const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await client.connect();
-      return await approveMenuRevision(client, actorId, venueId, input);
+      const storage = env.INGESTION_REPORTS_BUCKET?.get ? preparedStorage(env) : undefined;
+      return await approveMenuRevision(client, actorId, venueId, input, storage);
     } finally {
       await client.end();
     }
@@ -735,7 +741,8 @@ const dependencies: Dependencies = {
     const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await client.connect();
-      return await publishMenu(client, actorId, venueId, input);
+      const storage = env.INGESTION_REPORTS_BUCKET?.get ? preparedStorage(env) : undefined;
+      return await publishMenu(client, actorId, venueId, input, storage);
     } finally {
       await client.end();
     }
@@ -805,6 +812,14 @@ const dependencies: Dependencies = {
       if (source === 'production' && productionOwnerReportingEnabled(env)) {
         return await queryOwnerReport(client, actorId, venueId, now, source, {
           includeSummary: true,
+          productionDay: env.OWNER_PRODUCTION_REPORT_WINDOW === 'sf-day',
+          productionToday: env.OWNER_PRODUCTION_REPORT_WINDOW === 'sf-today',
+          productionDishLiveStart: ownerReportDishLiveStart(
+            env.OWNER_PRODUCTION_REPORT_DISH_LIVE_START,
+          ),
+          productionDishDayStart: ownerReportDishDayStart(
+            env.OWNER_PRODUCTION_REPORT_DISH_DAY_START,
+          ),
           includeDisplayActions: env.OWNER_REPORT_DISPLAY_ACTIONS_ENABLED === 'true',
           productionPublications: {
             storage: preparedStorage(env),
@@ -1103,10 +1118,8 @@ export async function approveDishDraftAtomic(
     ) {
       throw new IngestionError('draft_confirmation_required', 409);
     }
-    if (
-      !draft.name ||
-      (manual && (!manual.category || manual.priceAmount === null || manual.priceCurrency === null))
-    ) {
+    if (manual) assertManualDraftReady(manual);
+    if (!draft.name || corrected.allergens?.status === 'proposed') {
       throw new IngestionError('draft_incomplete', 409);
     }
     const approvedPhotoId = manual?.photoId ?? corrected.photo_id ?? null;

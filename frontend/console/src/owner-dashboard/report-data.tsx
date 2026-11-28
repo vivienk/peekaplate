@@ -2,7 +2,13 @@
 // shown exactly as the API returns them; nothing is recalculated here. S3-RES-03 connects it to the
 // report API (#107). Without the API settings (static previews) it shows a saved copy of a report
 // from Uneeza's synthetic P0 v2 data, labelled as such.
-import { type OwnerDishReport, OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
+import {
+  isOwnerProductionCalendarVersion,
+  OWNER_PRODUCTION_TODAY_VERSION,
+  OWNER_REPORT_TIME_ZONE,
+  type OwnerDishReport,
+  OwnerDishReportSchema,
+} from '@peekaplate/contracts/owner-report';
 import { type ReactNode, useEffect, useState } from 'react';
 import { type LiveMenuRow, LivePerf } from './pages';
 import { fetchOwnerReport, type ReportState } from './report-api';
@@ -54,13 +60,13 @@ function freshnessLabel(isStale: boolean | null) {
   return isStale ? 'out of date' : 'up to date';
 }
 
-const fmt = (iso: string) =>
+export const formatOwnerReportTime = (iso: string, timeZone = 'UTC') =>
   new Date(iso).toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    timeZone: 'UTC',
+    timeZone,
     timeZoneName: 'short',
   });
 
@@ -111,8 +117,9 @@ export function useOwnerReport(source: ReportSource): {
     request: { apiBase, venueId, getAccessToken },
     state: { kind: 'loading' } as ReportState,
     refreshing: false,
+    daily: false,
   }));
-  const { request, state, refreshing } = load;
+  const { request, state, refreshing, daily } = load;
   if (
     request.apiBase !== apiBase ||
     request.venueId !== venueId ||
@@ -123,6 +130,7 @@ export function useOwnerReport(source: ReportSource): {
       request: { apiBase, venueId, getAccessToken },
       state: { kind: 'loading' },
       refreshing: false,
+      daily: false,
     });
   }
   useEffect(() => {
@@ -140,12 +148,43 @@ export function useOwnerReport(source: ReportSource): {
         next = { kind: 'error' };
       }
       if (signal.aborted) return;
+      // Remember the validated report mode during a transient failure, while clearing its data.
       setLoad((current) =>
-        current.request === request ? { request, state: next, refreshing: false } : current,
+        current.request === request
+          ? {
+              request,
+              state: next,
+              refreshing: false,
+              daily:
+                next.kind === 'ready'
+                  ? isOwnerProductionCalendarVersion(
+                      next.report.report_metadata.calculation_version,
+                    )
+                  : current.daily && (next.kind === 'error' || next.kind === 'unavailable'),
+            }
+          : current,
       );
     })();
     return () => controller.abort();
   }, [request]);
+  useEffect(() => {
+    if (!daily || !apiBase || !venueId || !getAccessToken) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      setLoad((current) => {
+        if (
+          current.refreshing ||
+          current.request.venueId !== venueId ||
+          current.request.apiBase !== apiBase ||
+          current.request.getAccessToken !== getAccessToken ||
+          !current.daily
+        )
+          return current;
+        return { ...current, request: { ...current.request }, refreshing: true };
+      });
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [daily, apiBase, venueId, getAccessToken]);
   return {
     state: source.mode === 'saved' ? { kind: 'ready', report: SAVED_REPORT } : state,
     refreshing,
@@ -275,19 +314,28 @@ function ReportTable({
   refreshControl?: ReactNode;
 }) {
   const m = r.report_metadata;
+  const reportDay = isOwnerProductionCalendarVersion(m.calculation_version);
+  const zone = reportDay ? OWNER_REPORT_TIME_ZONE : 'UTC';
   if (presentation === 'performance')
     return (
       <LivePerf
         report={r}
         savedMenu={savedMenu}
         headerAction={refreshControl}
-        period={`${fmt(m.date_window.start_time)} – ${fmt(m.date_window.end_time)} (end exclusive)`}
+        period={`${formatOwnerReportTime(m.date_window.start_time, zone)} – ${formatOwnerReportTime(m.date_window.end_time, zone)} (end exclusive)`}
         summary={`${m.coverage.measurable_dishes_count} measurable · report ${m.report_status.toLowerCase()} · ${freshnessLabel(m.freshness.is_stale)}`}
         notice={
           saved ? (
             <Note kind="warn">Saved copy of a report: synthetic test data. Not real diners.</Note>
           ) : r.source === 'synthetic' ? (
             <Note kind="warn">Synthetic test data from the report API. Not real diners.</Note>
+          ) : m.calculation_version === OWNER_PRODUCTION_TODAY_VERSION ? (
+            <Note>Today’s verified dish activity updates through the cutoff shown above.</Note>
+          ) : reportDay ? (
+            <Note>
+              Dish Performance shows the previous completed San Francisco day. Today’s restaurant
+              totals are on Overview.
+            </Note>
           ) : m.calculation_version === 'production.batch.v1' ? (
             <Note>
               Each completed five-minute batch needs at least ten eligible visits per dish. Overview
@@ -309,7 +357,8 @@ function ReportTable({
     <div className="stack">
       <div className="pagehead">
         <span className="eyebrow">
-          Report data · {fmt(m.date_window.start_time)} – {fmt(m.date_window.end_time)}
+          Report data · {formatOwnerReportTime(m.date_window.start_time, zone)} –{' '}
+          {formatOwnerReportTime(m.date_window.end_time, zone)}
         </span>
         <h1>Dish report from the report API</h1>
         {refreshControl}

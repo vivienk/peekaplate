@@ -1,3 +1,8 @@
+import { execFileSync } from 'node:child_process';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DatabaseClient } from '../ingestion/repository';
@@ -19,6 +24,9 @@ const runtime = new Client({ connectionString: runtimeUrl });
 const venue = crypto.randomUUID();
 const otherVenue = crypto.randomUUID();
 const reviewer = crypto.randomUUID();
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const cliScript = join(repoRoot, 'backend/scripts/produce-menu-bundle.ts');
+const tsHooks = pathToFileURL(join(repoRoot, 'scripts/node-ts-hooks.mjs')).href;
 
 async function seedDish(tenant: string, name = 'Charred Leeks', description = 'Grilled leeks.') {
   const dishId = crypto.randomUUID();
@@ -389,4 +397,64 @@ describe('S4-RES privileged handoff admission', () => {
     expect(error).toMatchObject({ code: '42501' });
     expect(await handoffRows(attempt.menuId)).toEqual({ subjects: 0, bundles: 0 });
   });
+  it('admits a CLI export on retry when its existing handoff predates diagnostics', async () => {
+    const { dishId } = await seedDish(venue);
+    const jobId = await seedJob(venue);
+    await seedDraft(venue, jobId, {
+      reviewStatus: 'accepted',
+      publishedDishId: dishId,
+    });
+    const request = bundleRequest([{ dishId, assetId: null }]);
+    const directory = await mkdtemp(join(tmpdir(), 'peekaplate-cli-retry-'));
+    const requestPath = join(directory, 'request.json');
+    const outputDirectory = join(directory, 'output');
+    const t0Root = join(directory, 't0');
+    await mkdir(outputDirectory);
+    await mkdir(t0Root);
+    await writeFile(requestPath, JSON.stringify(request, null, 2));
+    const runCli = (admit: boolean) => {
+      const args = [
+        '--import',
+        tsHooks,
+        cliScript,
+        '--request',
+        requestPath,
+        '--t0-root',
+        t0Root,
+        '--database-url',
+        adminUrl!,
+        '--out',
+        outputDirectory,
+        ...(admit ? ['--admit'] : []),
+      ];
+      return execFileSync(process.execPath, args, {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        timeout: 20_000,
+        env: process.env,
+      });
+    };
+    try {
+      runCli(false);
+      const files = await readdir(outputDirectory);
+      const handoffFile = files.find((file) => file.endsWith('.handoff.json'));
+      expect(handoffFile).toBeDefined();
+      const handoffPath = join(outputDirectory, handoffFile!);
+      const existing = JSON.parse(await readFile(handoffPath, 'utf8')) as Record<string, unknown>;
+      delete existing.diagnostics;
+      await writeFile(handoffPath, `${JSON.stringify(existing, null, 2)}\n`);
+      const stdout = runCli(true);
+      expect(stdout).toContain('"admission": "inserted"');
+      expect(await handoffRows(request.menu_id)).toEqual({
+        subjects: 1,
+        bundles: 1,
+      });
+      const afterRetry = JSON.parse(await readFile(handoffPath, 'utf8')) as Record<string, unknown>;
+      expect(afterRetry).not.toHaveProperty('diagnostics');
+      expect(afterRetry.contentHash).toBe(existing.contentHash);
+      expect(afterRetry.menuRevisionId).toBe(existing.menuRevisionId);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 30_000);
 });

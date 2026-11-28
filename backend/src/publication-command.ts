@@ -9,6 +9,7 @@ import {
   type WithdrawMenu,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
+import { ownerMenuId, type PreparedStorage, verifyPublishedSnapshot } from './owner-prepare';
 import { assignRestaurantLink } from './restaurant-link';
 
 export type ApproveMenuRevisionInput = ApproveMenuRevision & { menuId: string };
@@ -37,6 +38,7 @@ export class PublicationCommandError extends Error {
       | 'command_conflict'
       | 'review_subject_not_found'
       | 'approval_not_found'
+      | 'menu_not_verified'
       | 'not_published',
     readonly status: 403 | 409,
   ) {
@@ -169,11 +171,73 @@ async function recordCommandAndOutbox(
   );
 }
 
+async function assertCurrentOwnerSnapshot(
+  client: Client,
+  venueId: string,
+  menuId: string,
+  menuRevisionId: string,
+  contentHash: string,
+  storage?: PreparedStorage,
+): Promise<void> {
+  if (menuId !== (await ownerMenuId(venueId))) return;
+  if (!storage) throw new PublicationCommandError('menu_not_verified', 409);
+  const bundle = await client.query<{ bundle_url: string }>(
+    `SELECT bundle_url FROM app_private.public_menu_bundle
+      WHERE tenant_id = $1 AND menu_id = $2 AND menu_revision_id = $3`,
+    [venueId, menuId, menuRevisionId],
+  );
+  const url = bundle.rows[0]?.bundle_url;
+  if (!url || !URL.canParse(url)) throw new PublicationCommandError('menu_not_verified', 409);
+  const snapshot = await verifyPublishedSnapshot(storage, {
+    venueId,
+    menuId,
+    menuRevisionId,
+    bundle: { url, contentHash },
+  });
+  if (!snapshot) throw new PublicationCommandError('menu_not_verified', 409);
+
+  // Identity-only placeholders are part of the snapshot but never appear on the diner menu.
+  const prepared = new Set(
+    snapshot.content.categories.flatMap(({ dishes }) =>
+      dishes.map((dish) => `${dish.dish_id}:${dish.dish_revision_id}`),
+    ),
+  );
+  const current = await client.query<{ dish_id: string; revision_id: string; ready: boolean }>(
+    `SELECT p.dish_id, p.revision_id,
+            (d.verification_status = 'verified' AND d.review_status = 'accepted'
+              AND p.revision_id IS NOT NULL
+              AND c.review_status IS DISTINCT FROM 'incomplete'
+              AND COALESCE(cardinality(c.incomplete_fields), 0) = 0) AS ready
+       FROM app_private.dish_drafts d
+       LEFT JOIN app_private.dish_current p
+         ON p.tenant_id = d.tenant_id AND p.dish_id = d.published_dish_id
+       LEFT JOIN app_private.menu_ingestion_jobs j
+         ON j.tenant_id = d.tenant_id AND j.id = d.job_id
+       LEFT JOIN app_private.candidate_review_current c
+         ON c.tenant_id = d.tenant_id
+        AND c.extraction_id = j.active_review_extraction_id
+        AND c.candidate_id = COALESCE(d.candidate_id, d.draft_id)
+      WHERE d.tenant_id = $1
+        AND d.removed_at IS NULL
+        AND d.review_status NOT IN ('rejected', 'superseded')
+        AND (c.review_status IS NULL OR c.review_status <> 'rejected')
+      FOR SHARE OF d`,
+    [venueId],
+  );
+  if (
+    current.rows.length !== prepared.size ||
+    current.rows.some((row) => !row.ready || !prepared.delete(`${row.dish_id}:${row.revision_id}`))
+  ) {
+    throw new PublicationCommandError('menu_not_verified', 409);
+  }
+}
+
 export async function approveMenuRevision(
   client: Client,
   actorId: string,
   venueId: string,
   input: ApproveMenuRevisionInput,
+  storage?: PreparedStorage,
 ): Promise<MenuApproval> {
   let started = false;
   try {
@@ -231,6 +295,14 @@ export async function approveMenuRevision(
     if (!approvedSubject) {
       throw new PublicationCommandError('review_subject_not_found', 409);
     }
+    await assertCurrentOwnerSnapshot(
+      client,
+      venueId,
+      input.menuId,
+      input.menuRevisionId,
+      approvedSubject.content_hash,
+      storage,
+    );
 
     const version = currentVersion + 1;
     const approvalId = randomUUID();
@@ -310,6 +382,7 @@ export async function publishMenu(
   actorId: string,
   venueId: string,
   input: PublishMenuInput,
+  storage?: PreparedStorage,
 ): Promise<MenuPublication> {
   let started = false;
   try {
@@ -365,6 +438,14 @@ export async function publishMenu(
     );
     const approved = approval.rows[0];
     if (!approved) throw new PublicationCommandError('approval_not_found', 409);
+    await assertCurrentOwnerSnapshot(
+      client,
+      venueId,
+      input.menuId,
+      approved.menu_revision_id,
+      approved.content_hash,
+      storage,
+    );
 
     const version = currentVersion + 1;
     const availabilityVersion = (current.rows[0]?.availability_version ?? 0) + 1;

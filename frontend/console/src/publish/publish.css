@@ -104,8 +104,7 @@
 .pp-menu-preview__badge {
   padding-inline-start: var(--pp-space-8);
 }
-.pp-menu-preview__label.is-live,
-.pp-menu-preview__badge.is-live {
+.pp-menu-preview__label.is-live {
   background: var(--pp-color-success-50);
   color: var(--pp-color-success-900);
 }

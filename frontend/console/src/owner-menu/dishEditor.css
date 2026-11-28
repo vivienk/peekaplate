@@ -73,22 +73,6 @@
   color: inherit;
 }
 
-.pp-dish-editor__evidence {
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: var(--pp-role-surface-variant, #f4f4f5);
-}
-
-.pp-dish-editor__evidence pre {
-  margin: 4px 0 12px;
-  white-space: pre-wrap;
-  font: inherit;
-}
-
-.pp-dish-editor__evidence figure {
-  margin: 0;
-}
-
 .pp-dish-editor .pp-dish-editor__group {
   border: 0;
   padding: 0;

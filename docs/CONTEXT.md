@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. Optional summary and clipped UTC daily opening buckets preserve per-cell privacy statuses; absent measurements are not zero. Food and portion evidence remain revision-bound. Serving size parses integer people counts; separate optional photo-bound plate calibration provides physical dimensions. Legacy text alone never creates measurement evidence.",
+      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. The production San Francisco day report permits positive single-session metrics under ADR 0019. Legacy scopes retain their original privacy rules. Missing denominators remain unavailable and internal cohort counts stay private. Food and portion evidence remain revision-bound. Serving size parses integer people counts; separate optional photo-bound calibration provides physical dimensions.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -82,10 +82,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md",
-        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md",
+        "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "64e593bf2c6a4472c2b5faa39e2aeab6c2a6d6cf98a9ef9a7d9f2d78338cc4e4"
+      "sourceFingerprint": "628092849f0f187ee8b4e88d6b1a401b5265e6798ab55b6b104be5a7f52f74d1"
     },
     {
       "id": "tokens",
@@ -123,7 +124,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Published menu entry verifies bundle integrity and scope. Verified portion blobs retain supported MIME and enforce byte, hash and dimension checks. Portion and camera views label serving count separately from plate size. Tracked table AR uses the measured footprint with matching optional counts; 2.5D and ordinary camera scale remain approximate. Standalone verified menus on the exact production diner origin start PostHog and canonical tracking automatically when browser privacy signals allow it. The Screen 13 phone iframe sends neither. Staging retains opt-in, which hides during portion preview/camera and returns on exit. A withdrawn publication denies new prepared-content reads. The comparison picker supports the anchor and two other dishes. Each rendered pair preserves the same comparison ID; a ready portion viewer records its own opening separately from timed detail activity.",
+      "summary": "Published menu entry verifies bundle integrity and scope. Portion blobs retain supported MIME and enforce byte, hash and dimension checks. Portion and camera label serving count separately from plate size. Tracked table AR uses the measured footprint with matching optional counts. 2.5D and ordinary camera scale remain approximate. Standalone verified menus on the exact production diner origin start PostHog and canonical tracking when browser privacy signals allow it. The Screen 13 phone iframe sends neither. Staging keeps opt-in and hides it during portion preview and camera. Withdrawn publications deny new prepared-content reads. Compare supports the anchor plus two dishes and shares one comparison ID across pairs. Ready portion viewer opens track separately from timed detail activity. Detail photo loading leaves dish facts and controls available. Synthetic views carry a fixture notice.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -141,6 +142,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/menuScreen.ts",
         "frontend/diner/src/menu/menuScreen.test.ts",
         "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/assets/icons/ui/dish.svg",
+        "frontend/diner/src/assets/icons/ui/sad-01.svg",
         "frontend/diner/src/menu/published.ts",
         "frontend/diner/src/menu/published.test.ts",
         "frontend/diner/src/menu/config.ts",
@@ -281,12 +284,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7c2678bd401baeaa4a46dcbef74a2c8f37bf33d43268482bd9ad1397531043c3"
+      "sourceFingerprint": "09fbfc8553d85e23bba18945eb06dcaec2c22a89116175c2ce9bffe1a9f6255a"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart read validated summaries and UTC daily buckets with unavailable gaps. Owners can refresh in place. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
+      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart show validated summaries and gaps. Visible San Francisco day reports retry transient refresh failures for the same source. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -310,6 +313,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/FirstDashboard.test.tsx",
         "tests/e2e/owner-first-dashboard.spec.ts",
         "tests/e2e/owner-onboarding.spec.ts",
+        "frontend/console/src/onboarding/MenuProcessing.test.tsx",
         "frontend/console/src/owner/PublishSuccessDialog.tsx",
         "frontend/console/src/owner-dashboard/report-api.ts",
         "frontend/console/src/owner-dashboard/pages.tsx",
@@ -467,18 +471,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
-        "docs/adr/0005-tenancy-and-privacy.md"
+        "docs/adr/0005-tenancy-and-privacy.md",
+        "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "740140a58afa303711664e905845ce1770665ff6cbbc8dd6bdb8263376d97e38"
+      "sourceFingerprint": "5aa7cfb82e3e14e494b0e118f15682a40fa2d467a0840da3345eb7edad4671cd"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Owner AI uses checked report references and currently gates to approved synthetic reports; its diagnostic path and private portion processing remain separate. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. Hosted production binding and provider compatibility still require verification. The production extraction host supports a separate portion-only deployment with no provider credentials or Internet egress. Its container requires the source origin to match its environment. The existing menu OCR transport is separate.",
+      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Production San Francisco day dish aggregates use the first eligible event for the completed day. Production batch reports enforce a fail-closed batch freshness evaluator, keeping is_stale unknown until queue-drain watermark infra is deployed. Owner AI uses checked report references and gates provider use on verified freshness. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. The separate production portion-only deployment requires matching source origin; menu OCR transport is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -506,9 +511,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish.integration.ts",
         "backend/src/owner-report.test.ts",
         "backend/src/owner-report.ts",
+        "backend/src/owner-report-freshness.ts",
+        "backend/src/owner-report-freshness.test.ts",
+        "backend/src/owner-report.data17.test.ts",
         "backend/src/owner-report-evidence.ts",
         "backend/src/owner-report-display-actions.ts",
         "backend/src/owner-report-batches.ts",
+        "backend/src/owner-report-batches.test.ts",
         "backend/src/owner-report-publications.ts",
         "backend/src/owner-report-posthog.ts",
         "backend/src/owner-report-posthog.test.ts",
@@ -536,6 +545,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/public-menu.ts",
         "backend/src/publication-command.test.ts",
         "backend/src/publication-command.ts",
+        "backend/src/s7-res-09-owner-review-gate.integration.ts",
+        "docs/s7-res-09-owner-review-gate.md",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -582,6 +593,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/repository.ts",
         "backend/src/bundle-producer/request.ts",
         "backend/src/bundle-producer/bundle-producer.integration.ts",
+        "backend/src/bundle-producer/handoff-file.ts",
+        "backend/src/bundle-producer/handoff-file.test.ts",
         "backend/scripts/produce-menu-bundle.ts",
         "docs/s4-res-bundle-producer.md",
         "docs/owner-report-staging.md",
@@ -741,13 +754,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0005-tenancy-and-privacy.md",
         "docs/adr/0014-team-analytics-access.md",
-        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md",
+        "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a97613088c4db2a48ec6f4c05af31ef8ae90113b97e99991addbad599fb255d6"
+      "sourceFingerprint": "de849f7957f34b6da2b14f45a8be8ce2ba5742f82d0bf82864e00747fd6144cf"
     },
     {
       "id": "database",
@@ -910,7 +924,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "220fd2243d5e8e0beb0e00d40c1cfdba30df0192b7adfc1d3ee804ed86e3e1c3"
+      "sourceFingerprint": "7dfc2e2b95f32348a9633821068710a60219c027e17348fd9ee575552ef2c8b4"
     },
     {
       "id": "agents",
@@ -977,7 +991,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Vision-first source-linked needs_review drafts preserve private attempts and bounded retries. Ingredient sidecars/artwork retain provenance; FE-06.4 verification is read-only and upstream usage remains separately gated. QA-02 strict offline scoring binds frozen reference/export bytes and occurrence mappings; exposed sources stay development, new holdouts provisional. Private single-tenant portion/cutout/model helpers validate hashes and bound uploads. Screen 9 processing uses request-scoped temporary files. Ambiguous provider submissions cannot auto-resubmit. Generated assets stay review-only and publication-ineligible. No human reference truth, fresh AI accuracy, physical-device scale or hosted acceptance follows from offline checks.",
+      "summary": "Vision-first needs_review drafts preserve source links and private attempts. V4 retries one transient 429 on the active page in the same loop, with a fresh budget reservation. It grounds ingredient proposals in printed descriptions, excludes priced add-ons, requires matching printed text for scalar prices, and leaves currency for owner review. Google AI Studio and OpenRouter receive strict V4Batch without format downgrade. Vision never upgrades AI-02 allergen/diet confidence. Ingredient sidecars/artwork retain provenance; FE-06.4 is read-only and upstream usage separately gated. QA-02 strict scoring binds frozen reference/export bytes and occurrence mappings. Private portion/cutout/model helpers validate hashes with request-scoped temp files; ambiguous submissions cannot auto-resubmit and generated assets stay publication-ineligible. Offline checks do not establish human reference truth, real-menu accuracy, physical scale or hosted acceptance.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -989,6 +1003,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/extract_menus.py",
         "processing/src/peekaplate_processing/images.py",
         "processing/src/peekaplate_processing/model_cache.py",
+        "processing/src/peekaplate_processing/model_providers.py",
         "processing/src/peekaplate_processing/ocr_regions.py",
         "processing/src/peekaplate_processing/ocr_space.py",
         "processing/src/peekaplate_processing/pdf.py",
@@ -1099,7 +1114,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_portion_ingestion.py",
         "processing/src/peekaplate_processing/prepare_assets.py",
         "processing/src/peekaplate_processing/provider_budget.py",
-        "processing/tests/test_provider_budget.py"
+        "processing/tests/test_provider_budget.py",
+        "processing/src/peekaplate_processing/vision_extraction.py",
+        "processing/src/peekaplate_processing/_vision_projection.py",
+        "processing/tests/test_vision_ingredients.py",
+        "processing/tests/test_vision_ingredient_handoff.py",
+        "processing/tests/test_vision_structured_output.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -1108,7 +1128,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "c443ae118979c83a2c40d1e331513e4412a597162ad512768a9f2dcb1b5a0fbd"
+      "sourceFingerprint": "a8bc68e759ee2e7e43be6891cbecbce0799fd903bd3e940259f3e3064c10ef21"
     },
     {
       "id": "assets",
@@ -1143,107 +1163,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "console",
-        "contracts"
-      ],
-      "summary": "Reconcile main release fixes into develop without dropping comparison/order/local-AI work. Reuse the existing dish-assistance route for saved ingredient proposals and existing portion state to hide repeated consent copy.",
-      "next": "Run pinned CI and hosted signed-out S1/ingredient/portion checks. Protected staging credential deployment and authoritative report completeness remain separate AI activation gates."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend",
-        "console",
-        "diner",
-        "contracts"
-      ],
-      "summary": "Sync the same reviewed main ingredient/consent commits into develop, preserving existing order/comparison/local AI work. Active extraction authority and real SQL fixture regressions are included.",
-      "next": "Wait for PR227 CI, merge main normally, then update develop without force or bypass. Deploy exact main only; credential approval and report completeness remain external AI gates."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "console"
-      ],
-      "summary": "Fix S13 handoff: retain preparation menu identity and load that exact snapshot in the existing PR208 MenuPreview. No screen/CSS replacement, auto-publication, or backend change.",
-      "next": "Verify direct preview and safe retry on staging; provider credentials and report completeness remain separate AI gates."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "backend"
-      ],
-      "summary": "Repair owner AI diagnostic loss with a bounded shared Responses transport, server-only status/code classifications and provisioning-compatible project validation. Report and draft read failures log an internal category before provider use. Public errors, evidence gates, model, request/token limits and no-retry behavior remain. All 131 focused caller and transport tests pass offline.",
-      "files": [
-        "backend/src/owner-ai/provider.ts",
-        "backend/src/owner-ai/responses.ts",
-        "backend/src/owner-ai/dish-assistance.ts",
-        "backend/src/owner-ai/routes.ts",
-        "docs/owner-ai-responses.md"
-      ],
-      "next": "Finish pinned repository checks and independent review, then obtain required human PR approval. Approved staging deployment and a captured synthetic request remain necessary to diagnose the hosted failure; no historical provider result is inferred."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "contracts",
-        "console",
-        "backend",
-        "diner"
-      ],
-      "summary": "Connect S09 Serving Size in cm to confirmed saved-photo boundaries, approved dish facts and published physical_size. People served remains optional. Exact photo/foreground checks and immutable snapshot asset reads preserve the existing approval and publication boundaries; size edits do not call the processor.",
-      "files": [
-        "docs/screen9-portion-publish.md",
-        "packages/contracts/src/portion.ts",
-        "frontend/console/src/owner-menu/PortionCalibrationEditor.tsx",
-        "backend/src/owner-prepare.ts",
-        "frontend/diner/src/menu/portionSize.ts"
-      ],
-      "next": "Complete pinned checks and independent review, then human review and exact staging release. Verify round/rectangular inputs through save, review, publish and supported-device table AR; ordinary camera and 2.5D remain approximate."
-    },
-    {
-      "date": "2026-11-17",
-      "modules": [
-        "contracts",
-        "console",
-        "backend",
-        "diner"
-      ],
-      "summary": "Correct the earlier interpretation: Serving size means people served. One count field replaces the duplicate People served input, while optional plate measurements independently authorize measured AR. Preserve canonical null/absent semantics, legacy notes, saved-photo evidence and immutable publication. Clearing old calibration preserves unknown people counts. Count changes require renewed confirmation and never multiply dimensions.",
-      "files": [
-        "docs/screen9-portion-publish.md",
-        "packages/contracts/src/portion.ts",
-        "frontend/console/src/owner-menu/DishEditor.tsx",
-        "frontend/console/src/owner-menu/PortionCalibrationEditor.tsx",
-        "backend/src/owner-menu.ts",
-        "frontend/diner/src/menu/portionSize.ts"
-      ],
-      "next": "Complete focused and repository checks, independently review the pinned correction, and update PR237. Human review and exact staging release remain required; physical-device scale acceptance is separate."
-    },
-    {
-      "date": "2026-11-21",
-      "modules": [
-        "console",
-        "diner",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "summary": "Production reports seal five-minute UTC batches from attested canonical facts and exact same-day PostHog matches. Dish performance uses real exposure, timing, save and engagement measures. New batches can show qualifying 2.5D renders and comparison starts from verified publication revisions. Venue visits and opens can start at one; dish metrics and display-action counts retain their floors. Verified orders lack linked evidence.",
-      "files": [
-        "docs/production-release.md",
-        "docs/adr/0017-production-owner-report-sources.md",
-        "docs/adr/0018-production-batch-counts.md",
-        "backend/src/owner-production-report.integration.ts",
-        "backend/src/owner-actions-cors.test.ts",
-        "backend/src/owner-workflow-environment.ts",
-        "backend/wrangler.production.jsonc"
-      ],
-      "next": "Keep Meta staging frozen. Provision production-only provider credentials securely and verify the two published venue flows plus freshness and disclosure before enabling reporting or paid AI."
-    },
     {
       "date": "2026-11-21",
       "modules": [
@@ -1289,6 +1208,113 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/production-release.md"
       ],
       "next": "Release the approved production API and console with their dashboard AI flags enabled, then verify one signed-in report question."
+    },
+    {
+      "date": "2026-11-23",
+      "modules": [
+        "backend",
+        "console",
+        "contracts"
+      ],
+      "summary": "Production Overview accumulates from San Francisco midnight and recovers after transient refresh failures. Dish Performance and CSV expose supported aggregates from the first eligible session in the previous complete local day under ADR 0019. The signed AI period stays aligned and unknown freshness still prevents provider use. The cutover withholds overlapping legacy dish reports.",
+      "files": [
+        "docs/adr/0019-production-single-session-reporting.md",
+        "backend/src/owner-production-report.integration.ts",
+        "packages/contracts/src/owner-report.ts"
+      ],
+      "next": "Review single-session disclosure and verify private snapshot retention and the approved Pacific midnight before activating the compatible production console and Worker."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "contracts",
+        "backend",
+        "processing"
+      ],
+      "summary": "Restore the prepared-page dimensions symbol and document the bundle producer's exact-byte output rule and six-field handoff retry comparison.",
+      "files": [
+        "docs/review-candidates.md",
+        "docs/s4-res-bundle-producer.md",
+        "qa-reports/S4-RES-test-plan.md"
+      ],
+      "next": "Use the linked CLI admission regression to verify retries against pre-diagnostics handoffs."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "processing"
+      ],
+      "summary": "Vision V4 resumes at the active page on one transient HTTP 429 per provider run. Prior drafts and private attempts survive. Daily quotas and budget denials retain their stop behavior. Explicitly priced additions are excluded from base ingredients while printed descriptions stay intact. Offline cases cover continuation, quota and budget stops, and the review export.",
+      "files": [
+        "processing/src/peekaplate_processing/vision_extraction.py",
+        "processing/src/peekaplate_processing/_vision_projection.py",
+        "processing/src/peekaplate_processing/run_pipeline.py",
+        "processing/tests/test_input_modes.py",
+        "processing/tests/test_vision_ingredients.py"
+      ],
+      "next": "Complete review of the processing patch. S6-VIS-04 live URL/PDF/staging checks and QA-02 holdout scoring remain separate."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "console"
+      ],
+      "summary": "The signed-in menu URL form reserves space for both icons even when the shared auth stylesheet is loaded after the onboarding stylesheet.",
+      "files": [
+        "frontend/console/src/onboarding/onboarding.css",
+        "tests/e2e/owner-workspace.spec.ts"
+      ],
+      "next": "Verify a long pasted URL on the published owner build without submitting an import."
+    },
+    {
+      "date": "2026-11-25",
+      "modules": [
+        "contracts",
+        "backend",
+        "console"
+      ],
+      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff alongside Overview. A separate snapshot prefix and explicit live cutover protect the partial first day; CSV and AI reuse the same report window.",
+      "files": [
+        "backend/src/owner-report.ts",
+        "packages/contracts/src/owner-report.ts",
+        "frontend/console/src/owner-dashboard/report-data.tsx",
+        "docs/adr/0020-production-today-dish-performance.md"
+      ],
+      "next": "Deploy the compatible owner console first and verify an eligible single dish event in the actual production window."
+    },
+    {
+      "date": "2026-11-24",
+      "modules": [
+        "backend",
+        "console"
+      ],
+      "summary": "S7-RES-09 keeps automatic checks separate from owner decisions. Manual verification and approval share required-field and proposed-fact checks. Owner-prepared menu commands verify the stored bundle and match its dish revisions to current active verified drafts.",
+      "files": [
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-prepare.ts",
+        "backend/src/publication-command.ts",
+        "backend/src/s7-res-09-owner-review-gate.integration.ts",
+        "frontend/console/src/onboarding/MenuProcessing.tsx",
+        "frontend/console/src/owner/review/reviewDishes.ts",
+        "docs/s7-res-09-owner-review-gate.md"
+      ],
+      "next": "Review exact-snapshot and concurrent draft behavior before authorized staging verification."
+    },
+    {
+      "date": "2026-11-27",
+      "modules": [
+        "diner"
+      ],
+      "summary": "Keep dish facts and Back usable while the photo loads. Retain fixture labels and three-dish Compare with pair evidence under one comparison ID. Search and Saved share the plate illustration, and Clear search remains clickable at mobile width.",
+      "files": [
+        "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/style.css",
+        "tests/e2e/menu-triggers-live.spec.ts",
+        "tests/e2e/compare-result.spec.ts",
+        "tests/e2e/search.spec.ts"
+      ],
+      "next": "Review and verify the pinned PR in hosted CI."
     }
   ]
 }
