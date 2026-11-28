@@ -133,6 +133,7 @@ test('production deep links resume after sign-in and keep orientation through br
   let workspaceReads = 0;
   let emptyReport = false;
   let analysisRequests = 0;
+  const soupQuestion = 'What was the engagement rate for the lentil soup?';
   await page.route('https://api.peekaplate.app/**', async (route) => {
     const { pathname, searchParams } = new URL(route.request().url());
     const headers = {
@@ -163,10 +164,9 @@ test('production deep links resume after sign-in and keep orientation through br
       json = { schemaVersion: 1, actions: [] };
     } else if (pathname.endsWith('/ai/questions')) {
       analysisRequests++;
-      expect(route.request().headers()['x-owner-report-ref']).toBe('fixture-report-reference');
-      expect(route.request().postDataJSON()).toEqual({
-        question: 'What was the engagement rate for the lentil soup?',
-      });
+      expect(pathname).toBe(`/api/v1/venues/${venue.venueId}/ai/questions`);
+      expect(route.request().headers()['x-owner-report-ref']).toBe(`fixture-report-${reportReads}`);
+      expect(route.request().postDataJSON()).toEqual({ question: soupQuestion });
       const period = UNEEZA_REPORT.report_metadata.date_window;
       json = {
         schemaVersion: 'owner-report-question.v1',
@@ -204,7 +204,7 @@ test('production deep links resume after sign-in and keep orientation through br
       };
       return route.fulfill({
         status: 200,
-        headers: { ...headers, 'X-Owner-Report-Ref': 'fixture-report-reference' },
+        headers: { ...headers, 'X-Owner-Report-Ref': `fixture-report-${reportReads}` },
         json,
       });
     } else return route.fulfill({ status: 404, headers, json: { error: 'unexpected_path' } });
@@ -220,11 +220,16 @@ test('production deep links resume after sign-in and keep orientation through br
   await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
   const question = page.getByRole('textbox', { name: 'Ask a report question' });
   const sendQuestion = page.getByRole('button', { name: 'Send question' });
-  await question.fill('What was the engagement rate for the lentil soup?');
-  await sendQuestion.click();
-  await expect(
-    page.getByText('There is not enough verified evidence in this report to answer that question.'),
-  ).toBeVisible();
+  const askAboutSoup = async () => {
+    await question.fill(soupQuestion);
+    await sendQuestion.click();
+    await expect(
+      page.getByText(
+        'There is not enough verified evidence in this report to answer that question.',
+      ),
+    ).toBeVisible();
+  };
+  await askAboutSoup();
   expect(analysisRequests).toBe(1);
   await page.getByRole('button', { name: '2.5D previews', exact: true }).click();
   await page.getByRole('button', { name: 'View as table', exact: true }).click();
@@ -241,6 +246,7 @@ test('production deep links resume after sign-in and keep orientation through br
     await nav.getByRole('button', { name: label, exact: true }).click();
     await expect(page).toHaveURL(`${productionOrigin}${path}`);
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    await expect(question).toBeEnabled();
   };
   const mainPane = page.locator('.owner-main');
   await mainPane.evaluate((element) => {
@@ -255,8 +261,12 @@ test('production deep links resume after sign-in and keep orientation through br
   await visit('Dish performance', '/dish-performance', 'What diners did with each dish');
   await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
   expect(reportReads).toBe(1);
+  await visit('Restaurant Setup', '/restaurant-setup', 'Welcome to PeekaPlate');
   await visit('Actions', '/actions', 'What you decided to do');
   await visit('Menu', '/menu', 'Your dishes');
+  await askAboutSoup();
+  expect(analysisRequests).toBe(2);
+  expect(reportReads).toBe(1);
   expect(setupReads).toBe(1);
   expect(workspaceReads).toBe(1);
 
@@ -275,6 +285,17 @@ test('production deep links resume after sign-in and keep orientation through br
   await expect(page.getByRole('heading', { name: 'What you decided to do' })).toBeVisible();
   await page.goForward();
   await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
+  for (const [path, heading] of [
+    ['/menu', 'Your dishes'],
+    ['/actions', 'What you decided to do'],
+  ]) {
+    const before = reportReads;
+    await page.goto(`${productionOrigin}${path}`);
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    await expect(question).toBeEnabled();
+    await askAboutSoup();
+    expect(reportReads).toBe(before + 1);
+  }
   await page.goto(`${productionOrigin}/dish-performance`);
   await expect(page.getByRole('table')).toBeVisible();
   await page.reload();
@@ -288,30 +309,31 @@ test('production deep links resume after sign-in and keep orientation through br
     'aria-disabled',
     'true',
   );
-  expect(reportReads).toBe(3);
+  await expect(question).toHaveCount(0);
+  await page.goto(`${productionOrigin}/menu`);
+  await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
+  await expect(question).toHaveCount(0);
+  expect(reportReads).toBe(5);
 
   await page.getByLabel('Owner account').click();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
   await expect(page).toHaveTitle('PeekaPlate · Owner sign in');
   published = true;
+  emptyReport = true;
   await enterEmail(page);
   await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
   await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
-  expect(reportReads).toBe(3);
-  emptyReport = true;
+  await expect(question).toBeEnabled();
+  expect(reportReads).toBe(6);
   await visit('Overview', '/overview', 'How your menu did this period');
-  await question.fill('What was the engagement rate for the lentil soup?');
-  await sendQuestion.click();
-  await expect(
-    page.getByText('There is not enough verified evidence in this report to answer that question.'),
-  ).toBeVisible();
-  expect(analysisRequests).toBe(2);
+  await askAboutSoup();
+  expect(analysisRequests).toBe(5);
 });
 
-test('the production day report retries transient failures on the next visible minute', async ({
+test('the production day report retries transient failures but stops after access denial', async ({
   page,
 }) => {
   await page.clock.install();
@@ -341,7 +363,7 @@ test('the production day report retries transient failures on the next visible m
     if (pathname === '/staff/venues') {
       return route.fulfill({
         headers,
-        json: { actorId: user.id, venues: reportReads >= 7 ? [] : [venue] },
+        json: { actorId: user.id, venues: [venue] },
       });
     }
     if (pathname.endsWith('/setup')) {
@@ -432,9 +454,16 @@ test('the production day report retries transient failures on the next visible m
   await expect(table.getByText('Report response 6')).toBeVisible();
   await page.clock.runFor(60_000);
   await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
   await expect(table).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
   await page.clock.runFor(120_000);
   expect(reportReads).toBe(7);
+
+  await page.getByLabel('Owner account').click();
+  await page.getByRole('button', { name: 'Refresh access', exact: true }).click();
+  await expect(panel).toBeVisible();
+  expect(reportReads).toBe(8);
 });
 
 test('signed-in mock rehearsal uses Overview counts and the active report reference', async ({

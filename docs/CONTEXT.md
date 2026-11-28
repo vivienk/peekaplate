@@ -477,7 +477,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "001aa4c12ab0b3cc6d39130c8b93edb97e9c29e951e1d8b4277fe7b60debefa5"
+      "sourceFingerprint": "924c2a7d8398af5ccb8256c1d898c5421004dc58a1be7101acb5c9d7957e6ba2"
     },
     {
       "id": "backend",
@@ -925,7 +925,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "8b10ed422f4e22cd106e99694c4a1b1188178ac0653c28c2fd8b30f0d12d3a85"
+      "sourceFingerprint": "217745ca2b97f0269d2ee0a1f4b050bbe8cb082e12d68b1af88bbef2c4b667de"
     },
     {
       "id": "agents",
@@ -1229,7 +1229,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/OwnerWorkspace.tsx",
         "docs/production-release.md"
       ],
-      "next": "Release the approved production API and console with their dashboard AI flags enabled, then verify one signed-in report question."
+      "next": "Release the approved production API and console with their dashboard AI flags enabled. After publication, verify the question box uses the same signed report on dashboard and direct workspace routes, and abstains on unknown freshness."
     },
     {
       "date": "2026-11-23",

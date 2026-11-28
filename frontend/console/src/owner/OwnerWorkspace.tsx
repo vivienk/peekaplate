@@ -37,6 +37,7 @@ import {
 import { mergeCategories } from '../owner-dashboard/category-field';
 import { Btn } from '../owner-dashboard/controls';
 import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
+import type { ReportState } from '../owner-dashboard/report-api';
 import {
   formatOwnerReportTime,
   formatOwnerReportValue,
@@ -92,7 +93,7 @@ export function OwnerWorkspace({
   owner: SignedInOwner;
   apiBase: string | null;
   production?: boolean;
-  /** Shows the #164 AI panel beside the live report. Off unless the build turns it on. */
+  /** Enables questions about the live report. Off unless the build turns it on. */
   aiEnabled?: boolean;
   dishAssistanceEnabled?: boolean;
   onSessionExpired: () => void;
@@ -109,7 +110,7 @@ export function OwnerWorkspace({
     status: RestaurantProfile['status'];
     navigation: number;
   } | null>(null);
-  const [reportAttempt, setReportAttempt] = useState(0);
+  const [deniedReportScope, setDeniedReportScope] = useState<string | null>(null);
   const [detailsRequested, setDetailsRequested] = useState(false);
   const [dirty, setDirty] = useState(false);
   const canLeave = useCallback(
@@ -137,13 +138,6 @@ export function OwnerWorkspace({
     [owner.id],
   );
   const pickerId = useId();
-  // The report on screen, tagged with the restaurant it belongs to, so the AI panel never offers
-  // one restaurant's dishes under another.
-  const [shown, setShown] = useState<{
-    scope: string;
-    report: OwnerDishReport;
-    reference?: string | undefined;
-  } | null>(null);
   const getAccessToken = useCallback(() => auth.accessTokenFor(owner.id), [auth, owner.id]);
 
   useEffect(() => {
@@ -236,11 +230,37 @@ export function OwnerWorkspace({
     return () => window.removeEventListener('beforeunload', onUnload);
   }, [dirty, production, selected, state.kind]);
   const scope = selected ? `${owner.id}:${selected.venueId}` : '';
-  const showReport = useCallback(
-    (report: OwnerDishReport | null, reference?: string) =>
-      setShown(report ? { scope, report, reference } : null),
-    [scope],
+  const reportScope = JSON.stringify([scope, apiBase]);
+  const reportPage =
+    activePage === 'overview' || activePage === 'report' || activePage === 'performance';
+  const showAi =
+    aiEnabled &&
+    selected?.permission === 'owner' &&
+    (reportPage || workspaceSetup.published === true);
+  // Report pages and the composer use the same validated response and signed reference.
+  // After a report denial, rechecking membership must not restart the background read in a loop.
+  const {
+    state: reportState,
+    retry,
+    reload,
+    refreshing,
+  } = useOwnerReport(
+    apiBase &&
+      selected?.permission === 'owner' &&
+      (reportPage || (showAi && deniedReportScope !== reportScope))
+      ? { mode: 'live', apiBase, venueId: selected.venueId, getAccessToken }
+      : null,
   );
+  useEffect(() => {
+    if (reportState.kind === 'denied') {
+      setDeniedReportScope(reportScope);
+      accessFailure('denied');
+    } else if (reportState.kind === 'signed_out') {
+      accessFailure('signed_out');
+    } else if (reportState.kind === 'ready') {
+      setDeniedReportScope((current) => (current === reportScope ? null : current));
+    }
+  }, [reportState.kind, reportScope, accessFailure]);
   const signOut = (
     <Button
       variant="text"
@@ -368,32 +388,25 @@ export function OwnerWorkspace({
       </main>
     );
 
-  const reportShown =
-    ['overview', 'report', 'performance'].includes(activePage) && shown?.scope === scope
-      ? shown.report
-      : null;
   const reportAvailability = (
     <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />
   );
   let aside = reportAvailability;
-  if (aiEnabled && selected.permission === 'owner') {
+  if (showAi) {
     aside = (
       <OwnerReportAiAside
-        key={JSON.stringify([scope, apiBase])}
+        key={reportScope}
         apiBase={apiBase}
         venueId={selected.venueId}
         restaurantName={selected.name}
         getAccessToken={getAccessToken}
-        report={reportShown}
+        report={reportState.kind === 'ready' ? reportState.report : null}
         page={activePage}
         fallback={reportAvailability}
         showOverviewPeriod={activePage !== 'performance'}
-        reportReference={shown?.scope === scope ? shown.reference : undefined}
+        reportReference={reportState.kind === 'ready' ? reportState.reference : undefined}
         onOpenDishPerformance={() => openPage('performance')}
-        onReloadReport={() => {
-          setShown(null);
-          setReportAttempt((value) => value + 1);
-        }}
+        onReloadReport={reload}
         onAccessFailure={accessFailure}
       />
     );
@@ -416,7 +429,9 @@ export function OwnerWorkspace({
       <Button
         variant="text"
         onClick={() => {
-          if (canLeave()) refresh();
+          if (!canLeave()) return;
+          setDeniedReportScope(null);
+          refresh();
         }}
       >
         Refresh access
@@ -518,18 +533,16 @@ export function OwnerWorkspace({
             onAccessFailure={accessFailure}
           />,
         )}
-      {(activePage === 'overview' || activePage === 'report' || activePage === 'performance') &&
+      {reportPage &&
         renderShell(
           <LiveDashboardReport
-            key={`${scope}:${reportAttempt}`}
+            key={scope}
             page={activePage}
-            apiBase={apiBase}
-            venueId={selected.venueId}
             restaurantName={workspaceSetup.restaurantName}
             menu={menu?.dishes ?? []}
-            getAccessToken={getAccessToken}
-            onAccessFailure={accessFailure}
-            onReport={showReport}
+            state={reportState}
+            retry={retry}
+            refreshing={refreshing}
             go={navigate}
           />,
         )}
@@ -707,40 +720,22 @@ function CreateTestRestaurant({
 const noop = () => {};
 function LiveDashboardReport({
   page,
-  apiBase,
-  venueId,
   restaurantName,
   menu,
-  getAccessToken,
-  onAccessFailure,
-  onReport,
+  state,
+  retry,
+  refreshing,
   go,
 }: {
   page: 'overview' | 'report' | 'performance';
-  apiBase: string;
-  venueId: string;
   restaurantName: string;
   menu: LiveMenuRow[];
-  getAccessToken: () => Promise<string | null>;
-  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
-  onReport: (report: OwnerDishReport | null, reference?: string) => void;
+  state: ReportState;
+  retry: () => void;
+  refreshing: boolean;
   go: (page: Page) => void;
 }) {
-  const { state, retry, refreshing } = useOwnerReport({
-    mode: 'live',
-    apiBase,
-    venueId,
-    getAccessToken,
-  });
   const report = state.kind === 'ready' ? state.report : null;
-  const reference = state.kind === 'ready' ? state.reference : undefined;
-  useEffect(() => {
-    onReport(report, reference);
-  }, [report, reference, onReport]);
-  useEffect(() => () => onReport(null), [onReport]);
-  useEffect(() => {
-    if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure(state.kind);
-  }, [state.kind, onAccessFailure]);
   const reportRefresh =
     state.kind === 'ready' ||
     state.kind === 'unavailable' ||

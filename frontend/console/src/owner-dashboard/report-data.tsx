@@ -107,12 +107,13 @@ export function reportSourceFromEnv(
 // Loads the report for one restaurant. Changing restaurant clears the old report at once, and an
 // answer for a previous restaurant or attempt is dropped, so one restaurant's numbers never show
 // under another.
-export function useOwnerReport(source: ReportSource): {
+export function useOwnerReport(source: ReportSource | null): {
   state: ReportState;
   refreshing: boolean;
   retry: () => void;
+  reload: () => void;
 } {
-  const live = source.mode === 'live' ? source : null;
+  const live = source?.mode === 'live' ? source : null;
   const apiBase = live?.apiBase;
   const venueId = live?.venueId;
   const getAccessToken = live?.getAccessToken;
@@ -188,15 +189,27 @@ export function useOwnerReport(source: ReportSource): {
     }, 60_000);
     return () => window.clearInterval(timer);
   }, [daily, apiBase, venueId, getAccessToken]);
+  function refresh(discard: boolean) {
+    setLoad((current) => {
+      if (
+        current.request !== request ||
+        current.state.kind === 'loading' ||
+        (current.refreshing && !discard)
+      )
+        return current;
+      return {
+        ...current,
+        request: current.refreshing ? request : { ...request },
+        ...(discard && { state: { kind: 'loading' } }),
+        refreshing: true,
+      };
+    });
+  }
   return {
-    state: source.mode === 'saved' ? { kind: 'ready', report: SAVED_REPORT } : state,
+    state: source?.mode === 'saved' ? { kind: 'ready', report: SAVED_REPORT } : state,
     refreshing,
-    retry: () =>
-      setLoad((current) => {
-        if (current.request !== request || current.refreshing || current.state.kind === 'loading')
-          return current;
-        return { ...current, request: { ...request }, refreshing: true };
-      }),
+    retry: () => refresh(false),
+    reload: () => refresh(true),
   };
 }
 

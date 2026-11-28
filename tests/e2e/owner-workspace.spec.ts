@@ -98,6 +98,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
     profileSaveStarted: false,
     releaseProfileSave: () => {},
     setupStatus: 200,
+    published: () => false,
     delaySetup: false,
     releaseSetup: () => {},
     delayProfilePhoto: false,
@@ -345,7 +346,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
             menuVerified:
               active.length > 0 &&
               active.every((draft) => draft.verification_status === 'verified'),
-            published: false,
+            published: state.published(),
           },
           headers,
         });
@@ -1020,9 +1021,12 @@ for (const width of [1440, 390]) {
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 1052 });
-    await fixture(context);
+    const workspace = await fixture(context);
     const state = await preparedPublication(context);
+    workspace.published = () => state.publicationVersion > 0;
     await signIn(page);
+    const question = page.getByRole('textbox', { name: 'Ask a report question' });
+    await expect(question).toHaveCount(0);
     await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
     await expect(
       page.getByRole('heading', { name: 'Preview your menu', exact: true }),
@@ -1071,7 +1075,9 @@ for (const width of [1440, 390]) {
     // Figma S13: after publishing, the only action is Go to dashboard.
     await page.getByRole('button', { name: 'Go to dashboard' }).click();
     await expect(page.getByRole('heading', { name: 'Your menu is live' })).toHaveCount(0);
+    await expect(question).toBeEnabled();
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await expect(question).toBeEnabled();
     await page.getByRole('button', { name: 'Review and publish' }).click();
     await expect(page.getByRole('heading', { name: 'Your menu is live' })).toBeVisible();
     expect(state.publishes).toHaveLength(1);
