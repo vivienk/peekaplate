@@ -91,6 +91,7 @@ test('the search icon opens the bar and the results are the normal dish cards', 
 
 test('no results shows the Figma state, and Clear search restores the menu', async ({ page }) => {
   await openMenu(page);
+  await expect(page.getByText('Fixture data', { exact: true })).toBeVisible();
   const allCards = await visibleCards(page).count();
   await page.getByRole('button', { name: 'Search menu' }).click();
   const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });

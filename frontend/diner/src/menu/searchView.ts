@@ -3,6 +3,7 @@
 // "No Result Found" state and the staff allergy line from searchMenu(). Everything runs on the menu
 // already loaded: no request, no tracking call, and the query is never stored, logged or put in the
 // URL.
+import { UI_ICONS } from './icons';
 import { searchMenu } from './search';
 import type { Menu } from './types';
 
@@ -61,7 +62,7 @@ export function searchPanelMarkup(): string {
         <span class="pp-search-panel__icon" aria-hidden="true"></span>
         <label class="pp-sr-only" for="pp-search-input">Search dishes or ingredients</label>
         <input class="pp-search-input" id="pp-search-input" type="search" placeholder="Search here" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
-        <button class="pp-search-close" type="button" aria-label="Close search"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="pp-search-close" type="button" aria-label="Close search"><img class="pp-search-close__icon" src="${UI_ICONS.close}" alt="" aria-hidden="true" width="16" height="16" /></button>
       </form>
       <p class="pp-search-staff" hidden>${SEARCH_STAFF_LINE}</p>
       <p class="pp-sr-only" id="pp-search-status" role="status" aria-live="polite"></p>

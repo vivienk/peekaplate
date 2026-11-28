@@ -91,6 +91,31 @@ const captured = (page: Page, type: string) =>
     type,
   );
 
+test('a pending published dish photo leaves allergen info and Back available', async ({ page }) => {
+  await open(page);
+  const photoUrl = original.categories[0].dishes[0].images.detail.url;
+  let finishPhoto!: () => void;
+  const pendingPhoto = new Promise<void>((resolve) => {
+    finishPhoto = resolve;
+  });
+  await page.route(photoUrl, async (route) => {
+    await pendingPhoto;
+    await route.abort();
+  });
+  try {
+    const requestedPhoto = page.waitForRequest(photoUrl);
+    await page.getByRole('button', { name: 'Open Charred Leeks' }).click();
+    await requestedPhoto;
+    await expect(page.locator('.pp-detail__image-wrap')).toHaveAttribute('aria-busy', 'true');
+    await expect(page.getByText('Allergens & dietary info')).toBeVisible();
+    await expect(page.getByText('Fixture data', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back to menu' }).click();
+    await expect(page.getByRole('button', { name: 'Open Charred Leeks' })).toBeFocused();
+  } finally {
+    finishPhoto();
+  }
+});
+
 test('opting in on an open detail starts a new opening without preconsent time', async ({
   page,
 }) => {

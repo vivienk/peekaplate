@@ -145,6 +145,7 @@ test('three dishes render at 320px and track only newly completed pairs', async 
   await page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' }).click();
   expect(compared(events)).toHaveLength(0);
   await page.locator('.pp-picker__confirm').click();
+  await expect(page.getByText('Fixture data', { exact: true })).toBeVisible();
   await expect(sideNames(page)).toHaveText([
     'Avocado Toast',
     'Harvest Power Bowl',

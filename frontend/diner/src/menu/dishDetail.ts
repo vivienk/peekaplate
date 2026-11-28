@@ -1,3 +1,4 @@
+import sadIcon from '../assets/icons/ui/sad-01.svg';
 import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
 import { allergenIcon, dietaryIcon, ingredientIcon } from './icons';
 import { navButtonMarkup } from './navButton';
@@ -61,6 +62,37 @@ function ingredientTiles(dish: CompleteDish): string {
       `;
     })
     .join('');
+}
+
+export function renderDishOpenFailed(
+  container: HTMLElement,
+  dishName: string,
+  onBack: () => void,
+  onRetry: () => void,
+  backLabel = 'Back to menu',
+  notice: string | null = null,
+): void {
+  // Figma DishDetail_OpenFailed: back button and the dish name, no heart; a 150px sad picture, the
+  // message 32px below it, then a full-width Try again button 24px below the message.
+  container.innerHTML = `
+    <div class="pp-detail pp-detail--failed">
+      <header class="pp-detail__topbar">
+        ${navButtonMarkup('back', 'pp-detail__back', backLabel)}
+        <h1 class="pp-detail__title" tabindex="-1">${escapeHtml(dishName)}</h1>
+      </header>
+      ${notice ? `<p class="pp-notice">${escapeHtml(notice)}</p>` : ''}
+      <div class="pp-open-failed" role="alert">
+        <img class="pp-open-failed__image" src="${escapeHtml(sadIcon)}" alt="" aria-hidden="true" width="150" height="150" />
+        <p class="pp-open-failed__text">Something went wrong! Please try again</p>
+        <button class="pp-btn pp-btn--primary pp-open-failed__retry" type="button">Try again</button>
+      </div>
+    </div>
+  `;
+  container.querySelector<HTMLButtonElement>('.pp-detail__back')?.addEventListener('click', onBack);
+  container
+    .querySelector<HTMLButtonElement>('.pp-open-failed__retry')
+    ?.addEventListener('click', onRetry);
+  container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 }
 
 export function renderDishDetail(
@@ -168,13 +200,22 @@ export function renderDishDetail(
   }
   container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 
-  const detailImg = container.querySelector<HTMLImageElement>('img.pp-detail__image');
-  if (detailImg) {
+  const imageWrap = container.querySelector<HTMLElement>('.pp-detail__image-wrap');
+  const detailImg = imageWrap?.querySelector<HTMLImageElement>('img.pp-detail__image');
+  if (imageWrap && detailImg) {
+    // Dish data and controls are ready while the photo is still loading.
+    const startLoading = () => {
+      imageWrap.setAttribute('aria-busy', 'true');
+    };
+    const finishLoading = () => {
+      imageWrap.removeAttribute('aria-busy');
+    };
     let triedCard = false;
     const handleFailure = () => {
       const cardFallback = dish.images?.card;
       if (!triedCard && cardFallback && detailImg.getAttribute('src') !== cardFallback.url) {
         triedCard = true;
+        startLoading();
         detailImg.src = cardFallback.url;
         detailImg.alt = cardFallback.alt;
         return;
@@ -183,9 +224,13 @@ export function renderDishDetail(
       missing.className = 'pp-detail__image pp-detail__image--missing';
       missing.setAttribute('aria-hidden', 'true');
       detailImg.replaceWith(missing);
+      finishLoading();
     };
+    detailImg.addEventListener('load', finishLoading, { once: true });
     detailImg.addEventListener('error', handleFailure);
-    if (detailImg.complete && detailImg.naturalWidth === 0) {
+    if (!detailImg.complete) {
+      startLoading();
+    } else if (detailImg.naturalWidth === 0) {
       handleFailure();
     }
   }

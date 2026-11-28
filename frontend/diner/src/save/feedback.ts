@@ -82,6 +82,13 @@ export function createSaveFeedback(saveState: SaveState, render: (toast: Toast |
       latestMenu = menu;
     },
 
+    // The close button on the removed toast: it ends the toast and, with it, the chance to undo.
+    // No event is sent, as for an expiring toast.
+    dismiss() {
+      lastRemoval = null;
+      show(null);
+    },
+
     toggle(target: HeartTarget) {
       latestMenu = target.menu;
       const { dish } = target;

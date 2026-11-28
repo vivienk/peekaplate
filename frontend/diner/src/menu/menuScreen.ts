@@ -35,9 +35,9 @@ import {
   track,
 } from '../tracking';
 import type { MenuToken } from '../tracking/delivery';
-import { completeDishes } from './adapter';
+import { completeDishes, FIXTURE_NOTICE } from './adapter';
 import { menuMode } from './config';
-import { renderDishDetail } from './dishDetail';
+import { renderDishDetail, renderDishOpenFailed } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
@@ -66,7 +66,6 @@ const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
   'offline',
 ]);
 
-const FIXTURE_LABEL = 'Fixture data';
 const ALL_CATEGORY_ID = SEARCH_ALL_CATEGORY_ID;
 
 let menuObserver: IntersectionObserver | null = null;
@@ -121,7 +120,7 @@ function stateHeading(): string {
 }
 
 function fixtureNotice(): string {
-  return fixtureMode ? `<p class="pp-notice">${FIXTURE_LABEL}</p>` : '';
+  return fixtureMode ? `<p class="pp-notice">${FIXTURE_NOTICE}</p>` : '';
 }
 
 function completeDishById(menu: Menu, dishId: string): CompleteDish | undefined {
@@ -242,7 +241,7 @@ function renderMenu(
           <img class="pp-search__icon" src="${UI_ICONS.search}" alt="" aria-hidden="true" width="18" height="18" />
         </button>
       </header>
-      ${toastAreaMarkup()}
+      ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
       ${
         import.meta.env.VITE_OWNER_SIGN_IN_URL
           ? `<p class="pp-owner-link-wrap"><a class="pp-owner-link" href="${escapeHtml(import.meta.env.VITE_OWNER_SIGN_IN_URL)}" target="_blank" rel="noopener noreferrer">Restaurant owner? Sign in</a></p>`
@@ -261,6 +260,7 @@ function renderMenu(
           )
           .join('')}
       </nav>
+      ${toastAreaMarkup()}
 
       <section class="pp-dishes" aria-live="polite">
         ${blocks
@@ -277,8 +277,6 @@ function renderMenu(
       ${searchEmptyMarkup()}
 
       <p class="pp-end">End of menu</p>
-      ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
-      <p class="pp-notice">Compare is not available yet.</p>
     </div>
   `;
 
@@ -628,11 +626,36 @@ export function mountMenuScreen(container: HTMLElement): void {
   ) => {
     if (!currentMenu || !saveState) return;
     const menu = currentMenu;
-    const dish = completeDishById(menu, requestedDish.dishId);
+    // Review only: ?preview=open-failed shows the Open failed screen for any dish (never in production).
+    const forceOpenFailed =
+      import.meta.env.MODE !== 'production' &&
+      new URLSearchParams(window.location.search).get('preview') === 'open-failed';
+    const dish = forceOpenFailed ? undefined : completeDishById(menu, requestedDish.dishId);
     if (!dish) {
-      if (compareBack) leaveCompare();
-      else if (from === 'saved_screen') showSaved();
-      else showMenu('opener');
+      // A dish that is no longer on the menu still goes back silently (tested behaviour, DIN-02).
+      // Review only: ?preview=open-failed shows the Figma Open failed screen instead.
+      if (!forceOpenFailed) {
+        if (compareBack) leaveCompare();
+        else if (from === 'saved_screen') showSaved();
+        else showMenu('opener');
+        return;
+      }
+      // Figma DishDetail_OpenFailed. Back goes where the diner came from; Try again opens it again.
+      switchScreen('detail');
+      const leave = () => {
+        if (compareBack) leaveCompare();
+        else if (from === 'saved_screen') showSaved();
+        else showMenu('opener');
+      };
+      renderDishOpenFailed(
+        container,
+        requestedDish.name,
+        leave,
+        () => showDetail(requestedDish, from, returning, compareBack),
+        from === 'saved_screen' && !compareBack ? 'Back to Saved' : 'Back to menu',
+        menu.notice,
+      );
+      window.scrollTo(0, 0);
       return;
     }
     switchScreen('detail');

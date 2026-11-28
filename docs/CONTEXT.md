@@ -124,7 +124,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Published menu entry verifies bundle integrity and scope. Verified portion blobs retain supported MIME and enforce byte, hash and dimension checks. Portion and camera views label serving count separately from plate size. Tracked table AR uses the measured footprint with matching optional counts; 2.5D and ordinary camera scale remain approximate. Standalone verified menus on the exact production diner origin start PostHog and canonical tracking automatically when browser privacy signals allow it. The Screen 13 phone iframe sends neither. Staging retains opt-in, which hides during portion preview/camera and returns on exit. A withdrawn publication denies new prepared-content reads. The comparison picker supports the anchor and two other dishes. Each rendered pair preserves the same comparison ID; a ready portion viewer records its own opening separately from timed detail activity.",
+      "summary": "Published menu entry verifies bundle integrity and scope. Portion blobs retain supported MIME and enforce byte, hash and dimension checks. Portion and camera label serving count separately from plate size. Tracked table AR uses the measured footprint with matching optional counts. 2.5D and ordinary camera scale remain approximate. Standalone verified menus on the exact production diner origin start PostHog and canonical tracking when browser privacy signals allow it. The Screen 13 phone iframe sends neither. Staging keeps opt-in and hides it during portion preview and camera. Withdrawn publications deny new prepared-content reads. Compare supports the anchor plus two dishes and shares one comparison ID across pairs. Ready portion viewer opens track separately from timed detail activity. Detail photo loading leaves dish facts and controls available. Synthetic views carry a fixture notice.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -142,6 +142,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/menuScreen.ts",
         "frontend/diner/src/menu/menuScreen.test.ts",
         "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/assets/icons/ui/dish.svg",
+        "frontend/diner/src/assets/icons/ui/sad-01.svg",
         "frontend/diner/src/menu/published.ts",
         "frontend/diner/src/menu/published.test.ts",
         "frontend/diner/src/menu/config.ts",
@@ -282,7 +284,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "8f62524d2f037e2676a4baf7dc4a4c8e373ae9df871dd63093f260b05af7451d"
+      "sourceFingerprint": "09fbfc8553d85e23bba18945eb06dcaec2c22a89116175c2ce9bffe1a9f6255a"
     },
     {
       "id": "console",
@@ -1166,27 +1168,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "date": "2026-11-21",
       "modules": [
         "console",
-        "diner",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "summary": "Production reports seal five-minute UTC batches from attested canonical facts and exact same-day PostHog matches. Dish performance uses real exposure, timing, save and engagement measures. New batches can show qualifying 2.5D renders and comparison starts from verified publication revisions. Venue visits and opens can start at one; dish metrics and display-action counts retain their floors. Verified orders lack linked evidence.",
-      "files": [
-        "docs/production-release.md",
-        "docs/adr/0017-production-owner-report-sources.md",
-        "docs/adr/0018-production-batch-counts.md",
-        "backend/src/owner-production-report.integration.ts",
-        "backend/src/owner-actions-cors.test.ts",
-        "backend/src/owner-workflow-environment.ts",
-        "backend/wrangler.production.jsonc"
-      ],
-      "next": "Keep Meta staging frozen. Provision production-only provider credentials securely and verify the two published venue flows plus freshness and disclosure before enabling reporting or paid AI."
-    },
-    {
-      "date": "2026-11-21",
-      "modules": [
-        "console",
         "backend",
         "delivery"
       ],
@@ -1319,6 +1300,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/s7-res-09-owner-review-gate.md"
       ],
       "next": "Review exact-snapshot and concurrent draft behavior before authorized staging verification."
+    },
+    {
+      "date": "2026-11-27",
+      "modules": [
+        "diner"
+      ],
+      "summary": "Keep dish facts and Back usable while the photo loads. Retain fixture labels and three-dish Compare with pair evidence under one comparison ID. Search and Saved share the plate illustration, and Clear search remains clickable at mobile width.",
+      "files": [
+        "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/style.css",
+        "tests/e2e/menu-triggers-live.spec.ts",
+        "tests/e2e/compare-result.spec.ts",
+        "tests/e2e/search.spec.ts"
+      ],
+      "next": "Review and verify the pinned PR in hosted CI."
     }
   ]
 }
