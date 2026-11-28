@@ -13,6 +13,13 @@ export const PublicMenuAllergenCodeSchema = z.enum([
   'soy',
   'sesame',
 ]);
+export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'gluten-free']);
+export const OWNER_DISH_DIETARY_MAX = 2;
+export const OwnerDishDietarySchema = z
+  .array(PublicMenuDietaryCodeSchema)
+  .max(OWNER_DISH_DIETARY_MAX)
+  .refine((values) => new Set(values).size === values.length, 'Dietary values must be unique');
+
 const items = <T extends z.ZodType>(item: T) =>
   z
     .strictObject({
@@ -43,6 +50,7 @@ export const OwnerDishFieldsSchema = z.strictObject({
     .default(null),
   ingredients: items(text.trim().min(1).max(160)).default({ status: 'unknown', items: [] }),
   allergens: items(PublicMenuAllergenCodeSchema).default({ status: 'unknown', items: [] }),
+  dietary: OwnerDishDietarySchema.optional(),
   photoId: z.uuid().nullable().default(null),
 });
 export type OwnerDishFields = z.infer<typeof OwnerDishFieldsSchema>;
@@ -76,6 +84,7 @@ export const ApprovedDishFactsSchema = z.strictObject({
     .nullable(),
   ingredients: z.array(text.trim().min(1).max(160)).max(100).nullable(),
   allergens: z.array(PublicMenuAllergenCodeSchema).max(9).nullable(),
+  dietary: OwnerDishDietarySchema.optional(),
   photoId: z.uuid().nullable(),
 });
 export type ApprovedDishFacts = z.infer<typeof ApprovedDishFactsSchema>;

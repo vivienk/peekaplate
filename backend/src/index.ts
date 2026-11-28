@@ -1157,6 +1157,7 @@ export async function approveDishDraftAtomic(
           priceCurrency: manual.priceCurrency,
           ingredients: manual.ingredients.status === 'confirmed' ? manual.ingredients.items : null,
           allergens: manual.allergens.status === 'confirmed' ? manual.allergens.items : null,
+          ...(manual.dietary !== undefined ? { dietary: manual.dietary } : {}),
           photoId: manual.photoId,
         }
       : reviewed
@@ -1174,6 +1175,7 @@ export async function approveDishDraftAtomic(
             ingredients: resolved.ingredients,
             allergens:
               corrected.allergens?.status === 'confirmed' ? corrected.allergens.items : null,
+            ...(corrected.dietary !== undefined ? { dietary: corrected.dietary } : {}),
             photoId: approvedPhotoId,
           }
         : undefined;

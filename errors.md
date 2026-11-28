@@ -5669,3 +5669,11 @@ The [owner workspace integration tests](backend/src/owner-menu.integration.ts)
 now use ready drafts for those verification paths and seed the existing accepted
 state directly for the legacy facts test. The complete database check covers
 both these fixtures and the new rejection cases.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-28T05:12:48.140Z","exitCode":1}
+```
+
+The local test database could not start because Docker's Linux engine was unavailable.
+The mixed manual and extracted dietary publication regression runs in the CI database lane.

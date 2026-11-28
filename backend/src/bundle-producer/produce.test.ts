@@ -225,6 +225,18 @@ describe('S4-RES bundle producer: AC-S1 shape', () => {
     expect(MenuBundleRequestSchema.safeParse(input).success).toBe(false);
   });
 
+  it.each([{ approved: ['vegetarian', 'gluten-free'] }, { approved: [] }] as const)(
+    'uses approved dietary codes when the operator request offers different labels ($approved)',
+    async ({ approved }) => {
+      const result = await produceMenuBundle(
+        parseRequest(requestInput()),
+        sources({ [LEEKS]: { approvedDietary: [...approved] } }),
+        assets(),
+      );
+      expect(dishes(result)[0]).toMatchObject({ complete: true, dietary: approved });
+    },
+  );
+
   it('builds a schema-valid bundle with exact identities, URLs, alt text and dimensions', async () => {
     const result = await produceDefault();
     const { bundle } = result;

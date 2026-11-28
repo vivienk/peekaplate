@@ -154,6 +154,7 @@ export function resolveEffectiveFields(
       corrected.ingredients !== undefined ? corrected.ingredients : candidate.original.ingredients,
     ...(corrected.serving_size !== undefined ? { serving_size: corrected.serving_size } : {}),
     ...(corrected.allergens !== undefined ? { allergens: corrected.allergens } : {}),
+    ...(corrected.dietary !== undefined ? { dietary: corrected.dietary } : {}),
     ...(corrected.photo_id !== undefined ? { photo_id: corrected.photo_id } : {}),
   });
 }

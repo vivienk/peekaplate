@@ -1759,6 +1759,22 @@ test('manual dish and original private photo survive save and reload', async ({
   await addCategory(page, 'Soup');
   await page.getByRole('textbox', { name: /^Price/ }).fill('9.50');
   await expect(page.getByRole('textbox', { name: /^Price \(USD\)/ })).toBeVisible();
+  const dietary = page.getByRole('combobox', { name: /^Dietary Info/ });
+  await page.mouse.move(0, 0);
+  await dietary.press('Enter');
+  await dietary.press('Enter');
+  await expect(page.getByRole('option', { name: 'Vegan', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await dietary.press('End');
+  await dietary.press('Enter');
+  await expect(page.getByRole('option', { name: 'Vegetarian', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await dietary.press('Escape');
+  await expect(dietary).toHaveText('Vegan, Gluten-free');
   const original = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
     'base64',
@@ -1775,6 +1791,7 @@ test('manual dish and original private photo survive save and reload', async ({
   expect([...state.photos.values()][0]).toEqual(original);
   expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
     allergens: { status: 'unknown', items: [] },
+    dietary: ['vegan', 'gluten-free'],
     servingSize: '1',
     servingCount: 1,
   });
@@ -1782,6 +1799,11 @@ test('manual dish and original private photo survive save and reload', async ({
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Price/ })).toHaveValue('9.50');
+  await expect(dietary).toHaveText('Vegan, Gluten-free');
+  await dietary.click();
+  await page.getByRole('option', { name: 'Vegan', exact: true }).click();
+  await page.getByRole('option', { name: 'Gluten-free', exact: true }).click();
+  await dietary.press('Escape');
   await page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true }).fill('2');
   await acknowledgeDish(page);
   await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
@@ -1791,10 +1813,12 @@ test('manual dish and original private photo survive save and reload', async ({
   expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
     servingSize: '2',
     servingCount: 2,
+    dietary: [],
   });
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(dietary).toHaveText('Select dietary info');
   await expect(
     page.getByRole('spinbutton', { name: 'Serving size (people)', exact: true }),
   ).toHaveValue('2');
@@ -2227,6 +2251,10 @@ test('an expired identity removes the shell before an API request can use it', a
   await signIn(page);
   await expect(page.locator('.owner-shell')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reload saved work', exact: true })).toBeVisible();
+  const draft = state.drafts[venue.venueId]![0]!;
+  const thumbnailPath = `/venues/${venue.venueId}/drafts/${draft.id}/photos/${draft.manual_fields!.photoId}`;
+  // The saved dish's lazy thumbnail is part of the valid session's initial reads.
+  await expect.poll(() => state.apiCalls.some(({ path }) => path === thumbnailPath)).toBe(true);
   const beforeExpiry = [...state.apiCalls];
   state.denyIdentity = true;
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();

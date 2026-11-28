@@ -12,6 +12,7 @@ import {
   type CandidateCorrectedFields,
   type OwnerDishFields,
   OwnerDishFieldsSchema,
+  type PublicMenuDietaryCode,
   type ReviewCandidateItemResponse,
   type SaveOwnerDishDraft,
 } from '@peekaplate/contracts';
@@ -33,6 +34,7 @@ export type DishForm = {
   portionCalibration?: OwnerDishFields['portionCalibration'];
   ingredients: { status: ValueStatus; items: string[] };
   allergens: { status: ValueStatus; items: AllergenCode[] };
+  dietary?: PublicMenuDietaryCode[];
   photoId: string | null;
   // Editor-only AI markers; save commands persist review status, never these display tags.
   aiIng?: string[];
@@ -79,6 +81,7 @@ export function emptyManualDish(): DishForm {
     servingCount: '',
     ingredients: { status: 'unknown', items: [] },
     allergens: { status: 'unknown', items: [] },
+    dietary: [],
     photoId: null,
     source: null,
   };
@@ -121,6 +124,7 @@ export function dishFromReviewItem(
         : { status: 'unknown', items: [] },
     // Only an explicit owner correction can add these; extraction never supplies them.
     allergens: effective.allergens ?? { status: 'unknown', items: [] },
+    dietary: [...(effective.dietary ?? [])],
     photoId: effective.photo_id ?? null,
     source: {
       extractionId,
@@ -162,6 +166,7 @@ export function dishFromManualDraft(draft: DishDraft): DishForm {
       : {}),
     ingredients: { status: fields.ingredients.status, items: [...fields.ingredients.items] },
     allergens: { status: fields.allergens.status, items: [...fields.allergens.items] },
+    dietary: [...(fields.dietary ?? [])],
     photoId: fields.photoId,
     source: null,
   };
@@ -194,6 +199,7 @@ export function manualSaveCommand(
       priceCurrency: pilotPriceCurrency(form.priceCurrency).toUpperCase(),
       ingredients: list(form.ingredients),
       allergens: list(form.allergens),
+      ...(form.dietary !== undefined ? { dietary: form.dietary } : {}),
       photoId: form.photoId,
       ...(form.servingCount !== undefined
         ? { servingCount: servingCountValue(form.servingCount) }
@@ -239,6 +245,11 @@ export function reviewCorrection(
     JSON.stringify(effective.allergens ?? { status: 'unknown', items: [] })
   )
     corrected.allergens = allergens;
+  if (
+    form.dietary !== undefined &&
+    JSON.stringify(form.dietary) !== JSON.stringify(effective.dietary ?? [])
+  )
+    corrected.dietary = form.dietary;
   if (form.photoId !== (effective.photo_id ?? null)) corrected.photo_id = form.photoId;
   if (
     form.portionCalibration !== undefined &&

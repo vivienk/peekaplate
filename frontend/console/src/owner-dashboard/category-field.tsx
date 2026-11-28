@@ -3,6 +3,7 @@
 // A select-only combobox: the field opens a list with "Add category" first, then the categories.
 // "Add category" turns the list into a name input and an Add button; the new category then
 // appears in the list for the owner to select. The categories live in the demo page's memory.
+import { OWNER_DISH_DIETARY_MAX, type PublicMenuDietaryCode } from '@peekaplate/contracts';
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import chevron from './assets/icons/angle-small-down.svg';
 import check from './assets/icons/check.svg';
@@ -230,9 +231,12 @@ export function CategoryField({
 }
 
 /** S09 Dietary options (Adam, Sprint 7 ticket 86bd5pnc2). */
-export const DIETARY_OPTIONS = ['Vegan', 'Vegetarian', 'Gluten-free'] as const;
-/** At most two labels per dish, e.g. Vegan + Gluten-free. */
-export const DIETARY_MAX = 2;
+export const DIETARY_LABELS: Record<PublicMenuDietaryCode, string> = {
+  vegan: 'Vegan',
+  vegetarian: 'Vegetarian',
+  'gluten-free': 'Gluten-free',
+};
+const DIETARY_OPTIONS = Object.values(DIETARY_LABELS);
 
 // Screen 9 Dietary field. No Figma frame exists yet, so it reuses the Category dropdown's field,
 // menu and option styles (same tokens) as a multi-select list: clicking an option adds or removes
@@ -248,12 +252,12 @@ export function DietaryField({
 }) {
   const uid = useId();
   const listId = `${uid}-list`;
-  const optionId = (option: string) => `${uid}-opt-${DIETARY_OPTIONS.indexOf(option as never)}`;
+  const optionId = (option: string) => `${uid}-opt-${DIETARY_OPTIONS.indexOf(option)}`;
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
-  const full = value.length >= DIETARY_MAX;
+  const full = value.length >= OWNER_DISH_DIETARY_MAX;
   const blocked = (option: string) => full && !value.includes(option);
 
   const close = (refocus = true) => {

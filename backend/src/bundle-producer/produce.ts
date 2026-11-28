@@ -4,6 +4,7 @@ import {
   type PublicMenuAllergenCode,
   type PublicMenuContentBundle,
   PublicMenuContentBundleSchema,
+  type PublicMenuDietaryCode,
   type PublicMenuDish,
   type PublicPortion,
   sha256,
@@ -33,6 +34,7 @@ export type ApprovedDishSource = {
   ingredients: unknown;
   reviewState: 'none' | 'corrected' | 'incomplete' | 'rejected';
   approvedAllergens?: PublicMenuAllergenCode[] | null;
+  approvedDietary?: PublicMenuDietaryCode[];
   approvedCategory?: string | null;
   /** The owner-selected photo snapshotted onto this approved revision (approved facts). */
   approvedPhotoId?: string | null;
@@ -440,7 +442,7 @@ async function buildDish(
       price: { amount: price.amount, currency },
       ingredients,
       allergens: effectiveAllergens,
-      dietary: requested.dietary,
+      dietary: source.approvedDietary ?? requested.dietary,
       images,
     },
     gaps,

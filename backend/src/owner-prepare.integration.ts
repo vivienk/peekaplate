@@ -482,7 +482,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
       [venue, JSON.stringify({ name: 'Synthetic Profile Bistro', photoId: logoId })],
     );
 
-    const soup = await manualDish(venue, full);
+    const soup = await manualDish(venue, { ...full, dietary: ['vegetarian'] });
     const salad = await manualDish(venue, { ...full, name: 'Fictional Side Salad' }, false);
     // P1: an explicit ingredient clear is kept, never restored from the extraction.
     const cleared = await extractedDish(venue, () => ({ ingredients: null }), false);
@@ -493,6 +493,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
       photo_id: photoId,
       allergens: { status: 'confirmed', items: ['egg', 'wheat'] },
       serving_count: 3,
+      dietary: ['vegan', 'gluten-free'],
     }));
 
     await expect(prepare(venue, editor)).rejects.toMatchObject({ status: 403 });
@@ -526,11 +527,16 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
       height: 4,
       alt: 'Synthetic Profile Bistro logo',
     });
-    expect(soupDish).toMatchObject({ complete: true, serving_count: 2, allergens: ['milk'] });
+    expect(soupDish).toMatchObject({
+      complete: true,
+      serving_count: 2,
+      allergens: ['milk'],
+      dietary: ['vegetarian'],
+    });
     if (!soupDish?.complete || !soupDish.images) throw new Error('expected a soup photo');
     expect(soupDish.images.card).toMatchObject({ width: 2, height: 3 });
     // A dish without a photo is the agreed text-only fallback.
-    expect(saladDish).toMatchObject({ complete: true, images: null });
+    expect(saladDish).toMatchObject({ complete: true, images: null, dietary: [] });
     // P1: cleared ingredients stay cleared (an incomplete placeholder), never the extraction's.
     expect(clearedDish).toEqual({
       dish_id: await preparedDishId(venue, cleared.draft),
@@ -548,6 +554,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('owner-prepared menus (real database)'
       name: 'Fictional Chosen Noodles',
       allergens: ['egg', 'wheat'],
       serving_count: 3,
+      dietary: ['vegan', 'gluten-free'],
     });
     if (!chosenDish?.complete || !chosenDish.images) throw new Error('expected a chosen photo');
     expect(chosenDish.images.card.url).toContain(`/${chosen.photoId}/`);
