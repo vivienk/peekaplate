@@ -400,11 +400,11 @@ export function OwnerWorkspace({
       setup={workspaceSetup}
       ariaLabel="Analysis availability"
       reportStatus={
-        showAi && !reportPage && deniedReportScope !== reportScope && reportState.kind !== 'ready'
+        showAi && deniedReportScope !== reportScope && reportState.kind !== 'ready'
           ? {
               message: OWNER_REPORT_STATE_TEXT[reportState.kind],
               refreshing,
-              ...(canRetryReport ? { onRetry: retry } : {}),
+              ...(canRetryReport && !reportPage ? { onRetry: retry } : {}),
             }
           : undefined
       }
