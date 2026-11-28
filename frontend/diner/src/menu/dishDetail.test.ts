@@ -4,7 +4,12 @@ import type { CompleteDish } from './types';
 
 const NOTE = 'For allergy questions, please ask the restaurant staff.';
 
-const render = (allergens: string[], name = 'Leaf', icons: unknown[] = []): string => {
+const render = (
+  allergens: string[],
+  name = 'Leaf',
+  icons: unknown[] = [],
+  allergensConfirmed = true,
+): string => {
   const container = {
     innerHTML: '',
     querySelector: () => null,
@@ -23,6 +28,7 @@ const render = (allergens: string[], name = 'Leaf', icons: unknown[] = []): stri
       price: { amount: '1.00', currency: 'USD' },
       ingredients: [{ ingredientId: 'i', name, description: null }],
       allergens,
+      allergensConfirmed,
       dietary: [],
       images: null,
     } as unknown as CompleteDish,
@@ -92,5 +98,15 @@ describe('dish detail allergen note', () => {
 
   it('never says there are no allergens', () => {
     expect(render([]).toLowerCase()).not.toContain('no allergens');
+    expect(render([], 'Leaf', [], false).toLowerCase()).not.toContain('no allergens');
+  });
+
+  it('says Allergens not confirmed, then the note once, when allergens were never reviewed', () => {
+    const html = render([], 'Leaf', [], false);
+    expect(html).toContain('Allergens not confirmed');
+    expect(count(html)).toBe(1);
+    expect(html.indexOf('Allergens not confirmed')).toBeLessThan(html.indexOf(NOTE));
+    expect(html).not.toContain('>Contains<');
+    expect(render([]).includes('Allergens not confirmed')).toBe(false);
   });
 });

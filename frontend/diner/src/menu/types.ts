@@ -53,6 +53,9 @@ export type CompleteDish = {
   price: { amount: string; currency: string };
   ingredients: Ingredient[];
   allergens: string[];
+  // False when the published menu left allergens unreviewed (`allergens: null`), so diners see
+  // "Allergens not confirmed" instead of an empty list that could read as "none".
+  allergensConfirmed: boolean;
   dietary: DietaryValue[];
   images: { card: MenuImage; detail: MenuImage } | null;
 };

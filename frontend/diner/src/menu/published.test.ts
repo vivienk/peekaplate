@@ -164,6 +164,7 @@ describe('published adapter', () => {
     const dish = result.menu.categories[0]?.dishes[1];
     if (!dish || dish.kind !== 'complete') throw new Error('expected complete');
     expect(dish.allergens).toEqual([]);
+    expect(dish.allergensConfirmed).toBe(false);
   });
 
   it('maps dietary codes to display values', () => {
