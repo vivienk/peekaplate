@@ -54,7 +54,9 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
       categoryId,
     };
   }
-  // null and [] both mean "not confirmed"; the detail screen then shows the staff note under Contains.
+  // An omitted list (published `allergens: null`) is unreviewed: "Allergens not confirmed".
+  // [] is a reviewed dish with no listed allergens. Both keep the staff note.
+  const allergensConfirmed = dish.allergens !== undefined;
   const labels = (dish.allergens ?? []).map(allergenLabel);
   const allergens = [...new Map(labels.map((a) => [chipKey(a), a])).values()];
   const glutenFreeExcluded = allergens.some((a) => EXCLUDES_GLUTEN_FREE.has(chipKey(a)));
@@ -89,6 +91,7 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
       description: i.description,
     })),
     allergens,
+    allergensConfirmed,
     dietary,
     images: dish.images
       ? { card: toImage(dish.images.card), detail: toImage(dish.images.detail) }

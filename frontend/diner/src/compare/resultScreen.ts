@@ -99,7 +99,11 @@ function sectionMarkup(
 // its full meaning for screen readers and as a tooltip ("Contains Wheat", "Vegan"); a value with no
 // approved icon falls back to its text label, so nothing is ever dropped. A dish with nothing
 // listed says "None listed" (Azoz review #12): never "allergen-free", which the data cannot promise.
+// Unreviewed allergens say "Allergens not confirmed", as the dish detail does, before any dietary icons.
 function dietaryAllergenCell(dish: CompleteDish): string {
+  const unconfirmed = dish.allergensConfirmed
+    ? ''
+    : '<p class="pp-compare__none">Allergens not confirmed</p>';
   const items = [
     ...dish.allergens.map((value) => ({
       icon: allergenIcon(value),
@@ -108,8 +112,8 @@ function dietaryAllergenCell(dish: CompleteDish): string {
     })),
     ...dish.dietary.map((value) => ({ icon: dietaryIcon(value), label: value, text: value })),
   ];
-  if (items.length === 0) return '<p class="pp-compare__none">None listed</p>';
-  return `<ul class="pp-compare__icons">${items
+  if (items.length === 0) return unconfirmed || '<p class="pp-compare__none">None listed</p>';
+  return `${unconfirmed}<ul class="pp-compare__icons">${items
     .map(({ icon, label, text }) =>
       icon
         ? `<li class="pp-compare__icon" title="${escapeHtml(label)}"><img src="${escapeHtml(icon)}" alt="${escapeHtml(label)}" width="24" height="24" /></li>`

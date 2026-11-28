@@ -120,11 +120,18 @@ export function renderDishDetail(
                   <div class="pp-chip-group">${allergenChips(dish)}</div>
                 </div>
               `
-              : `
+              : dish.allergensConfirmed
+                ? `
                 <div class="pp-allergen-row">
                   <span class="pp-allergen-row__label">Contains</span>
                   ${allergyNote}
                 </div>
+              `
+                : `
+                <div class="pp-allergen-row">
+                  <span class="pp-allergen-row__label">Allergens not confirmed</span>
+                </div>
+                ${allergyNote}
               `
           }
           ${
