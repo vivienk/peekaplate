@@ -31,8 +31,8 @@ describe('restaurant link HTTP boundary', () => {
     const env = { APP_ENV: 'production' };
     const origin = 'https://diner.peekaplate.app';
     for (const [path, method] of [
-      ['/public/restaurants/noka_ramen', 'GET'],
-      ['/observations', 'OPTIONS'],
+      ['https://api.peekaplate.app/public/restaurants/noka_ramen', 'GET'],
+      ['https://api.peekaplate.app/observations', 'OPTIONS'],
     ] as const) {
       const allowed = await app.request(
         path,
@@ -93,7 +93,7 @@ describe('restaurant link HTTP boundary', () => {
     });
     expect(readDinerLink).toHaveBeenCalledWith('owner-actor', scope.venueId, scope.menuId, env);
     const production = await app.request(
-      path,
+      `https://api.peekaplate.app${path}`,
       { headers: { Authorization: 'Bearer synthetic-staff-token' } },
       { APP_ENV: 'production' },
     );

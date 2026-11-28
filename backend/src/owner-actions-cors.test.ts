@@ -53,9 +53,10 @@ it('serves authenticated production console reads only while the owner workflow 
     OWNER_AI_RESPONSES_ENABLED: 'false',
   };
   const disabled = { ...production, OWNER_WORKFLOW_ENABLED: 'false' };
+  const prodUrl = `https://api.peekaplate.app${path}`;
   const preflight = (origin: string, env = production) =>
     app.request(
-      path,
+      prodUrl,
       {
         method: 'OPTIONS',
         headers: {
@@ -81,14 +82,18 @@ it('serves authenticated production console reads only while the owner workflow 
   expect(listOwnerActions).not.toHaveBeenCalled();
 
   const headers = { Origin: PRODUCTION_OWNER_ORIGIN, Authorization: 'Bearer signed-owner' };
-  const missingToken = await app.request(path, { headers: { Origin: headers.Origin } }, production);
+  const missingToken = await app.request(
+    prodUrl,
+    { headers: { Origin: headers.Origin } },
+    production,
+  );
   expect(missingToken.status).toBe(401);
-  const disabledRead = await app.request(path, { headers }, disabled);
+  const disabledRead = await app.request(prodUrl, { headers }, disabled);
   expect(disabledRead.status).toBe(404);
   expect(verify).not.toHaveBeenCalled();
   expect(listOwnerActions).not.toHaveBeenCalled();
 
-  const own = await app.request(`${path}?limit=100`, { headers }, production);
+  const own = await app.request(`${prodUrl}?limit=100`, { headers }, production);
   expect(own.status).toBe(200);
   expect(own.headers.get('Access-Control-Allow-Origin')).toBe(PRODUCTION_OWNER_ORIGIN);
   expect(await own.json()).toEqual(result);
@@ -97,7 +102,7 @@ it('serves authenticated production console reads only while the owner workflow 
 
   const otherVenueId = '00000000-0000-4000-8000-000000000125';
   const denied = await app.request(
-    `/venues/${otherVenueId}/owner-insight-actions`,
+    `https://api.peekaplate.app/venues/${otherVenueId}/owner-insight-actions`,
     { headers },
     production,
   );

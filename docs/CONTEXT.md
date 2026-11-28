@@ -297,6 +297,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/foundations/demo.tsx",
         "tests/e2e/input.spec.ts",
         "frontend/console/vite.config.ts",
+        "frontend/console/src/owner/security-headers.test.ts",
         "frontend/console/src/foundations/TextField.tsx",
         "frontend/console/src/foundations/field.css",
         "frontend/console/src/owner-dashboard/menu-api.ts",
@@ -476,7 +477,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5aa7cfb82e3e14e494b0e118f15682a40fa2d467a0840da3345eb7edad4671cd"
+      "sourceFingerprint": "6c1a691d2b7612901f5f75f2177fe9a408f99dea68f705278930cdb08613cb23"
     },
     {
       "id": "backend",
@@ -759,7 +760,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "de849f7957f34b6da2b14f45a8be8ce2ba5742f82d0bf82864e00747fd6144cf"
+      "sourceFingerprint": "26bdf85ade9093c6b883a9e44e4273c30446eaa026c7457f457cc25f41f3e01e"
     },
     {
       "id": "database",

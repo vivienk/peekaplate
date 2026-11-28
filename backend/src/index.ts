@@ -1249,12 +1249,44 @@ export async function approveDishDraftAtomic(
   }
 }
 
+const HSTS_HEADER_VALUE = 'max-age=2592000';
+
+function isHttpsRequest(request: Request): boolean {
+  return new URL(request.url).protocol === 'https:';
+}
+
 export function createApp(services: Dependencies = dependencies) {
   const app = new Hono<{ Bindings: Bindings }>();
   app.use('*', async (c, next) => {
-    c.header('Cache-Control', 'no-store');
-    c.header('X-Request-ID', crypto.randomUUID());
+    const requestId = crypto.randomUUID();
+    const isProduction = c.env?.APP_ENV === 'production';
+    const https = isHttpsRequest(c.req.raw);
+
+    if (isProduction && !https) {
+      const target = new URL(c.req.url);
+      target.protocol = 'https:';
+      return new Response(null, {
+        status: 308,
+        headers: {
+          Location: target.toString(),
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Request-ID': requestId,
+        },
+      });
+    }
+
+    c.header('X-Request-ID', requestId);
     await next();
+
+    if (!c.res.headers.has('Cache-Control')) {
+      c.header('Cache-Control', 'no-store');
+    }
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header('X-Request-ID', requestId);
+    if (isProduction && https) {
+      c.header('Strict-Transport-Security', HSTS_HEADER_VALUE);
+    }
   });
   registerOwnerAnalysisRoutes(app, {
     verify: services.verify,

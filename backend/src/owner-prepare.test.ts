@@ -342,7 +342,13 @@ describe('Part A HTTP boundary', () => {
     const path = `/venues/${venueId}/prepared-menus/prepare`;
     expect((await app.request(path, { method: 'POST' }, env)).status).toBe(401);
     expect(
-      (await app.request(path, { method: 'POST', headers }, { APP_ENV: 'production' })).status,
+      (
+        await app.request(
+          `https://api.peekaplate.app${path}`,
+          { method: 'POST', headers },
+          { APP_ENV: 'production' },
+        )
+      ).status,
     ).toBe(404);
     expect(prepareOwnerMenu).not.toHaveBeenCalled();
     const ok = await app.request(

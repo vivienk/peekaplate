@@ -60,8 +60,13 @@ describe('team analytics HTTP boundary', () => {
     const readAnalytics = vi.fn();
     const app = createApp({ verify: vi.fn(), execute: vi.fn(), readAnalytics });
     expect(
-      (await app.request(`/team/analytics/events${query}`, { headers }, { APP_ENV: 'production' }))
-        .status,
+      (
+        await app.request(
+          `https://api.peekaplate.app/team/analytics/events${query}`,
+          { headers },
+          { APP_ENV: 'production' },
+        )
+      ).status,
     ).toBe(404);
     expect(readAnalytics).not.toHaveBeenCalled();
   });
