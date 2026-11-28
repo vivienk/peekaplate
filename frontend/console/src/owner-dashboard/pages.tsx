@@ -31,6 +31,8 @@ import {
   WK_PREVIEWS,
   WK_TIME,
 } from './data';
+import { type DateRange, presetRange, toUtcWindow, type UtcWindow } from './date-range';
+import { DateRangeFilter } from './date-range-filter';
 import {
   Btn,
   ChartCard,
@@ -209,6 +211,7 @@ export function Overview({
   sim,
   openDish,
   live,
+  onDateRangeChange,
 }: {
   go: (p: Page) => void;
   sim: { scn: Scenario };
@@ -217,7 +220,10 @@ export function Overview({
   openDish: (id: string) => void;
   openInsight?: (id: string) => void;
   live?: LiveDashboardInput & { menu: readonly LiveMenuRow[] };
+  /** Called with the applied range as a half-open UTC window, for the report request. */
+  onDateRangeChange?: (window: UtcWindow, range: DateRange) => void;
 }) {
+  const [dateRange, setDateRange] = useState<DateRange>(() => presetRange('last-7', new Date()));
   const empty = !!live || sim.scn === 'empty';
   const daily = live?.summary?.daily_opens;
   const dailyLabels = daily?.current.map(
@@ -251,7 +257,18 @@ export function Overview({
     <div className="stack">
       <div className="pagehead">
         <span className="eyebrow">Overview · {live ? live.restaurantName : REST.period}</span>
-        <h1>{live ? 'How your menu did this period' : 'How your menu did this week'}</h1>
+        <div className="pagehead__row">
+          <h1>{live ? 'How your menu did this period' : 'How your menu did this week'}</h1>
+          {(!live || onDateRangeChange) && (
+            <DateRangeFilter
+              value={dateRange}
+              onApply={(range) => {
+                setDateRange(range);
+                onDateRangeChange?.(toUtcWindow(range), range);
+              }}
+            />
+          )}
+        </div>
         {live?.reportRefresh}
       </div>
       {empty && (

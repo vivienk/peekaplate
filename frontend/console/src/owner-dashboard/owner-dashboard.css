@@ -2831,4 +2831,154 @@
     width: 15px;
     height: 15px;
   }
+
+  /* Overview date filter (date-range-filter.tsx). Tokens only; the selected preset uses the same
+   * nav hover colour as the sidebar's current page. */
+  .pagehead__row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--pp-space-16);
+    flex-wrap: wrap;
+  }
+  .drf {
+    position: relative;
+  }
+  .drf__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pp-space-8);
+    min-block-size: 44px;
+    padding: var(--pp-space-8) var(--pp-space-16);
+    border: 1px solid var(--pp-role-outline);
+    border-radius: var(--pp-radius-full);
+    background: var(--pp-role-surface);
+    color: var(--pp-role-on-surface);
+    font-family: var(--sans);
+    font-size: var(--pp-font-size-paragraph-2);
+    line-height: var(--pp-line-height-paragraph-2);
+    cursor: pointer;
+  }
+  .drf__trigger:hover {
+    border-color: var(--pp-role-input-border-hover);
+  }
+  .drf__trigger[aria-expanded="true"] {
+    border-color: var(--pp-role-input-border-focus);
+  }
+  .drf__preset {
+    color: var(--pp-role-on-surface-variant);
+    font-size: var(--pp-font-size-small);
+    line-height: var(--pp-line-height-small);
+    font-weight: var(--pp-font-weight-medium);
+  }
+  .drf__dates {
+    font-weight: var(--pp-font-weight-semibold);
+  }
+  .drf__panel {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + var(--pp-space-8));
+    z-index: 20;
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    inline-size: min(640px, calc(100vw - var(--pp-space-32)));
+    border: 1px solid var(--pp-color-neutral-300);
+    border-radius: var(--pp-radius-12);
+    background: var(--pp-role-surface);
+    box-shadow: var(--pp-shadow-large);
+    font-family: var(--sans);
+  }
+  .drf__presets {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pp-space-2);
+    margin: 0;
+    padding: var(--pp-space-8);
+    border: 0;
+    border-inline-end: 1px solid var(--pp-role-outline-variant);
+  }
+  .drf__sr {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .drf__option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-block-size: 40px;
+    padding: var(--pp-space-8) var(--pp-space-12);
+    border-radius: var(--pp-radius-8);
+    color: var(--pp-role-on-surface-variant);
+    font-size: var(--pp-font-size-paragraph-2);
+    line-height: var(--pp-line-height-paragraph-2);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .drf__option:hover,
+  .drf__option:has(input:checked) {
+    background: var(--pp-color-info-100);
+    color: var(--pp-role-on-surface);
+  }
+  .drf__option:has(input:checked) {
+    font-weight: var(--pp-font-weight-medium);
+  }
+  .drf__option:has(input:focus-visible) {
+    outline: 2px solid var(--pp-role-focus-ring);
+    outline-offset: -2px;
+  }
+  /* The whole row is the target; the native radio stays for keyboard and screen readers. */
+  .drf__option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .drf__custom {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pp-space-12);
+    padding: var(--pp-space-16);
+    min-inline-size: 0;
+  }
+  .drf__dates-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--pp-space-12);
+  }
+  .drf__note {
+    margin: 0;
+    color: var(--pp-role-on-surface-variant);
+    font-size: var(--pp-font-size-small);
+    line-height: var(--pp-line-height-small);
+  }
+  .drf__note[role="alert"] {
+    color: var(--pp-role-input-text-error);
+  }
+  .drf__foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--pp-space-8);
+    margin-block-start: auto;
+  }
+  @media (max-width: 640px) {
+    .drf__panel {
+      inset-inline: 0 auto;
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .drf__presets {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border-inline-end: 0;
+      border-block-end: 1px solid var(--pp-role-outline-variant);
+    }
+    .drf__option {
+      white-space: normal;
+    }
+    .drf__dates-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
 }

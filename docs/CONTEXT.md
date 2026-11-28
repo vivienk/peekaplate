@@ -289,7 +289,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart show validated summaries and gaps. Visible San Francisco day reports retry transient refresh failures for the same source. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field, optional Plate size (cm), and up to two owner-selected dietary labels that persist when dishes are reopened. Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
+      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. KPI cards and LineChart show validated summaries and gaps. The date picker stays in preview until signed-in reports support ranges. Visible San Francisco day reports retry transient failed refreshes without stale data. S09 has a canonical serving count, optional plate size and up to two saved owner-selected dietary labels. Measurements bind to the authenticated saved photo and clear on count, measurement or photo edits. Production confirms signup back at sign-in and creates the first restaurant through Screen 5. S13 verifies the share-link host for the configured API. Staging and local keep their test-restaurant entry and explicit confirmation step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -480,7 +480,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a07fb47b32e412b5e42ee11d26ac23b2b4185789c48bba58ce07b4ad0e1dcaba"
+      "sourceFingerprint": "91bb07af89e4967af535fc304fe72065c2f58738fa352b624fa63fabc7c3679d"
     },
     {
       "id": "backend",

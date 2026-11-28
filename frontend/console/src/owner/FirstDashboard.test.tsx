@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { FirstDashboard } from './FirstDashboard';
+import { FirstDashboard, FirstDashboardTopbar } from './FirstDashboard';
 import type { OwnerSetup } from './setup';
 
 const noop = () => {};
@@ -178,5 +178,18 @@ describe('FirstDashboard (S12 first dashboard arrival, S6-FE-14 onboarding)', ()
     expect(page).toContain('Ember & Stone is published. Your dashboard pages are now open.');
     expect(page).not.toContain('Finish setting up');
     expect(render(published)).toContain('data-ai-state="empty"');
+  });
+});
+
+describe('Dashboard top bar publication tag', () => {
+  const bar = (state: OwnerSetup) => renderToStaticMarkup(<FirstDashboardTopbar setup={state} />);
+
+  it('shows no "Published" tag once the menu is live', () => {
+    expect(bar(published)).not.toContain('>Published<');
+  });
+
+  it('still warns when the menu is not published or the status is unknown', () => {
+    expect(bar(figmaState)).toContain('Not published');
+    expect(bar({ ...figmaState, published: null })).toContain('Status unavailable');
   });
 });
