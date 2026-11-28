@@ -69,6 +69,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
   const state = {
     venues: [venue],
     reportStatus: 200,
+    csvExports: [] as string[],
     denyIdentity: false,
     delayIdentity: false,
     releaseIdentity: () => {},
@@ -587,6 +588,18 @@ async function fixture(context: BrowserContext, reportReady = false) {
       }
       return route.fulfill({ status: 404, json: { error: 'synthetic_not_found' }, headers });
     } else {
+      if (url.pathname.endsWith('/analytics/dishes/export')) {
+        state.csvExports.push(request.headers().authorization ?? '');
+        return route.fulfill({
+          status: state.reportStatus,
+          body:
+            state.reportStatus === 200
+              ? 'dish_id,dish_name\nsynthetic,Fictional Lentil Soup\n'
+              : '',
+          contentType: 'text/csv; charset=utf-8',
+          headers: { 'Access-Control-Allow-Origin': origin },
+        });
+      }
       if (state.delayReport)
         await new Promise<void>((resolve) => {
           state.releaseReport = resolve;
@@ -3487,6 +3500,24 @@ test('Overview uses validated KPI cards and clears their values across restauran
   await openAccount(page);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(cards).toHaveCount(0);
+});
+
+test('Dish performance downloads the owner CSV with the owner token', async ({ context, page }) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  await expect(page.getByRole('table').first()).toBeVisible();
+  const button = page.getByRole('button', { name: 'Download CSV', exact: true });
+  const download = page.waitForEvent('download');
+  await button.click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^owner-report-[0-9a-f-]+-\d{4}-\d{2}-\d{2}\.csv$/);
+  expect(state.csvExports).toHaveLength(1);
+  expect(state.csvExports[0]).toMatch(/^Bearer /);
+  state.reportStatus = 503;
+  await button.click();
+  await expect(page.getByText('Couldn’t download the CSV. Try again.')).toBeVisible();
+  await expect(page.getByRole('table').first()).toBeVisible();
 });
 
 test('Refresh report recovers an unavailable report and clears values when it becomes unavailable', async ({

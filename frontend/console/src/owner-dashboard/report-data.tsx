@@ -101,12 +101,47 @@ export function reportSourceFromEnv(
   return { mode: 'live', apiBase, venueId, getAccessToken };
 }
 
+// What the page shows once a report request settles. An automatic refresh of an already shown
+// report that hits a network error or 503 keeps that report (and the AI panel that uses it) on
+// screen and flags the failed refresh. The owner's own Refresh shows the new outcome, and sign-out,
+// denied access or an invalid report always replace the report straight away.
+export type ReportLoad = {
+  state: ReportState;
+  refreshing: boolean;
+  /** True while the 60-second automatic refresh (not the owner's Refresh button) is running. */
+  background: boolean;
+  refreshFailed: boolean;
+  daily: boolean;
+};
+export function settleReport<T extends ReportLoad>(current: T, next: ReportState): T {
+  if (
+    current.background &&
+    current.state.kind === 'ready' &&
+    (next.kind === 'error' || next.kind === 'unavailable')
+  )
+    return { ...current, refreshing: false, background: false, refreshFailed: true };
+  // Remember the validated report mode during a transient failure, while clearing its data.
+  return {
+    ...current,
+    state: next,
+    refreshing: false,
+    background: false,
+    refreshFailed: false,
+    daily:
+      next.kind === 'ready'
+        ? isOwnerProductionCalendarVersion(next.report.report_metadata.calculation_version)
+        : current.daily && (next.kind === 'error' || next.kind === 'unavailable'),
+  };
+}
+
 // Loads the report for one restaurant. Changing restaurant clears the old report at once, and an
 // answer for a previous restaurant or attempt is dropped, so one restaurant's numbers never show
 // under another.
 export function useOwnerReport(source: ReportSource): {
   state: ReportState;
   refreshing: boolean;
+  /** The last automatic refresh hit a network error or 503, so the previous report is still shown. */
+  refreshFailed: boolean;
   retry: () => void;
 } {
   const live = source.mode === 'live' ? source : null;
@@ -117,9 +152,11 @@ export function useOwnerReport(source: ReportSource): {
     request: { apiBase, venueId, getAccessToken },
     state: { kind: 'loading' } as ReportState,
     refreshing: false,
+    background: false,
+    refreshFailed: false,
     daily: false,
   }));
-  const { request, state, refreshing, daily } = load;
+  const { request, state, refreshing, refreshFailed, daily } = load;
   if (
     request.apiBase !== apiBase ||
     request.venueId !== venueId ||
@@ -130,6 +167,8 @@ export function useOwnerReport(source: ReportSource): {
       request: { apiBase, venueId, getAccessToken },
       state: { kind: 'loading' },
       refreshing: false,
+      background: false,
+      refreshFailed: false,
       daily: false,
     });
   }
@@ -148,22 +187,7 @@ export function useOwnerReport(source: ReportSource): {
         next = { kind: 'error' };
       }
       if (signal.aborted) return;
-      // Remember the validated report mode during a transient failure, while clearing its data.
-      setLoad((current) =>
-        current.request === request
-          ? {
-              request,
-              state: next,
-              refreshing: false,
-              daily:
-                next.kind === 'ready'
-                  ? isOwnerProductionCalendarVersion(
-                      next.report.report_metadata.calculation_version,
-                    )
-                  : current.daily && (next.kind === 'error' || next.kind === 'unavailable'),
-            }
-          : current,
-      );
+      setLoad((current) => (current.request === request ? settleReport(current, next) : current));
     })();
     return () => controller.abort();
   }, [request]);
@@ -180,7 +204,7 @@ export function useOwnerReport(source: ReportSource): {
           !current.daily
         )
           return current;
-        return { ...current, request: { ...current.request }, refreshing: true };
+        return { ...current, request: { ...current.request }, refreshing: true, background: true };
       });
     }, 60_000);
     return () => window.clearInterval(timer);
@@ -188,11 +212,12 @@ export function useOwnerReport(source: ReportSource): {
   return {
     state: source.mode === 'saved' ? { kind: 'ready', report: SAVED_REPORT } : state,
     refreshing,
+    refreshFailed: source.mode === 'saved' ? false : refreshFailed,
     retry: () =>
       setLoad((current) => {
         if (current.request !== request || current.refreshing || current.state.kind === 'loading')
           return current;
-        return { ...current, request: { ...request }, refreshing: true };
+        return { ...current, request: { ...request }, refreshing: true, background: false };
       }),
   };
 }

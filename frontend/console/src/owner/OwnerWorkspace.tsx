@@ -34,6 +34,7 @@ import {
 import { mergeCategories } from '../owner-dashboard/category-field';
 import { Btn } from '../owner-dashboard/controls';
 import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
+import { fetchOwnerReportCsv } from '../owner-dashboard/report-api';
 import { formatOwnerReportTime, ReportView, useOwnerReport } from '../owner-dashboard/report-data';
 import { createOwnerMenuClient, newCommandId, OwnerMenuApiError } from '../owner-menu/api';
 import { Button, Input } from '../ui';
@@ -710,12 +711,34 @@ function LiveDashboardReport({
   onReport: (report: OwnerDishReport | null, reference?: string) => void;
   go: (page: Page) => void;
 }) {
-  const { state, retry, refreshing } = useOwnerReport({
+  const { state, retry, refreshing, refreshFailed } = useOwnerReport({
     mode: 'live',
     apiBase,
     venueId,
     getAccessToken,
   });
+  // Dish Performance CSV: the existing owner export, downloaded with the owner's token.
+  const [csvStatus, setCsvStatus] = useState<'idle' | 'busy' | 'failed'>('idle');
+  const downloadCsv = async () => {
+    setCsvStatus('busy');
+    const result = await fetchOwnerReportCsv({
+      apiBase,
+      venueId,
+      accessToken: await getAccessToken().catch(() => null),
+    });
+    if (result.kind !== 'ready') {
+      setCsvStatus('failed');
+      if (result.kind === 'signed_out' || result.kind === 'denied') onAccessFailure(result.kind);
+      return;
+    }
+    const url = URL.createObjectURL(result.csv);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = result.filename;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setCsvStatus('idle');
+  };
   const report = state.kind === 'ready' ? state.report : null;
   const reference = state.kind === 'ready' ? state.reference : undefined;
   useEffect(() => {
@@ -734,8 +757,27 @@ function LiveDashboardReport({
         <Btn type="button" size="md" onClick={retry} disabled={refreshing}>
           Refresh report
         </Btn>
+        {page === 'performance' && state.kind === 'ready' && (
+          <Btn
+            kind="outlined"
+            type="button"
+            size="md"
+            onClick={() => void downloadCsv()}
+            disabled={csvStatus === 'busy'}
+          >
+            Download CSV
+          </Btn>
+        )}
         <span className="muted" aria-live="polite">
-          {refreshing ? 'Refreshing report…' : ''}
+          {refreshing
+            ? 'Refreshing report…'
+            : refreshFailed
+              ? 'Couldn’t refresh. Showing the last report.'
+              : csvStatus === 'busy'
+                ? 'Preparing CSV…'
+                : csvStatus === 'failed'
+                  ? 'Couldn’t download the CSV. Try again.'
+                  : ''}
         </span>
       </div>
     ) : null;

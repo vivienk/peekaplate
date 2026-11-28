@@ -91,3 +91,47 @@ export async function fetchOwnerReport({
       : {}),
   };
 }
+
+export type ReportExport =
+  | { kind: 'ready'; csv: Blob; filename: string }
+  | Exclude<ReportState, { kind: 'ready' } | { kind: 'loading' }>;
+
+// Dish Performance CSV: the existing owner-only export endpoint, read with the owner's token (never a
+// token in a link). The filename follows the server's owner-report-<venue>-<date>.csv pattern.
+export async function fetchOwnerReportCsv({
+  apiBase,
+  venueId,
+  accessToken,
+  fetch: doFetch = fetch,
+  now = new Date(),
+}: ReportRequest & { now?: Date }): Promise<ReportExport> {
+  if (!accessToken) return { kind: 'signed_out' };
+  if (!UUID.test(venueId)) return { kind: 'invalid' };
+  const url = reportUrl(apiBase, venueId).replace(
+    '/analytics/dishes?',
+    '/analytics/dishes/export?',
+  );
+  let response: Response;
+  try {
+    response = await doFetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'text/csv' },
+      cache: 'no-store',
+      credentials: 'omit',
+    });
+  } catch {
+    return { kind: 'error' };
+  }
+  if (response.status === 401) return { kind: 'signed_out' };
+  if (response.status === 403) return { kind: 'denied' };
+  if (response.status === 503) return { kind: 'unavailable' };
+  if (!response.ok || !(response.headers.get('Content-Type') ?? '').startsWith('text/csv'))
+    return { kind: 'error' };
+  const csv = await response.blob();
+  const venue = venueId.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  return {
+    kind: 'ready',
+    csv,
+    filename: `owner-report-${venue}-${now.toISOString().slice(0, 10)}.csv`,
+  };
+}
