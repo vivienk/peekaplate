@@ -141,6 +141,9 @@ export type OwnerMenuClientOptions = {
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{16,128}$/;
 export const MAX_FILE_BYTES = 12_000_000;
+// Covers the server's 220s portion-processing deadline (30s container start + 180s segmentation
+// + delivery) plus a client-side margin so the browser does not abort mid-flight.
+export const PORTION_TIMEOUT_MS = 240_000;
 
 export function newCommandId(): string {
   return crypto.randomUUID();
@@ -237,6 +240,17 @@ const group = (body: unknown): UploadGroup => {
   return value;
 };
 
+function portionReview(body: unknown, draftId: string, photoId: string) {
+  const record = field(body, 'portionReview') as Record<string, unknown>;
+  if (
+    (record?.status !== 'needs_review' && record?.status !== 'failed') ||
+    record.dish_id !== draftId ||
+    record.draft_revision_id !== photoId
+  )
+    throw new Error('portion review identity');
+  return { status: record.status, approved: record.approved === true };
+}
+
 export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   const base = readWorkspaceApiBase(options.baseUrl);
   if (!base) throw new OwnerMenuApiError(0, 'invalid_api_origin');
@@ -253,15 +267,16 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
       headers?: Record<string, string>;
       upload?: boolean;
       blob?: boolean;
+      timeoutMs?: number;
     },
     parse: (body: unknown) => T,
   ): Promise<T> {
     const token = await options.getToken();
     if (options.signal?.aborted) throw new OwnerMenuApiError(0, 'aborted');
     if (!token) throw new OwnerMenuApiError(401, 'unauthorized');
-    const limit = init.upload
-      ? (options.uploadTimeoutMs ?? 120_000)
-      : (options.timeoutMs ?? 30_000);
+    const limit =
+      init.timeoutMs ??
+      (init.upload ? (options.uploadTimeoutMs ?? 120_000) : (options.timeoutMs ?? 30_000));
     const controller = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => {
@@ -539,22 +554,29 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           venueId,
           `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion`,
         ),
-        { method: 'POST', upload: true },
-        (body) => {
-          const record = field(body, 'portionReview') as Record<string, unknown>;
-          if (
-            !record ||
-            !['needs_review', 'failed'].includes(String(record.status)) ||
-            record.dish_id !== draftId ||
-            record.draft_revision_id !== photoId
-          )
-            throw new Error('portion review identity');
-          return {
-            status: record.status as 'needs_review' | 'failed',
-            approved: record.approved === true,
-          };
-        },
+        { method: 'POST', timeoutMs: PORTION_TIMEOUT_MS },
+        (body) => portionReview(body, draftId, photoId),
       );
+    },
+    async readDraftPortion(venueId: string, draftId: string, photoId: string) {
+      try {
+        return await request(
+          venuePath(
+            venueId,
+            `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion`,
+          ),
+          { method: 'GET' },
+          (body) => portionReview(body, draftId, photoId),
+        );
+      } catch (error) {
+        if (
+          error instanceof OwnerMenuApiError &&
+          error.status === 404 &&
+          error.code === 'not_found'
+        )
+          return null;
+        throw error;
+      }
     },
     async approveDraftPortion(venueId: string, draftId: string, photoId: string) {
       return request(

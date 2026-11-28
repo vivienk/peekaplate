@@ -5660,6 +5660,26 @@ The released owner menu URL field rendered with 16 px horizontal padding and the
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-25T09:00:01.094Z","exitCode":2}
 ```
 
+## 2026-11-25 2.5D portion generation timeouts
+
+```json
+{"id":"ERR-20261125-PORTION-001","status":"resolved","area":"portion-cutout-timeouts","cause":"Each disposable cutout subprocess imported rembg, which unconditionally imports pymatting and triggers Numba JIT compilation/caching of unused alpha-matting kernels (>180s at 0.5 vCPU in production, or fast cache-locator failure under --read-only), while the console aborted portion POSTs at 120s and the Worker lacked waitUntil for R2 persistence.","prevention":"Set NUMBA_DISABLE_JIT=1 and OMP_NUM_THREADS=1 in cutout.py and Dockerfile warmup; give generateDraftPortion a 240s per-call timeout with timeout-specific copy; wrap processPrivateDishPhoto in executionCtx.waitUntil.","sources":["processing/src/peekaplate_processing/cutout.py","processing/Dockerfile","backend/src/owner-menu-routes.ts","frontend/console/src/owner-menu/api.ts","frontend/console/src/owner-menu/jobs.ts","frontend/console/src/owner/OwnerMenuWorkspace.tsx"],"regression":"0.5-vCPU 4g --read-only container repro with noka-ikari-steak-ramen.png: BEFORE took 3.54s (fallback_retained/automatic_cutout_unavailable with /tmp tmpfs only) and 69.04s (ready with writable /home/extractor tmpfs); AFTER took 9.36s (ready, matching portion_bd9fdd60ac726fa6c2a7ae055f27b93c). Unit, vitest, lint, typecheck, context:check and docs:check passed."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-25T11:19:02.122Z","exitCode":1}
+```
+
+Clarification for `ERR-20261125-PORTION-001`: both settings apply to the runtime cutout subprocess. The final change uses the existing Dockerfile and model download step.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-25T13:08:57.700Z","exitCode":1}
+```
+
+The Worker transport integration test reported SQLITE_BUSY_RECOVERY and timed out in the parallel suite. The full suite passed with `pnpm exec vitest run --maxWorkers=1` (2575 passed, 5 skipped). The source of the lock is unconfirmed.
+
 ## 2026-11-26 owner review gate database fixtures
 
 The [database check on f50aba4e](https://github.com/vivienk/peekaplate/actions/runs/45947289663/job/140334842094)
@@ -5669,3 +5689,12 @@ The [owner workspace integration tests](backend/src/owner-menu.integration.ts)
 now use ready drafts for those verification paths and seed the existing accepted
 state directly for the legacy facts test. The complete database check covers
 both these fixtures and the new rejection cases.
+
+## 2026-11-27 Screen 9 photo rights and overlapping portion retries
+
+Opening an existing draft started a generation POST while the rights checkbox was unchecked.
+Screen 9 now reads the cached preview on reopen and sends generation only after an explicit
+rights-confirmed action. The [workspace regression](tests/e2e/owner-workspace.spec.ts) covers
+reopen, replacement and saving to review. Separately, an immediate retry could exhaust its 12s
+backoff before the first request saved its result. The [transport regression](backend/src/owner-portion-preview.test.ts)
+keeps both requests active and confirms the retry reads the record written to R2 at virtual 29s.

@@ -284,7 +284,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "09fbfc8553d85e23bba18945eb06dcaec2c22a89116175c2ce9bffe1a9f6255a"
+      "sourceFingerprint": "fea81d9cee8e50b31f475584994c8892ad036c1d7e267e208c1c351996748809"
     },
     {
       "id": "console",
@@ -479,7 +479,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "6c1a691d2b7612901f5f75f2177fe9a408f99dea68f705278930cdb08613cb23"
+      "sourceFingerprint": "79af16de25a2e9c221da0358b0e00226e304015f1546e68ef28e67512f194bb1"
     },
     {
       "id": "backend",
@@ -762,7 +762,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "26bdf85ade9093c6b883a9e44e4273c30446eaa026c7457f457cc25f41f3e01e"
+      "sourceFingerprint": "cc39116c3c0621076b9e2f7da7c51c2f4d8ddf975d179aa397b06ef82b80693f"
     },
     {
       "id": "database",
@@ -1112,6 +1112,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/tripo-cutout-to-3d.md",
         "processing/src/peekaplate_processing/portion_ingestion.py",
         "processing/src/peekaplate_processing/plate_calibration.py",
+        "processing/src/peekaplate_processing/cutout.py",
+        "processing/tests/test_cutout.py",
         "processing/tests/test_portion_ingestion.py",
         "processing/src/peekaplate_processing/prepare_assets.py",
         "processing/src/peekaplate_processing/provider_budget.py",
@@ -1129,7 +1131,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "a8bc68e759ee2e7e43be6891cbecbce0799fd903bd3e940259f3e3064c10ef21"
+      "sourceFingerprint": "60b6194f98170975e8bfa15e4e5295013ecf39256c725245ae0c375aa9a37d22"
     },
     {
       "id": "assets",
@@ -1164,23 +1166,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-21",
-      "modules": [
-        "console",
-        "backend",
-        "delivery"
-      ],
-      "summary": "Use the authored dashboard with an authenticated report refresh. Fix the production portion container startup and support a production-only processor with no OCR or external providers. Keep menu OCR and production reporting activation separate.",
-      "files": [
-        "backend/src/extraction-host.ts",
-        "backend/wrangler.extraction.production.jsonc",
-        "frontend/console/src/owner-dashboard/report-data.tsx",
-        "processing/src/peekaplate_processing/service.py",
-        "docs/production-release.md"
-      ],
-      "next": "Review the pinned PR and verify an exact production-only release. Reporting activation remains subject to publication provenance, historical isolation, and repeated-release disclosure checks."
-    },
     {
       "date": "2026-11-21",
       "modules": [
@@ -1316,6 +1301,27 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/search.spec.ts"
       ],
       "next": "Review and verify the pinned PR in hosted CI."
+    },
+    {
+      "date": "2026-11-27",
+      "modules": [
+        "console",
+        "backend",
+        "processing"
+      ],
+      "summary": "PR #274 keeps the 240s client timeout and local cutout subprocess settings. After a disconnect, an overlapping retry rechecks R2 across 30s of busy responses within the existing API deadline. Screen 9 reopens previews read-only and generates only when the owner confirms rights for the selected photo and requests generation. Saving for review retains its navigation. Focused local tests cover a late R2 write and unchecked fresh, saved and replacement photos; hosted cutout and publication acceptance remain pending.",
+      "files": [
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/jobs.ts",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/owner-dashboard/DishFormView.tsx",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "backend/src/owner-menu-routes.ts",
+        "backend/src/owner-portion-preview.ts",
+        "processing/src/peekaplate_processing/cutout.py",
+        "tests/e2e/owner-workspace.spec.ts"
+      ],
+      "next": "Deploy updated portion container, API Worker, and console in order, then rerun hosted S09 through Diner View Portion end-to-end QA."
     }
   ]
 }

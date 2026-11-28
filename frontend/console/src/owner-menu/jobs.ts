@@ -1,6 +1,6 @@
 // FE-06.2: one processing state for Screen 8 from the stored job states of an upload group. It
 // reports counts only: the API gives no provider progress, so there is no percentage or timer.
-import type { MenuJob } from './api';
+import { type MenuJob, OwnerMenuApiError } from './api';
 
 export type MenuProcessingPhase =
   // Some files still have to be sent before extraction can start.
@@ -99,4 +99,12 @@ const ERROR_COPY: Record<string, string> = {
 
 export function errorMessage(code: string): string {
   return ERROR_COPY[code] ?? 'Something went wrong. Try again, or add the dishes by hand.';
+}
+
+/** Honest copy when a 2.5D generation request fails or times out on the client. */
+export function portionFailureMessage(reason: unknown): string {
+  if (reason instanceof OwnerMenuApiError && reason.code === 'timeout') {
+    return '2.5D preview is still processing or timed out waiting for a response. Please try again in a moment. The original photo is retained.';
+  }
+  return '2.5D processing failed. Please try again or use another photo. The original photo is retained.';
 }

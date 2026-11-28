@@ -27,9 +27,12 @@ def automatic_mask(image):
             rgb.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
             rgb.save(root / 'input.png')
         try:
+            # Disable Numba JIT so importing rembg does not spend >60s/180s compiling
+            # unused pymatting alpha-matting kernels in each disposable subprocess,
+            # and keep ONNX intra-op threads at 1 to avoid oversubscribing 0.5 vCPU.
             result = subprocess.run([sys.executable, '-m', 'peekaplate_processing.cutout', str(root)],
                 timeout=180, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                env={**os.environ, 'OMP_NUM_THREADS': '2'}, check=False)
+                env={**os.environ, 'OMP_NUM_THREADS': '1', 'NUMBA_DISABLE_JIT': '1'}, check=False)
             if result.returncode or (root / 'mask.png').stat().st_size > 2_000_000:
                 raise ValueError('Segmentation failed')
             metadata = json.loads((root / 'model.json').read_text())
@@ -53,6 +56,8 @@ def automatic_mask(image):
 
 
 def worker(directory):
+    os.environ.setdefault('OMP_NUM_THREADS', '1')
+    os.environ.setdefault('NUMBA_DISABLE_JIT', '1')
     from rembg import new_session, remove
     from rembg.sessions.u2netp import U2netpSession
     root = Path(directory)

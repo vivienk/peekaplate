@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { MenuJob } from './api';
-import { errorMessage, menuProcessingState } from './jobs';
+import { type MenuJob, OwnerMenuApiError } from './api';
+import { errorMessage, menuProcessingState, portionFailureMessage } from './jobs';
 
 const job = (id: string, overrides: Partial<MenuJob> = {}): MenuJob => ({
   id,
@@ -90,5 +90,20 @@ describe('errorMessage', () => {
   it('explains known codes and never shows a raw code', () => {
     expect(errorMessage('menu_file_link_required')).toContain('direct link');
     expect(errorMessage('something_new')).not.toContain('something_new');
+  });
+});
+
+describe('portionFailureMessage', () => {
+  it('reports client timeouts honestly as still processing and retryable', () => {
+    const msg = portionFailureMessage(new OwnerMenuApiError(0, 'timeout'));
+    expect(msg).toContain('still processing');
+    expect(msg.toLowerCase()).toContain('try again');
+    expect(msg).toContain('original photo is retained');
+  });
+
+  it('keeps processing failure copy for non-timeout failures', () => {
+    const msg = portionFailureMessage(new OwnerMenuApiError(503, 'portion_processing_unavailable'));
+    expect(msg).toContain('2.5D processing failed');
+    expect(msg.toLowerCase()).toContain('try again');
   });
 });

@@ -35,7 +35,7 @@ import {
   reviewCorrection,
 } from '../owner-menu/dishForm';
 import { evidenceExcerpts } from '../owner-menu/evidence';
-import { errorMessage, menuProcessingState } from '../owner-menu/jobs';
+import { errorMessage, menuProcessingState, portionFailureMessage } from '../owner-menu/jobs';
 import {
   type CalibrationPhoto,
   calibrationMatchesPhoto,
@@ -247,7 +247,11 @@ export function OwnerMenuWorkspace({
       }
     | undefined
   >(undefined);
-  const [portionRetry, setPortionRetry] = useState(0);
+  const [portionRequest, setPortionRequest] = useState<{
+    draftId: string;
+    photoId: string;
+    editorGeneration: number;
+  } | null>(null);
   // The dish form (S09) returns to where it was opened: S10 review or S06 source choice
   // (Rania, #213 review). null = opened from the Menu list, which it returns to.
   const [editBack, setEditBack] = useState<'review' | 'sources' | null>(null);
@@ -548,8 +552,8 @@ export function OwnerMenuWorkspace({
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [pendingPhoto, editing?.form.photoId, editing?.id, venueId, current, failure]);
-  // Generate from the saved photo, never an unsaved browser File. The private service
-  // keys artifacts to the current draft/photo and does not authorize publication.
+  // Opening the editor only reads saved previews. The explicit save-and-generate action
+  // queues generation for the confirmed photo after its attachment is saved.
   useEffect(() => {
     const active = runtime.current;
     const draftId = editing?.id;
@@ -558,13 +562,19 @@ export function OwnerMenuWorkspace({
       setPortionReview(undefined);
       return;
     }
+    const generate =
+      portionRequest?.editorGeneration === viewGeneration.current &&
+      portionRequest.draftId === draftId &&
+      portionRequest.photoId === photoId;
     let disposed = false;
     let previewUrl: string | null = null;
-    setPortionReview({ status: 'processing' });
-    void active.client
-      .generateDraftPortion(venueId, draftId, photoId)
+    setPortionReview(generate ? { status: 'processing' } : undefined);
+    const request = generate
+      ? active.client.generateDraftPortion(venueId, draftId, photoId)
+      : active.client.readDraftPortion(venueId, draftId, photoId);
+    void request
       .then(async (result) => {
-        if (disposed || !current(active)) return;
+        if (!result || disposed || !current(active)) return;
         if (result.status === 'failed') {
           setPortionReview({
             status: 'failed',
@@ -578,12 +588,11 @@ export function OwnerMenuWorkspace({
         previewUrl = URL.createObjectURL(blob);
         setPortionReview({ status: 'needs_review', previewUrl, approved: result.approved });
       })
-      .catch(() => {
+      .catch((reason: unknown) => {
         if (!disposed && current(active)) {
           setPortionReview({
             status: 'failed',
-            message:
-              '2.5D processing failed. Please try again or use another photo. The original photo is retained.',
+            message: portionFailureMessage(reason),
           });
         }
       });
@@ -591,7 +600,7 @@ export function OwnerMenuWorkspace({
       disposed = true;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
-  }, [view, editing?.id, editing?.form.photoId, pendingPhoto, venueId, current, portionRetry]);
+  }, [view, editing?.id, editing?.form.photoId, pendingPhoto, venueId, current, portionRequest]);
 
   const dirty =
     (view === 'details' && detailsDirty) ||
@@ -832,6 +841,12 @@ export function OwnerMenuWorkspace({
   const saveDish = (stayOnEditor = false) =>
     void run(async (active) => {
       if (!editing) return;
+      if ((pendingPhoto || editing.form.photoId) && !licenseChecked) {
+        setError('Confirm you have the right to use this photo.');
+        return;
+      }
+      const editorGeneration = viewGeneration.current;
+      let photoId = editing.form.photoId;
       if (editing.form.origin === 'manual') {
         let saved = editing.draft;
         const input = manualSaveCommand(editing.form, saved?.draft_version ?? 0, newCommandId());
@@ -861,6 +876,7 @@ export function OwnerMenuWorkspace({
           setPendingPhoto(null);
           setEditing({ ...editing, draft: saved, form, saved: JSON.stringify(form) });
         }
+        photoId = form.photoId;
       } else if (editing.session && editing.form.source) {
         const session = editing.session;
         const item = session.items.find(
@@ -903,6 +919,7 @@ export function OwnerMenuWorkspace({
           if (!current(active)) return;
           setPendingPhoto(null);
           const form = dishFromReviewItem(session.extractionResult.extraction_id, updated);
+          photoId = form.photoId;
           setEditing({
             ...editing,
             form,
@@ -916,17 +933,15 @@ export function OwnerMenuWorkspace({
           });
         }
       }
+      if (stayOnEditor && photoId)
+        setPortionRequest({ draftId: editing.id, photoId, editorGeneration });
       await load(active);
       if (!current(active)) return;
       // An extracted dish counts as reviewed once it is saved with both boxes ticked.
       if (editing.form.origin === 'extracted' && reviewChecked)
         setReviewedIds((ids) => new Set(ids).add(editing.id));
       setNotice('Draft saved. This has not approved or published your menu.');
-      // Explicit 2.5D preparation remains on S09 while the saved photo generates.
       // Normal Continue to review retains the authored S09 -> S10 navigation.
-      // A new photo already triggers generation; retry explicitly only for the saved photo.
-      if (stayOnEditor && !pendingPhoto && editing.form.photoId)
-        setPortionRetry((attempt) => attempt + 1);
       if (!stayOnEditor) {
         setEditing(null);
         setPendingPhoto(null);
@@ -1311,7 +1326,15 @@ export function OwnerMenuWorkspace({
           photoPending={Boolean(pendingPhoto)}
           calibrationPhotoUnavailable={calibrationPhotoUnavailable}
           {...(portionReview ? { portionReview } : {})}
-          onGeneratePortion={() => saveDish(true)}
+          onGeneratePortion={() => {
+            if (
+              !licenseChecked ||
+              (!pendingPhoto && !editing.form.photoId) ||
+              portionReview?.status === 'processing'
+            )
+              return;
+            saveDish(true);
+          }}
           onApprovePortion={() => {
             const id = editing.id;
             const photoId = editing.form.photoId;
@@ -1365,6 +1388,7 @@ export function OwnerMenuWorkspace({
                     file.size <= 12_000_000 &&
                     ['image/jpeg', 'image/png'].includes(file.type)
                   ) {
+                    setPortionRequest(null);
                     setPendingPhoto(file);
                     setEditing((latest) =>
                       latest

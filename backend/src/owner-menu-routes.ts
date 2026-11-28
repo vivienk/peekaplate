@@ -300,7 +300,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
   app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/portion', async (c) => {
     const scope = await portionScope(c);
     try {
-      const record = await processPrivateDishPhoto({
+      const pending = processPrivateDishPhoto({
         env: c.env,
         bucket: scope.bucket,
         venueId: scope.venue,
@@ -310,6 +310,13 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
         sourceHash: scope.photo.source_hash,
         sourceSize: scope.photo.size_bytes,
       });
+      // Cloudflare waitUntil allows up to 30s for processing and R2 writes after disconnect.
+      try {
+        c.executionCtx.waitUntil(pending.catch(() => {}));
+      } catch {
+        // Tests invoking Hono without an ExecutionContext do not expose waitUntil.
+      }
+      const record = await pending;
       const approval = await readPrivatePortionApproval(scope.bucket, scope.key, record);
       c.header('Cache-Control', 'no-store');
       return c.json({ portionReview: { ...record, approved: Boolean(approval) } });
@@ -322,7 +329,9 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     const scope = await portionScope(c);
     const record = await readPrivatePortion(scope.bucket, scope.key);
     c.header('Cache-Control', 'no-store');
-    return record ? c.json({ portionReview: record }) : c.json({ error: 'not_found' }, 404);
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    const approval = await readPrivatePortionApproval(scope.bucket, scope.key, record);
+    return c.json({ portionReview: { ...record, approved: Boolean(approval) } });
   });
 
   app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/portion/approve', async (c) => {
