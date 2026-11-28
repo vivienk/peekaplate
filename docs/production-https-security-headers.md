@@ -1,8 +1,8 @@
 # Production HTTPS Enforcement & Security Headers
 
-**Branch:** `fix/production-https-security-headers`  
-**Base:** `origin/develop` (`11aaf3d4`)  
-**Reference Audit:** `docs/production-hardening-audit-2026-11-27.md`
+- **Branch** `fix/production-https-security-headers`
+- **Base** `origin/develop` (`11aaf3d4`)
+- **Reference audit** `docs/production-hardening-audit-2026-11-27.md`
 
 ---
 
@@ -28,7 +28,7 @@ Live production checks on 2026-11-27 confirmed two transport and framing gaps:
 - **Edge Layer (Primary — Cloudflare Dashboard, outside repo):** Cloudflare Zone SSL/TLS ("Always Use HTTPS" or a Zone Redirect Rule for `http://api.peekaplate.app/*` → `308`) is the primary edge enforcement point so unencrypted requests are redirected before reaching the Worker.
 - **Application Layer (Defense-in-Depth — `backend/src/index.ts`):**
   - Added `isHttpsRequest()` and a top-level `app.use('*', ...)` middleware in `createApp()` before CORS, authentication, and route handlers.
-  - When `APP_ENV === 'production'` and the request is not HTTPS (checking `X-Forwarded-Proto` first to prevent redirect loops behind TLS-terminating proxies, then `URL.protocol`, while allowing `localhost`/`127.0.0.1` for local test harnesses), the Worker immediately returns `308 Permanent Redirect` to the equivalent `https://` URL preserving path, query string, HTTP method, and request body, without processing credentials or running route handlers.
+  - In `APP_ENV === 'production'` the Worker reads the URL scheme and returns `308 Permanent Redirect` on HTTP before processing credentials or running route handlers. The redirect preserves path, query string, HTTP method, and request body. Forwarding headers and loopback hostnames do not bypass the check.
   - On HTTPS responses in `APP_ENV === 'production'`, sets `Strict-Transport-Security: max-age=2592000` (30 days; no `includeSubDomains`, no `preload`).
   - Sets `X-Content-Type-Options: nosniff` and `Cache-Control: no-store` via Hono `c.header(...)` without duplicating headers.
 
@@ -42,7 +42,7 @@ Live production checks on 2026-11-27 confirmed two transport and framing gaps:
 ## 3. Files Changed
 
 - `backend/src/index.ts` — Production HTTP → HTTPS `308` redirect middleware, `Strict-Transport-Security`, and `X-Content-Type-Options: nosniff`.
-- `backend/src/index.test.ts` — Unit tests for `308` redirect, path/query/method preservation, no-auth-over-HTTP, HSTS, `X-Forwarded-Proto` loop prevention, local/staging exemption, and CORS compatibility.
+- `backend/src/index.test.ts` — Unit tests for `308` redirects, path and query preservation, no auth over HTTP, HSTS, forwarding-header and loopback handling, local/staging behavior, CORS, and request ID correlation.
 - `frontend/console/vite.config.ts` — Emit Cloudflare Pages `_headers` in production builds.
 - `frontend/console/src/owner/security-headers.test.ts` — Build test verifying `_headers` and `_redirects` in production vs non-production builds.
 - `docs/production-https-security-headers.md` — This remediation document.
@@ -65,7 +65,7 @@ Live production checks on 2026-11-27 confirmed two transport and framing gaps:
 
 Application-level redirects in the Worker do **not** replace Cloudflare edge-level HTTPS enforcement. An authorized operator must verify/apply in the Cloudflare Dashboard (not modified by this PR):
 
-1. **Zone SSL/TLS → Edge Certificates:** Ensure **Always Use HTTPS** is enabled for `peekaplate.app` (or add a **Single Redirect Rule** matching `http.host eq "api.peekaplate.app" and not ssl` → Dynamic `concat("https://api.peekaplate.app", http.request.uri.path)` with status `308` and **Preserve query string** enabled).
+1. **API edge redirect:** Verify a rule matching HTTP requests to `api.peekaplate.app` returns `308` and preserves path and query. If needed, use an API-host-only Single Redirect Rule with `http.host eq "api.peekaplate.app" and not ssl`, dynamic target `concat("https://api.peekaplate.app", http.request.uri.path)`, and **Preserve query string** enabled. Confirm another edge rule does not take precedence and change the status.
 2. **Minimum TLS Version:** Confirm `TLS 1.2` or higher is enforced on the `peekaplate.app` zone.
 3. **Cloudflare Pages (`peekaplate-console`):** Confirm no conflicting Transform Rules override `_headers` on `peekaplate.app`.
 

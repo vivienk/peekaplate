@@ -1276,6 +1276,7 @@ export function createApp(services: Dependencies = dependencies) {
       });
     }
 
+    c.header('X-Request-ID', requestId);
     await next();
 
     if (!c.res.headers.has('Cache-Control')) {

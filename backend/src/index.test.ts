@@ -2994,15 +2994,23 @@ describe('production HTTPS enforcement, HSTS, and API security headers', () => {
       },
       execute: vi.fn(),
     });
-    const errRes = await errorApp.request(
-      'https://api.peekaplate.app/staff/venues',
-      { headers: { Authorization: 'Bearer signed' } },
-      productionEnv,
-    );
-    expect(errRes.status).toBe(503);
-    expect(errRes.headers.get('Strict-Transport-Security')).toBe('max-age=2592000');
-    expect(errRes.headers.get('X-Content-Type-Options')).toBe('nosniff');
-    expect(errRes.headers.get('Cache-Control')).toBe('no-store');
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const errRes = await errorApp.request(
+        'https://api.peekaplate.app/staff/venues',
+        { headers: { Authorization: 'Bearer signed' } },
+        productionEnv,
+      );
+      expect(errRes.status).toBe(503);
+      expect(errRes.headers.get('Strict-Transport-Security')).toBe('max-age=2592000');
+      expect(errRes.headers.get('X-Content-Type-Options')).toBe('nosniff');
+      expect(errRes.headers.get('Cache-Control')).toBe('no-store');
+      const requestId = errRes.headers.get('X-Request-ID');
+      expect(requestId).toMatch(/^[a-f0-9-]{36}$/);
+      expect(errorLog).toHaveBeenCalledWith(JSON.stringify({ event: 'command_failed', requestId }));
+    } finally {
+      errorLog.mockRestore();
+    }
   });
 
   it('does not redirect or send HSTS in local/staging environments and preserves CORS', async () => {
