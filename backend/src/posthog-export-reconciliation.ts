@@ -57,7 +57,9 @@ export function reconcilePostHogExportRuns(
   }
 
   const ordered = [...groups.values()].sort(
-    (a, b) => Date.parse(a[0]!.intervalStart) - Date.parse(b[0]!.intervalStart),
+    (a, b) =>
+      Date.parse(a[0]!.intervalStart) - Date.parse(b[0]!.intervalStart) ||
+      Date.parse(a[0]!.intervalEnd) - Date.parse(b[0]!.intervalEnd),
   );
 
   let cutoff = initialCutoff;
@@ -66,7 +68,7 @@ export function reconcilePostHogExportRuns(
 
   const intervals: PostHogReconciliationResult['intervals'] = [];
 
-  for (const group of ordered) {
+  for (const [index, group] of ordered.entries()) {
     const first = group[0]!;
     const start = Date.parse(first.intervalStart);
     const end = Date.parse(first.intervalEnd);
@@ -98,6 +100,7 @@ export function reconcilePostHogExportRuns(
 
     let reason: string | undefined;
     let accepted: PostHogExportRun | undefined;
+    const next = ordered[index + 1]?.[0];
 
     if (blocked) {
       reason = 'An earlier interval remains unverified';
@@ -106,6 +109,8 @@ export function reconcilePostHogExportRuns(
         start > cutoff
           ? 'Interval gap: verified cutoff cannot advance across missing time'
           : 'Interval overlaps the existing verified cutoff';
+    } else if (next && Date.parse(next.intervalStart) < end) {
+      reason = 'Distinct export intervals overlap';
     } else if (!expectedIdsConsistent) {
       reason = 'PostHog expected event identities differ across replay attempts';
     } else {

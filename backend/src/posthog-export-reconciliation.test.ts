@@ -6,6 +6,28 @@ const sunday = '2026-10-25T00:00:00.000Z';
 const monday = '2026-10-26T00:00:00.000Z';
 
 describe('reconcilePostHogExportRuns', () => {
+  it('does not certify overlapping intervals in either input order', () => {
+    const short = {
+      runId: 'short',
+      intervalStart: cutoff,
+      intervalEnd: sunday,
+      status: 'completed' as const,
+      expectedEventIds: ['event-1'],
+      copiedEventIds: ['event-1'],
+    };
+    const long = { ...short, runId: 'long', intervalEnd: monday };
+
+    for (const runs of [
+      [short, long],
+      [long, short],
+    ]) {
+      const result = reconcilePostHogExportRuns(runs, cutoff);
+      expect(result.verifiedThrough).toBe(cutoff);
+      expect(result.advanced).toBe(false);
+      expect(result.blockedBy).toMatch(/overlap/i);
+    }
+  });
+
   it('verifies a consecutive interval using event identities', () => {
     const result = reconcilePostHogExportRuns(
       [

@@ -140,6 +140,8 @@ event identities for each export interval.
 - Count repeated copies separately from unique event identities.
 - Block later intervals when an earlier interval is missing, incomplete, or
   inconsistent.
+- Distinct overlapping intervals block the cutoff. Only retries with identical
+  interval boundaries are reconciled together.
 
 The utility does not fetch provider run history, query Supabase, persist a
 verified cutoff, or associate landing-table rows with a provider run ID. Those
