@@ -290,9 +290,10 @@ test('production deep links resume after sign-in and keep orientation through br
   await expect(page.getByRole('heading', { name: 'What you decided to do' })).toBeVisible();
   await page.goForward();
   await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
-  for (const [path, heading] of [
-    ['/menu', 'Your dishes'],
-    ['/actions', 'What you decided to do'],
+  for (const [path, heading, retryLabel] of [
+    ['/menu', 'Your dishes', 'Retry report'],
+    ['/actions', 'What you decided to do', 'Retry report'],
+    ['/dish-performance', 'What diners did with each dish', 'Refresh report'],
   ]) {
     const before = reportReads;
     unavailableNextReport = true;
@@ -303,7 +304,7 @@ test('production deep links resume after sign-in and keep orientation through br
       availability.getByText('Reports aren’t available for this restaurant yet.'),
     ).toBeVisible();
     await expect(availability.getByRole('textbox')).toBeDisabled();
-    await availability.getByRole('button', { name: 'Retry report', exact: true }).click();
+    await page.getByRole('button', { name: retryLabel, exact: true }).click();
     await expect(question).toBeEnabled();
     await askAboutSoup();
     expect(reportReads).toBe(before + 2);
@@ -314,6 +315,7 @@ test('production deep links resume after sign-in and keep orientation through br
   await expect(page).toHaveURL(`${productionOrigin}/dish-performance`);
   await expect(page.getByRole('table')).toBeVisible();
 
+  const readsBeforeUnpublish = reportReads;
   published = false;
   await page.reload();
   await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
@@ -325,12 +327,13 @@ test('production deep links resume after sign-in and keep orientation through br
   await page.goto(`${productionOrigin}/menu`);
   await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
   await expect(question).toHaveCount(0);
-  expect(reportReads).toBe(7);
+  expect(reportReads).toBe(readsBeforeUnpublish);
 
   await page.getByLabel('Owner account').click();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
   await expect(page).toHaveTitle('PeekaPlate · Owner sign in');
+  const questionsBeforeEmptyReport = analysisRequests;
   published = true;
   emptyReport = true;
   await enterEmail(page);
@@ -339,10 +342,10 @@ test('production deep links resume after sign-in and keep orientation through br
   await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
   await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
   await expect(question).toBeEnabled();
-  expect(reportReads).toBe(8);
+  expect(reportReads).toBe(readsBeforeUnpublish + 1);
   await visit('Overview', '/overview', 'How your menu did this period');
   await askAboutSoup();
-  expect(analysisRequests).toBe(5);
+  expect(analysisRequests).toBe(questionsBeforeEmptyReport + 1);
 });
 
 test('the production day report retries transient failures but stops after access denial', async ({
