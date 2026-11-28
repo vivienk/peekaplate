@@ -5677,3 +5677,8 @@ both these fixtures and the new rejection cases.
 
 The local test database could not start because Docker's Linux engine was unavailable.
 The mixed manual and extracted dietary publication regression runs in the CI database lane.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-28T05:18:16.694Z","exitCode":1}
+```
