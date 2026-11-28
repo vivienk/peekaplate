@@ -37,16 +37,19 @@ const readPrefix =
   /^(?:please )?(?:(?:what (?:is|are|was|were)|how many|show(?: me)?|give(?: me)?|tell(?: me)?) )?(?:the )?/;
 const windowSuffix =
   / (?:in|for|during) (?:(?:this|the) (?:report|window|period)|the (?:current|displayed) (?:report|window|period))$/;
+const reportContextSuffix = / (?:in|for|during) (?:this|the) report$/;
 const openingCount =
   /^(?:(?:total|restaurant wide|restaurant) )?(?:(?:dish )?(?:opens|openings|open(?:ing)? counts?)|times (?:(?:the )?dishes were|were (?:the )?dishes) opened)$/;
 const restaurantVisits =
-  /^(?:restaurant(?: wide)? visits|menu sessions)(?: (?:were there|are there|did we (?:have|record|see)))?(?: this (?:report|window|period))?$/;
+  /^(?:restaurant(?: wide)? visits|menu sessions)(?: (?:were there|are there|did we (?:have|record|see)))?$/;
+const implicitCurrentWindow = / this (?:report|window|period)$/;
 const previousWindow =
-  / (?:in |for |during )?(?:the )?(?:previous|prior|preceding|last|baseline) (?:report|window|period)$/;
+  / (?:in |for |during )?(?:the )?(?:previous|prior|preceding|last|baseline) (?:report|(?:report )?(?:window|period))$/;
 const compareWindows =
   / (?:between |in |for )?(?:the )?(?:current|this)(?: (?:report|window|period))? (?:and|vs|versus|with|to) (?:the )?(?:previous|prior|preceding|last|baseline) (?:reports?|windows?|periods?)$/;
-const compareOpeningPrefix =
+const comparePeriodPrefix =
   /^(?:the )?(?:current|this) and (?:previous|prior|preceding|last|baseline) /;
+const compareWithPrevious = /^how (?:did|do) (?:our |the )?(.+) compare (?:with|to|against)$/;
 const openingQualifier =
   / (?:(?:were|are) there|did we (?:have|record|see)|(?:across|for|in) (?:the|this|my|our)(?: whole)? restaurant)$/;
 const maxPoints = 20;
@@ -74,31 +77,47 @@ type Selection = {
 };
 
 function questionParts(question: string) {
-  const text = normalize(question).replace(chartRequestPrefix, '').replace(windowSuffix, '');
+  const input = normalize(question).replace(chartRequestPrefix, '');
+  const text = input.replace(windowSuffix, '');
   const chart = chartPrefix.test(text) || chartSuffix.test(text);
+  const subject = text.replace(chartPrefix, '').replace(chartSuffix, '');
+  const query = subject.replace(windowSuffix, '');
   return {
-    query: text.replace(chartPrefix, '').replace(chartSuffix, '').replace(windowSuffix, ''),
+    query,
     chart,
+    explicitCurrentWindow:
+      (input !== text && !reportContextSuffix.test(input)) ||
+      (subject !== query && !reportContextSuffix.test(subject)),
   };
 }
 
-function overviewSelection(query: string): OverviewSelection | null {
+function overviewSelection({
+  query,
+  explicitCurrentWindow,
+}: ReturnType<typeof questionParts>): OverviewSelection | null {
   const text = query.replace(readPrefix, '');
-  if (restaurantVisits.test(text)) return { metric: 'menu_sessions', period: 'current' };
+  let period: OverviewSelection['period'] = 'current';
+  let subject = text;
   if (text.startsWith('compare ')) {
-    const subject = text.slice('compare '.length).replace(/^the /, '');
-    if (
-      (compareWindows.test(subject) && openingCount.test(subject.replace(compareWindows, ''))) ||
-      (compareOpeningPrefix.test(subject) &&
-        openingCount.test(subject.replace(compareOpeningPrefix, '')))
-    )
-      return { metric: 'dish_opens', period: 'compare' };
-    return null;
+    const comparison = text.slice('compare '.length).replace(/^the /, '');
+    const betweenWindows = comparison.replace(compareWindows, '');
+    subject =
+      betweenWindows === comparison ? comparison.replace(comparePeriodPrefix, '') : betweenWindows;
+    if (subject === comparison) return null;
+    period = 'compare';
+  } else {
+    const beforePreviousWindow = text.replace(previousWindow, '');
+    if (beforePreviousWindow !== text) {
+      const comparisonMetric = compareWithPrevious.exec(beforePreviousWindow)?.[1];
+      subject = comparisonMetric ?? beforePreviousWindow;
+      period = comparisonMetric ? 'compare' : 'baseline';
+    }
   }
-  const prior = previousWindow.test(text);
-  const subject = text.replace(previousWindow, '').replace(openingQualifier, '');
-  return openingCount.test(subject)
-    ? { metric: 'dish_opens', period: prior ? 'baseline' : 'current' }
+  if (explicitCurrentWindow && period !== 'current') return null;
+  const visitsSubject = period === 'current' ? subject.replace(implicitCurrentWindow, '') : subject;
+  if (restaurantVisits.test(visitsSubject)) return { metric: 'menu_sessions', period };
+  return openingCount.test(subject.replace(openingQualifier, ''))
+    ? { metric: 'dish_opens', period }
     : null;
 }
 
@@ -275,7 +294,7 @@ export function answerOwnerReportQuestion(
   const abstain = (reason: Refusal['reason']) =>
     OwnerReportQuestionResultSchema.parse({ ...base, status: 'abstained', reason });
   const parts = questionParts(question);
-  const overview = overviewSelection(parts.query);
+  const overview = overviewSelection(parts);
   if (overview) return readOverviewCount(report, overview, parts.chart, now, base);
   if (
     metadata.report_status !== 'NORMAL' ||

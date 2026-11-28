@@ -93,6 +93,7 @@ function setup(
     actions: false,
     overviewOnly: false,
     menuSessions: (_cutoff: Date): MenuSessionCount => ({ value: null, status: 'MISSING' }),
+    baselineMenuSessions: { value: null, status: 'MISSING' } as MenuSessionCount,
     openings: (_cutoff: Date): { current: number | null; baseline: number | null } => ({
       current: null,
       baseline: null,
@@ -136,7 +137,11 @@ function setup(
           dish_opens: count(openings.current),
           menu_sessions: reportState.menuSessions(end),
         },
-        baseline: { ...metrics, dish_opens: count(openings.baseline) },
+        baseline: {
+          ...metrics,
+          dish_opens: count(openings.baseline),
+          menu_sessions: reportState.baselineMenuSessions,
+        },
       };
     } else if (sealedBatch) {
       const end = Math.floor((anchor.getTime() - 60_000) / 300_000) * 300_000;
@@ -345,12 +350,13 @@ it('reads the signed restaurant counts for both Overview periods and pins the ol
   s.advance(signedAt - start);
   s.reportState.openings = (cutoff) => ({
     current: cutoff.getTime() < nextCutoff ? 11 : 13,
-    baseline: 10,
+    baseline: 8,
   });
   s.reportState.menuSessions = (cutoff) => ({
     value: cutoff.getTime() < nextCutoff ? 14 : 17,
     status: 'NORMAL',
   });
+  s.reportState.baselineMenuSessions = { value: 12, status: 'NORMAL' };
   delete s.env.OWNER_AI_OPENAI_API_KEY;
   delete s.env.OWNER_AI_OPENAI_PROJECT_ID;
   const first = await s.get();
@@ -393,12 +399,12 @@ it('reads the signed restaurant counts for both Overview periods and pins the ol
     metric: 'dish_opens',
     overview: { period: 'baseline' },
     timeWindow: previousWindow,
-    points: [{ label: 'Previous period', value: 10 }],
+    points: [{ label: 'Previous period', value: 8 }],
   });
   expect(
     await read(
       oldRef,
-      'Compare the dish openings for the current and previous periods as a bar chart.',
+      'Compare the dish openings for the current and previous periods as a bar chart in this report.',
     ),
   ).toMatchObject({
     status: 'answered',
@@ -408,9 +414,35 @@ it('reads the signed restaurant counts for both Overview periods and pins the ol
     timeWindow: firstWindow,
     points: [
       { label: 'Current period', value: 11 },
-      { label: 'Previous period', value: 10 },
+      { label: 'Previous period', value: 8 },
     ],
   });
+
+  for (const [question, metric, current, prior] of [
+    ['How many dish openings were there in the preceding report period?', 'dish_opens', null, 8],
+    ['How many menu sessions did we have in the preceding period?', 'menu_sessions', null, 12],
+    ['How did our openings compare with the preceding period?', 'dish_opens', 11, 8],
+    ['How did menu sessions compare with the preceding period?', 'menu_sessions', 14, 12],
+  ] as const) {
+    expect.soft(await read(oldRef, question), question).toMatchObject({
+      status: 'answered',
+      metric,
+      chart: false,
+      reportSnapshot: ownerReportSnapshot(firstReport),
+      timeWindow: current === null ? previousWindow : firstWindow,
+      overview:
+        current === null
+          ? { period: 'baseline' }
+          : { period: 'compare', baselineWindow: previousWindow },
+      points:
+        current === null
+          ? [{ label: 'Previous period', value: prior }]
+          : [
+              { label: 'Current period', value: current },
+              { label: 'Previous period', value: prior },
+            ],
+    });
+  }
 
   s.advance(10_000);
   const newRef = await s.reference();
@@ -433,7 +465,7 @@ it('reads the signed restaurant counts for both Overview periods and pins the ol
     timeWindow: { start: firstWindow.start, end: new Date(nextCutoff).toISOString() },
     points: [{ value: 17 }],
   });
-  s.reportState.openings = () => ({ current: 14, baseline: 10 });
+  s.reportState.openings = () => ({ current: 14, baseline: 8 });
   expect((await request(oldRef, 'How many openings?')).status).toBe(409);
   expect(s.provider).not.toHaveBeenCalled();
 });
@@ -492,13 +524,39 @@ it('preserves a measured restaurant visit zero and refuses unusable visit eviden
     expect(refusal).not.toHaveProperty('points');
   }
   s.reportState.menuSessions = () => ({ value: 14, status: 'NORMAL' });
-  expect(await ask('How many restaurant visits were there last Christmas?')).toMatchObject({
-    status: 'abstained',
+  const comparison = 'How did menu sessions compare with the preceding period?';
+  s.reportState.baselineMenuSessions = { value: 0, status: 'VALID_ZERO' };
+  expect(await ask(comparison)).toMatchObject({
+    status: 'answered',
+    points: [
+      { label: 'Current period', value: 14 },
+      { label: 'Previous period', value: 0 },
+    ],
   });
+  s.reportState.overviewOnly = false;
+  for (const question of [
+    'How many restaurant visits were there last Christmas?',
+    'How many menu sessions did we have in the preceding period in the current period?',
+    'How many menu sessions did we have this period in the preceding period?',
+    'Compare current and previous menu sessions this period.',
+    'How did menu sessions compare with the preceding period last Christmas?',
+  ]) {
+    const result = await ask(question);
+    expect(result, question).toMatchObject({ status: 'abstained', reason: 'unsupported_question' });
+    expect(result).not.toHaveProperty('points');
+  }
+  s.reportState.baselineMenuSessions = { value: null, status: 'SUPPRESSED' };
+  const suppressed = await ask(comparison);
+  expect(suppressed).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+  expect(suppressed).not.toHaveProperty('points');
+
+  s.reportState.baselineMenuSessions = { value: 12, status: 'NORMAL' };
   s.reportState.fresh = false;
-  const refusal = await ask();
-  expect(refusal).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
-  expect(refusal).not.toHaveProperty('points');
+  for (const question of [restaurantVisitsQuestion, comparison]) {
+    const refusal = await ask(question);
+    expect(refusal).toMatchObject({ status: 'abstained', reason: 'unusable_evidence' });
+    expect(refusal).not.toHaveProperty('points');
+  }
   expect(s.provider).not.toHaveBeenCalled();
 });
 
