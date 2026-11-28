@@ -62,6 +62,13 @@ body:not(:has(#app .pp-menu)) > #consent,
 body:has(.pp-detail, .pp-picker, .pp-result) > #consent {
   display: none;
 }
+
+/* In the development menu, leave the clear action above the analytics prompt. */
+body:has(.pp-menu .pp-search-empty:not([hidden])) #consent section {
+  position: static;
+  margin-block: 1rem;
+}
+
 main {
   max-width: 48rem;
   margin: 12vh auto;
@@ -2404,51 +2411,14 @@ main:has(> .pp-compare) {
   line-height: 24px;
 }
 
-/* Figma DishDetail_Loading: the same layout drawn as grey placeholders until the photo loads. */
-.pp-detail--loading {
-  pointer-events: none;
-}
-
-.pp-detail--loading .pp-detail__title,
-.pp-detail--loading .pp-detail__category,
-.pp-detail--loading .pp-detail__name,
-.pp-detail--loading .pp-detail__price,
-.pp-detail--loading .pp-detail__description,
-.pp-detail--loading .pp-detail__servings,
-.pp-detail--loading .pp-detail__save,
-.pp-detail--loading .pp-ingredient__name,
-.pp-detail--loading .pp-detail__actions .pp-btn {
-  border-radius: 8px;
-  background: #3a3d46;
-  color: transparent;
-  animation: pp-skeleton-pulse 1.2s ease-in-out infinite;
-}
-
-.pp-detail--loading .pp-detail__title {
-  width: 207px;
-  justify-self: start;
-}
-
-.pp-detail--loading .pp-detail__save {
-  width: 77px;
-  min-width: 77px;
-  border: 0;
-}
-
-.pp-detail--loading .pp-detail__save * {
-  visibility: hidden;
-}
-
-.pp-detail--loading .pp-detail__image-wrap {
+/* The photo placeholder leaves the loaded dish information and controls available. */
+.pp-detail__image-wrap[aria-busy="true"] {
   background:
     linear-gradient(#3a3d46, #3a3d46) center / min(320px, 100%) min(320px, 100%) no-repeat;
   animation: pp-skeleton-pulse 1.2s ease-in-out infinite;
 }
 
-.pp-detail--loading .pp-detail__image,
-.pp-detail--loading .pp-ingredient__icon,
-.pp-detail--loading .pp-chip,
-.pp-detail--loading .pp-allergen-section {
+.pp-detail__image-wrap[aria-busy="true"] .pp-detail__image {
   visibility: hidden;
 }
 
@@ -2459,16 +2429,7 @@ main:has(> .pp-compare) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pp-detail--loading .pp-detail__title,
-  .pp-detail--loading .pp-detail__category,
-  .pp-detail--loading .pp-detail__name,
-  .pp-detail--loading .pp-detail__price,
-  .pp-detail--loading .pp-detail__description,
-  .pp-detail--loading .pp-detail__servings,
-  .pp-detail--loading .pp-detail__save,
-  .pp-detail--loading .pp-ingredient__name,
-  .pp-detail--loading .pp-detail__actions .pp-btn,
-  .pp-detail--loading .pp-detail__image-wrap {
+  .pp-detail__image-wrap[aria-busy="true"] {
     animation: none;
   }
 }

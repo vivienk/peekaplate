@@ -5,6 +5,7 @@ import {
   type Comparison,
   comparisonDishes,
   dishComparedPayloads,
+  MAX_COMPARE_CHOICES,
   replaceExclusions,
   replaceSide,
   startComparison,
@@ -34,7 +35,7 @@ import {
   track,
 } from '../tracking';
 import type { MenuToken } from '../tracking/delivery';
-import { completeDishes } from './adapter';
+import { completeDishes, FIXTURE_NOTICE } from './adapter';
 import { menuMode } from './config';
 import { renderDishDetail, renderDishOpenFailed } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
@@ -118,6 +119,10 @@ function stateHeading(): string {
   return fixtureMode ? demoBundle.restaurant.name : 'Menu';
 }
 
+function fixtureNotice(): string {
+  return fixtureMode ? `<p class="pp-notice">${FIXTURE_NOTICE}</p>` : '';
+}
+
 function completeDishById(menu: Menu, dishId: string): CompleteDish | undefined {
   for (const category of menu.categories) {
     for (const dish of category.dishes) {
@@ -133,6 +138,7 @@ function renderLoading(container: HTMLElement): void {
     <div class="pp-menu pp-menu--loading" role="status" aria-live="polite">
       <div class="pp-spinner" aria-hidden="true"></div>
       <p class="pp-loading-text">Loading menu…</p>
+      ${fixtureNotice()}
     </div>
   `;
 }
@@ -154,6 +160,7 @@ function renderFailure(
     <div class="pp-menu pp-menu--state" role="status" aria-live="polite">
       <p class="pp-state-text">${escapeHtml(messages[status] ?? 'We could not load the menu.')}</p>
       ${showRetry ? '<button class="pp-button" type="button" data-retry>Try again</button>' : ''}
+      ${fixtureNotice()}
     </div>
   `;
   if (showRetry && onRetry) {
@@ -234,6 +241,7 @@ function renderMenu(
           <img class="pp-search__icon" src="${UI_ICONS.search}" alt="" aria-hidden="true" width="18" height="18" />
         </button>
       </header>
+      ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
       ${
         import.meta.env.VITE_OWNER_SIGN_IN_URL
           ? `<p class="pp-owner-link-wrap"><a class="pp-owner-link" href="${escapeHtml(import.meta.env.VITE_OWNER_SIGN_IN_URL)}" target="_blank" rel="noopener noreferrer">Restaurant owner? Sign in</a></p>`
@@ -645,6 +653,7 @@ export function mountMenuScreen(container: HTMLElement): void {
         leave,
         () => showDetail(requestedDish, from, returning, compareBack),
         from === 'saved_screen' && !compareBack ? 'Back to Saved' : 'Back to menu',
+        menu.notice,
       );
       window.scrollTo(0, 0);
       return;
@@ -655,7 +664,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       container,
       dish,
       compareBack ?? (fromSaved ? () => showSaved() : () => showMenu()),
-      null,
+      menu.notice,
       compareBack ? undefined : () => showPicker(dish, from),
       Boolean(compareBack),
       () => {
@@ -757,7 +766,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     renderComparePicker(container, {
       menu,
       keptDishes: [dish],
-      selectionLimit: 1,
+      selectionLimit: MAX_COMPARE_CHOICES,
       onClose: () => {
         showDetail(dish, from, true);
         container.querySelector<HTMLElement>('.pp-detail__compare')?.focus();

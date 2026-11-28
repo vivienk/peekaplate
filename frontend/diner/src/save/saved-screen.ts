@@ -2,7 +2,7 @@
 // renders into a container and navigates through callbacks; it is built with DOM methods, so dish
 // text is never parsed as markup. Copy and look are provisional until the Figma Saved frames are
 // applied.
-import savedEmptyIcon from '../assets/icons/ui/cutllery.svg';
+import savedEmptyIcon from '../assets/icons/ui/dish.svg';
 import { BACK_ICON } from '../menu/navButton';
 import { formatPrice } from '../menu/price';
 import type { CompleteDish, Menu } from '../menu/types';

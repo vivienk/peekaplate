@@ -91,6 +91,7 @@ test('the search icon opens the bar and the results are the normal dish cards', 
 
 test('no results shows the Figma state, and Clear search restores the menu', async ({ page }) => {
   await openMenu(page);
+  await expect(page.getByText('Fixture data', { exact: true })).toBeVisible();
   const allCards = await visibleCards(page).count();
   await page.getByRole('button', { name: 'Search menu' }).click();
   const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
@@ -103,11 +104,7 @@ test('no results shows the Figma state, and Clear search restores the menu', asy
   await page.screenshot({ path: 'test-results/search-no-results-fixture.png', fullPage: true });
   await expectNoAxeViolations(page);
 
-  // The taller Figma No result block puts the button under the fixed analytics banner at 390px,
-  // so it is activated by keyboard; pointer use works once the banner is answered.
-  const clear = page.getByRole('button', { name: 'Clear search' });
-  await clear.focus();
-  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Clear search' }).click();
   await expect(input).toHaveValue('');
   await expect(input).toBeFocused();
   await expect(page.getByRole('heading', { name: 'No Result Found' })).toBeHidden();

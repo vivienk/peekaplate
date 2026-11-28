@@ -70,6 +70,7 @@ export function renderDishOpenFailed(
   onBack: () => void,
   onRetry: () => void,
   backLabel = 'Back to menu',
+  notice: string | null = null,
 ): void {
   // Figma DishDetail_OpenFailed: back button and the dish name, no heart; a 150px sad picture, the
   // message 32px below it, then a full-width Try again button 24px below the message.
@@ -79,6 +80,7 @@ export function renderDishOpenFailed(
         ${navButtonMarkup('back', 'pp-detail__back', backLabel)}
         <h1 class="pp-detail__title" tabindex="-1">${escapeHtml(dishName)}</h1>
       </header>
+      ${notice ? `<p class="pp-notice">${escapeHtml(notice)}</p>` : ''}
       <div class="pp-open-failed" role="alert">
         <img class="pp-open-failed__image" src="${escapeHtml(sadIcon)}" alt="" aria-hidden="true" width="150" height="150" />
         <p class="pp-open-failed__text">Something went wrong! Please try again</p>
@@ -198,25 +200,22 @@ export function renderDishDetail(
   }
   container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 
-  const detailImg = container.querySelector<HTMLImageElement>('img.pp-detail__image');
-  // Figma DishDetail_Loading: the same layout as grey placeholders until the photo has loaded.
-  const detailRoot = container.querySelector<HTMLElement>('.pp-detail');
-  if (detailImg && detailRoot && !detailImg.complete) {
-    detailRoot.classList.add('pp-detail--loading');
-    detailRoot.setAttribute('aria-busy', 'true');
-    const loaded = () => {
-      detailRoot.classList.remove('pp-detail--loading');
-      detailRoot.removeAttribute('aria-busy');
+  const imageWrap = container.querySelector<HTMLElement>('.pp-detail__image-wrap');
+  const detailImg = imageWrap?.querySelector<HTMLImageElement>('img.pp-detail__image');
+  if (imageWrap && detailImg) {
+    // Dish data and controls are ready while the photo is still loading.
+    const startLoading = () => {
+      imageWrap.setAttribute('aria-busy', 'true');
     };
-    detailImg.addEventListener('load', loaded, { once: true });
-    detailImg.addEventListener('error', loaded, { once: true });
-  }
-  if (detailImg) {
+    const finishLoading = () => {
+      imageWrap.removeAttribute('aria-busy');
+    };
     let triedCard = false;
     const handleFailure = () => {
       const cardFallback = dish.images?.card;
       if (!triedCard && cardFallback && detailImg.getAttribute('src') !== cardFallback.url) {
         triedCard = true;
+        startLoading();
         detailImg.src = cardFallback.url;
         detailImg.alt = cardFallback.alt;
         return;
@@ -225,9 +224,13 @@ export function renderDishDetail(
       missing.className = 'pp-detail__image pp-detail__image--missing';
       missing.setAttribute('aria-hidden', 'true');
       detailImg.replaceWith(missing);
+      finishLoading();
     };
+    detailImg.addEventListener('load', finishLoading, { once: true });
     detailImg.addEventListener('error', handleFailure);
-    if (detailImg.complete && detailImg.naturalWidth === 0) {
+    if (!detailImg.complete) {
+      startLoading();
+    } else if (detailImg.naturalWidth === 0) {
       handleFailure();
     }
   }
