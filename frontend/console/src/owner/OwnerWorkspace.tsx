@@ -1,9 +1,12 @@
-import type { OwnerVenue, RestaurantProfile, RestaurantSetup } from '@peekaplate/contracts';
 import {
-  OWNER_ANALYSIS_ACTIONS,
-  OWNER_ANALYSIS_LIMITATION,
-  type OwnerAnalysisRequest,
-  type OwnerAnalysisResult,
+  canonicalJson,
+  type OwnerVenue,
+  type RestaurantProfile,
+  type RestaurantSetup,
+} from '@peekaplate/contracts';
+import {
+  OWNER_REPORT_QUESTION_MAX_LENGTH,
+  type OwnerReportQuestionResult,
 } from '@peekaplate/contracts/owner-analysis';
 import {
   isOwnerProductionCalendarVersion,
@@ -17,6 +20,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -27,14 +31,19 @@ import { OnboardingLayout, OwnerAccountMenu } from '../onboarding/OnboardingLayo
 import { RestaurantDetails } from '../onboarding/RestaurantDetails';
 import { focusScreenHeading } from '../onboarding/useHeadingFocus';
 import {
-  createOwnerAnalysisClient,
   OwnerAnalysisAccessError,
   OwnerAnalysisReferenceError,
 } from '../owner-dashboard/ai-preview/analysis-client';
 import { mergeCategories } from '../owner-dashboard/category-field';
 import { Btn } from '../owner-dashboard/controls';
 import { Actions, type LiveMenuRow, Overview, type Page, Report } from '../owner-dashboard/pages';
-import { formatOwnerReportTime, ReportView, useOwnerReport } from '../owner-dashboard/report-data';
+import type { ReportState } from '../owner-dashboard/report-api';
+import {
+  formatOwnerReportTime,
+  formatOwnerReportValue,
+  ReportView,
+  useOwnerReport,
+} from '../owner-dashboard/report-data';
 import { createOwnerMenuClient, newCommandId, OwnerMenuApiError } from '../owner-menu/api';
 import { Button, Input } from '../ui';
 import { FirstDashboardAside, FirstDashboardTopbar } from './FirstDashboard';
@@ -43,6 +52,7 @@ import type { MenuSnapshot } from './menu-snapshot';
 import { OwnerMenuWorkspace } from './OwnerMenuWorkspace';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
 import { fetchOwnerActions, type OwnerActionsState } from './owner-actions-api';
+import { createOwnerReportQuestionClient } from './report-question-client';
 import { OWNER_PAGE_LABELS } from './routes';
 import { useOwnerPage } from './useOwnerPage';
 import {
@@ -83,7 +93,7 @@ export function OwnerWorkspace({
   owner: SignedInOwner;
   apiBase: string | null;
   production?: boolean;
-  /** Shows the #164 AI panel beside the live report. Off unless the build turns it on. */
+  /** Enables questions about the live report. Off unless the build turns it on. */
   aiEnabled?: boolean;
   dishAssistanceEnabled?: boolean;
   onSessionExpired: () => void;
@@ -100,7 +110,7 @@ export function OwnerWorkspace({
     status: RestaurantProfile['status'];
     navigation: number;
   } | null>(null);
-  const [reportAttempt, setReportAttempt] = useState(0);
+  const [deniedReportScope, setDeniedReportScope] = useState<string | null>(null);
   const [detailsRequested, setDetailsRequested] = useState(false);
   const [dirty, setDirty] = useState(false);
   const canLeave = useCallback(
@@ -128,13 +138,6 @@ export function OwnerWorkspace({
     [owner.id],
   );
   const pickerId = useId();
-  // The report on screen, tagged with the restaurant it belongs to, so the AI panel never offers
-  // one restaurant's dishes under another.
-  const [shown, setShown] = useState<{
-    scope: string;
-    report: OwnerDishReport;
-    reference?: string | undefined;
-  } | null>(null);
   const getAccessToken = useCallback(() => auth.accessTokenFor(owner.id), [auth, owner.id]);
 
   useEffect(() => {
@@ -227,11 +230,37 @@ export function OwnerWorkspace({
     return () => window.removeEventListener('beforeunload', onUnload);
   }, [dirty, production, selected, state.kind]);
   const scope = selected ? `${owner.id}:${selected.venueId}` : '';
-  const showReport = useCallback(
-    (report: OwnerDishReport | null, reference?: string) =>
-      setShown(report ? { scope, report, reference } : null),
-    [scope],
+  const reportScope = JSON.stringify([scope, apiBase]);
+  const reportPage =
+    activePage === 'overview' || activePage === 'report' || activePage === 'performance';
+  const showAi =
+    aiEnabled &&
+    selected?.permission === 'owner' &&
+    (reportPage || workspaceSetup.published === true);
+  // Report pages and the composer use the same validated response and signed reference.
+  // After a report denial, rechecking membership must not restart the background read in a loop.
+  const {
+    state: reportState,
+    retry,
+    reload,
+    refreshing,
+  } = useOwnerReport(
+    apiBase &&
+      selected?.permission === 'owner' &&
+      (reportPage || (showAi && deniedReportScope !== reportScope))
+      ? { mode: 'live', apiBase, venueId: selected.venueId, getAccessToken }
+      : null,
   );
+  useEffect(() => {
+    if (reportState.kind === 'denied') {
+      setDeniedReportScope(reportScope);
+      accessFailure('denied');
+    } else if (reportState.kind === 'signed_out') {
+      accessFailure('signed_out');
+    } else if (reportState.kind === 'ready') {
+      setDeniedReportScope((current) => (current === reportScope ? null : current));
+    }
+  }, [reportState.kind, reportScope, accessFailure]);
   const signOut = (
     <Button
       variant="text"
@@ -359,29 +388,29 @@ export function OwnerWorkspace({
       </main>
     );
 
-  const reportShown =
-    ['overview', 'report', 'performance'].includes(activePage) && shown?.scope === scope
-      ? shown.report
-      : null;
-  const aside =
-    aiEnabled && selected.permission === 'owner' && reportShown ? (
-      <LiveAiPanel
-        key={scope}
+  const reportAvailability = (
+    <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />
+  );
+  let aside = reportAvailability;
+  if (showAi) {
+    aside = (
+      <OwnerReportAiAside
+        key={reportScope}
         apiBase={apiBase}
         venueId={selected.venueId}
         restaurantName={selected.name}
         getAccessToken={getAccessToken}
-        report={reportShown}
-        reportReference={shown?.scope === scope ? shown.reference : undefined}
-        onReloadReport={() => {
-          setShown(null);
-          setReportAttempt((value) => value + 1);
-        }}
+        report={reportState.kind === 'ready' ? reportState.report : null}
+        page={activePage}
+        fallback={reportAvailability}
+        showOverviewPeriod={activePage !== 'performance'}
+        reportReference={reportState.kind === 'ready' ? reportState.reference : undefined}
+        onOpenDishPerformance={() => openPage('performance')}
+        onReloadReport={reload}
         onAccessFailure={accessFailure}
       />
-    ) : (
-      <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />
     );
+  }
 
   const accountActions = (
     <>
@@ -400,7 +429,9 @@ export function OwnerWorkspace({
       <Button
         variant="text"
         onClick={() => {
-          if (canLeave()) refresh();
+          if (!canLeave()) return;
+          setDeniedReportScope(null);
+          refresh();
         }}
       >
         Refresh access
@@ -502,18 +533,16 @@ export function OwnerWorkspace({
             onAccessFailure={accessFailure}
           />,
         )}
-      {(activePage === 'overview' || activePage === 'report' || activePage === 'performance') &&
+      {reportPage &&
         renderShell(
           <LiveDashboardReport
-            key={`${scope}:${reportAttempt}`}
+            key={scope}
             page={activePage}
-            apiBase={apiBase}
-            venueId={selected.venueId}
             restaurantName={workspaceSetup.restaurantName}
             menu={menu?.dishes ?? []}
-            getAccessToken={getAccessToken}
-            onAccessFailure={accessFailure}
-            onReport={showReport}
+            state={reportState}
+            retry={retry}
+            refreshing={refreshing}
             go={navigate}
           />,
         )}
@@ -691,40 +720,22 @@ function CreateTestRestaurant({
 const noop = () => {};
 function LiveDashboardReport({
   page,
-  apiBase,
-  venueId,
   restaurantName,
   menu,
-  getAccessToken,
-  onAccessFailure,
-  onReport,
+  state,
+  retry,
+  refreshing,
   go,
 }: {
   page: 'overview' | 'report' | 'performance';
-  apiBase: string;
-  venueId: string;
   restaurantName: string;
   menu: LiveMenuRow[];
-  getAccessToken: () => Promise<string | null>;
-  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
-  onReport: (report: OwnerDishReport | null, reference?: string) => void;
+  state: ReportState;
+  retry: () => void;
+  refreshing: boolean;
   go: (page: Page) => void;
 }) {
-  const { state, retry, refreshing } = useOwnerReport({
-    mode: 'live',
-    apiBase,
-    venueId,
-    getAccessToken,
-  });
   const report = state.kind === 'ready' ? state.report : null;
-  const reference = state.kind === 'ready' ? state.reference : undefined;
-  useEffect(() => {
-    onReport(report, reference);
-  }, [report, reference, onReport]);
-  useEffect(() => () => onReport(null), [onReport]);
-  useEffect(() => {
-    if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure(state.kind);
-  }, [state.kind, onAccessFailure]);
   const reportRefresh =
     state.kind === 'ready' ||
     state.kind === 'unavailable' ||
@@ -848,37 +859,6 @@ function LiveActions({
   );
 }
 
-// PeekaPlate AI panel in the live shell, built on Rania's "AI panel" component (Figma 2462:15103):
-// header with restaurant and report-period chips, intro text, messages, composer. Identity and
-// restaurant come only from the signed-in workspace: the token getter is bound to this owner and the
-// venue is the authorised selection. The analysis API (#164) takes a dish and a review focus rather
-// than free text, so typed questions can only select a focus for the displayed report.
-const FOCUS_OPTIONS: { value: OwnerAnalysisRequest['goal']; label: string }[] = [
-  { value: 'menu', label: 'Menu presentation' },
-  { value: 'engagement', label: 'Dish engagement' },
-  { value: 'crm', label: 'Customer retention (CRM)' },
-];
-
-export function matchReportQuestion(question: string): OwnerAnalysisRequest['goal'] | null {
-  const text = question
-    .trim()
-    .toLowerCase()
-    .replace(/[?.!]$/, '')
-    .trim();
-  switch (text) {
-    case 'dish engagement':
-    case 'how is engagement for this dish':
-      return 'engagement';
-    case 'menu presentation':
-    case 'dish saves':
-      return 'menu';
-    case 'customer retention':
-    case 'how can i improve customer retention':
-      return 'crm';
-    default:
-      return null;
-  }
-}
 const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -896,7 +876,6 @@ function reportPeriod(window: { start_time: string; end_time: string }, pacific 
   const end = new Date(Math.max(start.getTime(), new Date(window.end_time).getTime() - 1));
   return PERIOD_FORMAT.formatRange(start, end);
 }
-const percent = (value: number | null) => `${((value ?? 0) * 100).toFixed(1)}%`;
 const EXACT_FORMAT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -919,9 +898,7 @@ export function periodPair(
     `${EXACT_FORMAT.format(new Date(window.start_time))} – ${EXACT_FORMAT.format(new Date(window.end_time))}`;
   return { report: exact(report), analysis: exact(analysisWindow) };
 }
-// The analysis reads its own server snapshot. Its suggestion is shown only when that snapshot
-// covers exactly the report period on screen (compared as instants, so "…07:00:00Z" and
-// "…07:00:00.000Z" match); otherwise it would read as advice about numbers the owner isn't seeing.
+// Show answers only for the exact report period on screen, compared as instants.
 export function samePeriod(
   report: { start_time: string; end_time: string },
   analysis: { start: string; end: string },
@@ -935,10 +912,169 @@ export function samePeriod(
 }
 
 type Reply =
-  | { kind: 'loading'; scope: string }
-  | { kind: 'error'; scope: string }
-  | { kind: 'reference_error'; scope: string }
-  | { kind: 'result'; scope: string; result: OwnerAnalysisResult; dishName: string };
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | { kind: 'reference_error'; reference: string }
+  | { kind: 'result'; result: OwnerReportQuestionResult };
+
+const reportQuestionMetrics = {
+  active_sessions: ['Visits', 'count'],
+  open_rate: ['Open rate', 'rate'],
+  avg_interaction_time_seconds: ['Average interaction time', 'seconds'],
+  timing_coverage: ['Timing coverage', 'rate'],
+  save_rate: ['Save rate', 'rate'],
+  engagement_rate: ['Engagement rate', 'rate'],
+  portion_previews_shown: ['2.5D previews shown', 'count'],
+  comparisons_started: ['Comparisons started', 'count'],
+  dish_opens: ['Restaurant-wide dish opens', 'count'],
+  menu_sessions: ['Restaurant-wide visits', 'count'],
+} as const;
+
+type Period = Pick<OwnerDishReport['report_metadata']['date_window'], 'start_time' | 'end_time'>;
+type AnswerEvidence =
+  | { kind: 'verified'; window: Period; baseline?: Period }
+  | { kind: 'mismatch'; periods: ReturnType<typeof periodPair> }
+  | { kind: 'unverified' }
+  | { kind: 'unsupported' };
+
+function reportAnswerEvidence(
+  result: OwnerReportQuestionResult,
+  report: OwnerDishReport,
+  displayedWindow: Period,
+): AnswerEvidence {
+  if (result.status === 'abstained' && result.reason === 'unsupported_question') {
+    return { kind: 'unsupported' };
+  }
+  const summary = report.summary;
+  const overview = result.overview;
+  if (!overview) {
+    return samePeriod(displayedWindow, result.timeWindow)
+      ? { kind: 'verified', window: displayedWindow }
+      : { kind: 'mismatch', periods: periodPair(displayedWindow, result.timeWindow) };
+  }
+  if (!summary) return { kind: 'unverified' };
+  const period = overview.period === 'baseline' ? 'baseline' : 'current';
+  const window = summary.periods[period];
+  if (!samePeriod(window, result.timeWindow)) {
+    return { kind: 'mismatch', periods: periodPair(window, result.timeWindow) };
+  }
+  let baseline: Period | undefined;
+  if (overview.period === 'compare') {
+    baseline = summary.periods.baseline;
+    if (!samePeriod(baseline, overview.baselineWindow)) {
+      return { kind: 'mismatch', periods: periodPair(baseline, overview.baselineWindow) };
+    }
+  }
+  if (result.status === 'answered') {
+    const { metric } = result;
+    if (metric !== 'dish_opens' && metric !== 'menu_sessions') return { kind: 'unverified' };
+    const counts = [summary[period][metric]];
+    if (baseline) counts.push(summary.baseline[metric]);
+    if (
+      report.report_metadata.freshness.is_stale !== false ||
+      result.points.length !== counts.length ||
+      !counts.every(
+        (count, index) =>
+          (count.status === 'NORMAL' || count.status === 'VALID_ZERO') &&
+          result.points[index]?.value === count.value,
+      )
+    ) {
+      return { kind: 'unverified' };
+    }
+  }
+  return baseline ? { kind: 'verified', window, baseline } : { kind: 'verified', window };
+}
+
+function ReportAnswer({
+  answer,
+}: {
+  answer: Extract<OwnerReportQuestionResult, { status: 'answered' }>;
+}) {
+  const caption = useId();
+  const [label, kind] = reportQuestionMetrics[answer.metric];
+  const scale = kind === 'rate' ? 1 : Math.max(1, ...answer.points.map(({ value }) => value));
+  const points = (
+    <ul className="owner-ai__values" role="list">
+      {answer.points.map(({ label, value }, index) => (
+        <li key={`${label}:${index}`}>
+          <span>{label}</span>
+          <strong>{formatOwnerReportValue(value, kind)}</strong>
+          {answer.chart && (
+            <span className="owner-ai__chart-track" aria-hidden="true">
+              <span style={{ inlineSize: `${(value / scale) * 100}%` }} />
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <>
+      <h3>{label}</h3>
+      {answer.chart ? (
+        <figure className="owner-ai__chart" aria-labelledby={caption}>
+          <figcaption id={caption} className="owner-visually-hidden">
+            {label} chart
+          </figcaption>
+          {points}
+        </figure>
+      ) : (
+        points
+      )}
+    </>
+  );
+}
+
+type LiveAiPanelProps = {
+  apiBase: string;
+  venueId: string;
+  restaurantName: string;
+  getAccessToken: () => Promise<string | null>;
+  report: OwnerDishReport;
+  showOverviewPeriod: boolean;
+  reportReference?: string | undefined;
+  onOpenDishPerformance: () => void;
+  onReloadReport: () => void;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
+  question: string;
+  setQuestion: (question: string) => void;
+};
+
+// The draft belongs to the signed-in owner and restaurant. Responses belong to the displayed
+// snapshot. Renewing the signature for that snapshot should only update the token for the next ask.
+function OwnerReportAiAside({
+  report,
+  page,
+  fallback,
+  ...panel
+}: Omit<LiveAiPanelProps, 'question' | 'setQuestion' | 'report'> & {
+  report: OwnerDishReport | null;
+  page: OwnerPage;
+  fallback: ReactNode;
+}) {
+  const [question, setQuestion] = useState('');
+  const hasReference = Boolean(panel.reportReference);
+  const replyKey = useMemo(
+    () =>
+      report && hasReference
+        ? `${page}:${canonicalJson({
+            ...report,
+            dishes: [...report.dishes].sort((a, b) => a.dish_id.localeCompare(b.dish_id)),
+          })}`
+        : page,
+    [page, report, hasReference],
+  );
+  if (!report) return fallback;
+  return (
+    <LiveAiPanel
+      key={replyKey}
+      {...panel}
+      report={report}
+      question={question}
+      setQuestion={setQuestion}
+    />
+  );
+}
 
 function LiveAiPanel({
   apiBase,
@@ -946,94 +1082,87 @@ function LiveAiPanel({
   restaurantName,
   getAccessToken,
   report,
+  showOverviewPeriod,
   reportReference,
+  onOpenDishPerformance,
   onReloadReport,
   onAccessFailure,
-}: {
-  apiBase: string;
-  venueId: string;
-  restaurantName: string;
-  getAccessToken: () => Promise<string | null>;
-  report: OwnerDishReport;
-  reportReference?: string | undefined;
-  onReloadReport: () => void;
-  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
-}) {
-  const ids = useId();
-  const dishes = report.dishes;
-  const production = report.source === 'production';
-  const [picked, setPicked] = useState('');
-  const [goal, setGoal] = useState<OwnerAnalysisRequest['goal']>('menu');
-  const [question, setQuestion] = useState('');
-  const [questionError, setQuestionError] = useState<string | null>(null);
-  const [reply, setReply] = useState<Reply | null>(null);
+  question,
+  setQuestion,
+}: LiveAiPanelProps) {
+  const inputId = useId();
+  const [storedReply, setReply] = useState<Reply | null>(null);
+  // The report can renew its signature without replacing its snapshot or the pending question.
+  const reply =
+    storedReply?.kind === 'reference_error' && storedReply.reference !== reportReference
+      ? null
+      : storedReply;
   const pending = useRef<AbortController | null>(null);
-  const dishId = dishes.some((dish) => dish.dish_id === picked)
-    ? picked
-    : (dishes[0]?.dish_id ?? '');
-  const requestGoal = question.trim() ? matchReportQuestion(question) : goal;
-  const scope = `${venueId}:${dishId}:${requestGoal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}:${reportReference ?? ''}`;
-  const analyze = useMemo(
-    () => createOwnerAnalysisClient({ baseUrl: apiBase, venueId, getAccessToken }),
+  const askReport = useMemo(
+    () => createOwnerReportQuestionClient({ apiBase, venueId, getAccessToken }),
     [apiBase, venueId, getAccessToken],
   );
-  // A reply belongs to one restaurant, dish and focus; changing any of them hides it and stops a
-  // request still on its way.
-  useEffect(
-    () => () => {
-      pending.current?.abort();
-      pending.current = null;
-    },
-    [analyze, scope],
+  const dishWindow = report.report_metadata.date_window;
+  const summaryWindow = report.summary?.periods.current;
+  const overviewWindow = showOverviewPeriod ? summaryWindow : undefined;
+  const window = overviewWindow ?? dishWindow;
+  const periodsDiffer =
+    summaryWindow &&
+    !samePeriod(summaryWindow, {
+      start: dishWindow.start_time,
+      end: dishWindow.end_time,
+    });
+  const differentDishWindow = showOverviewPeriod && periodsDiffer;
+  const timeZoneIsPacific = isOwnerProductionCalendarVersion(
+    report.report_metadata.calculation_version,
   );
-  const shown = reply?.scope === scope ? reply : null;
+  const result = reply?.kind === 'result' ? reply.result : undefined;
+  const evidence = result ? reportAnswerEvidence(result, report, window) : undefined;
+  const otherDishAnswer =
+    result && !result.overview && differentDishWindow && samePeriod(dishWindow, result.timeWindow);
+  let answerPeriodLabel = 'Answer period';
+  if (result?.overview) {
+    answerPeriodLabel =
+      result.overview.period === 'baseline'
+        ? 'Previous Overview period'
+        : 'Current Overview period';
+  }
+  const busy = reply?.kind === 'loading';
+
+  useLayoutEffect(() => () => pending.current?.abort(), []);
 
   async function ask(event: FormEvent) {
     event.preventDefault();
-    if (pending.current) return;
-    if (!dishId) {
-      if (production) setQuestionError('There are no dishes with report data in this period.');
-      return;
-    }
-    if (!reportReference) {
-      if (production) setReply({ kind: 'reference_error', scope });
-      return;
-    }
-    if (!requestGoal) {
-      setQuestionError(
-        'Use the focus menu or type “Dish engagement”, “Menu presentation”, “Dish saves”, or “Customer retention”. The review uses the displayed dish and report period.',
-      );
-      return;
-    }
-    setQuestionError(null);
+    const text = question.trim();
+    if (!text || !reportReference || pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
-    const dishName = dishes.find((dish) => dish.dish_id === dishId)?.name ?? '';
-    const requestScope = scope;
-    setReply({ kind: 'loading', scope: requestScope });
+    setReply({ kind: 'loading' });
     try {
-      const result = await analyze(
-        { dishId, goal: requestGoal },
-        controller.signal,
-        reportReference,
-      );
-      if (!controller.signal.aborted)
-        setReply({ kind: 'result', scope: requestScope, result, dishName });
+      const answer = await askReport(text, reportReference, controller.signal);
+      if (!controller.signal.aborted) {
+        setReply(
+          answer.source === report.source ? { kind: 'result', result: answer } : { kind: 'error' },
+        );
+      }
     } catch (error) {
       if (!controller.signal.aborted) {
         if (error instanceof OwnerAnalysisAccessError) {
           setReply(null);
           onAccessFailure(error.status === 401 ? 'signed_out' : 'denied');
-        } else if (error instanceof OwnerAnalysisReferenceError) {
-          setReply({ kind: 'reference_error', scope: requestScope });
-        } else setReply({ kind: 'error', scope: requestScope });
+        } else {
+          setReply(
+            error instanceof OwnerAnalysisReferenceError
+              ? { kind: 'reference_error', reference: reportReference }
+              : { kind: 'error' },
+          );
+        }
       }
     } finally {
       if (pending.current === controller) pending.current = null;
     }
   }
 
-  const busy = shown?.kind === 'loading';
   return (
     <aside className="owner-ai" aria-label="PeekaPlate AI">
       <div className="owner-ai__head">
@@ -1046,188 +1175,123 @@ function LiveAiPanel({
         <div className="owner-chips">
           <span className="owner-chip owner-chip--surface">{restaurantName}</span>
           <span className="owner-chip owner-chip--surface">
-            Displayed report period:{' '}
-            {reportPeriod(
-              report.report_metadata.date_window,
-              isOwnerProductionCalendarVersion(report.report_metadata.calculation_version),
-            )}
+            {overviewWindow ? 'Overview period' : 'Dish Performance period'}:{' '}
+            {reportPeriod(window, timeZoneIsPacific)}
           </span>
         </div>
       </div>
-      <div className="owner-ai__body" data-ai-state={shown?.kind ?? 'empty'} aria-live="polite">
-        {!reportReference && (
-          <p className="owner-muted">
-            Analysis needs a current server report reference. Reload the report; analysis stays
-            unavailable if no reference is issued.
-          </p>
+      <div className="owner-ai__body" data-ai-state={reply?.kind ?? 'empty'} aria-live="polite">
+        {differentDishWindow && (
+          <div>
+            <p>Dish Performance uses a different report period.</p>
+            <Button variant="outline" onClick={onOpenDishPerformance}>
+              Open Dish Performance to ask a question
+            </Button>
+          </div>
         )}
-        <p className="owner-muted">
-          {report.source === 'production'
-            ? 'Analysis uses the same authorized report window shown here.'
-            : 'Choose a dish for analysis from a separate authorized server-read snapshot. Its evidence period may differ from the report displayed here.'}
-        </p>
-        {dishes.length === 0 && (
-          <>
-            <h3>No questions yet</h3>
-            <p className="owner-muted">There are no dishes in this report to ask about yet.</p>
-          </>
-        )}
-        {dishes.length > 0 && !shown && (
-          <>
-            <h3>No questions yet</h3>
-            <p className="owner-muted">
-              Choose a dish and a focus below. Suggestions are for review only; nothing is changed
-              or sent to diners.
+        {(!reportReference || reply?.kind === 'reference_error') && (
+          <div role={reply?.kind === 'reference_error' ? 'alert' : undefined}>
+            <p>
+              {reply?.kind === 'reference_error'
+                ? 'The report reference expired or changed. Reload the report, then ask again.'
+                : 'Reload the report to ask a question about this period.'}
             </p>
-          </>
-        )}
-        {shown?.kind === 'loading' && (
-          <p className="owner-muted" role="status">
-            Reviewing the report…
-          </p>
-        )}
-        {shown?.kind === 'error' && (
-          <p className="owner-ai__error" role="alert">
-            The report could not be reviewed. Check your session or try again later.
-          </p>
-        )}
-        {shown?.kind === 'reference_error' && (
-          <div role="alert">
-            <p>The report reference expired or changed. Reload the report, then ask again.</p>
             <Button variant="outline" onClick={onReloadReport}>
               Reload report
             </Button>
           </div>
         )}
-        {shown?.kind === 'result' &&
-          !samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
-            <div className="owner-ai__answer" data-ai-period="mismatch">
-              <h3>Different report period</h3>
-              {(() => {
-                const periods = periodPair(
-                  report.report_metadata.date_window,
-                  shown.result.timeWindow,
-                );
-                return (
-                  <p>
-                    This analysis was calculated for {periods.analysis}, which is not exactly the
-                    report period shown here ({periods.report}). Its suggestion is not shown, so it
-                    can’t be mistaken for advice about these numbers.
-                  </p>
-                );
-              })()}
-              <p className="owner-muted">
-                Suggestions appear only when the analysis and the report on screen cover the same
-                period. No menu changes or customer messages are sent.
+        {reportReference && !reply && (
+          <p className="owner-muted">
+            {overviewWindow
+              ? 'Ask about this report. Try “How many openings?”'
+              : 'Ask about this report. Try “Chart the save rates by dish.”'}
+          </p>
+        )}
+        {reportReference && !reply && !showOverviewPeriod && periodsDiffer && (
+          <p className="owner-muted">Restaurant-wide opening totals use the Overview period.</p>
+        )}
+        {busy && (
+          <p className="owner-muted" role="status">
+            Checking the report…
+          </p>
+        )}
+        {reply?.kind === 'error' && (
+          <p className="owner-ai__error" role="alert">
+            The report question could not be answered. Check your session or try again later.
+          </p>
+        )}
+        {result && evidence && (
+          <div className="owner-ai__answer">
+            {evidence.kind === 'mismatch' && (
+              <>
+                <h3>Different report period</h3>
+                <p>
+                  The answer covers {evidence.periods.analysis}. The displayed report covers{' '}
+                  {evidence.periods.report}.{' '}
+                  {otherDishAnswer
+                    ? 'Ask from Dish Performance for this period.'
+                    : 'Reload the report before asking again.'}
+                </p>
+              </>
+            )}
+            {evidence.kind === 'unverified' && (
+              <p>There is not enough verified evidence in this report to answer that question.</p>
+            )}
+            {evidence.kind === 'unsupported' && (
+              <p>
+                This report cannot answer that question. Ask about activity shown in this report.
               </p>
-            </div>
-          )}
-        {shown?.kind === 'result' &&
-          samePeriod(report.report_metadata.date_window, shown.result.timeWindow) && (
-            <div className="owner-ai__answer">
-              {shown.result.status === 'review' && shown.result.metric !== null ? (
-                <>
-                  <h3>Suggested review: {shown.dishName}</h3>
-                  <p>{OWNER_ANALYSIS_ACTIONS[shown.result.metric]}</p>
+            )}
+            {evidence.kind === 'verified' && (
+              <>
+                {result.status === 'answered' ? (
+                  <ReportAnswer answer={result} />
+                ) : (
+                  <p>
+                    There is not enough verified evidence in this report to answer that question.
+                  </p>
+                )}
+                <p className="owner-muted">
+                  {answerPeriodLabel}: {reportPeriod(evidence.window, timeZoneIsPacific)}
+                </p>
+                {evidence.baseline && (
                   <p className="owner-muted">
-                    {shown.result.metric.replaceAll('_', ' ')}: {percent(shown.result.value)}
+                    Previous Overview period: {reportPeriod(evidence.baseline, timeZoneIsPacific)}
                   </p>
-                </>
-              ) : (
-                <>
-                  <h3>No recommendation for {shown.dishName}</h3>
-                  <p>
-                    {shown.result.reason === 'unsupported_goal'
-                      ? 'This report has no customer-retention or CRM evidence.'
-                      : 'There is not enough verified evidence to suggest a next step.'}
-                  </p>
-                </>
-              )}
-              <p className="owner-muted">
-                Analysis evidence period:{' '}
-                {reportPeriod({
-                  start_time: shown.result.timeWindow.start,
-                  end_time: shown.result.timeWindow.end,
-                })}
-              </p>
-              <p className="owner-muted">
-                {shown.result.source === 'production'
-                  ? 'Analysis from the authorized production report.'
-                  : 'Synthetic analysis from a separate server-read snapshot.'}
-              </p>
-              <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
-              <p className="owner-muted">No menu changes or customer messages are sent.</p>
-            </div>
-          )}
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
-      <form className="owner-ai__composer owner-ai__composer--pickers" onSubmit={ask}>
-        <label className="owner-visually-hidden" htmlFor={`${ids}-question`}>
+      <form className="owner-ai__composer" onSubmit={ask}>
+        <label className="owner-visually-hidden" htmlFor={inputId}>
           Ask a report question
         </label>
         <input
-          id={`${ids}-question`}
+          id={inputId}
           className="owner-ai__input"
           value={question}
           onChange={(event) => {
             setQuestion(event.target.value);
-            setQuestionError(null);
             pending.current?.abort();
             pending.current = null;
             setReply(null);
           }}
-          placeholder="Type a review focus, e.g. Dish engagement"
-          disabled={!production && dishes.length === 0}
+          placeholder="Ask a report question"
+          required
+          maxLength={OWNER_REPORT_QUESTION_MAX_LENGTH}
+          disabled={!reportReference}
         />
-        {questionError && (
-          <p className="owner-ai__error" role="alert">
-            {questionError}
-          </p>
-        )}
-        <label className="owner-visually-hidden" htmlFor={`${ids}-dish`}>
-          Dish
-        </label>
-        <select
-          id={`${ids}-dish`}
-          className="owner-ai__input"
-          value={dishId}
-          disabled={dishes.length === 0}
-          onChange={(event) => setPicked(event.target.value)}
+        <button
+          type="submit"
+          className="owner-ai__send"
+          disabled={busy || !reportReference || !question.trim()}
+          aria-label="Send question"
         >
-          {dishes.map((dish) => (
-            <option key={dish.dish_id} value={dish.dish_id}>
-              {dish.name}
-            </option>
-          ))}
-        </select>
-        <div className="owner-ai__row">
-          <label className="owner-visually-hidden" htmlFor={`${ids}-focus`}>
-            Review focus
-          </label>
-          <select
-            id={`${ids}-focus`}
-            className="owner-ai__input"
-            value={requestGoal ?? goal}
-            onChange={(event) => {
-              setGoal(event.target.value as OwnerAnalysisRequest['goal']);
-              setQuestion('');
-              setQuestionError(null);
-            }}
-          >
-            {FOCUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="owner-ai__send"
-            disabled={busy || (!production && (dishes.length === 0 || !reportReference))}
-            aria-label="Review report"
-          >
-            <Icon name="send" size={18} />
-          </button>
-        </div>
+          <Icon name="send" size={18} />
+        </button>
       </form>
     </aside>
   );

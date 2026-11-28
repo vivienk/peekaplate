@@ -1,7 +1,10 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { OWNER_PAGE_PATHS } from '../../frontend/console/src/owner/routes';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
-import { OWNER_PRODUCTION_DAY_VERSION } from '../../packages/contracts/src/owner-report';
+import {
+  OWNER_PRODUCTION_DAY_VERSION,
+  OWNER_PRODUCTION_TODAY_VERSION,
+} from '../../packages/contracts/src/owner-report';
 
 const origin = 'http://127.0.0.1:5174';
 const productionOrigin = 'https://peekaplate.app';
@@ -130,6 +133,7 @@ test('production deep links resume after sign-in and keep orientation through br
   let workspaceReads = 0;
   let emptyReport = false;
   let analysisRequests = 0;
+  const soupQuestion = 'What was the engagement rate for the lentil soup?';
   await page.route('https://api.peekaplate.app/**', async (route) => {
     const { pathname, searchParams } = new URL(route.request().url());
     const headers = {
@@ -158,26 +162,20 @@ test('production deep links resume after sign-in and keep orientation through br
     else if (pathname.endsWith('/drafts')) json = { drafts: [] };
     else if (pathname.endsWith('/owner-insight-actions')) {
       json = { schemaVersion: 1, actions: [] };
-    } else if (pathname.endsWith('/ai/analysis')) {
+    } else if (pathname.endsWith('/ai/questions')) {
       analysisRequests++;
-      expect(route.request().headers()['x-owner-report-ref']).toBe('fixture-report-reference');
-      const { dishId, goal } = route.request().postDataJSON();
-      expect(goal).toBe('engagement');
+      expect(pathname).toBe(`/api/v1/venues/${venue.venueId}/ai/questions`);
+      expect(route.request().headers()['x-owner-report-ref']).toBe(`fixture-report-${reportReads}`);
+      expect(route.request().postDataJSON()).toEqual({ question: soupQuestion });
       const period = UNEEZA_REPORT.report_metadata.date_window;
       json = {
-        schemaVersion: 'owner-analysis.v1',
+        schemaVersion: 'owner-report-question.v1',
         venueId: venue.venueId,
-        dishId,
-        goal,
         source: 'production',
         reportSnapshot: 'a'.repeat(64),
         timeWindow: { start: period.start_time, end: period.end_time },
         status: 'abstained',
-        metric: null,
-        value: null,
         reason: 'unusable_evidence',
-        approvalRequired: true,
-        allowedEffects: [],
       };
     } else if (pathname.endsWith('/analytics/dishes')) {
       expect(searchParams.get('source')).toBe('production');
@@ -206,7 +204,7 @@ test('production deep links resume after sign-in and keep orientation through br
       };
       return route.fulfill({
         status: 200,
-        headers: { ...headers, 'X-Owner-Report-Ref': 'fixture-report-reference' },
+        headers: { ...headers, 'X-Owner-Report-Ref': `fixture-report-${reportReads}` },
         json,
       });
     } else return route.fulfill({ status: 404, headers, json: { error: 'unexpected_path' } });
@@ -221,12 +219,17 @@ test('production deep links resume after sign-in and keep orientation through br
   await expect(page).toHaveURL(`${productionOrigin}/dish-performance`);
   await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
   const question = page.getByRole('textbox', { name: 'Ask a report question' });
-  const sendQuestion = page.getByRole('button', { name: 'Review report' });
-  await question.fill('Dish engagement');
-  await sendQuestion.click();
-  await expect(
-    page.getByText('There is not enough verified evidence to suggest a next step.'),
-  ).toBeVisible();
+  const sendQuestion = page.getByRole('button', { name: 'Send question' });
+  const askAboutSoup = async () => {
+    await question.fill(soupQuestion);
+    await sendQuestion.click();
+    await expect(
+      page.getByText(
+        'There is not enough verified evidence in this report to answer that question.',
+      ),
+    ).toBeVisible();
+  };
+  await askAboutSoup();
   expect(analysisRequests).toBe(1);
   await page.getByRole('button', { name: '2.5D previews', exact: true }).click();
   await page.getByRole('button', { name: 'View as table', exact: true }).click();
@@ -243,6 +246,7 @@ test('production deep links resume after sign-in and keep orientation through br
     await nav.getByRole('button', { name: label, exact: true }).click();
     await expect(page).toHaveURL(`${productionOrigin}${path}`);
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    await expect(question).toBeEnabled();
   };
   const mainPane = page.locator('.owner-main');
   await mainPane.evaluate((element) => {
@@ -257,8 +261,12 @@ test('production deep links resume after sign-in and keep orientation through br
   await visit('Dish performance', '/dish-performance', 'What diners did with each dish');
   await expect(page.getByRole('table').getByText('Fixture lentil soup')).toBeVisible();
   expect(reportReads).toBe(1);
+  await visit('Restaurant Setup', '/restaurant-setup', 'Welcome to PeekaPlate');
   await visit('Actions', '/actions', 'What you decided to do');
   await visit('Menu', '/menu', 'Your dishes');
+  await askAboutSoup();
+  expect(analysisRequests).toBe(2);
+  expect(reportReads).toBe(1);
   expect(setupReads).toBe(1);
   expect(workspaceReads).toBe(1);
 
@@ -277,6 +285,17 @@ test('production deep links resume after sign-in and keep orientation through br
   await expect(page.getByRole('heading', { name: 'What you decided to do' })).toBeVisible();
   await page.goForward();
   await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
+  for (const [path, heading] of [
+    ['/menu', 'Your dishes'],
+    ['/actions', 'What you decided to do'],
+  ]) {
+    const before = reportReads;
+    await page.goto(`${productionOrigin}${path}`);
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    await expect(question).toBeEnabled();
+    await askAboutSoup();
+    expect(reportReads).toBe(before + 1);
+  }
   await page.goto(`${productionOrigin}/dish-performance`);
   await expect(page.getByRole('table')).toBeVisible();
   await page.reload();
@@ -290,30 +309,31 @@ test('production deep links resume after sign-in and keep orientation through br
     'aria-disabled',
     'true',
   );
-  expect(reportReads).toBe(3);
+  await expect(question).toHaveCount(0);
+  await page.goto(`${productionOrigin}/menu`);
+  await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
+  await expect(question).toHaveCount(0);
+  expect(reportReads).toBe(5);
 
   await page.getByLabel('Owner account').click();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(`${productionOrigin}/owner-auth`);
   await expect(page).toHaveTitle('PeekaPlate · Owner sign in');
   published = true;
+  emptyReport = true;
   await enterEmail(page);
   await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
   await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
-  expect(reportReads).toBe(3);
-  emptyReport = true;
+  await expect(question).toBeEnabled();
+  expect(reportReads).toBe(6);
   await visit('Overview', '/overview', 'How your menu did this period');
-  await question.fill('Dish engagement');
-  await sendQuestion.click();
-  await expect(
-    page.getByText('There are no dishes with report data in this period.'),
-  ).toBeVisible();
-  expect(analysisRequests).toBe(1);
+  await askAboutSoup();
+  expect(analysisRequests).toBe(5);
 });
 
-test('the production day report retries transient failures on the next visible minute', async ({
+test('the production day report retries transient failures but stops after access denial', async ({
   page,
 }) => {
   await page.clock.install();
@@ -343,7 +363,7 @@ test('the production day report retries transient failures on the next visible m
     if (pathname === '/staff/venues') {
       return route.fulfill({
         headers,
-        json: { actorId: user.id, venues: reportReads >= 7 ? [] : [venue] },
+        json: { actorId: user.id, venues: [venue] },
       });
     }
     if (pathname.endsWith('/setup')) {
@@ -396,6 +416,16 @@ test('the production day report retries transient failures on the next visible m
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   const table = page.getByRole('table');
   await expect(table.getByText('Report response 1')).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('button', { name: 'Overview', exact: true })
+    .click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  await expect(panel.getByText('Dish Performance uses a different report period.')).toBeVisible();
+  await expect(panel.getByRole('textbox', { name: 'Ask a report question' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Open Dish Performance to ask a question' }).click();
+  await expect(table.getByText('Report response 1')).toBeVisible();
+  await expect(panel.getByText(/Dish Performance period:/)).toBeVisible();
 
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
@@ -424,9 +454,223 @@ test('the production day report retries transient failures on the next visible m
   await expect(table.getByText('Report response 6')).toBeVisible();
   await page.clock.runFor(60_000);
   await expect(page).toHaveURL(`${productionOrigin}/restaurant-setup`);
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
   await expect(table).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
   await page.clock.runFor(120_000);
   expect(reportReads).toBe(7);
+
+  await page.getByLabel('Owner account').click();
+  await page.getByRole('button', { name: 'Refresh access', exact: true }).click();
+  await expect(panel).toBeVisible();
+  expect(reportReads).toBe(8);
+});
+
+test('signed-in mock rehearsal uses Overview counts and the active report reference', async ({
+  page,
+}) => {
+  await page.route(`${productionOrigin}/**`, serveConsole);
+  await provider(page, {}, productionOrigin);
+  const venue = { venueId: user.id, name: 'Synthetic Corner Cafe', permission: 'owner' };
+  const baseline = { start_time: '2026-11-24T08:00:00Z', end_time: '2026-11-25T08:00:00Z' };
+  const current = { start_time: baseline.end_time, end_time: '2026-11-25T12:00:00Z' };
+  const dishPeriod = { ...current, start_time: '2026-11-25T08:35:00Z', duration_hours: 3 };
+  const currentWindow = { start: current.start_time, end: current.end_time };
+  const baselineWindow = { start: baseline.start_time, end: baseline.end_time };
+  const missing = { value: null, status: 'MISSING' } as const;
+  const totals = {
+    avg_interaction_time_seconds: missing,
+    portion_previews_shown: missing,
+    verified_orders: missing,
+  };
+  let fixture: 'eleven' | 'zero' | 'missing' = 'eleven';
+  const restaurantVisitsQuestion = 'How many restaurant visits were there this period?';
+  let incorrectVisitsCount = false;
+  const calls: Array<{ reference: string | undefined; question: string }> = [];
+  const openAI = [] as string[];
+  await page.route('https://api.openai.com/**', async (route) => {
+    openAI.push(route.request().url());
+    await route.abort();
+  });
+  await page.route('https://api.peekaplate.app/**', async (route) => {
+    const request = route.request();
+    const { pathname } = new URL(request.url());
+    const headers = {
+      'Access-Control-Allow-Origin': productionOrigin,
+      'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Owner-Report-Ref',
+      'Access-Control-Expose-Headers': 'X-Owner-Report-Ref',
+    };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    expect(request.headers().authorization).toBe(`Bearer ${session.access_token}`);
+    if (pathname === '/staff/venues') {
+      return route.fulfill({ headers, json: { actorId: user.id, venues: [venue] } });
+    }
+    if (pathname.endsWith('/setup')) {
+      return route.fulfill({
+        headers,
+        json: {
+          venueId: venue.venueId,
+          restaurantName: venue.name,
+          detailsStatus: 'verified',
+          menuAdded: true,
+          menuVerified: true,
+          published: true,
+        },
+      });
+    }
+    if (pathname.endsWith('/profile')) return route.fulfill({ headers, json: { profile: null } });
+    if (pathname.endsWith('/jobs')) return route.fulfill({ headers, json: { jobs: [] } });
+    if (pathname.endsWith('/drafts')) return route.fulfill({ headers, json: { drafts: [] } });
+    const count = fixture === 'eleven' ? 11 : 0;
+    const visits = fixture === 'eleven' ? 17 : 0;
+    const metricCell = (value: number) =>
+      fixture === 'missing' ? missing : { value, status: value === 0 ? 'VALID_ZERO' : 'NORMAL' };
+    const reference = `fixture-overview-${fixture}`;
+    if (pathname.endsWith('/analytics/dishes')) {
+      return route.fulfill({
+        headers: { ...headers, 'X-Owner-Report-Ref': reference },
+        json: {
+          ...UNEEZA_REPORT,
+          source: 'production',
+          venue_id: venue.venueId,
+          report_metadata: {
+            ...UNEEZA_REPORT.report_metadata,
+            calculation_version: OWNER_PRODUCTION_TODAY_VERSION,
+            generated_at: current.end_time,
+            date_window: dishPeriod,
+            freshness: { last_event_ingested_at: current.end_time, is_stale: false },
+          },
+          summary: {
+            periods: { current, baseline },
+            current: {
+              ...totals,
+              dish_opens: metricCell(count),
+              menu_sessions: metricCell(visits),
+            },
+            baseline: {
+              ...totals,
+              dish_opens: { value: 10, status: 'NORMAL' },
+              menu_sessions: { value: 16, status: 'NORMAL' },
+            },
+          },
+        },
+      });
+    }
+    if (pathname.endsWith('/ai/questions')) {
+      const { question } = request.postDataJSON();
+      expect(request.postDataJSON()).toEqual({ question });
+      calls.push({ question, reference: request.headers()['x-owner-report-ref'] });
+      const comparison = question.startsWith('Compare');
+      const restaurantVisits = question === restaurantVisitsQuestion;
+      const base = {
+        schemaVersion: 'owner-report-question.v1',
+        venueId: venue.venueId,
+        source: 'production',
+        reportSnapshot: 'a'.repeat(64),
+        timeWindow: currentWindow,
+        overview: comparison ? { period: 'compare', baselineWindow } : { period: 'current' },
+      };
+      if (question === 'What were verified orders?') {
+        return route.fulfill({
+          headers,
+          json: {
+            ...base,
+            overview: undefined,
+            timeWindow: { start: dishPeriod.start_time, end: dishPeriod.end_time },
+            status: 'abstained',
+            reason: 'unsupported_question',
+          },
+        });
+      }
+      return route.fulfill({
+        headers,
+        json:
+          fixture === 'missing'
+            ? { ...base, status: 'abstained', reason: 'unusable_evidence' }
+            : {
+                ...base,
+                status: 'answered',
+                metric: restaurantVisits ? 'menu_sessions' : 'dish_opens',
+                chart: false,
+                points: [
+                  {
+                    label: 'Current period',
+                    value: restaurantVisits && !incorrectVisitsCount ? visits : count,
+                  },
+                  ...(comparison ? [{ label: 'Previous period', value: 10 }] : []),
+                ],
+              },
+      });
+    }
+    return route.fulfill({ status: 404, headers });
+  });
+
+  await page.goto(`${productionOrigin}/overview`);
+  await enterEmail(page);
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'How your menu did this period' })).toBeVisible();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const input = panel.getByRole('textbox', { name: 'Ask a report question' });
+  async function ask(question: string) {
+    await input.fill(question);
+    await panel.getByRole('button', { name: 'Send question' }).click();
+  }
+  await expect(panel.getByText(/^Overview period:/)).toBeVisible();
+  await expect(panel.getByText('Dish Performance uses a different report period.')).toBeVisible();
+  await ask('What were verified orders?');
+  await expect(panel.getByText(/This report cannot answer that question/)).toBeVisible();
+  await expect(panel.getByRole('heading', { name: 'Different report period' })).toHaveCount(0);
+  await ask('How many openings?');
+  await expect(panel.getByRole('heading', { name: 'Restaurant-wide dish opens' })).toBeVisible();
+  await expect(panel.getByText('11', { exact: true })).toBeVisible();
+  await ask('Compare dish opens for the current and previous periods');
+  await expect(panel.getByText('11', { exact: true })).toBeVisible();
+  await expect(panel.getByText('10', { exact: true })).toBeVisible();
+  await expect(panel.getByText(/^Current Overview period:/)).toBeVisible();
+  await expect(panel.getByText(/^Previous Overview period:/)).toBeVisible();
+  await ask(restaurantVisitsQuestion);
+  await expect(panel.getByRole('heading', { name: 'Restaurant-wide visits' })).toBeVisible();
+  await expect(panel.getByText('17', { exact: true })).toBeVisible();
+  await expect(panel.getByText(/^Current Overview period:/)).toBeVisible();
+  incorrectVisitsCount = true;
+  await ask(restaurantVisitsQuestion);
+  await expect(panel.getByText(/not enough verified evidence/)).toBeVisible();
+  await expect(panel.getByText('11', { exact: true })).toHaveCount(0);
+  incorrectVisitsCount = false;
+
+  async function refresh(next: 'zero' | 'missing') {
+    fixture = next;
+    await page.getByRole('button', { name: 'Refresh report', exact: true }).click();
+    await expect(panel.getByText(/Ask about this report/)).toBeVisible();
+    await ask('How many openings?');
+  }
+  await refresh('zero');
+  await expect(panel.getByText('0', { exact: true })).toBeVisible();
+  await ask(restaurantVisitsQuestion);
+  await expect(panel.getByRole('heading', { name: 'Restaurant-wide visits' })).toBeVisible();
+  await expect(panel.getByText('0', { exact: true })).toBeVisible();
+  await refresh('missing');
+  await expect(panel.getByText(/not enough verified evidence/)).toBeVisible();
+  await expect(panel.getByText('0', { exact: true })).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Open Dish Performance to ask a question' }).click();
+  await expect(
+    panel.getByText('Restaurant-wide opening totals use the Overview period.'),
+  ).toBeVisible();
+  expect(calls).toEqual([
+    { reference: 'fixture-overview-eleven', question: 'What were verified orders?' },
+    { reference: 'fixture-overview-eleven', question: 'How many openings?' },
+    {
+      reference: 'fixture-overview-eleven',
+      question: 'Compare dish opens for the current and previous periods',
+    },
+    { reference: 'fixture-overview-eleven', question: restaurantVisitsQuestion },
+    { reference: 'fixture-overview-eleven', question: restaurantVisitsQuestion },
+    { reference: 'fixture-overview-zero', question: 'How many openings?' },
+    { reference: 'fixture-overview-zero', question: restaurantVisitsQuestion },
+    { reference: 'fixture-overview-missing', question: 'How many openings?' },
+  ]);
+  expect(openAI).toEqual([]);
 });
 
 test('production confirms to sign-in, opens S05, resumes saves and retains the authorized workspace', async ({

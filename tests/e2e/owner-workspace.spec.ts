@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
 import type { OwnerDishFields, RestaurantProfile } from '@peekaplate/contracts';
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
 import type { DishDraft, MenuJob } from '../../frontend/console/src/owner-menu/api';
 import { JOB, reviewSession } from '../../frontend/console/src/owner-menu/fixtures.test-helpers';
@@ -62,13 +62,28 @@ function claims(authorization: string | undefined): { sub?: string; version?: nu
   }
 }
 
-const reportReference = (actor: string, venueId: string) =>
-  `synthetic-report-reference.${actor}.${venueId}`;
+const reportReference = (actor: string, venueId: string, revision = 0) =>
+  `synthetic-report-reference.${actor}.${venueId}.${revision}`;
+
+const soupQuestion = 'What was the open rate for Soup?';
+const chartQuestion = 'Show me a chart of open rates by dish';
+async function askReportQuestion(panel: Locator, question = soupQuestion) {
+  await panel.getByRole('textbox', { name: 'Ask a report question' }).fill(question);
+  await panel.getByRole('button', { name: 'Send question' }).click();
+}
 
 async function fixture(context: BrowserContext, reportReady = false) {
   const state = {
     venues: [venue],
     reportStatus: 200,
+    reportRevision: 0,
+    reportHasReference: true,
+    reportFirstDishName: UNEEZA_REPORT.dishes[0]!.name,
+    reportWindow: {
+      start_time: UNEEZA_REPORT.report_metadata.date_window.start_time as string,
+      end_time: UNEEZA_REPORT.report_metadata.date_window.end_time as string,
+      duration_hours: 24,
+    },
     denyIdentity: false,
     delayIdentity: false,
     releaseIdentity: () => {},
@@ -83,6 +98,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
     profileSaveStarted: false,
     releaseProfileSave: () => {},
     setupStatus: 200,
+    published: () => false,
     delaySetup: false,
     releaseSetup: () => {},
     delayProfilePhoto: false,
@@ -213,7 +229,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
       actor,
       version: claims(request.headers().authorization).version ?? 0,
     });
-    const analysis = url.pathname.match(/^\/api\/v1\/venues\/([0-9a-f-]{36})\/ai\/analysis$/);
+    const analysis = url.pathname.match(/^\/api\/v1\/venues\/([0-9a-f-]{36})\/ai\/questions$/);
     if (analysis && request.method() === 'POST') {
       const body = request.postDataJSON();
       state.analyses.push({
@@ -222,31 +238,42 @@ async function fixture(context: BrowserContext, reportReady = false) {
         body,
         reference: request.headers()['x-owner-report-ref'],
       });
-      if (state.analysisStatus !== 200)
-        return route.fulfill({
-          status: state.analysisStatus,
-          json: { error: 'denied' },
-          headers: { 'Access-Control-Allow-Origin': origin },
-        });
+      const analysisStatus = state.analysisStatus;
       if (state.delayAnalysis)
         await new Promise<void>((resolve) => {
           state.releaseAnalysis = resolve;
         });
+      if (analysisStatus !== 200)
+        return route.fulfill({
+          status: analysisStatus,
+          json: { error: analysisStatus === 409 ? 'report_reference_unavailable' : 'denied' },
+          headers: { 'Access-Control-Allow-Origin': origin },
+        });
+      const selectedDishes = UNEEZA_REPORT.dishes.filter((dish) =>
+        body.question === chartQuestion ? true : dish.name === 'Soup',
+      );
+      const evidence =
+        body.question === 'What was the engagement rate for Bowl?'
+          ? { status: 'abstained', reason: 'unusable_evidence' }
+          : body.question === 'How much revenue did we earn?'
+            ? { status: 'abstained', reason: 'unsupported_question' }
+            : {
+                status: 'answered',
+                metric: 'open_rate',
+                points: selectedDishes.map((dish) => ({
+                  label: dish.name,
+                  value: dish.metrics.open_rate.value,
+                })),
+                chart: body.question === chartQuestion,
+              };
       return route.fulfill({
         json: {
-          schemaVersion: 'owner-analysis.v1',
+          schemaVersion: 'owner-report-question.v1',
           venueId: analysis[1],
-          dishId: body.dishId,
-          goal: body.goal,
           source: 'synthetic',
           reportSnapshot: 'a'.repeat(64),
           timeWindow: state.analysisWindow,
-          status: 'review',
-          metric: 'open_rate',
-          value: 0.5,
-          reason: 'review_evidence',
-          approvalRequired: true,
-          allowedEffects: [],
+          ...evidence,
         },
         headers: { 'Access-Control-Allow-Origin': origin },
       });
@@ -319,7 +346,7 @@ async function fixture(context: BrowserContext, reportReady = false) {
             menuVerified:
               active.length > 0 &&
               active.every((draft) => draft.verification_status === 'verified'),
-            published: false,
+            published: state.published(),
           },
           headers,
         });
@@ -597,12 +624,28 @@ async function fixture(context: BrowserContext, reportReady = false) {
         status: state.reportStatus,
         json:
           state.reportStatus === 200
-            ? { ...UNEEZA_REPORT, venue_id: url.pathname.split('/')[4] }
+            ? {
+                ...UNEEZA_REPORT,
+                venue_id: url.pathname.split('/')[4],
+                dishes: UNEEZA_REPORT.dishes.map((dish, index) =>
+                  index === 0 ? { ...dish, name: state.reportFirstDishName } : dish,
+                ),
+                report_metadata: {
+                  ...UNEEZA_REPORT.report_metadata,
+                  date_window: state.reportWindow,
+                },
+              }
             : { error: 'synthetic_denial' },
         headers: {
           'Access-Control-Allow-Origin': origin,
           'Access-Control-Expose-Headers': 'X-Owner-Report-Ref',
-          'X-Owner-Report-Ref': reportReference(actor, url.pathname.split('/')[4]!),
+          ...(state.reportHasReference && {
+            'X-Owner-Report-Ref': reportReference(
+              actor,
+              url.pathname.split('/')[4]!,
+              state.reportRevision,
+            ),
+          }),
         },
       });
     }
@@ -980,9 +1023,12 @@ for (const width of [1440, 390]) {
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 1052 });
-    await fixture(context);
+    const workspace = await fixture(context);
     const state = await preparedPublication(context);
+    workspace.published = () => state.publicationVersion > 0;
     await signIn(page);
+    const question = page.getByRole('textbox', { name: 'Ask a report question' });
+    await expect(question).toHaveCount(0);
     await page.getByRole('button', { name: 'Review and publish', exact: true }).click();
     await expect(
       page.getByRole('heading', { name: 'Preview your menu', exact: true }),
@@ -1031,7 +1077,9 @@ for (const width of [1440, 390]) {
     // Figma S13: after publishing, the only action is Go to dashboard.
     await page.getByRole('button', { name: 'Go to dashboard' }).click();
     await expect(page.getByRole('heading', { name: 'Your menu is live' })).toHaveCount(0);
+    await expect(question).toBeEnabled();
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await expect(question).toBeEnabled();
     await page.getByRole('button', { name: 'Review and publish' }).click();
     await expect(page.getByRole('heading', { name: 'Your menu is live' })).toBeVisible();
     expect(state.publishes).toHaveLength(1);
@@ -1526,8 +1574,8 @@ for (const width of [1440, 390]) {
     await capture('owner-report');
     if (process.env.PEEKAPLATE_TEST_OWNER_AI !== 'false') {
       const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
-      await panel.getByRole('button', { name: 'Review report' }).click();
-      await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+      await askReportQuestion(panel);
+      await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
       await capture('ai-report-synthetic-http');
     }
     state.reportStatus = 403;
@@ -2407,17 +2455,17 @@ test('the AI panel opens beside the live report and uses only the signed-in owne
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
   await expect(panel).toBeVisible();
-  const dish = panel.getByLabel('Dish', { exact: true });
-  await expect(dish.locator('option')).toHaveText(UNEEZA_REPORT.dishes.map((d) => d.name));
-  await dish.selectOption({ label: 'Soup' });
-  await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
-  const soup = UNEEZA_REPORT.dishes.find((d) => d.name === 'Soup');
+  await expect(panel.getByRole('combobox')).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Send question' })).toBeDisabled();
+  await askReportQuestion(panel);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+  await expect(panel.getByText('50%', { exact: true })).toBeVisible();
+  await expect(panel.getByRole('figure')).toHaveCount(0);
   expect(state.analyses).toEqual([
     {
       venueId: venue.venueId,
       actor: ownerId,
-      body: { dishId: soup?.dish_id, goal: 'menu' },
+      body: { question: soupQuestion },
       reference: reportReference(ownerId, venue.venueId),
     },
   ]);
@@ -2439,15 +2487,15 @@ test('switching restaurant clears the AI result and asks only for the new restau
   await page.getByLabel('Restaurant', { exact: true }).selectOption(venue.venueId);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
-  await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+  await askReportQuestion(panel);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
   await openAccount(page);
   await page.getByLabel('Restaurant', { exact: true }).selectOption(otherVenue.venueId);
-  await expect(page.getByRole('heading', { name: 'Suggested review' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Open rate', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   await expect(panel.getByText(otherVenue.name)).toBeVisible();
-  await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+  await askReportQuestion(panel);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
   expect(state.analyses.map((call) => call.venueId)).toEqual([venue.venueId, otherVenue.venueId]);
 });
 
@@ -2460,7 +2508,7 @@ test('editor access shows no AI panel', async ({ context, page }) => {
   expect(state.analyses).toEqual([]);
 });
 
-test('the typed AI question displays its matching focus and rejects a different time window', async ({
+test('the AI answer and requested chart use the displayed report values, including valid zero', async ({
   context,
   page,
 }) => {
@@ -2468,23 +2516,34 @@ test('the typed AI question displays its matching focus and rejects a different 
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
-  const question = panel.getByRole('textbox', { name: 'Ask a report question' });
-  await expect(panel.getByLabel('Review focus')).toHaveValue('menu');
-  await question.fill('How is engagement for this dish?');
-  await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
-  expect(state.analyses[0]?.body).toMatchObject({ goal: 'engagement' });
-  for (const unsupported of [
-    'How was engagement yesterday?',
-    'Show engagement on Monday',
-    'Show menu engagement on November 18',
+  await page.getByRole('button', { name: 'View as table', exact: true }).click();
+  await askReportQuestion(panel, chartQuestion);
+  const chart = panel.getByRole('figure', { name: 'Open rate chart', exact: true });
+  await expect(chart).toBeVisible();
+  for (const [dish, value] of [
+    ['Bowl', '0%'],
+    ['Soup', '50%'],
+    ['Salad', '50%'],
   ]) {
-    await question.fill(unsupported);
-    await panel.getByRole('button', { name: 'Review report' }).click();
-    await expect(panel.getByRole('alert')).toContainText('The review uses the displayed dish');
-    await expect(panel.getByRole('heading', { name: 'Suggested review' })).toHaveCount(0);
+    await expect(page.getByRole('row', { name: `${dish} ${value}`, exact: true })).toBeVisible();
+    const item = chart.getByRole('listitem').filter({ hasText: dish });
+    await expect(item.getByText(dish, { exact: true })).toBeVisible();
+    await expect(item.getByText(value, { exact: true })).toBeVisible();
   }
-  expect(state.analyses).toHaveLength(1);
+  await expect(panel.getByText(/Answer period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
+  expect(state.analyses[0]).toMatchObject({
+    venueId: venue.venueId,
+    reference: reportReference(ownerId, venue.venueId),
+    body: { question: chartQuestion },
+  });
+
+  await askReportQuestion(panel, 'What was the engagement rate for Bowl?');
+  await expect(panel.getByText(/There is not enough verified evidence/)).toBeVisible();
+  await expect(chart).toHaveCount(0);
+  await expect(panel.getByText('0%', { exact: true })).toHaveCount(0);
+
+  await askReportQuestion(panel, 'How much revenue did we earn?');
+  await expect(panel.getByText(/This report cannot answer that question/)).toBeVisible();
 });
 
 test('the AI panel shows the report period and an honest error when the review fails', async ({
@@ -2495,23 +2554,23 @@ test('the AI panel shows the report period and an honest error when the review f
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
-  await expect(panel.getByText('No questions yet')).toBeVisible();
+  await expect(panel.getByText(/Ask about this report/)).toBeVisible();
   await expect(panel.getByText(/Oct 19\s*–\s*20, 2026/)).toBeVisible();
-  await context.route(`${api}/api/v1/venues/*/ai/analysis`, (route) =>
+  await context.route(`${api}/api/v1/venues/*/ai/questions`, (route) =>
     route.fulfill({
       status: 503,
       json: { error: 'unavailable' },
       headers: { 'Access-Control-Allow-Origin': origin },
     }),
   );
-  await panel.getByRole('button', { name: 'Review report' }).click();
+  await askReportQuestion(panel);
   await expect(panel.getByRole('alert')).toHaveText(
-    'The report could not be reviewed. Check your session or try again later.',
+    'The report question could not be answered. Check your session or try again later.',
   );
-  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toHaveCount(0);
 });
 
-test('an analysis for a different period than the report on screen shows no suggestion', async ({
+test('an answer for a different period than the report on screen shows no answer or chart', async ({
   context,
   page,
 }) => {
@@ -2521,38 +2580,33 @@ test('an analysis for a different period than the report on screen shows no sugg
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
-  await panel.getByRole('button', { name: 'Review report' }).click();
+  await askReportQuestion(panel, chartQuestion);
   await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
   await expect(panel.getByText(/Nov 11\s*–\s*12, 2026/)).toBeVisible();
-  // Honest guidance: no promise that refreshing and asking again will match.
-  await expect(panel.getByText(/refresh/i)).toHaveCount(0);
-  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toHaveCount(0);
   await expect(panel.getByText(/open rate/i)).toHaveCount(0);
-  await expect(panel.getByText('Review the approved dish card', { exact: false })).toHaveCount(0);
+  await expect(panel.getByRole('figure')).toHaveCount(0);
 
   // Only the start differs: still no suggestion.
   state.analysisWindow = { start: '2026-10-19T06:00:00Z', end: '2026-10-20T07:00:00Z' };
-  await panel.getByLabel('Review focus').selectOption('engagement');
-  await panel.getByRole('button', { name: 'Review report' }).click();
+  await askReportQuestion(panel);
   await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
-  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toHaveCount(0);
 
   // The real path: report and analysis each compute a rolling window from their own request time,
   // so an analysis requested 25 seconds later covers a shifted window. Still no suggestion, and
   // the message names both periods with exact times because their dates read the same.
   state.analysisWindow = { start: '2026-10-19T07:00:25Z', end: '2026-10-20T07:00:25Z' };
-  await panel.getByLabel('Review focus').selectOption('crm');
-  await panel.getByRole('button', { name: 'Review report' }).click();
+  await askReportQuestion(panel);
   await expect(panel.getByRole('heading', { name: 'Different report period' })).toBeVisible();
-  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toHaveCount(0);
   await expect(panel.getByText(/Oct 19, 7:00:25\s*AM UTC/)).toBeVisible();
   await expect(panel.getByText(/Oct 19, 7:00:00\s*AM UTC/)).toBeVisible();
 
   // The same instants written differently (".000Z") count as the same period.
   state.analysisWindow = { start: '2026-10-19T07:00:00.000Z', end: '2026-10-20T07:00:00.000Z' };
-  await panel.getByLabel('Review focus').selectOption('menu');
-  await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toBeVisible();
+  await askReportQuestion(panel);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
 });
 
 test('analysis denial clears the private report and refreshes restaurant access', async ({
@@ -2566,30 +2620,185 @@ test('analysis denial clears the private report and refreshes restaurant access'
   await expect(panel).toBeVisible();
   state.analysisStatus = 403;
   state.venues = [];
-  await panel.getByRole('button', { name: 'Review report' }).click();
+  await askReportQuestion(panel);
   await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
   await expect(panel).toHaveCount(0);
   await expect(page.getByRole('table')).toHaveCount(0);
 });
 
-test('the panel distinguishes its server-read analysis period from the displayed report', async ({
-  context,
-  page,
-}) => {
+test('the panel identifies its matching signed report period', async ({ context, page }) => {
   await fixture(context, true);
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
-  await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toBeVisible();
-  await expect(panel.getByText(/Displayed report period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
-  // A suggestion is shown only when the analysis covers the period on screen (see the next test
-  // for a different period).
-  await expect(panel.getByText(/Analysis evidence period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
+  await askReportQuestion(panel);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+  await expect(panel.getByText(/Dish Performance period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
+  await expect(panel.getByText(/Answer period:.*Oct 19\s*–\s*20, 2026/)).toBeVisible();
+});
+
+test('renewing the same report reference preserves the draft, chart, and pending question', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const draft = panel.getByRole('textbox', { name: 'Ask a report question' });
+  const chart = panel.getByRole('figure', { name: 'Open rate chart' });
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+  await askReportQuestion(panel, chartQuestion);
+  await expect(chart).toBeVisible();
+
+  state.reportRevision++;
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(chart).toBeVisible();
+  await expect(draft).toHaveValue(chartQuestion);
+
+  state.delayAnalysis = true;
+  await askReportQuestion(panel);
+  await expect.poll(() => state.analyses.length).toBe(2);
+  expect(state.analyses[1]?.reference).toBe(reportReference(ownerId, venue.venueId, 1));
+  state.reportRevision++;
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(panel.getByRole('status')).toHaveText('Checking the report…');
+  await expect(draft).toHaveValue(soupQuestion);
+  state.releaseAnalysis();
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+
+  state.delayAnalysis = false;
+  await askReportQuestion(panel, chartQuestion);
+  await expect(chart).toBeVisible();
+  expect(state.analyses[2]?.reference).toBe(reportReference(ownerId, venue.venueId, 2));
+
+  state.reportHasReference = false;
+  await refresh.click();
   await expect(
-    panel.getByText('Synthetic analysis from a separate server-read snapshot.'),
+    panel.getByText('Reload the report to ask a question about this period.'),
   ).toBeVisible();
-  await expect(panel.getByText(/Answers use only the records shown/)).toHaveCount(0);
+  await expect(chart).toHaveCount(0);
+  await expect(page.getByRole('table')).toBeVisible();
+  await expect(draft).toHaveValue(chartQuestion);
+  await expect(draft).toBeDisabled();
+});
+
+test('renewing the same report reference clears a previous 409 warning', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const draft = panel.getByRole('textbox', { name: 'Ask a report question' });
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+
+  state.analysisStatus = 409;
+  await askReportQuestion(panel);
+  await expect(panel.getByRole('alert')).toContainText('The report reference expired or changed');
+  expect(state.analyses[0]?.reference).toBe(reportReference(ownerId, venue.venueId));
+
+  state.reportRevision++;
+  await refresh.click();
+  await expect(panel.getByText(/Ask about this report/)).toBeVisible();
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await expect(draft).toHaveValue(soupQuestion);
+
+  state.analysisStatus = 200;
+  await panel.getByRole('button', { name: 'Send question' }).click();
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+  expect(state.analyses[1]?.reference).toBe(reportReference(ownerId, venue.venueId, 1));
+});
+
+test('a late 409 cannot restore the warning after the same report reference renews', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  const draft = panel.getByRole('textbox', { name: 'Ask a report question' });
+  const refresh = page.getByRole('button', { name: 'Refresh report', exact: true });
+
+  state.analysisStatus = 409;
+  state.delayAnalysis = true;
+  await askReportQuestion(panel);
+  await expect.poll(() => state.analyses.length).toBe(1);
+  expect(state.analyses[0]?.reference).toBe(reportReference(ownerId, venue.venueId));
+
+  state.reportRevision++;
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(panel.getByRole('status')).toHaveText('Checking the report…');
+  state.releaseAnalysis();
+  await expect(panel.getByText(/Ask about this report/)).toBeVisible();
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await expect(draft).toHaveValue(soupQuestion);
+
+  state.delayAnalysis = false;
+  state.analysisStatus = 200;
+  await panel.getByRole('button', { name: 'Send question' }).click();
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+  expect(state.analyses[1]?.reference).toBe(reportReference(ownerId, venue.venueId, 1));
+});
+
+test('refreshing a changed report clears its old chart and sends the replacement reference', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  await askReportQuestion(panel, chartQuestion);
+  const chart = panel.getByRole('figure', { name: 'Open rate chart' });
+  await expect(chart).toBeVisible();
+
+  state.reportRevision++;
+  state.analysisWindow = { start: '2026-10-20T07:00:00Z', end: '2026-10-21T07:00:00Z' };
+  state.reportWindow = {
+    start_time: state.analysisWindow.start,
+    end_time: state.analysisWindow.end,
+    duration_hours: 24,
+  };
+  await page.getByRole('button', { name: 'Refresh report', exact: true }).click();
+  await expect(panel.getByText(/Dish Performance period:.*Oct 20\s*–\s*21, 2026/)).toBeVisible();
+  await expect(chart).toHaveCount(0);
+  await expect(panel.getByRole('textbox', { name: 'Ask a report question' })).toHaveValue(
+    chartQuestion,
+  );
+  state.analysisStatus = 409;
+  await askReportQuestion(panel, chartQuestion);
+  await expect(panel.getByRole('alert')).toContainText('The report reference expired or changed');
+  await panel.getByRole('button', { name: 'Reload report' }).click();
+
+  state.analysisStatus = 200;
+  await askReportQuestion(panel, chartQuestion);
+  await expect(chart).toBeVisible();
+  expect(state.analyses.map(({ reference }) => reference)).toEqual([
+    reportReference(ownerId, venue.venueId),
+    reportReference(ownerId, venue.venueId, 1),
+    reportReference(ownerId, venue.venueId, 1),
+  ]);
+
+  state.delayAnalysis = true;
+  await askReportQuestion(panel);
+  await expect.poll(() => state.analyses.length).toBe(4);
+  await expect(panel.getByRole('status')).toHaveText('Checking the report…');
+  state.reportRevision++;
+  state.reportFirstDishName = 'Updated report dish';
+  await page.getByRole('button', { name: 'Refresh report', exact: true }).click();
+  await expect(page.getByRole('table').getByText(state.reportFirstDishName)).toBeVisible();
+  await expect(panel.getByRole('textbox', { name: 'Ask a report question' })).toHaveValue(
+    soupQuestion,
+  );
+  await expect(panel.getByText(/Ask about this report/)).toBeVisible();
+  state.releaseAnalysis();
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toHaveCount(0);
 });
 
 test('a pending analysis cannot restore private output after sign-out and another account signs in', async ({
@@ -2601,8 +2810,8 @@ test('a pending analysis cannot restore private output after sign-out and anothe
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
-  await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(panel.getByRole('status')).toHaveText('Reviewing the report…');
+  await askReportQuestion(panel);
+  await expect(panel.getByRole('status')).toHaveText('Checking the report…');
   await expect.poll(() => state.analyses.length).toBe(1);
   await openAccount(page);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
@@ -2611,8 +2820,8 @@ test('a pending analysis cannot restore private output after sign-out and anothe
   await expect(page.locator('.owner-identity__name')).toHaveText(otherVenue.name);
   state.releaseAnalysis();
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
-  await expect(panel.getByText('No questions yet')).toBeVisible();
-  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+  await expect(panel.getByText(/Ask about this report/)).toBeVisible();
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toHaveCount(0);
   expect(state.analyses.map((call) => call.actor)).toEqual([ownerId]);
 });
 
@@ -2625,8 +2834,9 @@ test('the live owner AI panel stays usable on mobile with accessible controls', 
   await signIn(page);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
-  await panel.getByRole('button', { name: 'Review report' }).click();
-  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toBeVisible();
+  await askReportQuestion(panel, chartQuestion);
+  await expect(panel.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+  await expect(panel.getByRole('figure', { name: 'Open rate chart' })).toBeVisible();
   const overflow = await page.evaluate(() => ({
     width: document.documentElement.scrollWidth,
     viewport: window.innerWidth,

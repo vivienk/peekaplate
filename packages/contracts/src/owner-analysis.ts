@@ -36,6 +36,116 @@ export const OwnerAnalysisResultSchema = z
 export type OwnerAnalysisRequest = z.infer<typeof OwnerAnalysisRequestSchema>;
 export type OwnerAnalysisResult = z.infer<typeof OwnerAnalysisResultSchema>;
 
+export const OWNER_REPORT_QUESTION_MAX_LENGTH = 400;
+
+export const OwnerReportQuestionRequestSchema = z.strictObject({
+  question: z.string().trim().min(1).max(OWNER_REPORT_QUESTION_MAX_LENGTH),
+});
+
+const questionWindow = z.strictObject({ start: z.iso.datetime(), end: z.iso.datetime() });
+
+const questionReportScope = {
+  schemaVersion: z.literal('owner-report-question.v1'),
+  venueId: z.uuid(),
+  source: z.enum(['synthetic', 'production']),
+  reportSnapshot: z.string().regex(/^[a-f0-9]{64}$/),
+  timeWindow: questionWindow,
+  overview: z
+    .discriminatedUnion('period', [
+      z.strictObject({ period: z.literal('current') }),
+      z.strictObject({ period: z.literal('baseline') }),
+      z.strictObject({ period: z.literal('compare'), baselineWindow: questionWindow }),
+    ])
+    .optional(),
+};
+
+export const OwnerReportQuestionResultSchema = z
+  .discriminatedUnion('status', [
+    z.strictObject({
+      ...questionReportScope,
+      status: z.literal('answered'),
+      metric: z.enum([
+        'active_sessions',
+        'open_rate',
+        'avg_interaction_time_seconds',
+        'timing_coverage',
+        'save_rate',
+        'engagement_rate',
+        'portion_previews_shown',
+        'comparisons_started',
+        'dish_opens',
+        'menu_sessions',
+      ]),
+      points: z
+        .array(
+          z.strictObject({ label: z.string().min(1).max(160), value: z.number().nonnegative() }),
+        )
+        .min(1)
+        .max(20),
+      chart: z.boolean(),
+    }),
+    z.strictObject({
+      ...questionReportScope,
+      status: z.literal('abstained'),
+      reason: z.enum(['unsupported_question', 'unusable_evidence']),
+    }),
+  ])
+  .superRefine((result, context) => {
+    const start = Date.parse(result.timeWindow.start);
+    const end = Date.parse(result.timeWindow.end);
+    if (start > end || (result.status === 'answered' && start === end)) {
+      context.addIssue({ code: 'custom', path: ['timeWindow'], message: 'Invalid time window' });
+    }
+    if (result.overview?.period === 'compare') {
+      const baseline = result.overview.baselineWindow;
+      const baselineStart = Date.parse(baseline.start);
+      const baselineEnd = Date.parse(baseline.end);
+      if (
+        baselineStart > baselineEnd ||
+        (result.status === 'answered' && baselineStart === baselineEnd)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['overview', 'baselineWindow'],
+          message: 'Invalid baseline time window',
+        });
+      }
+    }
+    if (result.status === 'answered') {
+      const overviewMetric = result.metric === 'dish_opens' || result.metric === 'menu_sessions';
+      if (
+        overviewMetric !== Boolean(result.overview) ||
+        (result.overview && result.points.length !== (result.overview.period === 'compare' ? 2 : 1))
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['overview'],
+          message: 'Invalid Overview answer scope',
+        });
+      }
+      const validValues = result.points.every(({ value }) => {
+        switch (result.metric) {
+          case 'active_sessions':
+          case 'portion_previews_shown':
+          case 'comparisons_started':
+          case 'dish_opens':
+          case 'menu_sessions':
+            return Number.isSafeInteger(value);
+          case 'avg_interaction_time_seconds':
+            return value <= 300;
+          default:
+            return value <= 1;
+        }
+      });
+      if (!validValues) {
+        context.addIssue({ code: 'custom', path: ['points'], message: 'Invalid metric value' });
+      }
+    }
+  });
+
+export type OwnerReportQuestionRequest = z.infer<typeof OwnerReportQuestionRequestSchema>;
+export type OwnerReportQuestionResult = z.infer<typeof OwnerReportQuestionResultSchema>;
+
 // Model output never supplies owner-visible prose or executable actions.
 export const OWNER_ANALYSIS_ACTIONS = {
   open_rate: 'Review the approved dish card and whether it clearly represents the dish.',

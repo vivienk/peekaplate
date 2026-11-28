@@ -86,7 +86,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "bef195dcd7f677fb4dc91ac5c421a1b3d0a7117a8f1a5d59f30c23fd75531201"
+      "sourceFingerprint": "ef71d691c4b18ae04db713dbaacabee5f7eb22ffb64580eecb98f7e7f8de4990"
     },
     {
       "id": "tokens",
@@ -460,6 +460,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-menu/dish-assistance-api.test.ts",
         "docs/owner-flow-retest.md",
         "frontend/console/src/owner/owner-workspace-live.test.tsx",
+        "frontend/console/src/owner/report-question-client.ts",
         "scripts/owner-dashboard-css-isolation.test.mjs",
         "docs/screen9-portion-publish.md",
         "frontend/console/src/owner-dashboard/line-chart.test.tsx",
@@ -479,7 +480,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "b0ab2ef946334dae88a14f61cc535cda451e427a7bc798217dbd7a26e128219c"
+      "sourceFingerprint": "a07fb47b32e412b5e42ee11d26ac23b2b4185789c48bba58ce07b4ad0e1dcaba"
     },
     {
       "id": "backend",
@@ -664,6 +665,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/responses.test.ts",
         "backend/src/owner-ai/routes.ts",
         "backend/src/owner-ai/routes.test.ts",
+        "backend/src/owner-ai/questions.ts",
+        "backend/src/owner-ai/questions.test.ts",
         "backend/scripts/owner-ai-local.ts",
         "backend/scripts/owner-ai-local-fixture.ts",
         "scripts/start-owner-ai-private.py",
@@ -762,7 +765,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a2826ac809b5f81168071ab55297ad6bad0f0c447627e4a6e3842b8be2d0278c"
+      "sourceFingerprint": "d208bd3b58fcca214c8fc78ac1ad302cbd8d3d5e665671ad03a2f37c30356d24"
     },
     {
       "id": "database",
@@ -925,7 +928,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "7dfc2e2b95f32348a9633821068710a60219c027e17348fd9ee575552ef2c8b4"
+      "sourceFingerprint": "217745ca2b97f0269d2ee0a1f4b050bbe8cb082e12d68b1af88bbef2c4b667de"
     },
     {
       "id": "agents",
@@ -1193,7 +1196,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/OwnerWorkspace.tsx",
         "docs/production-release.md"
       ],
-      "next": "Release the approved production API and console with their dashboard AI flags enabled, then verify one signed-in report question."
+      "next": "Release the approved production API and console with their dashboard AI flags enabled. After publication, verify the question box uses the same signed report on dashboard and direct workspace routes, and abstains on unknown freshness."
     },
     {
       "date": "2026-11-23",
@@ -1259,14 +1262,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "console"
       ],
-      "summary": "Production can render today-to-date dish metrics through the latest settled Pacific cutoff alongside Overview. A separate snapshot prefix and explicit live cutover protect the partial first day; CSV and AI reuse the same report window.",
+      "summary": "Production renders today-to-date dish metrics through the latest settled Pacific cutoff. A separate snapshot prefix and explicit cutover protect the partial first day. CSV and AI use the same report, with dish visits from Dish Performance and restaurant visits and dish opens from Overview. Renewing the same snapshot preserves active chat and clears warnings for the replaced reference. A changed snapshot clears the old result. The route checks current owner access and abstains on unknown freshness or missing evidence without calling a model.",
       "files": [
         "backend/src/owner-report.ts",
         "packages/contracts/src/owner-report.ts",
         "frontend/console/src/owner-dashboard/report-data.tsx",
-        "docs/adr/0020-production-today-dish-performance.md"
+        "docs/adr/0020-production-today-dish-performance.md",
+        "backend/src/owner-ai/questions.ts",
+        "backend/src/owner-ai/report-reference.test.ts",
+        "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "tests/e2e/owner-workspace.spec.ts",
+        "tests/e2e/owner-auth-provider.spec.ts"
       ],
-      "next": "Deploy the compatible owner console first and verify an eligible single dish event in the actual production window."
+      "next": "Release the compatible questions API before enabling its console entry. Verify an eligible single-dish event in the actual report window and confirm source completeness for the exact venue and signed window before recording successful production answers."
     },
     {
       "date": "2026-11-24",
