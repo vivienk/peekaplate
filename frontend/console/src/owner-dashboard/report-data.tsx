@@ -214,7 +214,8 @@ export function useOwnerReport(source: ReportSource | null): {
 }
 
 // Proposed wording for the page states; Adam, Shirley and Rania to confirm.
-const STATE_TEXT: Record<Exclude<ReportState['kind'], 'ready' | 'loading'>, string> = {
+export const OWNER_REPORT_STATE_TEXT: Record<Exclude<ReportState['kind'], 'ready'>, string> = {
+  loading: 'Loading report…',
   signed_out: 'Sign in to see your restaurant’s reports.',
   denied: 'You don’t have access to this restaurant’s reports.',
   unavailable: 'Reports aren’t available for this restaurant yet.',
@@ -264,11 +265,11 @@ export function ReportView({
       </div>
       {state.kind === 'loading' ? (
         <div className="card" role="status">
-          Loading report…
+          {OWNER_REPORT_STATE_TEXT.loading}
         </div>
       ) : (
         <div className="card" role={state.kind === 'error' ? 'alert' : 'status'}>
-          <p>{STATE_TEXT[state.kind]}</p>
+          <p>{OWNER_REPORT_STATE_TEXT[state.kind]}</p>
           {state.kind === 'error' && onRetry && (
             <button type="button" className="btn primary" onClick={onRetry} disabled={refreshing}>
               {refreshing ? 'Retrying…' : 'Try again'}
