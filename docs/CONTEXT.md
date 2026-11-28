@@ -956,7 +956,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Staging uses opt-in for PostHog and canonical capture. Its restricted hourly export verified eight raw copies and four deduplicated events. The collaborator inspection API returns redacted diagnostics with outsider denial verified; operations.md records the checks. The shared PostHog adapter uses an allowlist, a separate random visit ID, and the event ID as SDK uuid. Production verified menus on the exact diner origin start capture without a prompt. The shared gate respects browser privacy signals and suspends capture when the publication is withdrawn. Desktop and mobile browser tests intercept both destinations, match the first menu view by event ID and exercise Global Privacy Control. Hosted production ingestion and the live reporting source remain unverified.",
+      "summary": "Staging uses opt-in for PostHog and canonical capture. Its restricted hourly export verified eight raw copies and four deduplicated events. The local DATA-19 reconciler verifies contiguous export intervals by event ID and blocks overlaps; it does not fetch evidence, change the schedule or attest owner report freshness. The collaborator inspection API returns redacted diagnostics with outsider denial verified; operations.md records the checks. The shared PostHog adapter uses an allowlist, a separate random visit ID, and the event ID as SDK uuid. Production verified menus on the exact diner origin start capture without a prompt. The shared gate respects browser privacy signals and suspends capture when the publication is withdrawn. Desktop and mobile browser tests intercept both destinations, match the first menu view by event ID and exercise Global Privacy Control. Hosted production ingestion and the live reporting source remain unverified.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",
@@ -985,7 +985,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "df8e4acf413c886612ec8d92f88101fe9d59bb0d0ec2c69dd611f543a35cc8a4"
+      "sourceFingerprint": "d3038c3709fe94f98f6df149cf5c1d29fa781df52bcd3e89dd3da369116f1569"
     },
     {
       "id": "processing",
