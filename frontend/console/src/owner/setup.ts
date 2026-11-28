@@ -101,7 +101,6 @@ function statusOf(id: StepId, state: StepState): StepView['status'] {
   if (state === 'waiting') return { text: 'Waiting for verification', tone: 'information' };
   if (id === 'details' && state === 'done') return { text: 'Verified', tone: 'success' };
   if (id === 'menu' && state === 'done') return { text: 'Added', tone: 'success' };
-  if (id === 'publish' && state === 'done') return { text: 'Published', tone: 'success' };
   if (id === 'publish' && state === 'current') return { text: 'Not published', tone: 'warning' };
   return null;
 }

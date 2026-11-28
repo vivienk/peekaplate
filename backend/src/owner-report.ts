@@ -29,6 +29,7 @@ import {
   REPORT_PUBLICATIONS,
   TODAY_REPORT_EVIDENCE,
 } from './owner-report-evidence';
+import { evaluateBatchFreshness } from './owner-report-freshness';
 import type { LivePostHogOwnerEvent } from './owner-report-posthog';
 import { readReportPublications } from './owner-report-publications';
 import { readOwnerReportSummary } from './owner-report-summary';
@@ -326,6 +327,16 @@ async function measureReport(
         ? OWNER_PRODUCTION_DAY_VERSION
         : undefined,
   );
+  const batchFreshness =
+    isBatch && liveEvidence
+      ? evaluateBatchFreshness({
+          batchWindowStart: windowStart.toISOString(),
+          batchWindowEnd: now.toISOString(),
+          now: options.validationNow ?? new Date(),
+          // Live production lacks an authoritative queue-drain watermark; fail closed as unknown.
+          watermark: null,
+        })
+      : null;
   return toOwnerReport({
     ...internal,
     ...(displayActions
@@ -342,7 +353,7 @@ async function measureReport(
         last_event_ingested_at: liveEvidence
           ? null
           : internal.report_metadata.freshness.last_event_ingested_at,
-        is_stale: complete ? false : null,
+        is_stale: complete ? false : (batchFreshness?.is_stale ?? null),
       },
     },
     ...(summary

@@ -365,7 +365,7 @@ describe('live Screen 9 on the authored #172 presentation', () => {
     expect(blank).toContain('required');
   });
 
-  it('keeps OCR evidence, actual CAD currency and unknown allergens on the authored form', () => {
+  it('hides the OCR excerpt but keeps actual CAD currency and unknown allergens on the authored form', () => {
     const session = reviewSession();
     const item = session.items[0]!;
     const html = render({
@@ -377,8 +377,9 @@ describe('live Screen 9 on the authored #172 presentation', () => {
     expect(html).toContain('s09-grid');
     expect(html).toContain('Price (CAD)');
     expect(html).toContain('Printed on the menu: 8.50 / 12.50 CAD');
-    expect(html).toContain('From the menu');
-    expect(html).toContain('Garden Soup - vegetables - 8.50 / 12.50 CAD');
+    // The raw OCR excerpt is no longer shown on the editor, even when evidence is passed in.
+    expect(html).not.toContain('From the menu');
+    expect(html).not.toContain('Garden Soup - vegetables - 8.50 / 12.50 CAD');
     expect(html).toContain('Diners will see: Allergens not confirmed.');
     expect(html).toContain('For allergy questions, please ask the restaurant staff.');
     expect(html).not.toContain('USD pilot default');

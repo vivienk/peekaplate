@@ -177,6 +177,17 @@ describe('isMenuReady', () => {
   it('is true only when every dish is Ready', () => {
     expect(isMenuReady([dish(), dish({ id: 'd2' })])).toBe(true);
     expect(isMenuReady([dish(), dish({ id: 'd2', priceAmount: null })])).toBe(false);
+    expect(
+      isMenuReady([dish(), dish({ id: 'd2', allergens: { status: 'proposed', items: ['milk'] } })]),
+    ).toBe(false);
+  });
+
+  it('keeps proposed allergens in Pending Review until owner resolution', () => {
+    expect(dishStatus(dish({ allergens: { status: 'proposed', items: ['milk'] } }))).toEqual({
+      ready: false,
+      label: 'Pending Review',
+      tone: 'warning',
+    });
   });
 });
 
