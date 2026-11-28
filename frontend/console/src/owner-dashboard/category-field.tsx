@@ -3,7 +3,8 @@
 // A select-only combobox: the field opens a list with "Add category" first, then the categories.
 // "Add category" turns the list into a name input and an Add button; the new category then
 // appears in the list for the owner to select. The categories live in the demo page's memory.
-import { OWNER_DISH_DIETARY_MAX, type PublicMenuDietaryCode } from '@peekaplate/contracts';
+import type { PublicMenuDietaryCode } from '@peekaplate/contracts';
+import { OWNER_DISH_DIETARY_MAX } from '@peekaplate/contracts/owner-menu';
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import chevron from './assets/icons/angle-small-down.svg';
 import check from './assets/icons/check.svg';
