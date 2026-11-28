@@ -287,7 +287,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart show validated summaries and gaps. Visible San Francisco day reports retry transient refresh failures for the same source. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
+      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart show validated summaries and gaps. The Overview date picker is available in preview; signed-in reports show their actual server period until range queries are wired. Visible San Francisco day reports retry transient refresh failures for the same source. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -476,7 +476,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "38732f095f39a76903c978a913ad2e79bc2d6f64edfd10b192434d5e734aca56"
+      "sourceFingerprint": "dd0299dc556c5093d0bc5847ca4ac0870630fe42807c92b8e71f323b61e8c887"
     },
     {
       "id": "backend",

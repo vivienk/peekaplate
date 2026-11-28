@@ -259,13 +259,15 @@ export function Overview({
         <span className="eyebrow">Overview · {live ? live.restaurantName : REST.period}</span>
         <div className="pagehead__row">
           <h1>{live ? 'How your menu did this period' : 'How your menu did this week'}</h1>
-          <DateRangeFilter
-            value={dateRange}
-            onApply={(range) => {
-              setDateRange(range);
-              onDateRangeChange?.(toUtcWindow(range), range);
-            }}
-          />
+          {(!live || onDateRangeChange) && (
+            <DateRangeFilter
+              value={dateRange}
+              onApply={(range) => {
+                setDateRange(range);
+                onDateRangeChange?.(toUtcWindow(range), range);
+              }}
+            />
+          )}
         </div>
         {live?.reportRefresh}
       </div>

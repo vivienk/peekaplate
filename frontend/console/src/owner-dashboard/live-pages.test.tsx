@@ -87,6 +87,7 @@ describe('authored dashboard pages with live inputs', () => {
     expect(html).toContain('/actual-soup.png');
     expect(html).toContain('Price not recorded');
     expect(html).toContain('Menu sessions');
+    expect(html).not.toContain('aria-haspopup="dialog"');
     expect(html.match(/class="kpi"/g)).toHaveLength(5);
     expect(html).toContain('Unavailable');
     expect(html).not.toContain('0 planned');
