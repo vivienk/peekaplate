@@ -38,8 +38,9 @@ example, ask “What was the save rate for Avocado Toast?” or “Chart open ra
 dish.” “Show visits by dish” and “Top two dishes by visits” read dish active
 sessions. “How many restaurant visits were there this period?” reads the current
 signed Overview menu-session count. “How many openings?” reads the separate dish-open
-count. Dish-opening questions can also select the previous report period or compare
-the current and previous periods. Each result uses its own Overview window,
+count. Both counts can select the preceding report period or compare it with the
+current period. For example, ask “How did menu sessions compare with the preceding
+period?” Each result uses its own Overview window,
 which can start before the Dish Performance window. The same signed snapshot binds
 both. A measured zero is displayed as zero. Unknown freshness, missing or suppressed values, or
 incomplete whole-menu evidence produce an abstention. The route does not answer

@@ -765,7 +765,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "ba992fdeb786a94303867cec46945ac401878ca547629399b82458bf48aab16d"
+      "sourceFingerprint": "49149f7aa1c2ec25bb3358827047613e93200ee0532aa3a60c429a9ba88edda2"
     },
     {
       "id": "database",
@@ -1262,7 +1262,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "console"
       ],
-      "summary": "Production renders today-to-date dish metrics through the latest settled Pacific cutoff. A separate snapshot prefix and explicit cutover protect the partial first day. CSV and AI use the same report, with dish visits from Dish Performance and restaurant visits and dish opens from Overview. Renewing the same snapshot preserves active chat and clears warnings for the replaced reference. A changed snapshot clears the old result. The route checks current owner access and abstains on unknown freshness or missing evidence without calling a model.",
+      "summary": "Production renders today-to-date dish metrics through the latest settled Pacific cutoff. A separate snapshot prefix and explicit cutover protect the partial first day. CSV and AI use the same report, with dish visits from Dish Performance and restaurant visits and dish opens from Overview. The signed Overview supports previous-period counts and comparisons for restaurant visits and dish opens. Renewing the same snapshot preserves active chat and clears warnings for the replaced reference. A changed snapshot clears the old result. The route checks current owner access and abstains on unknown freshness or missing evidence without calling a model.",
       "files": [
         "backend/src/owner-report.ts",
         "packages/contracts/src/owner-report.ts",
