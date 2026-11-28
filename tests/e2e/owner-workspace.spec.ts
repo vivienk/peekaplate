@@ -2267,6 +2267,45 @@ test('report revocation refreshes membership and clears private state', async ({
   await expect(page.getByRole('table')).toHaveCount(0);
 });
 
+for (const permission of ['editor', 'revoked'] as const) {
+  test(`a delayed background report denial rechecks menu access after an owner becomes ${permission}`, async ({
+    context,
+    page,
+  }) => {
+    const state = await fixture(context, true);
+    state.published = () => true;
+    state.delayReport = true;
+    await signIn(page);
+    await expect
+      .poll(() => state.apiCalls.some((call) => call.path.endsWith('/analytics/dishes')))
+      .toBe(true);
+    await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+    const draftName = page.getByRole('textbox', { name: /^Dish name/ });
+    await draftName.fill('Unsaved soup rename');
+
+    state.venues = permission === 'editor' ? [{ ...venue, permission }] : [];
+    state.reportStatus = 403;
+    state.releaseReport();
+    await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
+    if (permission === 'revoked') {
+      await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+      await expect(draftName).toHaveCount(0);
+      return;
+    }
+
+    await expect(
+      page.getByRole('button', { name: 'Dish performance', exact: true }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await expect(draftName).toHaveValue('Unsaved soup rename');
+    await acknowledgeDish(page);
+    await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+    await expect(
+      page.getByText('Draft saved. This has not approved or published your menu.'),
+    ).toBeVisible();
+    expect(state.drafts[venue.venueId]?.[0]?.name).toBe('Unsaved soup rename');
+  });
+}
+
 test('an expired identity removes the shell before an API request can use it', async ({
   context,
   page,

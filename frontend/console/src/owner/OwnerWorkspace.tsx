@@ -41,6 +41,7 @@ import type { ReportState } from '../owner-dashboard/report-api';
 import {
   formatOwnerReportTime,
   formatOwnerReportValue,
+  OWNER_REPORT_STATE_TEXT,
   ReportView,
   useOwnerReport,
 } from '../owner-dashboard/report-data';
@@ -254,13 +255,15 @@ export function OwnerWorkspace({
   useEffect(() => {
     if (reportState.kind === 'denied') {
       setDeniedReportScope(reportScope);
-      accessFailure('denied');
+      // A former owner may still have editor access. Recheck before discarding an active draft.
+      if (!reportPage && dirty) setAttempt((value) => value + 1);
+      else accessFailure('denied');
     } else if (reportState.kind === 'signed_out') {
       accessFailure('signed_out');
     } else if (reportState.kind === 'ready') {
       setDeniedReportScope((current) => (current === reportScope ? null : current));
     }
-  }, [reportState.kind, reportScope, accessFailure]);
+  }, [reportState.kind, reportScope, reportPage, dirty, accessFailure]);
   const signOut = (
     <Button
       variant="text"
@@ -388,8 +391,24 @@ export function OwnerWorkspace({
       </main>
     );
 
+  const canRetryReport =
+    reportState.kind === 'error' ||
+    reportState.kind === 'unavailable' ||
+    reportState.kind === 'invalid';
   const reportAvailability = (
-    <FirstDashboardAside setup={workspaceSetup} ariaLabel="Analysis availability" />
+    <FirstDashboardAside
+      setup={workspaceSetup}
+      ariaLabel="Analysis availability"
+      reportStatus={
+        showAi && !reportPage && deniedReportScope !== reportScope && reportState.kind !== 'ready'
+          ? {
+              message: OWNER_REPORT_STATE_TEXT[reportState.kind],
+              refreshing,
+              ...(canRetryReport ? { onRetry: retry } : {}),
+            }
+          : undefined
+      }
+    />
   );
   let aside = reportAvailability;
   if (showAi) {

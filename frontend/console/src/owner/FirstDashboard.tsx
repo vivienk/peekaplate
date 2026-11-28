@@ -121,10 +121,18 @@ export function FirstDashboardAside({
   setup,
   today = new Date(),
   ariaLabel = 'PeekaPlate AI',
+  reportStatus,
 }: {
   setup: OwnerSetup;
   today?: Date;
   ariaLabel?: string;
+  reportStatus?:
+    | {
+        message: string;
+        refreshing: boolean;
+        onRetry?: () => void;
+      }
+    | undefined;
 }) {
   const onboarding = !setup.published;
   return (
@@ -144,31 +152,52 @@ export function FirstDashboardAside({
           <span className="owner-chip owner-chip--surface">{setup.restaurantName}</span>
           {setup.reportPeriod ? (
             <span className="owner-chip owner-chip--surface">{setup.reportPeriod}</span>
-          ) : (
+          ) : !reportStatus ? (
             <time className="owner-chip owner-chip--surface" dateTime={localDate(today)}>
               {DATE_FORMAT.format(today)}
             </time>
-          )}
+          ) : null}
         </div>
       </div>
-      {/* Onboarding: fixed text only. This panel makes no API calls until publication. */}
-      <div className="owner-ai__body" data-ai-state={onboarding ? 'onboarding' : 'empty'}>
-        <p className="owner-muted">
-          Ask about dish activity or your reports. Answers use only the records shown on these
-          pages.
-        </p>
-        <h3>
-          {setup.published === null
-            ? 'Analysis is not active'
-            : onboarding
-              ? 'AI turns on after you publish'
-              : 'No questions yet'}
-        </h3>
-        <p className="owner-muted" id="owner-ai-empty">
-          {setup.published === null
-            ? 'Verified reporting and analysis status are not available here yet. No sample answers are shown.'
-            : 'There are no reports or dish activity to ask about yet. Once your menu is published and diners start using PeekaPlate, you can ask questions here.'}
-        </p>
+      <div
+        className="owner-ai__body"
+        data-ai-state={reportStatus ? 'report' : onboarding ? 'onboarding' : 'empty'}
+      >
+        {reportStatus ? (
+          <>
+            <p className="owner-muted" id="owner-ai-empty" role="status">
+              {reportStatus.refreshing ? 'Refreshing report…' : reportStatus.message}
+            </p>
+            {reportStatus.onRetry && (
+              <Button
+                variant="outline"
+                onClick={reportStatus.onRetry}
+                disabled={reportStatus.refreshing}
+              >
+                Retry report
+              </Button>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="owner-muted">
+              Ask about dish activity or your reports. Answers use only the records shown on these
+              pages.
+            </p>
+            <h3>
+              {setup.published === null
+                ? 'Analysis is not active'
+                : onboarding
+                  ? 'AI turns on after you publish'
+                  : 'No questions yet'}
+            </h3>
+            <p className="owner-muted" id="owner-ai-empty">
+              {setup.published === null
+                ? 'Verified reporting and analysis status are not available here yet. No sample answers are shown.'
+                : 'There are no reports or dish activity to ask about yet. Once your menu is published and diners start using PeekaPlate, you can ask questions here.'}
+            </p>
+          </>
+        )}
       </div>
       <form className="owner-ai__composer" onSubmit={(event) => event.preventDefault()}>
         <label className="owner-visually-hidden" htmlFor="owner-ai-input">
