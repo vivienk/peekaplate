@@ -16,6 +16,7 @@ describe('Screen 8 (Review) and Screen 9 (Saved) menu verification UI', () => {
     aiIng: [],
     alg: ['Gluten'],
     aiAlg: [],
+    diet: [],
     upload: 'data:image/png;base64,sample',
     rights: true,
     aiUsed: false,
@@ -107,6 +108,22 @@ describe('Screen 9 (Add dish) form', () => {
     expect(html).toContain('>AI<');
   });
 
+  it('shows an optional Dietary dropdown below Allergens', () => {
+    const html = render(newDraft());
+    expect(html).toMatch(/id="f-diet"[^>]*role="combobox"/);
+    expect(html).toContain('>Dietary Info<');
+    expect(html).toContain('Select dietary info');
+    expect(html).toMatch(/class="pp-field__hint"[^>]*>Select up to 2 options</);
+    expect(html).not.toMatch(/id="f-diet"[^>]*aria-required/);
+    expect(html.indexOf('id="f-alg"')).toBeLessThan(html.indexOf('id="f-diet"'));
+  });
+
+  it('shows the chosen dietary labels in the field', () => {
+    const html = render({ ...newDraft(), diet: ['Vegan', 'Gluten-free'] });
+    expect(html).toContain('Vegan, Gluten-free');
+    expect(html).not.toContain('Select dietary info');
+  });
+
   it('keeps Continue inactive while the photo is missing', () => {
     const html = render({
       ...newDraft(),
@@ -134,6 +151,31 @@ describe('Screen 9 (Add dish) form', () => {
       rights: true,
     });
     expect(html).toMatch(/aria-disabled="true"[^>]*>Continue to review/);
+  });
+});
+
+describe('Review summary dietary line', () => {
+  it('lists dietary labels next to allergens and flags a dietary change', () => {
+    const orig = {
+      ...newDraft(),
+      id: 'd1',
+      name: 'Lentil Bowl',
+      ing: ['Lentils'],
+      diet: ['Vegan'],
+    };
+    const draft = { ...orig, diet: ['Vegan', 'Gluten-free'] };
+    const html = renderToStaticMarkup(
+      <Review
+        ed={{ step: 'review', draft, origId: 'd1' }}
+        orig={orig}
+        back={vi.fn()}
+        confirm={vi.fn()}
+        cancel={vi.fn()}
+      />,
+    );
+    expect(html).toContain('<b>Dietary:</b> Vegan');
+    expect(html).toContain('Dietary');
+    expect(html).not.toContain('<b>Dietary:</b> Vegan, Gluten-free');
   });
 });
 

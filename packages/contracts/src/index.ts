@@ -16,7 +16,11 @@ export {
 } from './portion';
 
 import { z } from 'zod';
-import { ApprovedDishFactsSchema, PublicMenuAllergenCodeSchema } from './owner-menu';
+import {
+  ApprovedDishFactsSchema,
+  PublicMenuAllergenCodeSchema,
+  PublicMenuDietaryCodeSchema,
+} from './owner-menu';
 
 export {
   type ComparisonReport,
@@ -215,8 +219,6 @@ export const PublicMenuIncompleteDishSchema = z.strictObject({
   ...publicMenuDishIdentity,
   complete: z.literal(false),
 });
-
-export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'gluten-free']);
 
 export const PublicMenuCompleteDishSchema = z.strictObject({
   portion: PublicPortionSchema.optional(),

@@ -21,8 +21,8 @@ const baseUrl = z
 
 /**
  * Operator-authored, restaurant-confirmed request. It is the approval record for menu
- * composition, category names, allergen/dietary codes and image alt text: no reviewed store
- * holds those facts yet, so the producer never infers them.
+ * composition, category names, allergen/dietary codes and image alt text. Approved dish facts
+ * take precedence when present. The producer never infers them.
  */
 export const MenuBundleRequestDishSchema = z.strictObject({
   dish_id: uuid,

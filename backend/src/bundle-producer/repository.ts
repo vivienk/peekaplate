@@ -135,6 +135,7 @@ export async function loadApprovedDishSources(
             priceCurrency: facts.priceCurrency,
             ingredients: facts.ingredients,
             approvedAllergens: facts.allergens,
+            ...(facts.dietary !== undefined ? { approvedDietary: facts.dietary } : {}),
             approvedCategory: facts.category,
             approvedPhotoId: facts.photoId,
             ...(facts.portionCalibration !== undefined

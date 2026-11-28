@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. The production San Francisco day report permits positive single-session metrics under ADR 0019. Legacy scopes retain their original privacy rules. Missing denominators remain unavailable and internal cohort counts stay private. Food and portion evidence remain revision-bound. Serving size parses integer people counts; separate optional photo-bound calibration provides physical dimensions.",
+      "summary": "Strict shared tenant, command, publication, observation and owner-report contracts. The production San Francisco day report permits positive single-session metrics under ADR 0019. Legacy scopes retain their original privacy rules. Missing denominators remain unavailable and internal cohort counts stay private. Food and portion evidence remain revision-bound. Serving size parses integer people counts; separate optional photo-bound calibration provides physical dimensions. Owner dietary facts allow up to two distinct public codes and preserve explicit clears.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -86,7 +86,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0020-production-today-dish-performance.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "628092849f0f187ee8b4e88d6b1a401b5265e6798ab55b6b104be5a7f52f74d1"
+      "sourceFingerprint": "bef195dcd7f677fb4dc91ac5c421a1b3d0a7117a8f1a5d59f30c23fd75531201"
     },
     {
       "id": "tokens",
@@ -289,7 +289,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart show validated summaries and gaps. Visible San Francisco day reports retry transient refresh failures for the same source. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field and optional Plate size (cm). Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
+      "summary": "The console reuses merged auth, owner shell, S05-S13 and dashboard components. Existing KPI cards and LineChart show validated summaries and gaps. Visible San Francisco day reports retry transient refresh failures for the same source. Failed or superseded requests cannot display stale report data. S09 keeps one Serving size (people) field, optional Plate size (cm), and up to two owner-selected dietary labels that persist when dishes are reopened. Canonical counts, including null, precede legacy text. Confirmed boundaries bind to the authenticated saved photo, survive review, and clear on count, measurement or photo edits. Production signup confirmations return to sign-in and the authored Screen 5 creates the first restaurant after sign-in. Screen 13 verifies the share-link host for the configured API. Staging and local retain their test-restaurant entry and explicit confirmation step.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -479,12 +479,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "79af16de25a2e9c221da0358b0e00226e304015f1546e68ef28e67512f194bb1"
+      "sourceFingerprint": "b0ab2ef946334dae88a14f61cc535cda451e427a7bc798217dbd7a26e128219c"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Production San Francisco day dish aggregates use the first eligible event for the completed day. Production batch reports enforce a fail-closed batch freshness evaluator, keeping is_stale unknown until queue-drain watermark infra is deployed. Owner AI uses checked report references and gates provider use on verified freshness. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. The separate production portion-only deployment requires matching source origin; menu OCR transport is separate.",
+      "summary": "Worker serves authenticated owner and restaurant-scoped menu, publication, observations and report routes. Owner dietary selections and clears pass through the existing review and approval commands to the public bundle from approved dish revisions. Production San Francisco day dish aggregates use the first eligible event for the completed day. Production batch reports enforce a fail-closed batch freshness evaluator, keeping is_stale unknown until queue-drain watermark infra is deployed. Owner AI uses checked report references and gates provider use on verified freshness. Production owner-workflow and extraction entry are opt-in with distinct origin, storage, Queue and capability audience. The separate production portion-only deployment requires matching source origin; menu OCR transport is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -762,7 +762,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "cc39116c3c0621076b9e2f7da7c51c2f4d8ddf975d179aa397b06ef82b80693f"
+      "sourceFingerprint": "a2826ac809b5f81168071ab55297ad6bad0f0c447627e4a6e3842b8be2d0278c"
     },
     {
       "id": "database",
@@ -1274,7 +1274,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "console"
       ],
-      "summary": "S7-RES-09 keeps automatic checks separate from owner decisions. Manual verification and approval share required-field and proposed-fact checks. Owner-prepared menu commands verify the stored bundle and match its dish revisions to current active verified drafts.",
+      "summary": "S7-RES-09 keeps automatic checks separate from owner decisions. Manual verification and approval share required-field and proposed-fact checks. Owner-prepared menu commands verify the stored bundle and match its dish revisions to current active verified drafts. Screen 9 dietary selections and clears follow the same verified draft and approved revision path.",
       "files": [
         "backend/src/owner-menu.ts",
         "backend/src/owner-prepare.ts",
@@ -1282,7 +1282,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/s7-res-09-owner-review-gate.integration.ts",
         "frontend/console/src/onboarding/MenuProcessing.tsx",
         "frontend/console/src/owner/review/reviewDishes.ts",
-        "docs/s7-res-09-owner-review-gate.md"
+        "docs/s7-res-09-owner-review-gate.md",
+        "backend/src/owner-prepare.integration.ts"
       ],
       "next": "Review exact-snapshot and concurrent draft behavior before authorized staging verification."
     },

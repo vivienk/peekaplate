@@ -113,6 +113,20 @@ describe('reviewCorrection', () => {
     expect(reloaded.allergens).toEqual(form.allergens);
     expect(reloaded.photoId).toBe(form.photoId);
   });
+  it('saves owner-chosen dietary codes and explicitly clears them after reload', () => {
+    const original = firstItem();
+    const form = dishFromReviewItem(EXTRACTION_ID, original);
+    expect(form.dietary).toEqual([]);
+    form.dietary = ['vegan', 'gluten-free'];
+    expect(reviewCorrection(original, form)).toEqual({ dietary: ['vegan', 'gluten-free'] });
+    const saved = { ...original, effective: { ...original.effective, dietary: form.dietary } };
+    const reloaded = dishFromReviewItem(EXTRACTION_ID, saved);
+    expect(reloaded.dietary).toEqual(['vegan', 'gluten-free']);
+    expect(reviewCorrection(saved, reloaded)).toBeNull();
+    reloaded.dietary = [];
+    expect(reviewCorrection(saved, reloaded)).toEqual({ dietary: [] });
+  });
+
   it('sends only the fields the owner changed', () => {
     const item = firstItem();
     const form = dishFromReviewItem(EXTRACTION_ID, item);
@@ -157,6 +171,7 @@ describe('manual dishes', () => {
         priceCurrency: 'USD',
         ingredients: { status: 'unknown', items: [] },
         allergens: { status: 'unknown', items: [] },
+        dietary: [],
         photoId: null,
         servingCount: null,
       },

@@ -30,6 +30,21 @@ describe('owner working drafts', () => {
       }).fields,
     ).toMatchObject({ servingSize: null, servingCount: null });
   });
+  it('limits owner dietary choices to two distinct public codes and keeps explicit clears', () => {
+    expect(OwnerDishFieldsSchema.parse({})).not.toHaveProperty('dietary');
+    expect(OwnerDishFieldsSchema.parse({ dietary: [] }).dietary).toEqual([]);
+    expect(OwnerDishFieldsSchema.parse({ dietary: ['vegan', 'gluten-free'] }).dietary).toEqual([
+      'vegan',
+      'gluten-free',
+    ]);
+    for (const dietary of [
+      ['vegan', 'vegan'],
+      ['vegan', 'vegetarian', 'gluten-free'],
+      ['unverified'],
+    ])
+      expect(OwnerDishFieldsSchema.safeParse({ dietary }).success).toBe(false);
+  });
+
   it('permits incomplete saved work but never invents confirmed ingredients or allergens', () => {
     const fields = OwnerDishFieldsSchema.parse({});
     expect(fields.name).toBeNull();

@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 import { TextField } from '../foundations/TextField';
-import { CategoryField, mergeCategories } from './category-field';
+import { CategoryField, DietaryField, mergeCategories } from './category-field';
 import { Btn, Icon } from './controls';
 import type { MenuItem } from './data';
 import type { EditState } from './menu';
@@ -595,6 +595,7 @@ export function DishFormView({
               set({ alg: dr.alg.filter((x) => x !== t), aiAlg: dr.aiAlg.filter((x) => x !== t) }),
             )}
           </div>
+          <DietaryField id="f-diet" value={dr.diet} onChange={(diet) => set({ diet })} />
           <div className="pp-field">
             <label
               className={`s09-check${requireReviewBox || dr.aiUsed ? ' s09-req' : ''}`}

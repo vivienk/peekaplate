@@ -74,6 +74,13 @@ describe('S3-RES-01.2 review-command unit tests', () => {
         resolveEffectiveFields(soup, { portion_calibration: null }).portion_calibration,
       ).toBeNull();
     });
+    it('exposes only saved dietary corrections, including an explicit clear', () => {
+      const soup = fixtureV2.candidates[0] as ReviewCandidate;
+      expect(resolveEffectiveFields(soup, {})).not.toHaveProperty('dietary');
+      expect(resolveEffectiveFields(soup, { dietary: ['vegan'] }).dietary).toEqual(['vegan']);
+      expect(resolveEffectiveFields(soup, { dietary: [] }).dietary).toEqual([]);
+    });
+
     it('overlays corrected fields while preserving untouched original fields', () => {
       const soup = fixtureV2.candidates[0] as ReviewCandidate;
       const originalCopy = structuredClone(soup.original);

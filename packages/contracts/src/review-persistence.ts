@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OwnerDishFieldsSchema } from './owner-menu';
+import { OwnerDishDietarySchema, OwnerDishFieldsSchema } from './owner-menu';
 import { PlateCalibrationSchema, ServingCountSchema } from './portion';
 import {
   type ReviewCandidate,
@@ -51,6 +51,7 @@ export const ReviewEditableFieldSchema = z.enum([
   'ingredients',
   'serving_size',
   'allergens',
+  'dietary',
   'photo_id',
   'serving_count',
   'portion_calibration',
@@ -79,6 +80,7 @@ export const CandidateCorrectedFieldsSchema = z
     ingredients: z.array(postgresText.trim().min(1).max(200)).max(100).nullable().optional(),
     serving_size: postgresText.trim().min(1).max(160).nullable().optional(),
     allergens: OwnerDishFieldsSchema.shape.allergens.removeDefault().optional(),
+    dietary: OwnerDishDietarySchema.optional(),
     photo_id: z.uuid().nullable().optional(),
   })
   .superRefine((fields, ctx) => {
@@ -168,6 +170,7 @@ export const ResolvedCandidateFieldsSchema = z.strictObject({
   ingredients: z.array(postgresText).nullable(),
   serving_size: postgresText.trim().min(1).max(160).nullable().optional(),
   allergens: OwnerDishFieldsSchema.shape.allergens.removeDefault().optional(),
+  dietary: OwnerDishDietarySchema.optional(),
   photo_id: z.uuid().nullable().optional(),
 });
 export type ResolvedCandidateFields = z.infer<typeof ResolvedCandidateFieldsSchema>;
@@ -195,6 +198,7 @@ export const CandidateReviewRecordSchema = z.strictObject({
     ingredients: z.array(postgresText).nullable().optional(),
     serving_size: postgresText.trim().min(1).max(160).nullable().optional(),
     allergens: OwnerDishFieldsSchema.shape.allergens.removeDefault().optional(),
+    dietary: OwnerDishDietarySchema.optional(),
     photo_id: z.uuid().nullable().optional(),
   }),
   editedFields: z.array(ReviewEditableFieldSchema),

@@ -432,6 +432,16 @@
   color: var(--pp-color-orange-800);
   font-weight: var(--pp-font-weight-medium);
 }
+/* Dietary (multi-select): a chosen option keeps the check icon at the row end; once two are
+ * chosen the rest are unavailable. */
+.s09-diet__check {
+  margin-inline-start: auto;
+}
+.s09-cat__option[aria-disabled="true"] {
+  background: none;
+  color: var(--pp-role-input-placeholder);
+  cursor: not-allowed;
+}
 .s09-cat__divider {
   block-size: 1px;
   background: var(--pp-role-outline-variant);

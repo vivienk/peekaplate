@@ -133,6 +133,7 @@ export async function saveOwnerDishDraft(
         : retainedServingCount;
     const fields = OwnerDishFieldsSchema.parse({
       ...input.fields,
+      dietary: input.fields.dietary ?? previous.dietary,
       servingSize,
       ...(portionCalibration === undefined ? {} : { portionCalibration }),
       servingCount,

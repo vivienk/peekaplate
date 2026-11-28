@@ -1,7 +1,12 @@
 // Live values and evidence on #172's authored Screen 9; demo providers stay in menu.tsx.
 
-import { PublicMenuAllergenCodeSchema, parseServingCountInput } from '@peekaplate/contracts';
+import {
+  OwnerDishDietarySchema,
+  PublicMenuAllergenCodeSchema,
+  parseServingCountInput,
+} from '@peekaplate/contracts';
 import { type ReactNode, useState } from 'react';
+import { DIETARY_LABELS } from '../owner-dashboard/category-field';
 import { DishFormView } from '../owner-dashboard/DishFormView';
 import type { MenuItem } from '../owner-dashboard/data';
 import {
@@ -99,6 +104,7 @@ export function DishEditor({
     alg: value.allergens.items,
     aiIng: value.aiIng ?? [],
     aiAlg: value.aiAlg ?? [],
+    diet: (value.dietary ?? []).map((code) => DIETARY_LABELS[code]),
     upload: photoUrl ?? (value.photoId ? 'private-photo' : null),
     rights: licenseConfirmed,
     aiUsed: value.aiUsed || value.origin === 'extracted',
@@ -122,6 +128,13 @@ export function DishEditor({
             setFieldError(
               'Use a supported allergen: milk, egg, fish, crustacean shellfish, nuts, peanut, wheat, soy or sesame. Do not infer allergens from ingredients.',
             );
+            return;
+          }
+          const dietary = OwnerDishDietarySchema.safeParse(
+            dish.diet.map((label) => label.toLowerCase()),
+          );
+          if (!dietary.success) {
+            setFieldError('Select up to two supported dietary options.');
             return;
           }
           setFieldError('');
@@ -162,6 +175,7 @@ export function DishEditor({
             aiIng,
             aiAlg,
             aiUsed: dish.aiUsed,
+            dietary: dietary.data,
             ingredients: aiIng.length
               ? { status: 'proposed', items: dish.ing }
               : JSON.stringify(dish.ing) === JSON.stringify(value.ingredients.items)

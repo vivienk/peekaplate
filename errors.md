@@ -5698,3 +5698,11 @@ rights-confirmed action. The [workspace regression](tests/e2e/owner-workspace.sp
 reopen, replacement and saving to review. Separately, an immediate retry could exhaust its 12s
 backoff before the first request saved its result. The [transport regression](backend/src/owner-portion-preview.test.ts)
 keeps both requests active and confirms the retry reads the record written to R2 at virtual 29s.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-28T05:12:48.140Z","exitCode":1}
+```
+
+The local test database could not start because Docker's Linux engine was unavailable.
+The mixed manual and extracted dietary publication regression runs in the CI database lane.
