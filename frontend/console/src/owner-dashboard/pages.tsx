@@ -1717,17 +1717,29 @@ export function LivePerf({
                   ))}
                 </tr>
               ))}
+              {/* No reportable dishes yet: list the saved menu in the same columns, with a dash for
+                  each measurement, so owners see their dishes in place rather than a separate list. */}
+              {!report.dishes.length &&
+                menuMatches.map(({ id, name }) => (
+                  <tr key={id} className="tbl-pending">
+                    <td>
+                      <b>{name}</b>
+                    </td>
+                    {columns.map(([key]) => (
+                      <td key={key} className="r num">
+                        <span aria-hidden="true">—</span>
+                        <span className="sr">No data yet</span>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
             </tbody>
           </table>
           {!report.dishes.length && menuMatches.length > 0 && (
-            <div className="empty">
-              <p>Saved menu</p>
-              <ul>
-                {menuMatches.map(({ id, name }) => (
-                  <li key={id}>{name}</li>
-                ))}
-              </ul>
-            </div>
+            <p className="tbl-note">
+              These are your saved dishes. A dash (—) means no data yet; numbers appear once enough
+              diners visit each dish.
+            </p>
           )}
           {dishes.length === 0 && (report.dishes.length > 0 || menuMatches.length === 0) && (
             <div className="empty">

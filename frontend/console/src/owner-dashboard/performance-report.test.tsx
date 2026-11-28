@@ -166,8 +166,11 @@ describe('authored performance presentation with report API data', () => {
         savedMenu={[{ id: 'draft-id', name: 'QA Lentil Soup' }]}
       />,
     );
-    expect(markup).toContain('Saved menu');
-    expect(markup).toContain('QA Lentil Soup');
+    expect(markup).toContain('These are your saved dishes.');
+    expect(markup).toMatch(/<tr class="tbl-pending"><td><b>QA Lentil Soup<\/b><\/td>/);
+    // One dash per measurement column, each announced as "No data yet".
+    expect(markup.match(/<span class="sr">No data yet<\/span>/g)).toHaveLength(6);
+    expect(markup).not.toContain('<ul>');
     expect(markup).toContain('Dish metrics appear when enough eligible visits');
     expect(markup).not.toContain('0 of 0 dishes');
     expect(markup).not.toContain('View as table');
