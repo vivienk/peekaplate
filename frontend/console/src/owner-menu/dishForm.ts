@@ -81,7 +81,6 @@ export function emptyManualDish(): DishForm {
     servingCount: '',
     ingredients: { status: 'unknown', items: [] },
     allergens: { status: 'unknown', items: [] },
-    dietary: [],
     photoId: null,
     source: null,
   };
@@ -124,7 +123,7 @@ export function dishFromReviewItem(
         : { status: 'unknown', items: [] },
     // Only an explicit owner correction can add these; extraction never supplies them.
     allergens: effective.allergens ?? { status: 'unknown', items: [] },
-    dietary: [...(effective.dietary ?? [])],
+    ...(effective.dietary !== undefined && { dietary: [...effective.dietary] }),
     photoId: effective.photo_id ?? null,
     source: {
       extractionId,
@@ -166,7 +165,7 @@ export function dishFromManualDraft(draft: DishDraft): DishForm {
       : {}),
     ingredients: { status: fields.ingredients.status, items: [...fields.ingredients.items] },
     allergens: { status: fields.allergens.status, items: [...fields.allergens.items] },
-    dietary: [...(fields.dietary ?? [])],
+    ...(fields.dietary !== undefined && { dietary: [...fields.dietary] }),
     photoId: fields.photoId,
     source: null,
   };

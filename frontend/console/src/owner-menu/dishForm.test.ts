@@ -116,7 +116,7 @@ describe('reviewCorrection', () => {
   it('saves owner-chosen dietary codes and explicitly clears them after reload', () => {
     const original = firstItem();
     const form = dishFromReviewItem(EXTRACTION_ID, original);
-    expect(form.dietary).toEqual([]);
+    expect(form).not.toHaveProperty('dietary');
     form.dietary = ['vegan', 'gluten-free'];
     expect(reviewCorrection(original, form)).toEqual({ dietary: ['vegan', 'gluten-free'] });
     const saved = { ...original, effective: { ...original.effective, dietary: form.dietary } };
@@ -171,7 +171,6 @@ describe('manual dishes', () => {
         priceCurrency: 'USD',
         ingredients: { status: 'unknown', items: [] },
         allergens: { status: 'unknown', items: [] },
-        dietary: [],
         photoId: null,
         servingCount: null,
       },
@@ -216,6 +215,10 @@ describe('manual dishes', () => {
       ingredients: { status: 'confirmed', items: ['Carrot'] },
       allergens: { status: 'confirmed', items: ['milk'] },
     });
+    const commandId = crypto.randomUUID();
+    const edited = { ...form, name: 'Updated soup' };
+    expect(manualSaveCommand(edited, 2, commandId).fields).not.toHaveProperty('dietary');
+    expect(manualSaveCommand({ ...edited, dietary: [] }, 2, commandId).fields.dietary).toEqual([]);
   });
 });
 

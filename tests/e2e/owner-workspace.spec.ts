@@ -1798,6 +1798,28 @@ test('live Screen 9 opened from S06 goes Back to S06 and focus follows each scre
   await expect(s06).toBeFocused();
 });
 
+test('editing a legacy manual dish preserves an absent dietary field', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context, true);
+  expect(state.drafts[venue.venueId]![0]!.manual_fields).not.toHaveProperty('dietary');
+  await signIn(page);
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: /^Dietary Info/ })).toHaveText(
+    'Select dietary info',
+  );
+  await page.getByRole('textbox', { name: /^Price/ }).fill('12.50');
+  await acknowledgeDish(page);
+  await page.getByRole('button', { name: 'Continue to review', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  const saved = state.drafts[venue.venueId]![0]!.manual_fields;
+  expect(saved).toMatchObject({ priceAmount: '12.50' });
+  expect(saved).not.toHaveProperty('dietary');
+});
+
 test('manual dish and original private photo survive save and reload', async ({
   context,
   page,

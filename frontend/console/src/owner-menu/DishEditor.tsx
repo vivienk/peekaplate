@@ -175,7 +175,9 @@ export function DishEditor({
             aiIng,
             aiAlg,
             aiUsed: dish.aiUsed,
-            dietary: dietary.data,
+            ...((dietary.data.length > 0 || value.dietary !== undefined) && {
+              dietary: dietary.data,
+            }),
             ingredients: aiIng.length
               ? { status: 'proposed', items: dish.ing }
               : JSON.stringify(dish.ing) === JSON.stringify(value.ingredients.items)
