@@ -1255,7 +1255,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       },
     );
     expect(preview.status).toBe(200);
-    expect(await preview.json()).toEqual({ portionReview: previewRecord });
+    expect(await preview.json()).toEqual({ portionReview: { ...previewRecord, approved: false } });
     const changed = (
       await admin.query(
         'SELECT id,draft_version,verification_status FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2',
