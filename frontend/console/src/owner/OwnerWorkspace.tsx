@@ -402,7 +402,9 @@ export function OwnerWorkspace({
       reportStatus={
         showAi && deniedReportScope !== reportScope && reportState.kind !== 'ready'
           ? {
-              message: OWNER_REPORT_STATE_TEXT[reportState.kind],
+              message: reportPage
+                ? 'Questions are unavailable until the report loads.'
+                : OWNER_REPORT_STATE_TEXT[reportState.kind],
               refreshing,
               ...(canRetryReport && !reportPage ? { onRetry: retry } : {}),
             }
