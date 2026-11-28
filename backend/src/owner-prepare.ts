@@ -348,32 +348,22 @@ export async function prepareOwnerMenu(
       return found.rows[0]?.version ?? 0;
     });
     const reviewVersion = draft.has_session ? (draft.review_version ?? 0) : undefined;
-    try {
-      await approve(client, actorId, venueId, draft.id, {
-        commandId: await derivedUuid(
-          'owner-prepare-approval:v1',
-          venueId,
-          draft.id,
-          String(draft.draft_version),
-          String(reviewVersion ?? ''),
-          String(current),
-        ),
-        expectedVersion: current,
-        expectedDraftVersion: draft.draft_version,
-        ...(reviewVersion === undefined ? {} : { expectedReviewVersion: reviewVersion }),
-        ...(draft.has_session && draft.extraction_id ? { extractionId: draft.extraction_id } : {}),
-        confirmed: true,
-        preparedDishId: dishId,
-      });
-    } catch (error) {
-      // A verified dish that cannot become a public fact stays out and is reported; any other
-      // failure stops here and the next run continues from the dishes already approved.
-      if (error instanceof IngestionError && error.code === 'draft_incomplete') {
-        diagnostics.push({ dishId, code: 'review_incomplete' });
-        continue;
-      }
-      throw error;
-    }
+    await approve(client, actorId, venueId, draft.id, {
+      commandId: await derivedUuid(
+        'owner-prepare-approval:v1',
+        venueId,
+        draft.id,
+        String(draft.draft_version),
+        String(reviewVersion ?? ''),
+        String(current),
+      ),
+      expectedVersion: current,
+      expectedDraftVersion: draft.draft_version,
+      ...(reviewVersion === undefined ? {} : { expectedReviewVersion: reviewVersion }),
+      ...(draft.has_session && draft.extraction_id ? { extractionId: draft.extraction_id } : {}),
+      confirmed: true,
+      preparedDishId: dishId,
+    });
   }
 
   // 2. Every approved, verified dish of the venue, in menu order, from its canonical revision.

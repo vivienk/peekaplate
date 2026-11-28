@@ -333,9 +333,7 @@ export function FirstDashboardContent({
             <div className="owner-verify__row">
               {setup.published === null ? (
                 <StatusLabel text="Status unavailable" tone="neutral" />
-              ) : setup.published ? (
-                <StatusLabel text="Published" tone="success" />
-              ) : (
+              ) : setup.published ? null : (
                 <StatusLabel text="Not published" tone="warning" />
               )}
               <p>
