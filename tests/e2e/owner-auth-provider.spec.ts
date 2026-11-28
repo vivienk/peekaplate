@@ -301,7 +301,11 @@ test('production deep links resume after sign-in and keep orientation through br
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     const availability = page.getByRole('complementary', { name: 'Analysis availability' });
     await expect(
-      availability.getByText('Reports aren’t available for this restaurant yet.'),
+      availability.getByText(
+        path === '/dish-performance'
+          ? 'Questions are unavailable until the report loads.'
+          : 'Reports aren’t available for this restaurant yet.',
+      ),
     ).toBeVisible();
     await expect(availability.getByRole('textbox')).toBeDisabled();
     await page.getByRole('button', { name: retryLabel, exact: true }).click();
