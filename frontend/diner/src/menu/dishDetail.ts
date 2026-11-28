@@ -212,10 +212,10 @@ export function renderDishDetail(
     };
     let triedCard = false;
     const handleFailure = () => {
+      finishLoading();
       const cardFallback = dish.images?.card;
       if (!triedCard && cardFallback && detailImg.getAttribute('src') !== cardFallback.url) {
         triedCard = true;
-        startLoading();
         detailImg.src = cardFallback.url;
         detailImg.alt = cardFallback.alt;
         return;
@@ -224,7 +224,6 @@ export function renderDishDetail(
       missing.className = 'pp-detail__image pp-detail__image--missing';
       missing.setAttribute('aria-hidden', 'true');
       detailImg.replaceWith(missing);
-      finishLoading();
     };
     detailImg.addEventListener('load', finishLoading, { once: true });
     detailImg.addEventListener('error', handleFailure);
