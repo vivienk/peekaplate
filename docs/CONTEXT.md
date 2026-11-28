@@ -476,7 +476,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5497d08b029882b954249ca5767e5b800da1e46aa194d8371e1b83a5119e41cf"
+      "sourceFingerprint": "454fca87aa5748358c82ac416db2d8a58058fc079e5995bc17b023be958397dc"
     },
     {
       "id": "backend",
@@ -759,7 +759,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "6ca0f8002f56436c16953c43142bcc2d4b7517517596401b0726621e4b7270bc"
+      "sourceFingerprint": "f7735bae2731b4fc7a5e5d5f28c4cba68ea0972837f591ba2e6e54f82a436c12"
     },
     {
       "id": "database",
@@ -1307,7 +1307,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "processing"
       ],
-      "summary": "Rebase PR #274 onto develop and address review feedback: keep 240s per-call client timeout and NUMBA_DISABLE_JIT=1 / OMP_NUM_THREADS=1 in cutout subprocesses (~9.4s cutout), document Cloudflare's ~30s waitUntil post-disconnect cap, add 429 busy R2-recheck backoff inside processPrivateDishPhoto for uncached disconnect/retry recovery, and gate S09 Save photo and generate 2.5D on photo-rights confirmation (S7-VIS-06).",
+      "summary": "PR #274 keeps the 240s client timeout and local cutout subprocess settings. After a disconnect, an overlapping retry rechecks R2 across 30s of busy responses within the existing API deadline. Screen 9 reopens previews read-only and generates only when the owner confirms rights for the selected photo and requests generation. Saving for review retains its navigation. Focused local tests cover a late R2 write and unchecked fresh, saved and replacement photos; hosted cutout and publication acceptance remain pending.",
       "files": [
         "frontend/console/src/owner-menu/api.ts",
         "frontend/console/src/owner-menu/jobs.ts",

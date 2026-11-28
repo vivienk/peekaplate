@@ -264,20 +264,23 @@ describe('private portion service transport', () => {
       expect.any(String),
     );
   });
-  it('persists an uncached portion via waitUntil after disconnect so retry reads R2 without re-invoking the container', async () => {
+  it('recovers an uncached portion on an immediate retry while the disconnected request is still processing', async () => {
+    vi.useFakeTimers();
     const app = portionApp();
     const base = fixture({
       APP_ENV: 'staging',
       OWNER_WORKFLOW_ENABLED: 'true',
     });
     base.env.INGESTION_REPORTS_BUCKET = base.bucket;
-    let releaseContainer!: (response: Response) => void;
-    const fetcher = vi.fn(
-      () =>
-        new Promise<Response>((resolve) => {
-          releaseContainer = resolve;
-        }),
-    );
+    const fetcher = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            setTimeout(() => resolve(Response.json(readyPayload())), 29_000);
+          }),
+      )
+      .mockImplementation(async () => Response.json({ error: 'busy' }, { status: 429 }));
     vi.stubGlobal('fetch', fetcher);
     const waitUntil = vi.fn();
     const disconnect = new AbortController();
@@ -298,23 +301,26 @@ describe('private portion service transport', () => {
         });
       }),
     ]);
-    await vi.waitFor(() => {
-      expect(fetcher).toHaveBeenCalledOnce();
-      expect(waitUntil).toHaveBeenCalledOnce();
-    });
-    // First browser request disconnects before container segmentation completes.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(waitUntil).toHaveBeenCalledOnce();
     disconnect.abort();
     await expect(firstCaller).resolves.toBe('client_disconnected');
-    // Container finishes inside the waitUntil window and writes R2.
-    releaseContainer(Response.json(readyPayload()));
-    await waitUntil.mock.calls[0]?.[0];
 
-    const retryRes = await app.request(
+    const retry = app.request(
       `https://test/venues/${id(1)}/drafts/${id(2)}/photos/${id(3)}/portion`,
       { method: 'POST', headers: { Authorization: 'Bearer staff-token' } },
       base.env as Bindings,
       { waitUntil, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext,
     );
+    await vi.advanceTimersByTimeAsync(12_000);
+    expect(fetcher).toHaveBeenCalledTimes(5);
+    expect(base.bucket.put).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(17_000);
+    await waitUntil.mock.calls[0]?.[0];
+    const callsBeforeCacheHit = fetcher.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(1_000);
+    const retryRes = await retry;
     expect(retryRes.status).toBe(200);
     await expect(retryRes.json()).resolves.toMatchObject({
       portionReview: {
@@ -322,6 +328,34 @@ describe('private portion service transport', () => {
         foreground_sha256: fgHash,
         approved: false,
       },
+    });
+    expect(fetcher).toHaveBeenCalledTimes(callsBeforeCacheHit);
+  });
+  it('reads cached preview approval without re-invoking processing', async () => {
+    const app = portionApp();
+    const input = fixture({ APP_ENV: 'staging', OWNER_WORKFLOW_ENABLED: 'true' });
+    input.env.INGESTION_REPORTS_BUCKET = input.bucket;
+    const fetcher = vi.fn(async () => Response.json(readyPayload()));
+    vi.stubGlobal('fetch', fetcher);
+    const url = `https://test/venues/${id(1)}/drafts/${id(2)}/photos/${id(3)}/portion`;
+    const headers = { Authorization: 'Bearer staff-token' };
+    const absent = await app.request(url, { headers }, input.env);
+    expect(absent.status).toBe(404);
+    expect(absent.headers.get('Cache-Control')).toBe('no-store');
+
+    await processPrivateDishPhoto(input);
+    const before = await app.request(url, { headers }, input.env);
+    expect(before.status).toBe(200);
+    await expect(before.json()).resolves.toMatchObject({
+      portionReview: { status: 'needs_review', approved: false },
+    });
+
+    const approval = await app.request(`${url}/approve`, { method: 'POST', headers }, input.env);
+    expect(approval.status).toBe(200);
+    const after = await app.request(url, { headers }, input.env);
+    expect(after.status).toBe(200);
+    await expect(after.json()).resolves.toMatchObject({
+      portionReview: { status: 'needs_review', approved: true },
     });
     expect(fetcher).toHaveBeenCalledOnce();
   });

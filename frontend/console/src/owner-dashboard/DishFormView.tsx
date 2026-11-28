@@ -268,7 +268,9 @@ export function DishFormView({
                     kind="outlined"
                     size="md"
                     type="button"
-                    disabled={busy || !dr.upload || !dr.rights}
+                    disabled={
+                      busy || !dr.upload || !dr.rights || portionReview?.status === 'processing'
+                    }
                     onClick={() => {
                       if (!dr.rights) {
                         setErrs((prev) => ({

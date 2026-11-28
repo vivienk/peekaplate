@@ -240,6 +240,17 @@ const group = (body: unknown): UploadGroup => {
   return value;
 };
 
+function portionReview(body: unknown, draftId: string, photoId: string) {
+  const record = field(body, 'portionReview') as Record<string, unknown>;
+  if (
+    (record?.status !== 'needs_review' && record?.status !== 'failed') ||
+    record.dish_id !== draftId ||
+    record.draft_revision_id !== photoId
+  )
+    throw new Error('portion review identity');
+  return { status: record.status, approved: record.approved === true };
+}
+
 export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   const base = readWorkspaceApiBase(options.baseUrl);
   if (!base) throw new OwnerMenuApiError(0, 'invalid_api_origin');
@@ -544,21 +555,28 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion`,
         ),
         { method: 'POST', timeoutMs: PORTION_TIMEOUT_MS },
-        (body) => {
-          const record = field(body, 'portionReview') as Record<string, unknown>;
-          if (
-            !record ||
-            !['needs_review', 'failed'].includes(String(record.status)) ||
-            record.dish_id !== draftId ||
-            record.draft_revision_id !== photoId
-          )
-            throw new Error('portion review identity');
-          return {
-            status: record.status as 'needs_review' | 'failed',
-            approved: record.approved === true,
-          };
-        },
+        (body) => portionReview(body, draftId, photoId),
       );
+    },
+    async readDraftPortion(venueId: string, draftId: string, photoId: string) {
+      try {
+        return await request(
+          venuePath(
+            venueId,
+            `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/portion`,
+          ),
+          { method: 'GET' },
+          (body) => portionReview(body, draftId, photoId),
+        );
+      } catch (error) {
+        if (
+          error instanceof OwnerMenuApiError &&
+          error.status === 404 &&
+          error.code === 'not_found'
+        )
+          return null;
+        throw error;
+      }
     },
     async approveDraftPortion(venueId: string, draftId: string, photoId: string) {
       return request(

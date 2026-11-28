@@ -5689,3 +5689,12 @@ The [owner workspace integration tests](backend/src/owner-menu.integration.ts)
 now use ready drafts for those verification paths and seed the existing accepted
 state directly for the legacy facts test. The complete database check covers
 both these fixtures and the new rejection cases.
+
+## 2026-11-27 Screen 9 photo rights and overlapping portion retries
+
+Opening an existing draft started a generation POST while the rights checkbox was unchecked.
+Screen 9 now reads the cached preview on reopen and sends generation only after an explicit
+rights-confirmed action. The [workspace regression](tests/e2e/owner-workspace.spec.ts) covers
+reopen, replacement and saving to review. Separately, an immediate retry could exhaust its 12s
+backoff before the first request saved its result. The [transport regression](backend/src/owner-portion-preview.test.ts)
+keeps both requests active and confirms the retry reads the record written to R2 at virtual 29s.

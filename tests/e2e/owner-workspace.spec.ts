@@ -585,6 +585,8 @@ async function fixture(context: BrowserContext, reportReady = false) {
           headers,
         });
       }
+      if (request.method() === 'GET' && /^drafts\/[^/]+\/photos\/[^/]+\/portion$/.test(path))
+        return route.fulfill({ status: 404, json: { error: 'not_found' }, headers });
       return route.fulfill({ status: 404, json: { error: 'synthetic_not_found' }, headers });
     } else {
       if (state.delayReport)
@@ -3125,6 +3127,9 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
     },
   ];
   let generations = 0;
+  let reads = 0;
+  let approved = false;
+  let finishFirstGeneration: (() => void) | undefined;
   const headers = {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': '*',
@@ -3133,17 +3138,33 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
   await context.route(
     `${api}/venues/${venue.venueId}/drafts/${id}/photos/${photoId}/portion**`,
     async (route) => {
-      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
-      if (new URL(route.request().url()).pathname.endsWith('/image'))
+      const method = route.request().method();
+      const path = new URL(route.request().url()).pathname;
+      if (method === 'OPTIONS') return route.fulfill({ status: 204, headers });
+      if (path.endsWith('/image'))
         return route.fulfill({ body: image, contentType: 'image/webp', headers });
-      generations++;
+      if (path.endsWith('/approve')) {
+        approved = true;
+        return route.fulfill({ json: { approved }, headers });
+      }
+      if (method === 'GET') {
+        reads++;
+        if (generations === 0)
+          return route.fulfill({ status: 404, json: { error: 'not_found' }, headers });
+      } else {
+        generations++;
+        if (generations === 1)
+          await new Promise<void>((resolve) => {
+            finishFirstGeneration = resolve;
+          });
+      }
       return route.fulfill({
         json: {
           portionReview: {
             status: generations === 1 ? 'failed' : 'needs_review',
             dish_id: id,
             draft_revision_id: photoId,
-            approved: false,
+            approved,
           },
         },
         headers,
@@ -3151,7 +3172,27 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
     },
   );
   await signIn(page);
-  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  const edit = page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true });
+  await edit.click();
+  const rights = page.getByRole('checkbox', { name: 'I have the right to use this photo.' });
+  const generateBtn = page.getByRole('button', {
+    name: 'Save photo and generate 2.5D',
+    exact: true,
+  });
+  await expect.poll(() => reads + generations).toBe(1);
+  await expect(rights).not.toBeChecked();
+  await expect(generateBtn).toBeDisabled();
+  expect(generations).toBe(0);
+  expect(reads).toBe(1);
+  await rights.check();
+  await expect(generateBtn).toBeEnabled();
+  expect(generations).toBe(0);
+  await generateBtn.click();
+  await expect.poll(() => Boolean(finishFirstGeneration)).toBe(true);
+  await expect(page.getByLabel('Dish photo', { exact: true })).toBeEnabled();
+  await expect(generateBtn).toBeDisabled();
+  expect(generations).toBe(1);
+  finishFirstGeneration!();
   await expect(
     page.getByText(
       '2.5D processing failed. Please try another photo. The original photo is retained.',
@@ -3159,13 +3200,6 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
   ).toBeVisible();
   await expect(page.getByRole('progressbar', { name: '2.5D preview processing' })).toBeVisible();
   expect(generations).toBe(1);
-  const generateBtn = page.getByRole('button', {
-    name: 'Save photo and generate 2.5D',
-    exact: true,
-  });
-  await expect(generateBtn).toBeDisabled();
-  await page.getByRole('checkbox', { name: 'I have the right to use this photo.' }).check();
-  await expect(generateBtn).toBeEnabled();
   await generateBtn.click();
   await expect(
     page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Lentil Soup' }),
@@ -3178,6 +3212,15 @@ test('retries failed 2.5D generation for an unchanged saved photo without duplic
   const imageBounds = await portionImage.boundingBox();
   expect(imageBounds?.height).toBeGreaterThan(0);
   expect(imageBounds?.height).toBeLessThanOrEqual(120);
+  expect(generations).toBe(2);
+  await page.getByRole('button', { name: 'Approve 2.5D preview', exact: true }).click();
+  await expect(portionCard.getByText('Approved for publication review')).toBeVisible();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await edit.click();
+  await expect(rights).not.toBeChecked();
+  await expect(portionImage).toBeVisible();
+  await expect(portionCard.getByText('Approved for publication review')).toBeVisible();
+  expect(reads).toBe(2);
   expect(generations).toBe(2);
   await page.getByRole('textbox', { name: /^Dish name/ }).fill('Fictional Lentil Soup updated');
   await expect(
@@ -3204,11 +3247,14 @@ test('gates Screen 9 photo upload and 2.5D generation on photo-rights confirmati
   await context.route(
     `${api}/venues/${venue.venueId}/drafts/*/photos/*/portion**`,
     async (route) => {
-      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+      const method = route.request().method();
+      if (method === 'OPTIONS') return route.fulfill({ status: 204, headers });
       const parts = new URL(route.request().url()).pathname.split('/');
       if (parts.at(-1) === 'image') {
         return route.fulfill({ body: image, contentType: 'image/webp', headers });
       }
+      if (method === 'GET')
+        return route.fulfill({ status: 404, json: { error: 'not_found' }, headers });
       const draftIdx = parts.indexOf('drafts');
       const draftId = draftIdx >= 0 ? parts[draftIdx + 1] : '';
       const photoId = draftIdx >= 0 ? parts[draftIdx + 3] : '';
@@ -3247,19 +3293,43 @@ test('gates Screen 9 photo upload and 2.5D generation on photo-rights confirmati
     exact: true,
   });
   await expect(generateBtn).toBeDisabled();
-  await generateBtn.click({ force: true });
+  await page
+    .getByRole('checkbox', { name: /I reviewed the AI-drafted text and ingredients/ })
+    .check();
+  const continueButton = page.getByRole('button', { name: 'Continue to review', exact: true });
+  await expect(continueButton).toBeDisabled();
   expect(state.photos.size).toBe(0);
   expect(state.apiCalls.some((call) => /\/drafts\/[^/]+\/photos$/.test(call.path))).toBe(false);
   expect(generations).toBe(0);
 
   await rights.check();
   await expect(generateBtn).toBeEnabled();
+  expect(state.photos.size).toBe(0);
+  expect(generations).toBe(0);
   await generateBtn.click();
   await expect(
     page.getByRole('img', { name: 'Review-only 2.5D preview of Fictional Herb Omelette' }),
   ).toBeVisible();
   expect(state.photos.size).toBe(1);
   expect(state.apiCalls.some((call) => /\/drafts\/[^/]+\/photos$/.test(call.path))).toBe(true);
+  expect(generations).toBe(1);
+
+  await page
+    .getByLabel('Dish photo', { exact: true })
+    .setInputFiles({ name: 'omelette-replacement.png', mimeType: 'image/png', buffer: image });
+  await expect(rights).not.toBeChecked();
+  await expect(generateBtn).toBeDisabled();
+  await expect(continueButton).toBeDisabled();
+  expect(state.photos.size).toBe(1);
+  expect(generations).toBe(1);
+
+  await rights.check();
+  await continueButton.click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  await expect(continueButton).toHaveCount(0);
+  expect(state.photos.size).toBe(2);
   expect(generations).toBe(1);
 });
 

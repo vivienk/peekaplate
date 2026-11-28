@@ -125,7 +125,8 @@ export async function processPrivateDishPhoto(input: {
     sourceKey,
     sourceHash,
     sourceSize,
-    busyRetryDelaysMs = [2_000, 4_000, 6_000],
+    // Recheck R2 through the full 30s the disconnected request can still finish.
+    busyRetryDelaysMs = [2_000, 4_000, 6_000, 6_000, 6_000, 6_000],
   } = input;
   const key = previewKey(venueId, draftId, photoId, sourceHash);
   const existing = await readPrivatePortion(bucket, key);

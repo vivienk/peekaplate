@@ -402,6 +402,39 @@ describe('timeouts', () => {
     });
   });
 
+  it('reads the saved portion and approval without requesting generation', async () => {
+    const record = {
+      status: 'needs_review',
+      dish_id: JOB,
+      draft_revision_id: JOB,
+      approved: true,
+    };
+    const { api, calls } = client([
+      { status: 200, body: { portionReview: record } },
+      { status: 404, body: { error: 'not_found' } },
+      { status: 404, body: { error: 'photo_not_found' } },
+      { status: 200, body: { portionReview: { ...record, dish_id: VENUE } } },
+    ]);
+
+    await expect(api.readDraftPortion(VENUE, JOB, JOB)).resolves.toEqual({
+      status: 'needs_review',
+      approved: true,
+    });
+    await expect(api.readDraftPortion(VENUE, JOB, JOB)).resolves.toBeNull();
+    await expect(api.readDraftPortion(VENUE, JOB, JOB)).rejects.toMatchObject({
+      code: 'photo_not_found',
+    });
+    await expect(api.readDraftPortion(VENUE, JOB, JOB)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+    expect(calls).toHaveLength(4);
+    for (const call of calls) {
+      expect(call.init.method).toBe('GET');
+      expect(call.url).toMatch(`/venues/${VENUE}/drafts/${JOB}/photos/${JOB}/portion`);
+      expect(header(call, 'Authorization')).toBe('Bearer staff-token');
+    }
+  });
+
   it('gives portion generation longer than the 220s server bound without raising regular upload timeouts', async () => {
     vi.useFakeTimers();
     const hanging = ((_url: string, init: RequestInit) =>
